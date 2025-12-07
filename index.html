@@ -1,0 +1,3420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>trends | prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f3f4f6;
+      --bg-soft: #f9fafb;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59,130,246,0.08);
+      --danger: #ef4444;
+    }
+
+    body {
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",
+        "Hiragino Sans","Yu Gothic",sans-serif;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1120px;
+      background: var(--bg-soft);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 80vh;
+      overflow: hidden;
+      box-shadow:
+        0 18px 40px rgba(15,23,42,0.06),
+        0 0 0 1px rgba(148,163,184,0.1);
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 8px; }
+      .app { min-height: 90vh; border-radius: 16px; }
+    }
+
+    /* topbar */
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #ffffff;
+      gap: 8px;
+    }
+
+    .brand-main {
+      font-size: 16px;
+      font-weight: 650;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .topbar-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 60%;
+    }
+
+    .user-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text);
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.1s ease,border-color 0.1s ease,
+        box-shadow 0.1s ease,transform 0.08s ease;
+      white-space: nowrap;
+    }
+
+    .btn.primary {
+      border-color: transparent;
+      background: linear-gradient(to right,#3b82f6,#60a5fa);
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 8px 18px rgba(59,130,246,0.35);
+    }
+
+    .btn:hover {
+      background: #f3f4f6;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(15,23,42,0.08);
+    }
+
+    .btn.primary:hover {
+      box-shadow: 0 10px 22px rgba(59,130,246,0.45);
+    }
+
+    .btn.small {
+      padding: 4px 9px;
+      font-size: 10px;
+    }
+
+    .btn.danger {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: #fff1f2;
+    }
+
+    .hidden { display: none !important; }
+
+    .icon-btn {
+      border: none;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.08s ease,opacity 0.08s ease;
+    }
+
+    .icon-btn:hover {
+      transform: translateY(-1px);
+      opacity: 0.8;
+    }
+
+    .lang-select {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      padding: 4px 8px;
+      background: #ffffff;
+    }
+
+    /* layout */
+
+    .content-layout {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    .feed-column {
+      flex: 2;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .side-column {
+      flex: 1.2;
+      min-width: 260px;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    @media (max-width: 768px) {
+      .content-layout {
+        flex-direction: column;
+      }
+      .side-column {
+        max-width: 100%;
+        min-width: 0;
+      }
+    }
+
+    .section-header {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-header-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    .section-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .card {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 8px;
+    }
+
+    .card.tight {
+      padding: 6px;
+    }
+
+    .status {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .empty {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* feed */
+
+    .feed-header-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .feed-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .feed-filter-select {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      font-size: 11px;
+      outline: none;
+    }
+
+    .feed-list {
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    @media (max-width: 768px) {
+      .feed-list {
+        max-height: none;
+      }
+    }
+
+    .post-card {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .post-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .post-meta-left {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .post-meta-texts {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .post-name {
+      font-size: 12px;
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+    }
+
+    .post-handle {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .post-sub {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: #f9fafb;
+    }
+
+    .badge.type {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .post-body {
+      font-size: 12px;
+    }
+
+    .post-body strong {
+      margin-right: 4px;
+    }
+
+    .post-training {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .post-media {
+      margin-top: 4px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #f3f4f6;
+    }
+
+    .post-media-inner {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%;
+    }
+
+    .post-media-inner img,
+    .post-media-inner video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .post-media-placeholder {
+      position: absolute;
+      inset: 0;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      text-align: center;
+      padding: 0 8px;
+    }
+
+    .post-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .post-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .likes-text {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* comments */
+
+    .comments-section {
+      border-top: 1px solid var(--border);
+      margin-top: 6px;
+      padding-top: 4px;
+    }
+
+    .comments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 80px;
+      overflow-y: auto;
+      padding-right: 2px;
+      margin-bottom: 4px;
+    }
+
+    .comment-item {
+      font-size: 11px;
+    }
+
+    .comment-meta {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .comment-form {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .comment-form input {
+      flex: 1;
+      font-size: 11px;
+      padding: 4px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+
+    /* side tabs */
+
+    .side-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .side-tab-btn {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .side-tab-btn.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .side-section {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .side-section.active {
+      display: flex;
+    }
+
+    .side-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .side-section-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    /* fields */
+
+    label {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    input,
+    select,
+    textarea {
+      background: #ffffff;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 6px 7px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-soft);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+      max-height: 120px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .hint {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* simple list */
+
+    .simple-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding-right: 2px;
+      margin-top: 4px;
+    }
+
+    .meal-item {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 6px;
+      font-size: 11px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .meal-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+    }
+
+    .tag-pill {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f3f4f6;
+      color: var(--muted);
+    }
+
+    .meal-main {
+      font-size: 11px;
+    }
+
+    .meal-meta {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .food-result {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 6px;
+      font-size: 11px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .food-result-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: baseline;
+    }
+
+    .food-macro {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .meal-summary {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 6px;
+      background: #ffffff;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .meal-summary-main {
+      font-weight: 600;
+    }
+
+    .meal-summary-sub {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .meal-summary-bar {
+      margin-top: 2px;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      overflow: hidden;
+    }
+
+    .meal-summary-bar-inner {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    /* Gyms */
+
+    .gym-item {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 6px;
+      font-size: 11px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .gym-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+    }
+
+    .gym-main {
+      font-size: 11px;
+    }
+
+    .gym-meta {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .rating-stars {
+      font-size: 11px;
+      color: #f59e0b;
+    }
+
+    /* Messages */
+
+    .chat-card {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 0;
+      max-height: 280px;
+    }
+
+    .chat-header {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .chat-sub {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .chat-thread {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-right: 2px;
+      margin-top: 2px;
+    }
+
+    .msg {
+      max-width: 80%;
+      padding: 6px 8px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+    }
+
+    .msg.me {
+      align-self: flex-end;
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .msg.other {
+      align-self: flex-start;
+      background: #f9fafb;
+    }
+
+    .msg-meta {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .chat-input-row textarea {
+      flex: 1;
+      min-height: 40px;
+      max-height: 80px;
+    }
+
+    .conv-list {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .conv-pill {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .conv-pill.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Settings */
+
+    .settings-item {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 6px;
+      font-size: 11px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .settings-title {
+      font-weight: 600;
+    }
+
+    .people-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 160px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .people-item {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+    }
+
+    .people-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .people-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .people-sub {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .pill-follow {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f3f4f6;
+      color: var(--muted);
+      align-self: flex-start;
+    }
+
+    .fab {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg,#3b82f6,#60a5fa);
+      color: #ffffff;
+      font-size: 26px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 18px 40px rgba(37,99,235,0.4);
+      z-index: 20;
+    }
+
+    @media (max-width: 768px) {
+      .fab {
+        right: 16px;
+        bottom: 16px;
+      }
+    }
+
+    /* training sets */
+
+    .training-set-row {
+      display: grid;
+      grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) repeat(2,minmax(0,1fr)) minmax(0,1fr) auto;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .training-set-row input,
+    .training-set-row select {
+      font-size: 11px;
+      padding: 4px 6px;
+    }
+
+    .training-set-remove {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* modal */
+
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+      padding: 16px;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 460px;
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 10px;
+      box-shadow: 0 16px 40px rgba(15,23,42,0.25);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .close-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--muted);
+    }
+
+    /* search modal */
+
+    .search-input {
+      width: 100%;
+      margin-bottom: 6px;
+    }
+
+    .search-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 6px;
+      margin-bottom: 2px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-main">trends</div>
+        <div class="brand-sub" data-i18n="brandSub">シンプルなトレーニングSNS</div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="btn-open-search" title="Search">
+          🔍
+        </button>
+        <select id="lang-select" class="lang-select">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+        <div class="user-label" id="nav-user-label">
+          未ログイン / このブラウザ内だけで保存
+        </div>
+        <button class="btn primary" id="btn-open-auth" data-i18n="loginBtn">ログイン / 登録</button>
+        <button class="btn hidden" id="btn-logout" data-i18n="logoutBtn">ログアウト</button>
+      </div>
+    </header>
+
+    <div class="content-layout">
+      <!-- Feed column -->
+      <section class="feed-column">
+        <div>
+          <div class="section-header">
+            <span class="section-header-dot"></span>
+            <span data-i18n="feedTitle">Feed</span>
+          </div>
+          <div class="section-sub" data-i18n="feedSub">
+            トレーニングとPhysiqueのタイムライン
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="feed-header-row">
+            <div class="feed-toolbar">
+              <div class="status" id="feed-status">
+                ログインすると投稿を保存できます。
+              </div>
+              <select id="feed-filter" class="feed-filter-select">
+                <option value="mine">自分</option>
+                <option value="following">フォロー中＋自分</option>
+                <option value="all">すべて</option>
+                <option value="bookmarks">ブックマーク</option>
+              </select>
+            </div>
+          </div>
+          <div class="feed-list" id="feed-list"></div>
+          <div class="empty hidden" id="feed-empty">
+            まだ投稿がありません。右下の「＋」から投稿してみてください。
+          </div>
+        </div>
+      </section>
+
+      <!-- Side column -->
+      <aside class="side-column">
+        <div class="side-tabs">
+          <button class="side-tab-btn active" data-section="meals">
+            <span data-i18n="tabMeals">Meals 🍚</span>
+          </button>
+          <button class="side-tab-btn" data-section="gyms">
+            <span data-i18n="tabGyms">Gyms 🏋️</span>
+          </button>
+          <button class="side-tab-btn" data-section="messages">
+            <span data-i18n="tabMessages">Messages 💬</span>
+          </button>
+          <button class="side-tab-btn" data-section="settings">
+            <span data-i18n="tabSettings">Settings ⚙️</span>
+          </button>
+        </div>
+
+        <!-- Meals -->
+        <section class="side-section active" id="side-meals">
+          <div class="side-section-title" data-i18n="mealsTitle">Meals</div>
+          <div class="side-section-sub" data-i18n="mealsSub">
+            日付ごとの簡単な食事ログ。
+          </div>
+
+          <div class="card tight">
+            <div class="field-row">
+              <label>
+                日付
+                <input type="date" id="meal-date" />
+              </label>
+              <label>
+                タイミング
+                <select id="meal-time">
+                  <option value="朝">朝ごはん</option>
+                  <option value="昼">昼ごはん</option>
+                  <option value="夜">夜ごはん</option>
+                  <option value="間食">間食 / プロテイン</option>
+                </select>
+              </label>
+            </div>
+            <div class="field-row" style="margin-top:4px;">
+              <label>
+                食べ物を検索
+                <input type="text" id="meal-food-search" placeholder="例: ごはん / 鶏胸 / プロテイン" />
+              </label>
+              <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
+                <button class="btn small" id="meal-food-search-btn" type="button" style="margin-top:auto;">検索</button>
+              </div>
+            </div>
+            <div class="simple-list" id="meal-food-results"></div>
+            <div class="status" id="meal-status"></div>
+          </div>
+
+          <div class="card tight">
+            <div class="side-section-sub" style="margin-bottom:2px;">
+              選択した日の食事と合計
+            </div>
+            <div id="meal-list" class="simple-list"></div>
+            <div class="empty hidden" id="meal-empty">
+              まだこの日の食事が登録されていません。
+            </div>
+          </div>
+        </section>
+
+        <!-- Gyms -->
+        <section class="side-section" id="side-gyms">
+          <div class="side-section-title" data-i18n="gymsTitle">Gyms</div>
+          <div class="side-section-sub" data-i18n="gymsSub">
+            よく行くジムのメモ・評価。
+          </div>
+
+          <div class="card tight">
+            <div class="field-row">
+              <label>
+                ジム名
+                <input type="text" id="gym-name" placeholder="例: ○○ジム 新宿店" />
+              </label>
+              <label>
+                評価
+                <select id="gym-rating">
+                  <option value="">なし</option>
+                  <option value="5">★★★★★</option>
+                  <option value="4">★★★★</option>
+                  <option value="3">★★★</option>
+                  <option value="2">★★</option>
+                  <option value="1">★</option>
+                </select>
+              </label>
+            </div>
+            <label style="margin-top:4px;">
+              メモ
+              <textarea id="gym-note" placeholder="ラックの数・雰囲気・料金など"></textarea>
+            </label>
+            <div class="btn-row">
+              <button class="btn small" id="gym-save" type="button">保存 / 上書き</button>
+              <button class="btn small" id="gym-clear" type="button">リセット</button>
+            </div>
+            <div class="status" id="gym-status"></div>
+          </div>
+
+          <div class="card tight">
+            <label>
+              ジム名で検索
+              <input type="text" id="gym-search" placeholder="例: 新宿 / Anytime" />
+            </label>
+            <div class="simple-list" id="gym-list"></div>
+            <div class="empty hidden" id="gym-empty">
+              まだジムが登録されていません。
+            </div>
+          </div>
+        </section>
+
+        <!-- Messages -->
+        <section class="side-section" id="side-messages">
+          <div class="side-section-title" data-i18n="messagesTitle">Messages</div>
+          <div class="side-section-sub" data-i18n="messagesSub">
+            コーチ・仲間・自分用メモの簡易チャット。
+          </div>
+
+          <div class="conv-list" id="conv-list"></div>
+
+          <div class="chat-card">
+            <div class="chat-header" id="chat-title">会話を選択してください</div>
+            <div class="chat-sub" id="chat-sub">
+              上のスレッドから選ぶとメッセージが表示されます。
+            </div>
+            <div class="chat-thread" id="chat-thread"></div>
+            <div class="chat-input-row">
+              <textarea id="chat-input" placeholder="ここにメッセージを書く"></textarea>
+              <button class="btn primary small" id="chat-send" type="button">送信</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="side-section" id="side-settings">
+          <div class="side-section-title" data-i18n="settingsTitle">Settings</div>
+          <div class="side-section-sub" data-i18n="settingsSub">
+            アカウント / フォロー / プラン / テーマ / データ削除。
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-title">アカウント</div>
+            <div class="status" id="settings-account-text">
+              未ログインです。
+            </div>
+            <button class="btn small" id="settings-open-auth" type="button">
+              ログイン / 登録
+            </button>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-title">People & Followers</div>
+            <div class="status" id="people-summary">
+              ブラウザ内のユーザー一覧とフォロー設定。
+            </div>
+            <div class="people-list" id="people-list"></div>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-title">プラン & Pro 機能</div>
+            <div class="status" id="plan-status">
+              ログインするとプランを切り替えできます。
+            </div>
+            <div class="btn-row">
+              <button class="btn small" id="btn-plan-free" type="button">Free</button>
+              <button class="btn small" id="btn-plan-pro" type="button">Pro</button>
+            </div>
+            <label style="margin-top:4px;">
+              1日の目標カロリー (kcal)
+              <input type="number" id="cal-target" placeholder="例: 2500" />
+            </label>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-title">テーマ</div>
+            <label>
+              カラーパレット
+              <select id="theme-select">
+                <option value="light">Light（青）</option>
+                <option value="sakura">Sakura（ピンク）</option>
+                <option value="mint">Mint（グリーン）</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-title" style="color:var(--danger);">
+              全データ削除
+            </div>
+            <div class="status">
+              このブラウザに保存されたデータをすべて削除します。
+            </div>
+            <button class="btn small danger" id="btn-clear-all" type="button">
+              ⚠ 全データを削除
+            </button>
+            <div class="status" id="clear-status"></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <button class="fab" id="fab-post">＋</button>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="backdrop hidden" id="auth-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" data-i18n="authTitle">ログイン / 新規登録</div>
+        <button class="close-btn" id="auth-close">✕</button>
+      </div>
+      <form id="auth-form">
+        <div class="field-row">
+          <label>
+            メールアドレス
+            <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+          </label>
+          <label>
+            ハンドルネーム
+            <input type="text" id="auth-handle" placeholder="homare_pwr" autocomplete="username" />
+          </label>
+        </div>
+        <label style="margin-top:4px;">
+          パスワード
+          <input type="password" id="auth-password" placeholder="8文字以上推奨" autocomplete="current-password" />
+        </label>
+        <div class="hint">
+          初回はアカウント作成、2回目以降はログイン（ローカル専用）。
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" type="submit">OK</button>
+          <button class="btn small" id="auth-fill-demo" type="button">テスト用入力</button>
+        </div>
+        <div class="status" id="auth-status"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Post Modal -->
+  <div class="backdrop hidden" id="post-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">新しい投稿</div>
+        <button class="close-btn" id="post-close">✕</button>
+      </div>
+      <form id="post-form">
+        <div class="field-row">
+          <label>
+            日付
+            <input type="date" id="post-date" />
+          </label>
+          <label>
+            体重 (kg)
+            <input type="number" step="0.1" id="post-bodyweight" placeholder="例: 77.4" />
+          </label>
+        </div>
+
+        <label style="margin-top:4px;">
+          トレーニングセット
+          <div id="training-sets"></div>
+          <button class="btn small" id="btn-add-set" type="button" style="margin-top:4px;">
+            ＋ セット追加
+          </button>
+        </label>
+
+        <div class="field-row" style="margin-top:4px;">
+          <label>
+            公開範囲
+            <select id="post-visibility">
+              <option value="public">全員</option>
+              <option value="followers">フォロワーのみ</option>
+              <option value="close">親しい友達のみ</option>
+              <option value="private">自分だけ</option>
+            </select>
+          </label>
+          <label>
+            画像 / 動画（任意）
+            <input type="file" id="post-media-file" accept="image/*,video/*" />
+          </label>
+        </div>
+
+        <label style="margin-top:4px;">
+          メモ / キャプション
+          <textarea id="post-note" placeholder="フォームの感想、次の課題、今日の気分など"></textarea>
+        </label>
+
+        <div class="btn-row">
+          <button class="btn primary" type="submit">投稿する</button>
+          <button class="btn" id="post-clear" type="button">リセット</button>
+        </div>
+        <div class="status" id="post-status"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Search Modal -->
+  <div class="backdrop hidden" id="search-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">検索</div>
+        <button class="close-btn" id="search-close">✕</button>
+      </div>
+      <input
+        id="search-input"
+        class="search-input"
+        type="text"
+        placeholder="ユーザー・投稿を検索"
+      />
+      <div id="search-results" class="simple-list"></div>
+    </div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div class="backdrop hidden" id="profile-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="profile-title">@someone</div>
+        <button class="close-btn" id="profile-close">✕</button>
+      </div>
+      <div class="status" id="profile-sub"></div>
+      <div id="profile-summary" class="simple-list"></div>
+      <div class="side-section-sub" style="margin-top:4px;">
+        このユーザーの投稿
+      </div>
+      <div id="profile-posts" class="simple-list" style="max-height:260px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // ---- storage keys ----
+      const STORAGE_USERS_KEY = "wsns_users";
+      const STORAGE_CURRENT_USER_KEY = "wsns_current_user";
+      const STORAGE_POSTS_KEY = "wsns_posts";
+      const STORAGE_CONVS_KEY = "wsns_conversations";
+      const STORAGE_MEALS_KEY = "wsns_meals";
+      const STORAGE_GYMS_KEY = "wsns_gyms";
+      const STORAGE_THEME_KEY = "wsns_theme";
+      const STORAGE_LANG_KEY = "wsns_lang";
+
+      // ---- themes ----
+      const THEMES = {
+        light: {
+          "--bg": "#f3f4f6",
+          "--bg-soft": "#f9fafb",
+          "--card": "#ffffff",
+          "--border": "#e5e7eb",
+          "--text": "#111827",
+          "--muted": "#6b7280",
+          "--accent": "#3b82f6",
+          "--accent-soft": "rgba(59,130,246,0.08)",
+          "--danger": "#ef4444",
+        },
+        sakura: {
+          "--bg": "#fff1f2",
+          "--bg-soft": "#fdf2f8",
+          "--card": "#ffffff",
+          "--border": "#fecdd3",
+          "--text": "#4a044e",
+          "--muted": "#9d174d",
+          "--accent": "#ec4899",
+          "--accent-soft": "rgba(236,72,153,0.12)",
+          "--danger": "#b91c1c",
+        },
+        mint: {
+          "--bg": "#ecfdf5",
+          "--bg-soft": "#f0fdf4",
+          "--card": "#ffffff",
+          "--border": "#bbf7d0",
+          "--text": "#064e3b",
+          "--muted": "#047857",
+          "--accent": "#22c55e",
+          "--accent-soft": "rgba(34,197,94,0.12)",
+          "--danger": "#b91c1c",
+        },
+      };
+
+      function applyTheme(name) {
+        const theme = THEMES[name] || THEMES.light;
+        Object.entries(theme).forEach(([k, v]) => {
+          document.documentElement.style.setProperty(k, v);
+        });
+        localStorage.setItem(STORAGE_THEME_KEY, name);
+      }
+
+      // ---- i18n (最小構成。必要に応じて増やせる) ----
+      const I18N = {
+        ja: {
+          brandSub: "シンプルなトレーニングSNS",
+          loginBtn: "ログイン / 登録",
+          logoutBtn: "ログアウト",
+          feedTitle: "Feed",
+          feedSub: "トレーニングとPhysiqueのタイムライン",
+          tabMeals: "Meals 🍚",
+          tabGyms: "Gyms 🏋️",
+          tabMessages: "Messages 💬",
+          tabSettings: "Settings ⚙️",
+          mealsTitle: "Meals",
+          mealsSub: "日付ごとの簡単な食事ログ。",
+          gymsTitle: "Gyms",
+          gymsSub: "よく行くジムのメモ・評価。",
+          messagesTitle: "Messages",
+          messagesSub: "コーチ・仲間・自分用メモの簡易チャット。",
+          settingsTitle: "Settings",
+          settingsSub: "アカウント / フォロー / プラン / テーマ / データ削除。",
+          authTitle: "ログイン / 新規登録",
+        },
+        en: {
+          brandSub: "Simple training SNS",
+          loginBtn: "Log in / Sign up",
+          logoutBtn: "Log out",
+          feedTitle: "Feed",
+          feedSub: "Timeline for training and physique",
+          tabMeals: "Meals 🍚",
+          tabGyms: "Gyms 🏋️",
+          tabMessages: "Messages 💬",
+          tabSettings: "Settings ⚙️",
+          mealsTitle: "Meals",
+          mealsSub: "Simple meal log by date.",
+          gymsTitle: "Gyms",
+          gymsSub: "Notes and ratings for your gyms.",
+          messagesTitle: "Messages",
+          messagesSub: "Lightweight chat for coach / friends / self-memo.",
+          settingsTitle: "Settings",
+          settingsSub: "Account / follows / plan / theme / data wipe.",
+          authTitle: "Log in / Sign up",
+        },
+      };
+
+      function applyLanguage(lang) {
+        const dict = I18N[lang] || I18N.ja;
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const key = el.getAttribute("data-i18n");
+          if (dict[key]) {
+            el.textContent = dict[key];
+          }
+        });
+        localStorage.setItem(STORAGE_LANG_KEY, lang);
+      }
+
+      function loadLanguage() {
+        const saved = localStorage.getItem(STORAGE_LANG_KEY) || "ja";
+        return saved === "en" ? "en" : "ja";
+      }
+
+      // ---- food DB (簡易版 / 1食分の目安) ----
+      const FOOD_DB = [
+        { name: "ごはん（茶碗1杯 200g）", kcal: 330, protein: 6, fat: 1, carbs: 72 },
+        { name: "鶏むね肉（皮なし 150g）", kcal: 250, protein: 45, fat: 5, carbs: 0 },
+        { name: "鶏もも肉（皮あり 150g）", kcal: 350, protein: 30, fat: 25, carbs: 0 },
+        { name: "牛ももステーキ 150g", kcal: 330, protein: 30, fat: 20, carbs: 0 },
+        { name: "サーモン切り身 120g", kcal: 250, protein: 24, fat: 16, carbs: 0 },
+        { name: "プロテインシェイク 1杯（30g）", kcal: 120, protein: 24, fat: 2, carbs: 3 },
+        { name: "卵 2個", kcal: 150, protein: 13, fat: 11, carbs: 1 },
+        { name: "バナナ 1本", kcal: 90, protein: 1, fat: 0, carbs: 23 },
+        { name: "オートミール 50g", kcal: 190, protein: 7, fat: 3, carbs: 33 },
+        { name: "ヨーグルト 150g（無糖）", kcal: 90, protein: 7, fat: 3, carbs: 10 },
+        { name: "鶏むね肉 + ごはんセット", kcal: 580, protein: 50, fat: 6, carbs: 72 },
+        { name: "ラーメン 1杯", kcal: 650, protein: 20, fat: 25, carbs: 80 },
+        { name: "牛丼 並", kcal: 700, protein: 25, fat: 23, carbs: 95 },
+      ];
+
+      // ---- DOM refs ----
+      const navUserLabel = document.getElementById("nav-user-label");
+      const btnOpenAuth = document.getElementById("btn-open-auth");
+      const btnLogout = document.getElementById("btn-logout");
+      const langSelect = document.getElementById("lang-select");
+      const btnOpenSearch = document.getElementById("btn-open-search");
+
+      // side tabs
+      const sideTabBtns = document.querySelectorAll(".side-tab-btn");
+      const sideSections = document.querySelectorAll(".side-section");
+
+      // feed
+      const feedStatus = document.getElementById("feed-status");
+      const feedList = document.getElementById("feed-list");
+      const feedEmpty = document.getElementById("feed-empty");
+      const feedFilter = document.getElementById("feed-filter");
+
+      // auth
+      const authBackdrop = document.getElementById("auth-backdrop");
+      const authClose = document.getElementById("auth-close");
+      const authForm = document.getElementById("auth-form");
+      const authEmail = document.getElementById("auth-email");
+      const authHandle = document.getElementById("auth-handle");
+      const authPassword = document.getElementById("auth-password");
+      const authStatus = document.getElementById("auth-status");
+      const authFillDemo = document.getElementById("auth-fill-demo");
+
+      // post
+      const postBackdrop = document.getElementById("post-backdrop");
+      const postClose = document.getElementById("post-close");
+      const postForm = document.getElementById("post-form");
+      const postDate = document.getElementById("post-date");
+      const postBodyweight = document.getElementById("post-bodyweight");
+      const postVisibility = document.getElementById("post-visibility");
+      const postMediaFile = document.getElementById("post-media-file");
+      const postNote = document.getElementById("post-note");
+      const postClear = document.getElementById("post-clear");
+      const postStatus = document.getElementById("post-status");
+      const trainingSetsContainer = document.getElementById("training-sets");
+      const btnAddSet = document.getElementById("btn-add-set");
+      const fabPost = document.getElementById("fab-post");
+
+      // Meals
+      const mealDate = document.getElementById("meal-date");
+      const mealTime = document.getElementById("meal-time");
+      const mealFoodSearch = document.getElementById("meal-food-search");
+      const mealFoodSearchBtn = document.getElementById("meal-food-search-btn");
+      const mealFoodResults = document.getElementById("meal-food-results");
+      const mealStatus = document.getElementById("meal-status");
+      const mealList = document.getElementById("meal-list");
+      const mealEmpty = document.getElementById("meal-empty");
+
+      // Gyms
+      const gymName = document.getElementById("gym-name");
+      const gymRating = document.getElementById("gym-rating");
+      const gymNote = document.getElementById("gym-note");
+      const gymSave = document.getElementById("gym-save");
+      const gymClear = document.getElementById("gym-clear");
+      const gymStatus = document.getElementById("gym-status");
+      const gymSearch = document.getElementById("gym-search");
+      const gymList = document.getElementById("gym-list");
+      const gymEmpty = document.getElementById("gym-empty");
+
+      // Messages
+      const convListEl = document.getElementById("conv-list");
+      const chatTitle = document.getElementById("chat-title");
+      const chatSub = document.getElementById("chat-sub");
+      const chatThread = document.getElementById("chat-thread");
+      const chatInput = document.getElementById("chat-input");
+      const chatSend = document.getElementById("chat-send");
+
+      // Settings
+      const settingsAccountText = document.getElementById("settings-account-text");
+      const settingsOpenAuth = document.getElementById("settings-open-auth");
+      const peopleSummary = document.getElementById("people-summary");
+      const peopleListEl = document.getElementById("people-list");
+      const planStatus = document.getElementById("plan-status");
+      const btnPlanFree = document.getElementById("btn-plan-free");
+      const btnPlanPro = document.getElementById("btn-plan-pro");
+      const calTarget = document.getElementById("cal-target");
+      const themeSelect = document.getElementById("theme-select");
+      const clearAllBtn = document.getElementById("btn-clear-all");
+      const clearStatus = document.getElementById("clear-status");
+
+      // Search modal
+      const searchBackdrop = document.getElementById("search-backdrop");
+      const searchClose = document.getElementById("search-close");
+      const searchInput = document.getElementById("search-input");
+      const searchResults = document.getElementById("search-results");
+
+      // Profile modal
+      const profileBackdrop = document.getElementById("profile-backdrop");
+      const profileClose = document.getElementById("profile-close");
+      const profileTitle = document.getElementById("profile-title");
+      const profileSub = document.getElementById("profile-sub");
+      const profileSummary = document.getElementById("profile-summary");
+      const profilePosts = document.getElementById("profile-posts");
+
+      // ---- state ----
+      let users = [];
+      let currentUser = null;
+      let posts = [];
+      let conversations = [];
+      let meals = [];
+      let gyms = [];
+      let currentConvId = null;
+
+      const DEFAULT_CONVS = [
+        { id: "coach", title: "コーチ相談", description: "フォーム・メニュー相談メモ用" },
+        { id: "community", title: "コミュニティ案", description: "アプリや仲間づくりのアイデア" },
+        { id: "personal", title: "個人メモ", description: "考え事を整理するスペース" },
+      ];
+
+      function ensureUserExtraFields(user) {
+        if (!user.following) user.following = [];
+        if (!user.followers) user.followers = [];
+        if (!user.closeFriends) user.closeFriends = [];
+        if (!user.bookmarks) user.bookmarks = [];
+        if (!user.plan) user.plan = "free";
+        if (user.calorieTarget === undefined) user.calorieTarget = null;
+        return user;
+      }
+
+      // ---- util ----
+      function formatDate(dateString) {
+        if (!dateString) return "日付未設定";
+        const d = new Date(dateString);
+        if (Number.isNaN(d.getTime())) return dateString;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}/${m}/${day}`;
+      }
+
+      function formatTime(dateString) {
+        const d = new Date(dateString);
+        if (Number.isNaN(d.getTime())) return "";
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        return `${m}/${day} ${hh}:${mm}`;
+      }
+
+      function visibilityLabel(v) {
+        switch (v) {
+          case "followers": return "👥 フォロワーのみ";
+          case "close": return "⭐ 親しい友達";
+          case "private": return "🔒 自分だけ";
+          default: return "🌐 全員";
+        }
+      }
+
+      function typeLabel(t) {
+        switch (t) {
+          case "physique": return "Physique";
+          case "note": return "メモ";
+          default: return "トレーニング";
+        }
+      }
+
+      function getUserByEmail(email) {
+        return users.find(u => u.email === email);
+      }
+
+      function canSeePost(viewer, post, owner) {
+        const visibility = post.visibility || "public";
+        if (!viewer) return visibility === "public";
+        if (viewer.email === owner.email) return true;
+
+        switch (visibility) {
+          case "public":
+            return true;
+          case "followers":
+            return (owner.followers || []).includes(viewer.handle);
+          case "close":
+            return (owner.closeFriends || []).includes(viewer.handle);
+          case "private":
+            return false;
+          default:
+            return true;
+        }
+      }
+
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // ---- training set rows ----
+      function populateSelectsForRow(repsSelect, setsSelect, rpeSelect) {
+        repsSelect.innerHTML = "";
+        setsSelect.innerHTML = "";
+        rpeSelect.innerHTML = "";
+
+        let opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "reps";
+        repsSelect.appendChild(opt);
+        for (let i = 1; i <= 20; i++) {
+          const o = document.createElement("option");
+          o.value = String(i);
+          o.textContent = i;
+          repsSelect.appendChild(o);
+        }
+
+        opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "sets";
+        setsSelect.appendChild(opt);
+        for (let i = 1; i <= 10; i++) {
+          const o = document.createElement("option");
+          o.value = String(i);
+          o.textContent = i;
+          setsSelect.appendChild(o);
+        }
+
+        opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "RPE";
+        rpeSelect.appendChild(opt);
+        for (let x = 5; x <= 10; x += 0.5) {
+          const v = x.toFixed(1);
+          const o = document.createElement("option");
+          o.value = v;
+          o.textContent = v;
+          rpeSelect.appendChild(o);
+        }
+      }
+
+      function createTrainingSetRow(initial = {}) {
+        const row = document.createElement("div");
+        row.className = "training-set-row";
+
+        const exInput = document.createElement("input");
+        exInput.type = "text";
+        exInput.placeholder = "種目";
+        exInput.value = initial.exercise || "";
+
+        const wInput = document.createElement("input");
+        wInput.type = "number";
+        wInput.placeholder = "kg";
+        wInput.value = initial.weightKg || "";
+
+        const repsSelect = document.createElement("select");
+        const setsSelect = document.createElement("select");
+        const rpeSelect = document.createElement("select");
+        populateSelectsForRow(repsSelect, setsSelect, rpeSelect);
+
+        if (initial.reps) repsSelect.value = String(initial.reps);
+        if (initial.sets) setsSelect.value = String(initial.sets);
+        if (initial.rpe) rpeSelect.value = String(initial.rpe);
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "training-set-remove";
+        removeBtn.textContent = "✕";
+        removeBtn.addEventListener("click", () => {
+          trainingSetsContainer.removeChild(row);
+          if (!trainingSetsContainer.querySelector(".training-set-row")) {
+            createTrainingSetRow();
+          }
+        });
+
+        row.appendChild(exInput);
+        row.appendChild(wInput);
+        row.appendChild(repsSelect);
+        row.appendChild(setsSelect);
+        row.appendChild(rpeSelect);
+        row.appendChild(removeBtn);
+
+        trainingSetsContainer.appendChild(row);
+      }
+
+      function resetTrainingSets() {
+        trainingSetsContainer.innerHTML = "";
+        createTrainingSetRow();
+      }
+
+      // ---- storage helpers ----
+      function loadUsers() {
+        try {
+          const raw = localStorage.getItem(STORAGE_USERS_KEY);
+          users = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(users)) users = [];
+        } catch {
+          users = [];
+        }
+        users = users.map(ensureUserExtraFields);
+      }
+      function saveUsers() {
+        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+      }
+
+      function loadPosts() {
+        try {
+          const raw = localStorage.getItem(STORAGE_POSTS_KEY);
+          posts = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(posts)) posts = [];
+        } catch {
+          posts = [];
+        }
+      }
+      function savePosts() {
+        localStorage.setItem(STORAGE_POSTS_KEY, JSON.stringify(posts));
+      }
+
+      function loadConversations() {
+        try {
+          const raw = localStorage.getItem(STORAGE_CONVS_KEY);
+          conversations = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(conversations)) conversations = [];
+        } catch {
+          conversations = [];
+        }
+        DEFAULT_CONVS.forEach(def => {
+          if (!conversations.some(c => c.id === def.id)) {
+            conversations.push({ id: def.id, title: def.title, description: def.description, messages: [] });
+          }
+        });
+      }
+      function saveConversations() {
+        localStorage.setItem(STORAGE_CONVS_KEY, JSON.stringify(conversations));
+      }
+
+      function loadMeals() {
+        try {
+          const raw = localStorage.getItem(STORAGE_MEALS_KEY);
+          meals = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(meals)) meals = [];
+        } catch {
+          meals = [];
+        }
+      }
+      function saveMeals() {
+        localStorage.setItem(STORAGE_MEALS_KEY, JSON.stringify(meals));
+      }
+
+      function loadGyms() {
+        try {
+          const raw = localStorage.getItem(STORAGE_GYMS_KEY);
+          gyms = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(gyms)) gyms = [];
+        } catch {
+          gyms = [];
+        }
+      }
+      function saveGyms() {
+        localStorage.setItem(STORAGE_GYMS_KEY, JSON.stringify(gyms));
+      }
+
+      function loadCurrentUser() {
+        try {
+          const raw = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
+          if (!raw) {
+            currentUser = null;
+            return;
+          }
+          const obj = JSON.parse(raw);
+          if (obj && obj.email) {
+            const found = users.find(u => u.email === obj.email);
+            currentUser = found ? ensureUserExtraFields(found) : null;
+          }
+        } catch {
+          currentUser = null;
+        }
+      }
+      function saveCurrentUser() {
+        if (!currentUser) {
+          localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
+          return;
+        }
+        localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify({
+          email: currentUser.email,
+          handle: currentUser.handle,
+          createdAt: currentUser.createdAt || new Date().toISOString()
+        }));
+      }
+
+      function loadTheme() {
+        const t = localStorage.getItem(STORAGE_THEME_KEY) || "light";
+        applyTheme(t);
+        themeSelect.value = t;
+      }
+
+      // ---- UI ----
+      function updatePlanUI() {
+        if (!planStatus) return;
+        if (!currentUser) {
+          planStatus.textContent = "ログインするとプランを切り替えできます。";
+          calTarget.value = "";
+          calTarget.disabled = true;
+          return;
+        }
+        const plan = currentUser.plan || "free";
+        planStatus.textContent =
+          plan === "pro"
+            ? "現在: Proプラン（テスト用）"
+            : "現在: Freeプラン";
+        calTarget.value = currentUser.calorieTarget || "";
+        calTarget.disabled = plan !== "pro";
+      }
+
+      function updateNav() {
+        if (currentUser) {
+          navUserLabel.textContent = `@${currentUser.handle} / ${currentUser.email}` +
+            (currentUser.plan === "pro" ? " · PRO" : "");
+          btnOpenAuth.classList.add("hidden");
+          btnLogout.classList.remove("hidden");
+          feedStatus.textContent = "ログイン済み。このブラウザ内に投稿を保存しています。";
+          const followersCount = currentUser.followers?.length || 0;
+          const followingCount = currentUser.following?.length || 0;
+          settingsAccountText.textContent =
+            `ログイン中: @${currentUser.handle} / フォロワー ${followersCount} / フォロー中 ${followingCount}`;
+        } else {
+          navUserLabel.textContent = "未ログイン / このブラウザ内だけで保存";
+          btnOpenAuth.classList.remove("hidden");
+          btnLogout.classList.add("hidden");
+          feedStatus.textContent = "ログインすると投稿が保存されます。";
+          settingsAccountText.textContent =
+            "未ログインです。右上のボタンからログインしてください。";
+        }
+        renderPeopleList();
+        updatePlanUI();
+      }
+
+      function renderFeed() {
+        feedList.innerHTML = "";
+        if (!currentUser) {
+          feedEmpty.classList.add("hidden");
+          return;
+        }
+
+        const filter = feedFilter.value || "mine";
+        const sorted = [...posts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const result = [];
+
+        sorted.forEach(post => {
+          const owner = getUserByEmail(post.userEmail);
+          if (!owner) return;
+          ensureUserExtraFields(owner);
+          const viewer = currentUser;
+          const isBookmarked = viewer && viewer.bookmarks && viewer.bookmarks.includes(post.id);
+
+          if (!canSeePost(viewer, post, owner)) return;
+
+          if (filter === "mine" && post.userEmail !== viewer.email) return;
+
+          if (filter === "following") {
+            const isMine = post.userEmail === viewer.email;
+            const isFromFollowing = (viewer.following || []).includes(owner.handle);
+            if (!isMine && !isFromFollowing) return;
+          }
+
+          if (filter === "bookmarks" && !isBookmarked) return;
+
+          result.push({ post, owner, isBookmarked });
+        });
+
+        if (result.length === 0) {
+          feedEmpty.classList.remove("hidden");
+          return;
+        }
+        feedEmpty.classList.add("hidden");
+
+        result.forEach(({ post, owner, isBookmarked }) => {
+          const card = document.createElement("article");
+          card.className = "post-card";
+
+          const header = document.createElement("div");
+          header.className = "post-header";
+
+          const left = document.createElement("div");
+          left.className = "post-meta-left";
+
+          const avatar = document.createElement("div");
+          avatar.className = "avatar";
+          avatar.textContent = (owner.handle || "?").charAt(0).toUpperCase();
+
+          const metaTexts = document.createElement("div");
+          metaTexts.className = "post-meta-texts";
+
+          const nameRow = document.createElement("div");
+          nameRow.className = "post-name";
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent = owner.handle || "user";
+          const handleSpan = document.createElement("span");
+          handleSpan.className = "post-handle";
+          handleSpan.textContent = `@${owner.handle || "user"}`;
+          nameRow.appendChild(nameSpan);
+          nameRow.appendChild(handleSpan);
+
+          const subRow = document.createElement("div");
+          subRow.className = "post-sub";
+          subRow.textContent = `${formatDate(post.date)} · ${formatTime(post.createdAt)}`;
+
+          metaTexts.appendChild(nameRow);
+          metaTexts.appendChild(subRow);
+
+          left.appendChild(avatar);
+          left.appendChild(metaTexts);
+
+          const right = document.createElement("div");
+          right.className = "pill-row";
+
+          const typeBadge = document.createElement("div");
+          typeBadge.className = "badge type";
+          typeBadge.textContent = typeLabel(post.type || "training");
+          right.appendChild(typeBadge);
+
+          const visBadge = document.createElement("div");
+          visBadge.className = "badge";
+          visBadge.textContent = visibilityLabel(post.visibility || "public");
+          right.appendChild(visBadge);
+
+          if (currentUser && currentUser.email === owner.email) {
+            const delBtn = document.createElement("button");
+            delBtn.className = "btn small";
+            delBtn.textContent = "削除";
+            delBtn.addEventListener("click", () => {
+              if (!confirm("この投稿を削除しますか？")) return;
+              posts = posts.filter(p => p.id !== post.id);
+              savePosts();
+              renderFeed();
+            });
+            right.appendChild(delBtn);
+          }
+
+          header.appendChild(left);
+          header.appendChild(right);
+
+          const body = document.createElement("div");
+          body.className = "post-body";
+          const strong = document.createElement("strong");
+          strong.textContent =
+            post.type === "note" ? "メモ" :
+            (post.type === "physique" ? "Physique" :
+            (post.exercise || "トレーニング"));
+          body.appendChild(strong);
+          body.appendChild(document.createTextNode(post.note || ""));
+
+          card.appendChild(header);
+          card.appendChild(body);
+
+          const trainingDiv = document.createElement("div");
+          trainingDiv.className = "post-training";
+          const lines = [];
+
+          if (Array.isArray(post.trainingSets) && post.trainingSets.length > 0) {
+            post.trainingSets.forEach(set => {
+              if (!set) return;
+              const parts = [];
+              if (set.exercise) parts.push(set.exercise);
+              if (set.weightKg) parts.push(`${set.weightKg}kg`);
+              if (set.reps) parts.push(`${set.reps}reps`);
+              if (set.sets) parts.push(`${set.sets}sets`);
+              if (set.rpe) parts.push(`RPE${set.rpe}`);
+              if (parts.length > 0) lines.push(parts.join(" × "));
+            });
+          }
+
+          if (post.bodyWeight) {
+            lines.push(`体重 ${post.bodyWeight}kg`);
+          }
+
+          if (lines.length > 0 && post.type === "training") {
+            lines.forEach(text => {
+              const l = document.createElement("div");
+              l.textContent = text;
+              trainingDiv.appendChild(l);
+            });
+            card.appendChild(trainingDiv);
+          }
+
+          if (post.mediaType && (post.mediaData || post.mediaUrl || post.mediaSessionUrl)) {
+            const media = document.createElement("div");
+            media.className = "post-media";
+            const inner = document.createElement("div");
+            inner.className = "post-media-inner";
+
+            const src = post.mediaData || post.mediaUrl || post.mediaSessionUrl;
+            if (post.mediaType === "video") {
+              const v = document.createElement("video");
+              v.src = src;
+              v.controls = true;
+              inner.appendChild(v);
+            } else {
+              const img = document.createElement("img");
+              img.src = src;
+              img.alt = "media";
+              img.onerror = () => {
+                inner.innerHTML = "";
+                const ph = document.createElement("div");
+                ph.className = "post-media-placeholder";
+                ph.textContent = "メディアを読み込めませんでした。";
+                inner.appendChild(ph);
+              };
+              inner.appendChild(img);
+            }
+            media.appendChild(inner);
+            card.appendChild(media);
+          }
+
+          const footer = document.createElement("div");
+          footer.className = "post-footer";
+
+          const actions = document.createElement("div");
+          actions.className = "post-actions";
+
+          // like
+          const likeBtn = document.createElement("button");
+          likeBtn.className = "icon-btn";
+          likeBtn.type = "button";
+          const liked = post.liked === true;
+          likeBtn.textContent = liked ? "💙" : "🤍";
+          likeBtn.title = "いいね";
+          likeBtn.addEventListener("click", () => {
+            if (typeof post.likes !== "number") post.likes = 0;
+            if (post.liked) {
+              post.liked = false;
+              post.likes = Math.max(post.likes - 1, 0);
+            } else {
+              post.liked = true;
+              post.likes += 1;
+            }
+            savePosts();
+            renderFeed();
+          });
+          actions.appendChild(likeBtn);
+
+          // bookmark
+          const bmBtn = document.createElement("button");
+          bmBtn.className = "icon-btn";
+          bmBtn.type = "button";
+          bmBtn.textContent = isBookmarked ? "🔖" : "📑";
+          bmBtn.title = "ブックマーク";
+          bmBtn.addEventListener("click", () => {
+            if (!currentUser) {
+              openAuthModal();
+              return;
+            }
+            ensureUserExtraFields(currentUser);
+            currentUser.bookmarks = currentUser.bookmarks || [];
+            const idx = currentUser.bookmarks.indexOf(post.id);
+            if (idx >= 0) {
+              currentUser.bookmarks.splice(idx, 1);
+            } else {
+              currentUser.bookmarks.push(post.id);
+            }
+            users = users.map(u => (u.email === currentUser.email ? currentUser : u));
+            saveUsers();
+            saveCurrentUser();
+            renderFeed();
+          });
+          actions.appendChild(bmBtn);
+
+          const likesText = document.createElement("div");
+          likesText.className = "likes-text";
+          const likeCount = typeof post.likes === "number" ? post.likes : 0;
+          const commentsCount = Array.isArray(post.comments) ? post.comments.length : 0;
+          likesText.textContent = `いいね ${likeCount}件 / コメント ${commentsCount}件`;
+
+          footer.appendChild(actions);
+          footer.appendChild(likesText);
+
+          card.appendChild(footer);
+
+          // comments
+          const commentsSection = document.createElement("div");
+          commentsSection.className = "comments-section";
+
+          const commentsList = document.createElement("div");
+          commentsList.className = "comments-list";
+
+          const comments = Array.isArray(post.comments) ? post.comments : [];
+          if (comments.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "comment-meta";
+            empty.textContent = "まだコメントはありません。";
+            commentsList.appendChild(empty);
+          } else {
+            comments.forEach(c => {
+              const item = document.createElement("div");
+              item.className = "comment-item";
+              const meta = document.createElement("div");
+              meta.className = "comment-meta";
+              meta.textContent = `@${c.handle || "user"} · ${formatTime(c.createdAt)}`;
+              const text = document.createElement("div");
+              text.textContent = c.text;
+              item.appendChild(meta);
+              item.appendChild(text);
+              commentsList.appendChild(item);
+            });
+          }
+
+          const commentForm = document.createElement("div");
+          commentForm.className = "comment-form";
+          const input = document.createElement("input");
+          input.type = "text";
+          input.placeholder = currentUser ? "コメントを書く…" : "コメントするにはログインしてください";
+          const btn = document.createElement("button");
+          btn.className = "btn small";
+          btn.type = "button";
+          btn.textContent = "送信";
+
+          btn.addEventListener("click", () => {
+            if (!currentUser) {
+              openAuthModal();
+              return;
+            }
+            const text = input.value.trim();
+            if (!text) return;
+            const list = Array.isArray(post.comments) ? post.comments : [];
+            const newComment = {
+              id: "c_" + Date.now() + "_" + Math.random().toString(36).slice(2),
+              userEmail: currentUser.email,
+              handle: currentUser.handle,
+              text,
+              createdAt: new Date().toISOString()
+            };
+            list.push(newComment);
+            post.comments = list;
+            savePosts();
+            renderFeed();
+          });
+
+          commentForm.appendChild(input);
+          commentForm.appendChild(btn);
+
+          commentsSection.appendChild(commentsList);
+          commentsSection.appendChild(commentForm);
+
+          card.appendChild(commentsSection);
+
+          feedList.appendChild(card);
+        });
+      }
+
+      function renderConvList() {
+        convListEl.innerHTML = "";
+        conversations.forEach(conv => {
+          const pill = document.createElement("div");
+          pill.className = "conv-pill" + (conv.id === currentConvId ? " active" : "");
+          pill.textContent = conv.title;
+          pill.addEventListener("click", () => {
+            currentConvId = conv.id;
+            renderConvList();
+            renderChat();
+          });
+          convListEl.appendChild(pill);
+        });
+
+        const add = document.createElement("div");
+        add.className = "conv-pill";
+        add.textContent = "＋ 新規";
+        add.addEventListener("click", () => {
+          const title = prompt("新しいスレッド名");
+          if (!title) return;
+          const id = "conv_" + Date.now();
+          conversations.push({ id, title, description: "", messages: [] });
+          saveConversations();
+          currentConvId = id;
+          renderConvList();
+          renderChat();
+        });
+        convListEl.appendChild(add);
+      }
+
+      function renderChat() {
+        chatThread.innerHTML = "";
+        const conv = conversations.find(c => c.id === currentConvId);
+        if (!conv) {
+          chatTitle.textContent = "会話を選択してください";
+          chatSub.textContent = "上のスレッドから選ぶとメッセージが表示されます。";
+          return;
+        }
+        chatTitle.textContent = conv.title;
+        chatSub.textContent = conv.description || "";
+
+        if (!conv.messages || conv.messages.length === 0) {
+          const info = document.createElement("div");
+          info.className = "empty";
+          info.textContent = "まだメッセージがありません。";
+          chatThread.appendChild(info);
+          return;
+        }
+
+        conv.messages
+          .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+          .forEach(msg => {
+            const div = document.createElement("div");
+            div.className = "msg " + (msg.from === "me" ? "me" : "other");
+
+            const text = document.createElement("div");
+            text.textContent = msg.text;
+
+            const meta = document.createElement("div");
+            meta.className = "msg-meta";
+            meta.textContent = `${msg.from === "me" ? "自分" : msg.fromHandle || ""} · ${formatTime(msg.createdAt)}`;
+
+            div.appendChild(text);
+            div.appendChild(meta);
+            chatThread.appendChild(div);
+          });
+
+        chatThread.scrollTop = chatThread.scrollHeight;
+      }
+
+      function renderPeopleList() {
+        peopleListEl.innerHTML = "";
+        if (!users || users.length === 0) {
+          peopleSummary.textContent = "まだユーザーが登録されていません。";
+          return;
+        }
+        if (!currentUser) {
+          peopleSummary.textContent = "ログインするとフォロー設定ができます。";
+          return;
+        }
+
+        const followersCount = currentUser.followers?.length || 0;
+        const followingCount = currentUser.following?.length || 0;
+        const closeCount = currentUser.closeFriends?.length || 0;
+        peopleSummary.textContent =
+          `@${currentUser.handle} / フォロワー ${followersCount} / フォロー中 ${followingCount} / 親しい友達 ${closeCount}`;
+
+        const others = users.filter(u => u.email !== currentUser.email);
+        if (others.length === 0) {
+          const info = document.createElement("div");
+          info.className = "status";
+          info.textContent = "他のユーザーはまだいません。";
+          peopleListEl.appendChild(info);
+          return;
+        }
+
+        others.forEach(u => {
+          ensureUserExtraFields(u);
+          const item = document.createElement("div");
+          item.className = "people-item";
+
+          const row = document.createElement("div");
+          row.className = "people-row";
+
+          const main = document.createElement("div");
+          main.className = "people-main";
+
+          const h = document.createElement("div");
+          h.textContent = `@${u.handle || "user"}`;
+
+          const sub = document.createElement("div");
+          sub.className = "people-sub";
+          const fCount = u.followers?.length || 0;
+          const gCount = u.following?.length || 0;
+          sub.textContent = `フォロワー ${fCount} / フォロー中 ${gCount}`;
+
+          main.appendChild(h);
+          main.appendChild(sub);
+
+          const btnBox = document.createElement("div");
+          btnBox.style.display = "flex";
+          btnBox.style.flexDirection = "column";
+          btnBox.style.gap = "4px";
+
+          const isFollowing = (currentUser.following || []).includes(u.handle);
+          const followBtn = document.createElement("button");
+          followBtn.className = "btn small";
+          followBtn.textContent = isFollowing ? "フォロー中" : "フォロー";
+          followBtn.addEventListener("click", () => toggleFollow(currentUser, u));
+
+          const isClose = (currentUser.closeFriends || []).includes(u.handle);
+          const closeBtn = document.createElement("button");
+          closeBtn.className = "btn small";
+          closeBtn.textContent = isClose ? "⭐ 親しい友達" : "☆ 親しい友達に";
+          closeBtn.addEventListener("click", () => toggleCloseFriend(currentUser, u));
+
+          btnBox.appendChild(followBtn);
+          btnBox.appendChild(closeBtn);
+
+          row.appendChild(main);
+          row.appendChild(btnBox);
+
+          const pill = document.createElement("div");
+          pill.className = "pill-follow";
+          const rel = [];
+          if (isFollowing) rel.push("あなたがフォロー中");
+          if ((u.followers || []).includes(currentUser.handle)) rel.push("あなたをフォロー");
+          if (isClose) rel.push("親しい友達");
+          pill.textContent = rel.length ? rel.join(" / ") : "関係なし";
+
+          item.appendChild(row);
+          item.appendChild(pill);
+
+          peopleListEl.appendChild(item);
+        });
+      }
+
+      function toggleFollow(me, other) {
+        ensureUserExtraFields(me);
+        ensureUserExtraFields(other);
+
+        const isFollowing = (me.following || []).includes(other.handle);
+        if (isFollowing) {
+          me.following = me.following.filter(h => h !== other.handle);
+          other.followers = (other.followers || []).filter(h => h !== me.handle);
+        } else {
+          me.following.push(other.handle);
+          other.followers = other.followers || [];
+          if (!other.followers.includes(me.handle)) {
+            other.followers.push(me.handle);
+          }
+        }
+        users = users.map(u => {
+          if (u.email === me.email) return me;
+          if (u.email === other.email) return other;
+          return u;
+        });
+        saveUsers();
+        updateNav();
+        renderFeed();
+      }
+
+      function toggleCloseFriend(me, other) {
+        ensureUserExtraFields(me);
+        me.closeFriends = me.closeFriends || [];
+        const isClose = me.closeFriends.includes(other.handle);
+        if (isClose) {
+          me.closeFriends = me.closeFriends.filter(h => h !== other.handle);
+        } else {
+          me.closeFriends.push(other.handle);
+        }
+        users = users.map(u => (u.email === me.email ? me : u));
+        saveUsers();
+        updateNav();
+      }
+
+      // ---- Meals ----
+      function addMealFromFood(food, multiplier) {
+        if (!currentUser) {
+          mealStatus.textContent = "ログインしてから食事を登録してください。";
+          return;
+        }
+        const dateVal = mealDate.value;
+        const timeVal = mealTime.value;
+        if (!dateVal) {
+          mealStatus.textContent = "日付を選んでください。";
+          return;
+        }
+        const factor = Number(multiplier) > 0 ? Number(multiplier) : 1;
+        const meal = {
+          id: "meal_" + Date.now() + "_" + Math.random().toString(36).slice(2),
+          userEmail: currentUser.email,
+          date: dateVal,
+          time: timeVal,
+          title: `${food.name} x${factor}`,
+          note: `${Math.round(food.kcal * factor)}kcal / P${Math.round(food.protein * factor)}g / F${Math.round(food.fat * factor)}g / C${Math.round(food.carbs * factor)}g`,
+          kcal: Math.round(food.kcal * factor),
+          protein: Math.round(food.protein * factor),
+          fat: Math.round(food.fat * factor),
+          carbs: Math.round(food.carbs * factor),
+          createdAt: new Date().toISOString()
+        };
+        meals.push(meal);
+        saveMeals();
+        mealStatus.textContent = "食事を追加しました。";
+        renderMeals();
+      }
+
+      function renderMeals() {
+        mealList.innerHTML = "";
+        if (!currentUser) {
+          mealEmpty.classList.add("hidden");
+          return;
+        }
+        const selectedDate = mealDate.value;
+        let myMeals = meals.filter(m => m.userEmail === currentUser.email);
+        if (selectedDate) {
+          myMeals = myMeals.filter(m => m.date === selectedDate);
+        }
+        if (myMeals.length === 0) {
+          mealEmpty.classList.remove("hidden");
+          return;
+        }
+        mealEmpty.classList.add("hidden");
+
+        let totalKcal = 0, totalP = 0, totalF = 0, totalC = 0;
+        myMeals.forEach(m => {
+          totalKcal += m.kcal || 0;
+          totalP += m.protein || 0;
+          totalF += m.fat || 0;
+          totalC += m.carbs || 0;
+        });
+
+        const summary = document.createElement("div");
+        summary.className = "meal-summary";
+
+        const main = document.createElement("div");
+        main.className = "meal-summary-main";
+        main.textContent = `${selectedDate ? formatDate(selectedDate) : "全期間"} の合計: ${totalKcal}kcal`;
+
+        const sub = document.createElement("div");
+        sub.className = "meal-summary-sub";
+        const pText = `P${totalP}g`;
+        const fText = `F${totalF}g`;
+        const cText = `C${totalC}g`;
+
+        if (currentUser && currentUser.calorieTarget && currentUser.calorieTarget > 0) {
+          const target = currentUser.calorieTarget;
+          const ratio = Math.min(totalKcal / target, 1);
+          sub.textContent = `${pText} / ${fText} / ${cText} · 目標 ${target}kcal の ${(ratio * 100).toFixed(0)}%`;
+          const bar = document.createElement("div");
+          bar.className = "meal-summary-bar";
+          const inner = document.createElement("div");
+          inner.className = "meal-summary-bar-inner";
+          inner.style.width = `${Math.min(ratio * 100, 100)}%`;
+          bar.appendChild(inner);
+          summary.appendChild(main);
+          summary.appendChild(sub);
+          summary.appendChild(bar);
+        } else {
+          sub.textContent = `${pText} / ${fText} / ${cText}`;
+          summary.appendChild(main);
+          summary.appendChild(sub);
+        }
+
+        mealList.appendChild(summary);
+
+        const sorted = [...myMeals].sort((a, b) =>
+          (b.date + "T23:59:59").localeCompare(a.date + "T23:59:59") ||
+          new Date(b.createdAt) - new Date(a.createdAt)
+        );
+
+        sorted.forEach(m => {
+          const item = document.createElement("div");
+          item.className = "meal-item";
+
+          const top = document.createElement("div");
+          top.className = "meal-top";
+
+          const left = document.createElement("div");
+          left.textContent = `${m.time || ""} · ${m.title || ""}`;
+
+          const right = document.createElement("div");
+          right.className = "tag-pill";
+          right.textContent = `${m.kcal || "?"}kcal`;
+
+          top.appendChild(left);
+          top.appendChild(right);
+
+          const mainLine = document.createElement("div");
+          mainLine.className = "meal-main";
+          mainLine.textContent = m.note || "";
+
+          const meta = document.createElement("div");
+          meta.className = "meal-meta";
+          meta.textContent = `登録: ${formatTime(m.createdAt)}`;
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "btn small";
+          delBtn.style.alignSelf = "flex-end";
+          delBtn.textContent = "削除";
+          delBtn.addEventListener("click", () => {
+            if (!confirm("この食事ログを削除しますか？")) return;
+            meals = meals.filter(x => x.id !== m.id);
+            saveMeals();
+            renderMeals();
+          });
+
+          item.appendChild(top);
+          item.appendChild(mainLine);
+          item.appendChild(meta);
+          item.appendChild(delBtn);
+
+          mealList.appendChild(item);
+        });
+      }
+
+      function searchFood() {
+        mealFoodResults.innerHTML = "";
+        const q = (mealFoodSearch.value || "").trim().toLowerCase();
+        if (!q) {
+          mealFoodResults.innerHTML = "";
+          return;
+        }
+        const results = FOOD_DB.filter(f => f.name.toLowerCase().includes(q));
+        if (results.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "該当する食べ物が見つかりませんでした。";
+          mealFoodResults.appendChild(empty);
+          return;
+        }
+
+        results.forEach(food => {
+          const card = document.createElement("div");
+          card.className = "food-result";
+
+          const top = document.createElement("div");
+          top.className = "food-result-top";
+
+          const nameSpan = document.createElement("div");
+          nameSpan.textContent = food.name;
+
+          const kcalSpan = document.createElement("div");
+          kcalSpan.className = "tag-pill";
+          kcalSpan.textContent = `${food.kcal}kcal`;
+
+          top.appendChild(nameSpan);
+          top.appendChild(kcalSpan);
+
+          const macro = document.createElement("div");
+          macro.className = "food-macro";
+          macro.textContent =
+            `P${food.protein}g / F${food.fat}g / C${food.carbs}g（1食分目安）`;
+
+          const qtyRow = document.createElement("div");
+          qtyRow.style.display = "flex";
+          qtyRow.style.alignItems = "center";
+          qtyRow.style.gap = "4px";
+          qtyRow.style.marginTop = "4px";
+
+          const qtyLabel = document.createElement("span");
+          qtyLabel.className = "food-macro";
+          qtyLabel.textContent = "何食分:";
+
+          const qtyInput = document.createElement("input");
+          qtyInput.type = "number";
+          qtyInput.min = "0.25";
+          qtyInput.step = "0.25";
+          qtyInput.value = "1";
+          qtyInput.style.width = "60px";
+          qtyInput.style.fontSize = "11px";
+          qtyInput.style.padding = "4px 6px";
+
+          const btnRow = document.createElement("div");
+          btnRow.className = "btn-row";
+          const addBtn = document.createElement("button");
+          addBtn.className = "btn small";
+          addBtn.textContent = "この量で追加";
+          addBtn.addEventListener("click", () => {
+            const factor = Number(qtyInput.value) || 1;
+            addMealFromFood(food, factor);
+          });
+          btnRow.appendChild(addBtn);
+
+          qtyRow.appendChild(qtyLabel);
+          qtyRow.appendChild(qtyInput);
+
+          card.appendChild(top);
+          card.appendChild(macro);
+          card.appendChild(qtyRow);
+          card.appendChild(btnRow);
+
+          mealFoodResults.appendChild(card);
+        });
+      }
+
+      // ---- Gyms ----
+      function stars(n) {
+        if (!n || n < 1) return "評価なし";
+        const full = "★".repeat(n);
+        const empty = "☆".repeat(5 - n);
+        return full + empty;
+      }
+
+      function renderGyms() {
+        gymList.innerHTML = "";
+        if (!currentUser) {
+          gymEmpty.classList.add("hidden");
+          return;
+        }
+        const query = (gymSearch.value || "").toLowerCase();
+        let myGyms = gyms.filter(g => g.userEmail === currentUser.email);
+        if (query) {
+          myGyms = myGyms.filter(g => g.name.toLowerCase().includes(query));
+        }
+        if (myGyms.length === 0) {
+          gymEmpty.classList.remove("hidden");
+          return;
+        }
+        gymEmpty.classList.add("hidden");
+
+        myGyms
+          .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+          .forEach(g => {
+            const item = document.createElement("div");
+            item.className = "gym-item";
+
+            const top = document.createElement("div");
+            top.className = "gym-top";
+            const left = document.createElement("div");
+            left.textContent = g.name;
+            const right = document.createElement("div");
+            right.className = "rating-stars";
+            right.textContent = g.rating ? stars(g.rating) : "評価なし";
+            top.appendChild(left);
+            top.appendChild(right);
+
+            const main = document.createElement("div");
+            main.className = "gym-main";
+            main.textContent = g.note || "(メモなし)";
+
+            const meta = document.createElement("div");
+            meta.className = "gym-meta";
+            meta.textContent = `更新: ${formatTime(g.updatedAt)}`;
+
+            const delBtn = document.createElement("button");
+            delBtn.className = "btn small";
+            delBtn.style.alignSelf = "flex-end";
+            delBtn.textContent = "削除";
+            delBtn.addEventListener("click", () => {
+              if (!confirm("このジム情報を削除しますか？")) return;
+              gyms = gyms.filter(x => x.id !== g.id);
+              saveGyms();
+              renderGyms();
+            });
+
+            item.appendChild(top);
+            item.appendChild(main);
+            item.appendChild(meta);
+            item.appendChild(delBtn);
+
+            gymList.appendChild(item);
+          });
+      }
+
+      function clearGymForm() {
+        gymName.value = "";
+        gymRating.value = "";
+        gymNote.value = "";
+      }
+
+      // ---- Auth modal ----
+      function openAuthModal() {
+        authStatus.textContent = "";
+        authBackdrop.classList.remove("hidden");
+      }
+      function closeAuthModal() {
+        authBackdrop.classList.add("hidden");
+      }
+
+      btnOpenAuth.addEventListener("click", openAuthModal);
+      settingsOpenAuth.addEventListener("click", openAuthModal);
+      authClose.addEventListener("click", closeAuthModal);
+      authBackdrop.addEventListener("click", (e) => {
+        if (e.target === authBackdrop) closeAuthModal();
+      });
+
+      authFillDemo.addEventListener("click", () => {
+        authEmail.value = "demo@example.com";
+        authHandle.value = "demo_lifter";
+        authPassword.value = "password123";
+        authStatus.textContent = "テスト用情報を入力しました。";
+      });
+
+      authForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const email = authEmail.value.trim();
+        const handle = authHandle.value.trim();
+        const pw = authPassword.value;
+
+        if (!email || !pw) {
+          authStatus.textContent = "メールアドレスとパスワードは必須です。";
+          return;
+        }
+
+        const idx = users.findIndex(u => u.email === email);
+        if (idx >= 0) {
+          const existing = ensureUserExtraFields(users[idx]);
+          if (existing.password !== pw) {
+            authStatus.textContent = "パスワードが違います。";
+            return;
+          }
+          currentUser = existing;
+          saveCurrentUser();
+          authStatus.textContent = "ログインしました。";
+        } else {
+          const user = ensureUserExtraFields({
+            email,
+            handle: handle || email.split("@")[0],
+            password: pw,
+            createdAt: new Date().toISOString()
+          });
+          users.push(user);
+          saveUsers();
+          currentUser = user;
+          saveCurrentUser();
+          authStatus.textContent = "アカウントを作成しました。";
+        }
+
+        updateNav();
+        renderFeed();
+        renderPeopleList();
+        renderMeals();
+        renderGyms();
+        closeAuthModal();
+      });
+
+      // ---- logout ----
+      btnLogout.addEventListener("click", () => {
+        if (!confirm("ログアウトしますか？（データは残ります）")) return;
+        currentUser = null;
+        saveCurrentUser();
+        updateNav();
+        renderFeed();
+        renderMeals();
+        renderGyms();
+      });
+
+      // ---- Post modal ----
+      function openPostModal() {
+        if (!currentUser) {
+          openAuthModal();
+          authStatus.textContent = "先にログインしてください。";
+          return;
+        }
+        postStatus.textContent = "";
+        postBackdrop.classList.remove("hidden");
+      }
+      function closePostModal() {
+        postBackdrop.classList.add("hidden");
+      }
+
+      fabPost.addEventListener("click", openPostModal);
+      postClose.addEventListener("click", closePostModal);
+      postBackdrop.addEventListener("click", (e) => {
+        if (e.target === postBackdrop) closePostModal();
+      });
+
+      function clearPostForm() {
+        const today = new Date().toISOString().slice(0, 10);
+        postDate.value = today;
+        postBodyweight.value = "";
+        postVisibility.value = "public";
+        if (postMediaFile) postMediaFile.value = "";
+        postNote.value = "";
+        resetTrainingSets();
+      }
+
+      postClear.addEventListener("click", () => {
+        clearPostForm();
+        postStatus.textContent = "入力をリセットしました。";
+      });
+
+      btnAddSet.addEventListener("click", () => createTrainingSetRow());
+
+      postForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!currentUser) {
+          postStatus.textContent = "先にログインしてください。";
+          return;
+        }
+
+        const dateVal = postDate.value;
+        const bw = postBodyweight.value.trim();
+        const visibility = postVisibility.value || "public";
+        const note = postNote.value.trim();
+
+        let mediaType = "";
+        let mediaUrl = "";
+        let mediaData = "";
+
+        if (postMediaFile && postMediaFile.files && postMediaFile.files[0]) {
+          const file = postMediaFile.files[0];
+          mediaType = file.type.startsWith("video") ? "video" : "image";
+          try {
+            mediaData = await readFileAsDataUrl(file);
+          } catch (err) {
+            console.error(err);
+            postStatus.textContent = "画像/動画の読み込みに失敗しました。";
+            return;
+          }
+        }
+
+        const trainingSets = [];
+        const rows = trainingSetsContainer.querySelectorAll(".training-set-row");
+        rows.forEach(row => {
+          const inputs = row.querySelectorAll("input,select");
+          if (inputs.length < 5) return;
+          const exercise = inputs[0].value.trim();
+          const weightKg = inputs[1].value.trim();
+          const reps = inputs[2].value;
+          const sets = inputs[3].value;
+          const rpe = inputs[4].value;
+          if (exercise || weightKg || reps || sets || rpe) {
+            trainingSets.push({ exercise, weightKg, reps, sets, rpe });
+          }
+        });
+
+        const hasTraining = trainingSets.length > 0;
+        const hasMedia = !!mediaData || !!mediaUrl;
+        const hasNote = !!note;
+
+        if (!dateVal) {
+          postStatus.textContent = "日付は必須です。";
+          return;
+        }
+        if (!hasTraining && !hasMedia && !hasNote) {
+          postStatus.textContent = "トレーニング / メモ / 画像のどれかは入れてください。";
+          return;
+        }
+
+        let postType = "note";
+        if (hasTraining) postType = "training";
+        else if (hasMedia) postType = "physique";
+
+        const firstSet = trainingSets[0] || {};
+
+        const post = {
+          id: "post_" + Date.now() + "_" + Math.random().toString(36).slice(2),
+          userEmail: currentUser.email,
+          userHandle: currentUser.handle,
+          type: postType,
+          date: dateVal,
+          bodyWeight: bw || null,
+          visibility,
+          note,
+          trainingSets,
+          exercise: firstSet.exercise || "",
+          weightKg: firstSet.weightKg || "",
+          reps: firstSet.reps || "",
+          sets: firstSet.sets || "",
+          rpe: firstSet.rpe || "",
+          mediaType,
+          mediaUrl,
+          mediaData,
+          mediaSessionUrl: "",
+          likes: 0,
+          liked: false,
+          comments: [],
+          createdAt: new Date().toISOString()
+        };
+
+        posts.push(post);
+        savePosts();
+        postStatus.textContent = "投稿を保存しました。";
+        clearPostForm();
+        closePostModal();
+        renderFeed();
+      });
+
+      // ---- Messages ----
+      chatSend.addEventListener("click", () => {
+        if (!currentConvId) {
+          alert("先にスレッドを選んでください。");
+          return;
+        }
+        const text = chatInput.value.trim();
+        if (!text) return;
+        const conv = conversations.find(c => c.id === currentConvId);
+        if (!conv) return;
+        conv.messages = conv.messages || [];
+        conv.messages.push({
+          id: "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2),
+          from: "me",
+          fromHandle: currentUser ? currentUser.handle : "me",
+          text,
+          createdAt: new Date().toISOString()
+        });
+        saveConversations();
+        chatInput.value = "";
+        renderChat();
+      });
+
+      // ---- side tabs ----
+      sideTabBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const section = btn.dataset.section;
+          sideTabBtns.forEach(b => b.classList.toggle("active", b === btn));
+          sideSections.forEach(s => s.classList.toggle("active", s.id === "side-" + section));
+        });
+      });
+
+      // ---- events: Meals / Gyms / theme / plan ----
+      mealFoodSearchBtn.addEventListener("click", searchFood);
+      mealFoodSearch.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          searchFood();
+        }
+      });
+
+      mealDate.addEventListener("change", renderMeals);
+
+      gymSave.addEventListener("click", () => {
+        if (!currentUser) {
+          gymStatus.textContent = "ログインしてからジム情報を保存してください。";
+          return;
+        }
+        const nameVal = gymName.value.trim();
+        const ratingVal = gymRating.value;
+        const noteVal = gymNote.value.trim();
+        if (!nameVal) {
+          gymStatus.textContent = "ジム名は必須です。";
+          return;
+        }
+        if (!ratingVal && !noteVal) {
+          gymStatus.textContent = "評価かメモのどちらかは入れてください。";
+          return;
+        }
+        const gym = {
+          id: "gym_" + Date.now() + "_" + Math.random().toString(36).slice(2),
+          userEmail: currentUser.email,
+          name: nameVal,
+          rating: ratingVal ? Number(ratingVal) : null,
+          note: noteVal,
+          updatedAt: new Date().toISOString()
+        };
+        const idx = gyms.findIndex(g => g.userEmail === currentUser.email && g.name === nameVal);
+        if (idx >= 0) {
+          gyms[idx] = gym;
+        } else {
+          gyms.push(gym);
+        }
+        saveGyms();
+        gymStatus.textContent = "ジム情報を保存しました。";
+        clearGymForm();
+        renderGyms();
+      });
+
+      gymClear.addEventListener("click", () => {
+        clearGymForm();
+        gymStatus.textContent = "入力をリセットしました。";
+      });
+
+      gymSearch.addEventListener("input", renderGyms);
+
+      themeSelect.addEventListener("change", () => {
+        const value = themeSelect.value || "light";
+        applyTheme(value);
+      });
+
+      btnPlanFree.addEventListener("click", () => {
+        if (!currentUser) {
+          openAuthModal();
+          return;
+        }
+        currentUser.plan = "free";
+        users = users.map(u => (u.email === currentUser.email ? currentUser : u));
+        saveUsers();
+        saveCurrentUser();
+        updateNav();
+        renderMeals();
+      });
+
+      btnPlanPro.addEventListener("click", () => {
+        if (!currentUser) {
+          openAuthModal();
+          return;
+        }
+        alert("Proプランはプロトタイプです。実際の課金はまだありません。");
+        currentUser.plan = "pro";
+        users = users.map(u => (u.email === currentUser.email ? currentUser : u));
+        saveUsers();
+        saveCurrentUser();
+        updateNav();
+        renderMeals();
+      });
+
+      calTarget.addEventListener("change", () => {
+        if (!currentUser) {
+          calTarget.value = "";
+          return;
+        }
+        if (currentUser.plan !== "pro") {
+          calTarget.value = currentUser.calorieTarget || "";
+          alert("カロリー目標の編集は Proプラン専用です。");
+          return;
+        }
+        const v = parseInt(calTarget.value, 10);
+        currentUser.calorieTarget = Number.isFinite(v) && v > 0 ? v : null;
+        users = users.map(u => (u.email === currentUser.email ? currentUser : u));
+        saveUsers();
+        saveCurrentUser();
+        renderMeals();
+      });
+
+      clearAllBtn.addEventListener("click", () => {
+        if (!confirm("本当に全データを削除しますか？")) return;
+        localStorage.removeItem(STORAGE_USERS_KEY);
+        localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
+        localStorage.removeItem(STORAGE_POSTS_KEY);
+        localStorage.removeItem(STORAGE_CONVS_KEY);
+        localStorage.removeItem(STORAGE_MEALS_KEY);
+        localStorage.removeItem(STORAGE_GYMS_KEY);
+        users = [];
+        posts = [];
+        conversations = [];
+        meals = [];
+        gyms = [];
+        currentUser = null;
+        currentConvId = null;
+        loadConversations();
+        updateNav();
+        renderFeed();
+        renderConvList();
+        renderChat();
+        renderPeopleList();
+        renderMeals();
+        renderGyms();
+        clearStatus.textContent = "全データを削除しました。";
+      });
+
+      // ---- Profile ----
+      function openProfile(handle) {
+        const user = users.find(u => (u.handle || "").toLowerCase() === (handle || "").toLowerCase());
+        if (!user) {
+          alert("ユーザーが見つかりませんでした。");
+          return;
+        }
+
+        profileTitle.textContent = `@${user.handle || "user"}`;
+        const followersCount = user.followers?.length || 0;
+        const followingCount = user.following?.length || 0;
+        const closeCount = user.closeFriends?.length || 0;
+
+        profileSub.textContent =
+          `${user.email || ""} / フォロワー ${followersCount} / フォロー中 ${followingCount} / 親しい友達 ${closeCount}`;
+
+        profileSummary.innerHTML = "";
+        if (currentUser) {
+          const card = document.createElement("div");
+          card.className = "people-item";
+
+          const row = document.createElement("div");
+          row.className = "people-row";
+
+          const main = document.createElement("div");
+          main.className = "people-main";
+
+          const selfRel = document.createElement("div");
+          selfRel.className = "people-sub";
+
+          const rel = [];
+          if ((currentUser.following || []).includes(user.handle)) rel.push("あなたがフォロー中");
+          if ((user.followers || []).includes(currentUser.handle)) rel.push("あなたをフォロー");
+          if ((currentUser.closeFriends || []).includes(user.handle)) rel.push("親しい友達に設定中");
+
+          selfRel.textContent = rel.length ? rel.join(" / ") : "現在関係なし";
+
+          main.appendChild(selfRel);
+
+          const btnBox = document.createElement("div");
+          btnBox.style.display = "flex";
+          btnBox.style.flexDirection = "column";
+          btnBox.style.gap = "4px";
+
+          const isFollowing = (currentUser.following || []).includes(user.handle);
+          const followBtn = document.createElement("button");
+          followBtn.className = "btn small";
+          followBtn.textContent = isFollowing ? "フォロー中" : "フォロー";
+          followBtn.addEventListener("click", () => toggleFollow(currentUser, user));
+
+          const isClose = (currentUser.closeFriends || []).includes(user.handle);
+          const closeBtn = document.createElement("button");
+          closeBtn.className = "btn small";
+          closeBtn.textContent = isClose ? "⭐ 親しい友達" : "☆ 親しい友達に";
+          closeBtn.addEventListener("click", () => toggleCloseFriend(currentUser, user));
+
+          btnBox.appendChild(followBtn);
+          btnBox.appendChild(closeBtn);
+
+          row.appendChild(main);
+          row.appendChild(btnBox);
+          card.appendChild(row);
+          profileSummary.appendChild(card);
+        } else {
+          const info = document.createElement("div");
+          info.className = "status";
+          info.textContent = "ログインするとフォロー状態を変更できます。";
+          profileSummary.appendChild(info);
+        }
+
+        profilePosts.innerHTML = "";
+        const userPosts = posts.filter(p => p.userEmail === user.email)
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        if (userPosts.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "まだ投稿がありません。";
+          profilePosts.appendChild(empty);
+        } else {
+          userPosts.forEach(p => {
+            const item = document.createElement("div");
+            item.className = "meal-item";
+
+            const top = document.createElement("div");
+            top.className = "meal-top";
+            const left = document.createElement("div");
+            left.textContent = `${formatDate(p.date)} · ${typeLabel(p.type || "training")}`;
+            const right = document.createElement("div");
+            right.className = "tag-pill";
+            right.textContent = visibilityLabel(p.visibility || "public");
+            top.appendChild(left);
+            top.appendChild(right);
+
+            const main = document.createElement("div");
+            main.className = "meal-main";
+            const ex = p.exercise || (p.trainingSets && p.trainingSets[0]?.exercise) || "";
+            const note = (p.note || "").slice(0, 40);
+            main.textContent = [ex, note].filter(Boolean).join(" | ");
+
+            item.appendChild(top);
+            item.appendChild(main);
+            profilePosts.appendChild(item);
+          });
+        }
+
+        profileBackdrop.classList.remove("hidden");
+      }
+
+      profileClose.addEventListener("click", () => {
+        profileBackdrop.classList.add("hidden");
+      });
+      profileBackdrop.addEventListener("click", (e) => {
+        if (e.target === profileBackdrop) {
+          profileBackdrop.classList.add("hidden");
+        }
+      });
+
+      // ---- Search ----
+      function openSearchModal() {
+        searchInput.value = "";
+        searchResults.innerHTML = "";
+        searchBackdrop.classList.remove("hidden");
+        setTimeout(() => searchInput.focus(), 0);
+      }
+      function closeSearchModal() {
+        searchBackdrop.classList.add("hidden");
+      }
+
+      btnOpenSearch.addEventListener("click", openSearchModal);
+      searchClose.addEventListener("click", closeSearchModal);
+      searchBackdrop.addEventListener("click", (e) => {
+        if (e.target === searchBackdrop) closeSearchModal();
+      });
+
+      function renderSearchResults(q) {
+        searchResults.innerHTML = "";
+        const query = (q || "").trim().toLowerCase();
+        if (!query) return;
+
+        const uRes = users.filter(u =>
+          (u.handle || "").toLowerCase().includes(query) ||
+          (u.email || "").toLowerCase().includes(query)
+        );
+
+        const pRes = posts.filter(p => {
+          const owner = getUserByEmail(p.userEmail) || {};
+          const textParts = [
+            p.note || "",
+            p.exercise || "",
+            (p.trainingSets || []).map(s => s.exercise || "").join(" "),
+            owner.handle || "",
+          ].join(" ").toLowerCase();
+          return textParts.includes(query);
+        });
+
+        if (uRes.length === 0 && pRes.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "一致する結果がありません。";
+          searchResults.appendChild(empty);
+          return;
+        }
+
+        function addSectionTitle(label, count) {
+          const t = document.createElement("div");
+          t.className = "search-section-title";
+          t.textContent = `${label} (${count})`;
+          searchResults.appendChild(t);
+        }
+
+        if (uRes.length) {
+          addSectionTitle("Users", uRes.length);
+          uRes.forEach(u => {
+            const item = document.createElement("div");
+            item.className = "people-item";
+            item.style.cursor = "pointer";
+
+            const row = document.createElement("div");
+            row.className = "people-row";
+
+            const main = document.createElement("div");
+            main.className = "people-main";
+
+            const h = document.createElement("div");
+            h.textContent = `@${u.handle || "user"}`;
+
+            const sub = document.createElement("div");
+            sub.className = "people-sub";
+            sub.textContent = u.email || "";
+
+            main.appendChild(h);
+            main.appendChild(sub);
+            row.appendChild(main);
+            item.appendChild(row);
+
+            item.addEventListener("click", () => {
+              openProfile(u.handle);
+              closeSearchModal();
+            });
+
+            searchResults.appendChild(item);
+          });
+        }
+
+        if (pRes.length) {
+          addSectionTitle("Posts", pRes.length);
+          pRes
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .forEach(p => {
+              const owner = getUserByEmail(p.userEmail) || {};
+              const item = document.createElement("div");
+              item.className = "meal-item";
+
+              const top = document.createElement("div");
+              top.className = "meal-top";
+
+              const left = document.createElement("div");
+              left.textContent = `@${owner.handle || "user"} · ${formatDate(p.date)}`;
+
+              const right = document.createElement("div");
+              right.className = "tag-pill";
+              right.textContent = typeLabel(p.type || "training");
+
+              top.appendChild(left);
+              top.appendChild(right);
+
+              const main = document.createElement("div");
+              main.className = "meal-main";
+              const ex = p.exercise || (p.trainingSets && p.trainingSets[0]?.exercise) || "";
+              const note = (p.note || "").slice(0, 40);
+              main.textContent = [ex, note].filter(Boolean).join(" | ");
+
+              item.appendChild(top);
+              item.appendChild(main);
+
+              searchResults.appendChild(item);
+            });
+        }
+      }
+
+      searchInput.addEventListener("input", () => {
+        renderSearchResults(searchInput.value);
+      });
+      searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          renderSearchResults(searchInput.value);
+        }
+      });
+
+      // ---- Language ----
+      langSelect.addEventListener("change", () => {
+        const lang = langSelect.value === "en" ? "en" : "ja";
+        applyLanguage(lang);
+      });
+
+      // ---- init ----
+      function init() {
+        loadUsers();
+        loadPosts();
+        loadConversations();
+        loadMeals();
+        loadGyms();
+        loadCurrentUser();
+        loadTheme();
+
+        const lang = loadLanguage();
+        langSelect.value = lang;
+        applyLanguage(lang);
+
+        const today = new Date().toISOString().slice(0, 10);
+        if (postDate && !postDate.value) postDate.value = today;
+        if (mealDate && !mealDate.value) mealDate.value = today;
+
+        resetTrainingSets();
+        updateNav();
+        renderFeed();
+        renderConvList();
+        currentConvId = conversations[0]?.id || null;
+        renderConvList();
+        renderChat();
+        renderPeopleList();
+        renderMeals();
+        renderGyms();
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
