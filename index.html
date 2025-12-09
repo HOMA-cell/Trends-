@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Trends</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #f4f5fb;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --accent-soft: #e0edff;
+      --border: #e5e7eb;
+      --text-main: #111827;
+      --text-sub: #6b7280;
+      --danger: #dc2626;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+    }
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        system-ui, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #e0ecff, #f6f7fb);
+      color: var(--text-main);
+    }
+    .app-shell {
+      max-width: 1120px;
+      margin: 24px auto 40px;
+      padding: 0 16px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .brand-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .lang-select {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    select,
+    input,
+    textarea,
+    button {
+      font-size: 14px;
+    }
+    select,
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="file"],
+    textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease,
+        background 0.15s ease;
+    }
+    select:focus,
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+      background: #ffffff;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+    }
+    .btn-danger {
+      background: #fee2e2;
+      color: var(--danger);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.2fr);
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    .card-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .card-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .feed-main {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    label {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .post-actions-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .error-bar {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--danger);
+    }
+    .feed-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+      margin-bottom: 8px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill-select {
+      display: flex;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .pill-option {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--text-sub);
+    }
+    .pill-option.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .search-box {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+    }
+    .search-box input {
+      border: none;
+      background: transparent;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+    .search-box input:focus {
+      box-shadow: none;
+    }
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .post-card {
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      padding: 10px 12px;
+      background: #ffffff;
+    }
+    .post-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .post-user {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: #dbeafe;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1d4ed8;
+    }
+    .handle {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .handle span {
+      color: var(--text-sub);
+      font-weight: 400;
+      margin-left: 4px;
+    }
+    .post-meta {
+      font-size: 11px;
+      color: var(--text-sub);
+      text-align: right;
+    }
+    .post-body {
+      font-size: 13px;
+      margin-bottom: 4px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .post-media {
+      margin: 6px 0;
+    }
+    .post-media img,
+    .post-media video {
+      max-width: 100%;
+      border-radius: 10px;
+      display: block;
+    }
+    .post-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .tag-pill {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      color: var(--text-sub);
+    }
+    .card-small {
+      margin-bottom: 10px;
+    }
+    .account-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+    }
+    .account-row strong {
+      font-weight: 600;
+    }
+    .tips-list {
+      font-size: 12px;
+      color: var(--text-sub);
+      padding-left: 16px;
+      margin: 4px 0 0;
+    }
+    .debug-badge {
+      font-size: 11px;
+      color: var(--danger);
+    }
+    @media (max-width: 840px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .feed-list {
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <div class="brand">
+        <div class="brand-title">Trends</div>
+        <div class="brand-sub" data-i18n="tagline">
+          筋トレ専用SNS / シンプルに記録するだけ
+        </div>
+      </div>
+      <div class="lang-select">
+        <label for="langSelect">言語</label>
+        <select id="langSelect">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- LEFT: Feed -->
+      <main class="feed-main">
+        <section class="card">
+          <div class="card-title-row">
+            <div>
+              <div class="card-title" data-i18n="feedTitle">Feed</div>
+              <div class="card-sub" data-i18n="feedSub">
+                トレ記録・ボディチェック・メモなどのタイムライン
+              </div>
+            </div>
+          </div>
+
+          <!-- New post form -->
+          <div class="field-row">
+            <label for="postDate" data-i18n="date">日付</label>
+            <input id="postDate" type="date" />
+          </div>
+
+          <div class="field-grid">
+            <div class="field-row">
+              <label for="postWeight" data-i18n="weight">体重 (kg)</label>
+              <input id="postWeight" type="number" step="0.1" />
+            </div>
+            <div class="field-row">
+              <label for="mediaFile" data-i18n="mediaFile">画像 / 動画</label>
+              <input
+                id="mediaFile"
+                type="file"
+                accept="image/*,video/*"
+              />
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <div class="field-row">
+              <label for="postVisibility" data-i18n="visibility">公開範囲</label>
+              <select id="postVisibility">
+                <option value="public" data-i18n="visPublic">Public</option>
+                <option value="private" data-i18n="visPrivate">
+                  自分だけ
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label for="postNote" data-i18n="note">
+              キャプション / トレメモ
+            </label>
+            <textarea
+              id="postNote"
+              placeholder="bench 100kg x5 / RPE8 …"
+            ></textarea>
+          </div>
+
+          <div class="post-actions-row">
+            <button id="btnSubmitPost" class="btn-primary" data-i18n="submit">
+              投稿
+            </button>
+            <button id="btnResetPost" class="btn-secondary" data-i18n="reset">
+              リセット
+            </button>
+            <div id="postStatus" class="card-sub"></div>
+          </div>
+
+          <div id="errorBar" class="error-bar"></div>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:10px 0" />
+
+          <div class="feed-toolbar">
+            <div class="pill-select">
+              <div
+                class="pill-option active"
+                data-filter="all"
+                data-i18n="filterAll"
+              >
+                すべて
+              </div>
+              <div
+                class="pill-option"
+                data-filter="mine"
+                data-i18n="filterMine"
+              >
+                自分
+              </div>
+              <div
+                class="pill-option"
+                data-filter="public"
+                data-i18n="filterPublic"
+              >
+                Publicのみ
+              </div>
+            </div>
+            <div class="search-box">
+              <span style="font-size:12px; color:#9ca3af">🔍</span>
+              <input
+                id="searchInput"
+                type="text"
+                placeholder="caption / handle / メモで検索"
+              />
+            </div>
+          </div>
+
+          <div id="feedList" class="feed-list"></div>
+        </section>
+      </main>
+
+      <!-- RIGHT: Account / Tips -->
+      <aside>
+        <section class="card card-small">
+          <div class="card-title-row">
+            <div class="card-title" data-i18n="account">アカウント</div>
+          </div>
+          <div class="account-row">
+            <div id="accountInfo"></div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap">
+              <button id="btnLogin" class="btn-primary" data-i18n="login">
+                Log in / Sign up
+              </button>
+              <button
+                id="btnReloadFeed"
+                class="btn-outline"
+                data-i18n="reload"
+              >
+                Reload feed
+              </button>
+              <button id="btnLogout" class="btn-secondary" data-i18n="logout">
+                Log out
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card card-small">
+          <div class="card-title-row">
+            <div class="card-title" data-i18n="tipsTitle">使い方</div>
+          </div>
+          <ul class="tips-list">
+            <li data-i18n="tip1">毎日のトレを1行メモ。</li>
+            <li data-i18n="tip2">
+              見られたくない日は「自分だけ」を選択。
+            </li>
+            <li data-i18n="tip3">
+              画像アップでボディ変化をストック。
+            </li>
+          </ul>
+        </section>
+
+        <section class="card card-small">
+          <div class="card-title-row">
+            <div class="card-title">Debug / Dev</div>
+          </div>
+          <div class="account-row">
+            <span class="debug-badge"
+              >For now everything is intentionally simple.</span
+            >
+            <button id="btnClearCache" class="btn-danger">
+              Clear local cache
+            </button>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // ==== Supabase 設定 ====
+    const SUPABASE_URL = "https://sfuroqxcljlkbthblqva.supabase.co";
+    const SUPABASE_ANON_KEY =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdXJvcXhjbGpsa2J0aGJscXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxOTE0MTQsImV4cCI6MjA4MDc2NzQxNH0.v1qrjQgkPg3hPjIVCsKg3unwM0lvPGXkw8DvVm8YlRI";
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ==== 状態 ====
+    let currentUser = null;
+    let profilesCache = new Map();
+    let postsCache = [];
+    let currentFilter = "all";
+    let currentSearch = "";
+    let currentLang = "ja";
+
+    // ==== 簡単な i18n ====
+    const dict = {
+      ja: {
+        tagline: "筋トレ専用SNS / シンプルに記録するだけ",
+        feedTitle: "Feed",
+        feedSub: "トレ記録・ボディチェック・メモなどのタイムライン",
+        date: "日付",
+        weight: "体重 (kg)",
+        mediaFile: "画像 / 動画",
+        visibility: "公開範囲",
+        visPublic: "Public",
+        visPrivate: "自分だけ",
+        note: "キャプション / トレメモ",
+        submit: "投稿",
+        reset: "リセット",
+        filterAll: "すべて",
+        filterMine: "自分",
+        filterPublic: "Publicのみ",
+        account: "アカウント",
+        login: "Log in / Sign up",
+        reload: "Reload feed",
+        logout: "Log out",
+        tipsTitle: "使い方",
+        tip1: "毎日のトレを1行メモ。",
+        tip2: "見られたくない日は「自分だけ」を選択。",
+        tip3: "画像アップでボディ変化をストック。",
+      },
+      en: {
+        tagline: "Minimal workout-only SNS for logging.",
+        feedTitle: "Feed",
+        feedSub: "Timeline for workouts, check-in photos, and notes.",
+        date: "Date",
+        weight: "Bodyweight (kg)",
+        mediaFile: "Image / Video",
+        visibility: "Visibility",
+        visPublic: "Public",
+        visPrivate: "Private",
+        note: "Caption / Training memo",
+        submit: "Post",
+        reset: "Reset",
+        filterAll: "All",
+        filterMine: "Mine",
+        filterPublic: "Public only",
+        account: "Account",
+        login: "Log in / Sign up",
+        reload: "Reload feed",
+        logout: "Log out",
+        tipsTitle: "Tips",
+        tip1: "Log each session in one line.",
+        tip2: 'Use "Private" when you don\'t want others to see.',
+        tip3: "Upload photos to track physique changes.",
+      },
+    };
+
+    function applyLanguage(lang) {
+      currentLang = lang;
+      const t = dict[lang];
+      document
+        .querySelectorAll("[data-i18n]")
+        .forEach((el) => (el.textContent = t[el.dataset.i18n] || ""));
+      document.documentElement.lang = lang;
+    }
+
+    // ==== Util ====
+    function showError(msg) {
+      const bar = document.getElementById("errorBar");
+      bar.textContent = msg || "";
+      if (!msg) return;
+      setTimeout(() => {
+        if (bar.textContent === msg) bar.textContent = "";
+      }, 4000);
+    }
+
+    function setPostStatus(msg) {
+      document.getElementById("postStatus").textContent = msg || "";
+    }
+
+    function initialsFromName(name) {
+      if (!name) return "?";
+      return name.trim().charAt(0).toUpperCase();
+    }
+
+    function fmtDate(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime())) return dateStr;
+      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}/${String(d.getDate()).padStart(2, "0")} ${String(
+        d.getHours()
+      ).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+
+    // ==== Auth 関連 ====
+    async function refreshSession() {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+      if (error) {
+        console.error(error);
+        showError(error.message);
+        return;
+      }
+      currentUser = session?.user ?? null;
+      await loadProfiles();
+      updateAccountInfo();
+      await loadPosts();
+    }
+
+    async function loginOrSignUp() {
+      const email = window.prompt("Email:");
+      if (!email) return;
+
+      const password = window.prompt("Password (新規 or 既存):");
+      if (!password) return;
+
+      let handle = window.prompt("表示ハンドル (例: homare1007abc):");
+      if (!handle) handle = email.split("@")[0];
+
+      // まず signIn を試す
+      let { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        // signIn 失敗 → signUp 試す
+        const signUpRes = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { handle },
+          },
+        });
+        if (signUpRes.error) {
+          console.error(signUpRes.error);
+          showError(signUpRes.error.message);
+          return;
+        }
+        data = signUpRes.data;
+      }
+
+      currentUser = data.user ?? data.session?.user ?? null;
+      await ensureProfile(handle);
+      updateAccountInfo();
+      await loadProfiles();
+      await loadPosts();
+    }
+
+    async function ensureProfile(handleInput) {
+      if (!currentUser) return;
+      const uid = currentUser.id;
+
+      if (profilesCache.has(uid)) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", uid)
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        console.error(error);
+      }
+
+      if (!data) {
+        const handle =
+          handleInput ||
+          currentUser.user_metadata?.handle ||
+          currentUser.email?.split("@")[0];
+
+        const { data: inserted, error: insErr } = await supabase
+          .from("profiles")
+          .insert({
+            id: uid,
+            handle,
+            display_name: handle,
+          })
+          .select("*")
+          .single();
+
+        if (insErr) {
+          console.error(insErr);
+          showError(insErr.message);
+          return;
+        }
+        profilesCache.set(uid, inserted);
+      } else {
+        profilesCache.set(uid, data);
+      }
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+      currentUser = null;
+      updateAccountInfo();
+      postsCache = [];
+      renderPosts();
+    }
+
+    function updateAccountInfo() {
+      const el = document.getElementById("accountInfo");
+      if (!currentUser) {
+        el.textContent = "ログインしていません";
+        return;
+      }
+      const profile = profilesCache.get(currentUser.id);
+      const handle = profile?.handle || currentUser.email;
+      el.textContent = `ログイン中: @${handle}`;
+    }
+
+    // ==== Profiles & Posts ====
+    async function loadProfiles() {
+      const { data, error } = await supabase.from("profiles").select("*");
+      if (error) {
+        console.error(error);
+        showError(error.message);
+        return;
+      }
+      profilesCache = new Map();
+      for (const p of data) {
+        profilesCache.set(p.id, p);
+      }
+    }
+
+    async function loadPosts() {
+      const { data, error } = await supabase
+        .from("posts")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error(error);
+        showError(error.message);
+        return;
+      }
+      postsCache = data || [];
+      renderPosts();
+    }
+
+    function filteredPosts() {
+      return postsCache.filter((p) => {
+        if (currentFilter === "mine" && currentUser) {
+          if (p.user_id !== currentUser.id) return false;
+        } else if (currentFilter === "public") {
+          if (p.visibility !== "public") return false;
+        }
+        if (currentSearch) {
+          const profile = profilesCache.get(p.user_id);
+          const handle = profile?.handle || "";
+          const display = profile?.display_name || "";
+          const hay = [
+            p.note || "",
+            handle,
+            display,
+            p.bodyweight?.toString() || "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          if (!hay.includes(currentSearch)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderPosts() {
+      const list = document.getElementById("feedList");
+      list.innerHTML = "";
+      const posts = filteredPosts();
+
+      if (!posts.length) {
+        const empty = document.createElement("div");
+        empty.className = "card-sub";
+        empty.textContent = "まだ投稿がありません";
+        list.appendChild(empty);
+        return;
+      }
+
+      for (const post of posts) {
+        list.appendChild(renderPostCard(post));
+      }
+    }
+
+    function renderPostCard(post) {
+      const card = document.createElement("article");
+      card.className = "post-card";
+
+      const profile = profilesCache.get(post.user_id);
+      const handle = profile?.handle || "user";
+      const display = profile?.display_name || handle;
+
+      // header
+      const head = document.createElement("div");
+      head.className = "post-head";
+
+      const left = document.createElement("div");
+      left.className = "post-user";
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = initialsFromName(display);
+
+      const userInfo = document.createElement("div");
+      const nameEl = document.createElement("div");
+      nameEl.className = "handle";
+      nameEl.textContent = display;
+      const handleEl = document.createElement("div");
+      handleEl.style.fontSize = "11px";
+      handleEl.style.color = "#6b7280";
+      handleEl.textContent = `@${handle}`;
+
+      userInfo.appendChild(nameEl);
+      userInfo.appendChild(handleEl);
+
+      left.appendChild(avatar);
+      left.appendChild(userInfo);
+
+      const right = document.createElement("div");
+      right.className = "post-meta";
+
+      const dateLine =
+        fmtDate(post.date || post.created_at) ||
+        fmtDate(post.created_at) ||
+        "";
+      const weightLine =
+        post.bodyweight != null ? `${post.bodyweight.toFixed(1)} kg` : "";
+
+      right.innerHTML = `${dateLine}<br>${weightLine}`;
+
+      head.appendChild(left);
+      head.appendChild(right);
+
+      // body
+      const body = document.createElement("div");
+      body.className = "post-body";
+      body.textContent = post.note || "";
+
+      // media
+      if (post.media_url) {
+        const mediaWrap = document.createElement("div");
+        mediaWrap.className = "post-media";
+
+        if (post.media_type === "video") {
+          const vid = document.createElement("video");
+          vid.src = post.media_url;
+          vid.controls = true;
+          mediaWrap.appendChild(vid);
+        } else {
+          const img = document.createElement("img");
+          img.src = post.media_url;
+          img.alt = "post media";
+          mediaWrap.appendChild(img);
+        }
+
+        body.appendChild(mediaWrap);
+      }
+
+      // footer
+      const footer = document.createElement("div");
+      footer.className = "post-footer";
+
+      const leftFoot = document.createElement("div");
+      const tag = document.createElement("span");
+      tag.className = "tag-pill";
+      tag.textContent = post.visibility === "public" ? "Public" : "Private";
+      leftFoot.appendChild(tag);
+
+      const rightFoot = document.createElement("div");
+      // シンプルにログ / Delete だけ
+      const logBtn = document.createElement("button");
+      logBtn.className = "btn-outline";
+      logBtn.style.fontSize = "11px";
+      logBtn.textContent = "Log";
+      logBtn.onclick = () => console.log(post);
+
+      rightFoot.appendChild(logBtn);
+
+      if (currentUser && post.user_id === currentUser.id) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn-outline";
+        delBtn.style.fontSize = "11px";
+        delBtn.textContent = "Delete";
+        delBtn.onclick = () => deletePost(post.id);
+        rightFoot.appendChild(delBtn);
+      }
+
+      footer.appendChild(leftFoot);
+      footer.appendChild(rightFoot);
+
+      card.appendChild(head);
+      card.appendChild(body);
+      card.appendChild(footer);
+      return card;
+    }
+
+    async function deletePost(id) {
+      if (!window.confirm("本当に削除しますか？")) return;
+      const { error } = await supabase.from("posts").delete().eq("id", id);
+      if (error) {
+        console.error(error);
+        showError(error.message);
+        return;
+      }
+      await loadPosts();
+    }
+
+    // ==== 投稿作成（Storage アップロード付き） ====
+    async function createPost() {
+      if (!currentUser) {
+        showError("ログインしてください");
+        return;
+      }
+
+      const dateInput = document.getElementById("postDate");
+      const weightInput = document.getElementById("postWeight");
+      const noteInput = document.getElementById("postNote");
+      const visibilitySelect = document.getElementById("postVisibility");
+      const fileInput = document.getElementById("mediaFile");
+
+      const date = dateInput.value || null;
+      const bodyweight = weightInput.value
+        ? Number(weightInput.value)
+        : null;
+      const note = noteInput.value.trim();
+      const visibility = visibilitySelect.value;
+
+      let mediaUrl = null;
+      let mediaType = null;
+
+      setPostStatus("Saving…");
+
+      // ファイルがあれば Storage にアップロード
+      if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const ext = file.name.split(".").pop().toLowerCase();
+        const isVideo = file.type.startsWith("video/");
+
+        const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("post-media")
+          .upload(path, file, { upsert: false });
+
+        if (uploadError) {
+          console.error(uploadError);
+          showError("画像 / 動画のアップロードに失敗しました");
+          setPostStatus("");
+          return;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from("post-media")
+          .getPublicUrl(path);
+
+        mediaUrl = urlData.publicUrl;
+        mediaType = isVideo ? "video" : "image";
+      }
+
+      const { error } = await supabase.from("posts").insert({
+        user_id: currentUser.id,
+        date,
+        bodyweight,
+        note,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        visibility,
+      });
+
+      if (error) {
+        console.error(error);
+        showError(error.message);
+        setPostStatus("");
+        return;
+      }
+
+      // フォームリセット（必要なら日付は残してもOK）
+      // dateInput.value = "";
+      weightInput.value = "";
+      noteInput.value = "";
+      fileInput.value = "";
+
+      setPostStatus("Saved ✅");
+      setTimeout(() => setPostStatus(""), 1500);
+      await loadPosts();
+    }
+
+    function resetPostForm() {
+      document.getElementById("postWeight").value = "";
+      document.getElementById("postNote").value = "";
+      document.getElementById("mediaFile").value = "";
+      document.getElementById("postVisibility").value = "public";
+    }
+
+    // ==== イベント ====
+    function setupEvents() {
+      document
+        .getElementById("btnSubmitPost")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          createPost();
+        });
+
+      document
+        .getElementById("btnResetPost")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          resetPostForm();
+        });
+
+      document
+        .getElementById("btnLogin")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          loginOrSignUp();
+        });
+
+      document
+        .getElementById("btnLogout")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          logout();
+        });
+
+      document
+        .getElementById("btnReloadFeed")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          loadPosts();
+        });
+
+      document
+        .getElementById("btnClearCache")
+        .addEventListener("click", () => {
+          localStorage.clear();
+          showError("Local cache cleared");
+        });
+
+      document
+        .getElementById("langSelect")
+        .addEventListener("change", (e) => {
+          applyLanguage(e.target.value);
+        });
+
+      document
+        .getElementById("searchInput")
+        .addEventListener("input", (e) => {
+          currentSearch = e.target.value.trim().toLowerCase();
+          renderPosts();
+        });
+
+      document.querySelectorAll(".pill-option").forEach((el) => {
+        el.addEventListener("click", () => {
+          document
+            .querySelectorAll(".pill-option")
+            .forEach((p) => p.classList.remove("active"));
+          el.classList.add("active");
+          currentFilter = el.dataset.filter;
+          renderPosts();
+        });
+      });
+    }
+
+    // ==== 初期化 ====
+    async function init() {
+      // デフォ言語
+      applyLanguage("ja");
+
+      // 日付を今日にセット
+      const today = new Date();
+      document.getElementById("postDate").value = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, "0"),
+        String(today.getDate()).padStart(2, "0"),
+      ].join("-");
+
+      setupEvents();
+
+      // Auth 状態監視
+      supabase.auth.onAuthStateChange((_event, session) => {
+        currentUser = session?.user ?? null;
+        updateAccountInfo();
+        loadProfiles();
+        loadPosts();
+      });
+
+      await refreshSession();
+    }
+
+    init();
+  </script>
+</body>
+</html>
