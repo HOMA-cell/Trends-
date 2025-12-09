@@ -2,16 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Trends | 筋トレ専用SNS プロトタイプ</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trends | Workout SNS</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-        "Helvetica Neue", Arial, sans-serif;
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
       background: #f3f4f6;
       color: #111827;
     }
@@ -24,164 +21,133 @@
     }
     header {
       width: 100%;
-      max-width: 1100px;
+      max-width: 960px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
     .logo {
-      font-weight: 700;
-      font-size: 1.4rem;
       display: flex;
       align-items: center;
       gap: 8px;
+      font-weight: 700;
+      font-size: 1.2rem;
     }
     .logo-mark {
-      width: 26px;
-      height: 26px;
+      width: 24px;
+      height: 24px;
       border-radius: 999px;
       border: 2px solid #2563eb;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: #2563eb;
     }
-    .lang-select {
+    .lang {
       display: flex;
       align-items: center;
       gap: 6px;
       font-size: 0.8rem;
     }
-    select,
-    input,
-    textarea,
-    button {
+    select,input,textarea,button {
       font-family: inherit;
+      font-size: 0.9rem;
     }
-    select,
-    input,
-    textarea {
+    select,input,textarea {
+      width: 100%;
+      padding: 8px 10px;
       border-radius: 10px;
       border: 1px solid #d1d5db;
-      padding: 8px 10px;
-      font-size: 0.9rem;
-      width: 100%;
+      background: #fff;
     }
-    textarea {
-      min-height: 72px;
-      resize: vertical;
-    }
-    button {
-      border-radius: 999px;
-      border: none;
-      padding: 8px 14px;
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
-    .btn-primary {
-      background: #2563eb;
-      color: #fff;
-    }
-    .btn-secondary {
-      background: #e5e7eb;
-      color: #111827;
-    }
-
-    .layout {
-      width: 100%;
-      max-width: 1100px;
-      display: grid;
-      grid-template-columns: minmax(0, 2.3fr) minmax(260px, 1fr);
-      gap: 16px;
-    }
-    @media (max-width: 900px) {
-      .layout {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    .card {
-      background: #ffffff;
-      border-radius: 18px;
-      padding: 16px;
-      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
-    }
-    .card + .card {
-      margin-top: 10px;
-    }
-
-    .section-title {
-      font-size: 0.95rem;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .section-sub {
-      font-size: 0.8rem;
-      color: #6b7280;
-      margin-bottom: 10px;
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-    @media (max-width: 600px) {
-      .form-row {
-        grid-template-columns: minmax(0, 1fr);
-      }
-    }
-
-    .field {
-      margin-bottom: 8px;
-    }
-    .field label {
-      font-size: 0.8rem;
-      display: block;
-      margin-bottom: 3px;
-      color: #4b5563;
-    }
-    .field input[type="file"] {
+    textarea { min-height: 70px; resize: vertical; }
+    input[type="file"] {
       padding: 0;
       border: none;
       background: transparent;
       font-size: 0.8rem;
     }
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #e5e7eb; color: #111827; }
+
+    .layout {
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: minmax(0,2fr) minmax(260px,1fr);
+      gap: 12px;
+    }
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: minmax(0,1fr);
+      }
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 6px 20px rgba(15,23,42,0.06);
+    }
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .title {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .sub {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+    .field { margin-bottom: 8px; }
+    .field label {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 0.8rem;
+      color: #4b5563;
+    }
+    .row-2 {
+      display: grid;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      gap: 8px;
+    }
+    @media (max-width: 600px) {
+      .row-2 { grid-template-columns: minmax(0,1fr); }
+    }
     .secondary-input {
       margin-top: 4px;
-      font-size: 0.8rem;
       padding: 6px 9px;
-    }
-
-    .media-preview {
-      margin-top: 6px;
+      font-size: 0.8rem;
     }
     .media-preview img,
     .media-preview video {
       max-width: 100%;
-      border-radius: 12px;
+      border-radius: 10px;
+      margin-top: 4px;
       display: block;
     }
-
-    .form-actions {
+    .actions {
       display: flex;
-      gap: 8px;
       align-items: center;
-      margin-top: 4px;
+      gap: 8px;
+      margin-top: 2px;
+      flex-wrap: wrap;
     }
-
-    .error-text {
-      color: #b91c1c;
-      font-size: 0.8rem;
-      margin-top: 4px;
-    }
-    .info-text {
-      color: #6b7280;
-      font-size: 0.8rem;
-    }
+    .info { font-size: 0.8rem; color: #6b7280; }
+    .error { font-size: 0.8rem; color: #b91c1c; margin-top: 2px; }
 
     .feed-toolbar {
       display: flex;
@@ -190,18 +156,15 @@
       margin-bottom: 6px;
       flex-wrap: wrap;
     }
-    .feed-toolbar small {
-      font-size: 0.8rem;
-      color: #6b7280;
+    .feed-toolbar select {
+      max-width: 120px;
     }
+    .feed-list { margin-top: 6px; }
 
-    .feed-list {
-      margin-top: 8px;
-    }
-    .post-card {
-      border-radius: 16px;
+    .post {
+      border-radius: 14px;
       border: 1px solid #e5e7eb;
-      padding: 12px;
+      padding: 10px;
       margin-bottom: 8px;
       background: #f9fafb;
     }
@@ -209,24 +172,27 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 6px;
+      gap: 8px;
+      margin-bottom: 4px;
     }
     .post-user {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.85rem;
+      gap: 6px;
     }
     .avatar {
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       border-radius: 999px;
       background: #2563eb;
       color: #fff;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+    .post-user-main {
+      font-size: 0.8rem;
     }
     .post-meta {
       font-size: 0.75rem;
@@ -234,55 +200,74 @@
     }
     .badge {
       font-size: 0.7rem;
-      padding: 3px 8px;
+      padding: 2px 7px;
       border-radius: 999px;
       background: #e5e7eb;
       color: #374151;
     }
-    .badge-public {
-      background: #dbeafe;
-      color: #1d4ed8;
-    }
-    .badge-private {
-      background: #fef3c7;
-      color: #b45309;
-    }
+    .badge-public { background: #dbeafe; color: #1d4ed8; }
+    .badge-private { background: #fef3c7; color: #b45309; }
+
     .post-body {
       font-size: 0.9rem;
-      margin-top: 4px;
+      margin-top: 2px;
       white-space: pre-wrap;
     }
-    .post-body strong {
-      font-weight: 600;
-    }
+    .post-body strong { font-weight: 600; }
     .post-footer {
       margin-top: 6px;
-      font-size: 0.8rem;
-      color: #6b7280;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
-    }
-
-    .account-box small {
       font-size: 0.8rem;
       color: #6b7280;
     }
+    .post-footer-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .icon-btn {
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+    .icon-btn span.icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .icon-btn.liked { color: #ef4444; }
+
+    .small-buttons {
+      display: flex;
+      gap: 4px;
+    }
+    .small-buttons button {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      border-radius: 999px;
+    }
+
     .account-row {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      margin-bottom: 8px;
+      gap: 6px;
+      margin-top: 6px;
     }
-
-    .debug-card {
-      margin-top: 8px;
+    .account-small {
+      font-size: 0.8rem;
+      color: #4b5563;
     }
-    .debug-card button {
-      width: 100%;
-    }
+    .debug-card { margin-top: 8px; }
+    .debug-card button { width: 100%; }
   </style>
 </head>
 <body>
@@ -292,7 +277,7 @@
         <div class="logo-mark">Tr</div>
         <span>Trends</span>
       </div>
-      <div class="lang-select">
+      <div class="lang">
         <span id="labelLanguage">言語</span>
         <select id="languageSelect">
           <option value="ja">日本語</option>
@@ -302,34 +287,27 @@
     </header>
 
     <main class="layout">
-      <!-- Feed / new post -->
+      <!-- LEFT = 投稿 & Feed -->
       <section>
+        <!-- New post -->
         <div class="card">
-          <div class="section-title" id="labelFeedTitle">Feed</div>
-          <div class="section-sub" id="labelFeedSub">
-            トレーニング記録・メモ・写真を残すタイムライン。
+          <div class="title-row">
+            <div class="title" id="labelFeedTitle">Feed</div>
           </div>
 
-          <!-- New post form -->
           <div id="newPostForm">
-            <div class="form-row">
+            <div class="row-2">
               <div class="field">
                 <label for="postDate" id="labelDate">日付</label>
                 <input id="postDate" type="date" />
               </div>
               <div class="field">
                 <label for="postBodyweight" id="labelBodyweight">体重 (kg)</label>
-                <input
-                  id="postBodyweight"
-                  type="number"
-                  step="0.1"
-                  inputmode="decimal"
-                  placeholder="77.4"
-                />
+                <input id="postBodyweight" type="number" step="0.1" inputmode="decimal" placeholder="77.4" />
               </div>
             </div>
 
-            <div class="form-row">
+            <div class="row-2">
               <div class="field">
                 <label for="postVisibility" id="labelVisibility">公開範囲</label>
                 <select id="postVisibility">
@@ -337,155 +315,124 @@
                   <option value="private">自分のみ</option>
                 </select>
               </div>
-
               <div class="field">
                 <label for="postMediaFile" id="labelMedia">写真 / 動画</label>
-                <input
-                  id="postMediaFile"
-                  type="file"
-                  accept="image/*,video/*"
-                />
-                <input
-                  id="postMediaUrl"
-                  type="url"
-                  placeholder="外部URLを貼りたい場合のみ"
-                  class="secondary-input"
-                />
+                <input id="postMediaFile" type="file" accept="image/*,video/*" />
+                <input id="postMediaUrl" type="url" placeholder="外部URLを使う場合だけ" class="secondary-input" />
                 <div id="mediaPreview" class="media-preview"></div>
               </div>
             </div>
 
             <div class="field">
-              <label for="postNote" id="labelNote">キャプション / トレーニングメモ</label>
-              <textarea id="postNote" placeholder="bench 100kg"></textarea>
+              <label for="postNote" id="labelNote">メモ / キャプション</label>
+              <textarea id="postNote" placeholder="bench 100kg x5 @8"></textarea>
             </div>
 
-            <div class="form-actions">
+            <div class="actions">
               <button id="btnSubmitPost" class="btn-primary">
                 <span id="labelPostButton">投稿</span>
               </button>
               <button id="btnResetPost" class="btn-secondary" type="button">
                 <span id="labelResetButton">リセット</span>
               </button>
-              <span id="postStatus" class="info-text"></span>
+              <span id="postStatus" class="info"></span>
             </div>
-            <div id="postError" class="error-text"></div>
+            <div id="postError" class="error"></div>
           </div>
         </div>
 
-        <!-- Feed list -->
-        <div class="card" style="margin-top: 12px">
+        <!-- Feed -->
+        <div class="card" style="margin-top: 10px;">
           <div class="feed-toolbar">
-            <select id="feedFilter" style="max-width: 120px">
+            <select id="feedFilter">
               <option value="all">すべて</option>
               <option value="mine">自分のみ</option>
               <option value="public">Publicのみ</option>
             </select>
-            <input
-              id="feedSearch"
-              type="search"
-              placeholder="caption / メモ / handle で検索"
-            />
-            <small id="feedCountLabel">0 posts</small>
+            <input id="feedSearch" type="search" placeholder="caption / メモ / ユーザー検索" />
+            <span class="info" id="feedCountLabel">0 posts</span>
           </div>
           <div id="feedList" class="feed-list"></div>
         </div>
       </section>
 
-      <!-- Account / debug -->
+      <!-- RIGHT = アカウント / Debug -->
       <aside>
-        <div class="card account-box">
-          <div class="section-title" id="labelAccountTitle">アカウント</div>
-          <div class="section-sub" id="labelAccountSub">
-            メール & パスワードでログイン / サインアップ。
-          </div>
+        <div class="card">
+          <div class="title" id="labelAccountTitle">アカウント</div>
+          <div class="sub" id="labelAccountSub">メール & パスワードだけのシンプルログイン。</div>
 
-          <div class="account-row" id="authControls">
+          <div id="authControls" class="account-row">
             <input id="authEmail" type="email" placeholder="email@example.com" />
-            <input
-              id="authPassword"
-              type="password"
-              placeholder="password"
-            />
+            <input id="authPassword" type="password" placeholder="password" />
             <button id="btnAuth" class="btn-primary">
               <span id="labelAuthButton">Log in / Sign up</span>
             </button>
           </div>
 
-          <div class="account-row" id="loggedInInfo" style="display: none">
-            <small id="currentUserLabel"></small>
-            <div style="display: flex; gap: 8px">
-              <button id="btnReloadFeed" class="btn-secondary" type="button">
-                Reload feed
-              </button>
-              <button id="btnLogout" class="btn-secondary" type="button">
-                Log out
-              </button>
+          <div id="loggedInInfo" class="account-row" style="display:none;">
+            <div class="account-small" id="currentUserLabel"></div>
+            <div style="display:flex;gap:6px;">
+              <button id="btnReloadFeed" class="btn-secondary" type="button">Reload</button>
+              <button id="btnLogout" class="btn-secondary" type="button">Log out</button>
             </div>
           </div>
 
-          <div id="authError" class="error-text"></div>
+          <div id="authError" class="error"></div>
         </div>
 
         <div class="card debug-card">
-          <div class="section-title">Debug / Dev</div>
-          <div class="section-sub">
-            今は単一ページのプロトタイプです。挙動テスト用。
-          </div>
-          <button id="btnClearCache" class="btn-secondary" type="button">
-            Clear local cache
-          </button>
+          <div class="title">Debug</div>
+          <div class="sub">今はプロトタイプ。ローカルキャッシュを消すだけ。</div>
+          <button id="btnClearCache" class="btn-secondary" type="button">Clear local cache</button>
         </div>
       </aside>
     </main>
   </div>
 
-  <!-- Supabase JS v2 -->
+  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // ==== Supabase 初期化 ====
+    // ==== Supabase setup ====
     const SUPABASE_URL = "https://sfuroqxcljlkbthblqva.supabase.co";
     const SUPABASE_ANON_KEY =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdXJvcXhjbGpsa2J0aGJscXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxOTE0MTQsImV4cCI6MjA4MDc2NzQxNH0.v1qrjQgkPg3hPjIVCsKg3unwM0lvPGXkw8DvVm8YlRI";
 
-    const supabase = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentUser = null;
     let allPosts = [];
 
-    // ==== 多言語ラベル ====
+    // ==== i18n ====
     const i18n = {
       ja: {
         language: "言語",
         feedTitle: "Feed",
-        feedSub: "トレーニング記録・メモ・写真を残すタイムライン。",
+        feedSub: "",
         date: "日付",
         bodyweight: "体重 (kg)",
         visibility: "公開範囲",
         media: "写真 / 動画",
-        note: "キャプション / トレーニングメモ",
+        note: "メモ / キャプション",
         postButton: "投稿",
         resetButton: "リセット",
         accountTitle: "アカウント",
-        accountSub: "メール & パスワードでログイン / サインアップ。",
+        accountSub: "メール & パスワードだけのシンプルログイン。",
         authButton: "Log in / Sign up",
       },
       en: {
         language: "Language",
         feedTitle: "Feed",
-        feedSub: "Timeline for logging your training, notes, and photos.",
+        feedSub: "",
         date: "Date",
         bodyweight: "Bodyweight (kg)",
         visibility: "Visibility",
         media: "Photo / Video",
-        note: "Caption / Training notes",
+        note: "Note / Caption",
         postButton: "Post",
         resetButton: "Reset",
         accountTitle: "Account",
-        accountSub: "Log in / sign up with email and password.",
+        accountSub: "Simple email + password login.",
         authButton: "Log in / Sign up",
       },
     };
@@ -494,7 +441,6 @@
       const t = i18n[lang] || i18n.ja;
       document.getElementById("labelLanguage").textContent = t.language;
       document.getElementById("labelFeedTitle").textContent = t.feedTitle;
-      document.getElementById("labelFeedSub").textContent = t.feedSub;
       document.getElementById("labelDate").textContent = t.date;
       document.getElementById("labelBodyweight").textContent = t.bodyweight;
       document.getElementById("labelVisibility").textContent = t.visibility;
@@ -507,11 +453,11 @@
       document.getElementById("labelAuthButton").textContent = t.authButton;
     }
 
-    // ==== ユーティリティ ====
+    // ==== Utils ====
     function setToday() {
       const input = document.getElementById("postDate");
-      const today = new Date();
-      const iso = today.toISOString().slice(0, 10);
+      const d = new Date();
+      const iso = d.toISOString().slice(0, 10);
       input.value = iso;
     }
 
@@ -530,24 +476,45 @@
       const d = new Date(dateStr);
       if (Number.isNaN(d.getTime())) return dateStr;
       const y = d.getFullYear();
-      const m = (d.getMonth() + 1).toString().padStart(2, "0");
-      const day = d.getDate().toString().padStart(2, "0");
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
       return `${y}/${m}/${day}`;
     }
 
-    function renderMediaHtml(post) {
-      if (!post.media_url) return "";
-      const type = post.media_type || "";
-      if (type.startsWith("video")) {
-        return `<video src="${post.media_url}" controls></video>`;
-      }
-      if (type.startsWith("image")) {
-        return `<img src="${post.media_url}" alt="media" />`;
-      }
-      // その他はリンクとして扱う
-      return `<a href="${post.media_url}" target="_blank" rel="noopener noreferrer">メディアを開く</a>`;
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
     }
 
+    // ==== local likes (postId -> true) ====
+    const LIKES_KEY = "trends-likes-v1";
+    function loadLikes() {
+      try {
+        return JSON.parse(localStorage.getItem(LIKES_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+    function saveLikes(map) {
+      localStorage.setItem(LIKES_KEY, JSON.stringify(map));
+    }
+
+    function isLiked(id) {
+      const map = loadLikes();
+      return !!map[id];
+    }
+    function toggleLike(id) {
+      const map = loadLikes();
+      if (map[id]) delete map[id];
+      else map[id] = true;
+      saveLikes(map);
+      renderPosts(); // 再描画
+    }
+
+    // ==== Storage にメディアアップロード ====
     async function uploadMediaToStorage(file, userId) {
       const bucket = "post-media";
       const ext = file.name.split(".").pop() || "bin";
@@ -559,9 +526,7 @@
           cacheControl: "3600",
           upsert: false,
         });
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       const { data: publicData } = supabase.storage
         .from(bucket)
@@ -572,14 +537,25 @@
       return { url, type };
     }
 
-    // ==== 投稿読み込み & レンダリング ====
+    function renderMediaHtml(post) {
+      if (!post.media_url) return "";
+      const type = post.media_type || "";
+      if (type.startsWith("video")) {
+        return `<video src="${post.media_url}" controls></video>`;
+      }
+      if (type.startsWith("image")) {
+        return `<img src="${post.media_url}" alt="media" />`;
+      }
+      return `<a href="${post.media_url}" target="_blank" rel="noopener noreferrer">メディアを開く</a>`;
+    }
+
+    // ==== Feed ====
     async function loadPosts() {
       if (!currentUser) {
         allPosts = [];
         renderPosts();
         return;
       }
-
       const { data, error } = await supabase
         .from("posts")
         .select("*")
@@ -588,7 +564,7 @@
 
       if (error) {
         console.error("loadPosts error", error);
-        showPostError("Feed の読み込みに失敗しました。");
+        showPostError("Feedの読み込みに失敗しました。");
         return;
       }
       allPosts = data || [];
@@ -603,92 +579,115 @@
       let posts = allPosts.slice();
 
       if (filter === "mine" && currentUser) {
-        posts = posts.filter((p) => p.user_id === currentUser.id);
+        posts = posts.filter(p => p.user_id === currentUser.id);
       } else if (filter === "public") {
-        posts = posts.filter((p) => p.visibility === "public");
+        posts = posts.filter(p => p.visibility === "public");
       }
 
       if (q) {
-        posts = posts.filter((p) => {
+        posts = posts.filter(p => {
           const note = (p.note || "").toLowerCase();
-          const bw = (p.bodyweight || "").toString().toLowerCase();
           const id = (p.user_id || "").toLowerCase();
+          const bw = (p.bodyweight || "").toString().toLowerCase();
           return (
             note.includes(q) ||
-            bw.includes(q) ||
-            id.includes(q)
+            id.includes(q) ||
+            bw.includes(q)
           );
         });
       }
 
-      document.getElementById(
-        "feedCountLabel"
-      ).textContent = `${posts.length} posts`;
+      document.getElementById("feedCountLabel").textContent = `${posts.length} posts`;
 
       if (!posts.length) {
-        list.innerHTML =
-          '<div class="info-text">まだ投稿がありません。</div>';
+        list.innerHTML = '<div class="info">まだ投稿がありません。</div>';
         return;
       }
 
-      const html = posts
-        .map((p) => {
-          const initials = (p.user_id || "?").slice(0, 2).toUpperCase();
-          const dateLabel = formatDate(p.date || p.created_at);
-          const bwLabel = p.bodyweight
-            ? `<strong>${p.bodyweight}kg</strong>`
-            : "";
-          const vis =
-            p.visibility === "public"
-              ? '<span class="badge badge-public">Public</span>'
-              : '<span class="badge badge-private">自分のみ</span>';
+      const likesMap = loadLikes();
 
-          return `
-          <article class="post-card">
+      const html = posts.map(p => {
+        const initials = (p.user_id || "?").slice(0, 2).toUpperCase();
+        const dateLabel = formatDate(p.date || p.created_at);
+        const bwLabel = p.bodyweight ? `<strong>${p.bodyweight}kg</strong>` : "";
+        const vis =
+          p.visibility === "public"
+            ? '<span class="badge badge-public">Public</span>'
+            : '<span class="badge badge-private">自分のみ</span>';
+
+        const liked = !!likesMap[p.id];
+        const likeClass = liked ? "icon-btn liked" : "icon-btn";
+        const likeIcon = liked ? "♥" : "♡";
+        const likeText = liked ? "Liked" : "Like";
+
+        const canDelete = currentUser && p.user_id === currentUser.id;
+
+        return `
+          <article class="post">
             <div class="post-header">
               <div class="post-user">
                 <div class="avatar">${initials}</div>
                 <div>
-                  <div>@${(p.user_id || "").slice(0, 8)}</div>
+                  <div class="post-user-main">@${(p.user_id || "").slice(0, 8)}</div>
                   <div class="post-meta">${dateLabel}</div>
                 </div>
               </div>
               ${vis}
             </div>
-            ${
-              bwLabel
-                ? `<div class="post-body">${bwLabel}</div>`
-                : ""
-            }
-            ${
-              p.note
-                ? `<div class="post-body">${escapeHtml(p.note)}</div>`
-                : ""
-            }
-            ${
-              p.media_url
-                ? `<div class="media-preview" style="margin-top:6px;">${renderMediaHtml(
-                    p
-                  )}</div>`
-                : ""
-            }
+            ${bwLabel ? `<div class="post-body">${bwLabel}</div>` : ""}
+            ${p.note ? `<div class="post-body">${escapeHtml(p.note)}</div>` : ""}
+            ${p.media_url ? `<div class="media-preview">${renderMediaHtml(p)}</div>` : ""}
+            <div class="post-footer">
+              <div class="post-footer-left">
+                <button class="${likeClass}" onclick="handleLikeClick('${p.id}')">
+                  <span class="icon">${likeIcon}</span><span>${likeText}</span>
+                </button>
+              </div>
+              <div class="small-buttons">
+                <button class="btn-secondary" onclick="handleLogPost('${p.id}')">Log</button>
+                ${
+                  canDelete
+                    ? `<button class="btn-secondary" onclick="handleDeletePost('${p.id}')">Delete</button>`
+                    : ""
+                }
+              </div>
+            </div>
           </article>
         `;
-        })
-        .join("");
+      }).join("");
 
       list.innerHTML = html;
     }
 
-    function escapeHtml(str) {
-      if (!str) return "";
-      return str
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
+    // ==== いいね / Log / Delete (イベントハンドラ) ====
+    window.handleLikeClick = function (id) {
+      toggleLike(id);
+    };
 
-    // ==== 投稿送信 ====
+    window.handleLogPost = function (id) {
+      const p = allPosts.find(x => x.id === id);
+      if (!p) return;
+      console.log("Post detail", p);
+      alert(JSON.stringify(p, null, 2));
+    };
+
+    window.handleDeletePost = async function (id) {
+      if (!currentUser) return;
+      const post = allPosts.find(p => p.id === id);
+      if (!post) return;
+      if (post.user_id !== currentUser.id) return;
+      if (!confirm("この投稿を削除しますか？")) return;
+
+      const { error } = await supabase.from("posts").delete().eq("id", id);
+      if (error) {
+        console.error("delete error", error);
+        alert("削除に失敗しました。");
+        return;
+      }
+      await loadPosts();
+    };
+
+    // ==== 投稿処理 ====
     async function handlePostSubmit() {
       showPostError("");
       showPostStatus("");
@@ -716,9 +715,9 @@
       }
 
       showPostStatus("投稿中...");
+
       let mediaUrl = null;
       let mediaType = null;
-
       const file = mediaFileInput.files[0];
 
       try {
@@ -750,15 +749,16 @@
           return;
         }
 
-        // clear
+        // reset
         noteInput.value = "";
+        bwInput.value = "";
         mediaFileInput.value = "";
         mediaUrlInput.value = "";
         document.getElementById("mediaPreview").innerHTML = "";
         showPostStatus("投稿しました。");
         await loadPosts();
       } catch (e) {
-        console.error("post submit error", e);
+        console.error("post error", e);
         showPostError("メディアのアップロードまたは投稿に失敗しました。");
         showPostStatus("");
       }
@@ -780,45 +780,32 @@
       showAuthError("");
 
       const email = document.getElementById("authEmail").value.trim();
-      const password = document
-        .getElementById("authPassword")
-        .value.trim();
+      const password = document.getElementById("authPassword").value.trim();
 
       if (!email || !password) {
         showAuthError("Email と password を入力してください。");
         return;
       }
 
-      // まず login を試す。ダメなら sign up
       const { data: signInData, error: signInError } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        await supabase.auth.signInWithPassword({ email, password });
 
       if (signInError) {
-        // 新規ユーザーかもしれないので signUp を試す
         const { data: signUpData, error: signUpError } =
-          await supabase.auth.signUp({
-            email,
-            password,
-          });
+          await supabase.auth.signUp({ email, password });
 
         if (signUpError) {
           console.error("auth error", signInError, signUpError);
           showAuthError("ログイン / サインアップに失敗しました。");
           return;
-        } else {
-          currentUser = signUpData.user;
-          updateAuthUI();
-          await loadPosts();
-          return;
         }
+        currentUser = signUpData.user;
       } else {
         currentUser = signInData.user;
-        updateAuthUI();
-        await loadPosts();
       }
+
+      updateAuthUI();
+      await loadPosts();
     }
 
     async function handleLogout() {
@@ -839,24 +826,22 @@
         loggedInInfo.style.display = "flex";
         newPostForm.style.opacity = "1";
         newPostForm.style.pointerEvents = "auto";
-        document.getElementById(
-          "currentUserLabel"
-        ).textContent = `ログイン中: ${currentUser.email || currentUser.id}`;
+        document.getElementById("currentUserLabel").textContent =
+          `ログイン中: ${currentUser.email || currentUser.id}`;
       } else {
         authControls.style.display = "flex";
         loggedInInfo.style.display = "none";
-        newPostForm.style.opacity = "0.5";
+        newPostForm.style.opacity = "0.45";
         newPostForm.style.pointerEvents = "none";
         document.getElementById("currentUserLabel").textContent = "";
       }
     }
 
-    // ==== イベント登録 & 初期化 ====
+    // ==== init ====
     async function init() {
-      // language
+      // lang
       const langSelect = document.getElementById("languageSelect");
-      const savedLang =
-        localStorage.getItem("trends-lang") || "ja";
+      const savedLang = localStorage.getItem("trends-lang") || "ja";
       langSelect.value = savedLang;
       applyLanguage(savedLang);
       langSelect.addEventListener("change", () => {
@@ -888,57 +873,40 @@
       });
 
       // buttons
-      document
-        .getElementById("btnSubmitPost")
-        .addEventListener("click", (e) => {
-          e.preventDefault();
-          handlePostSubmit();
-        });
-      document
-        .getElementById("btnResetPost")
-        .addEventListener("click", (e) => {
-          e.preventDefault();
-          handlePostReset();
-        });
-      document
-        .getElementById("btnAuth")
-        .addEventListener("click", (e) => {
-          e.preventDefault();
-          handleAuth();
-        });
-      document
-        .getElementById("btnLogout")
-        .addEventListener("click", (e) => {
-          e.preventDefault();
-          handleLogout();
-        });
-      document
-        .getElementById("btnReloadFeed")
-        .addEventListener("click", (e) => {
-          e.preventDefault();
-          loadPosts();
-        });
-      document
-        .getElementById("btnClearCache")
-        .addEventListener("click", () => {
-          localStorage.clear();
-          alert("Local cache cleared.");
-        });
+      document.getElementById("btnSubmitPost").addEventListener("click", e => {
+        e.preventDefault();
+        handlePostSubmit();
+      });
+      document.getElementById("btnResetPost").addEventListener("click", e => {
+        e.preventDefault();
+        handlePostReset();
+      });
+      document.getElementById("btnAuth").addEventListener("click", e => {
+        e.preventDefault();
+        handleAuth();
+      });
+      document.getElementById("btnLogout").addEventListener("click", e => {
+        e.preventDefault();
+        handleLogout();
+      });
+      document.getElementById("btnReloadFeed").addEventListener("click", e => {
+        e.preventDefault();
+        loadPosts();
+      });
+      document.getElementById("btnClearCache").addEventListener("click", () => {
+        localStorage.clear();
+        alert("Local cache cleared.");
+      });
 
-      document
-        .getElementById("feedFilter")
-        .addEventListener("change", renderPosts);
-      document
-        .getElementById("feedSearch")
-        .addEventListener("input", renderPosts);
+      document.getElementById("feedFilter").addEventListener("change", renderPosts);
+      document.getElementById("feedSearch").addEventListener("input", renderPosts);
 
       // auth state
       supabase.auth.onAuthStateChange((event, session) => {
         currentUser = session?.user || null;
         updateAuthUI();
-        if (currentUser) {
-          loadPosts();
-        } else {
+        if (currentUser) loadPosts();
+        else {
           allPosts = [];
           renderPosts();
         }
@@ -948,9 +916,7 @@
       const { data } = await supabase.auth.getUser();
       currentUser = data.user || null;
       updateAuthUI();
-      if (currentUser) {
-        await loadPosts();
-      }
+      if (currentUser) await loadPosts();
     }
 
     init();
