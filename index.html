@@ -2,1909 +2,958 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>Trends | Workout SNS</title>
+  <title>Trends | 筋トレ専用SNS プロトタイプ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #f3f4f6;
-      --bg-soft: #f9fafb;
-      --card: #ffffff;
-      --border: #e5e7eb;
-      --text: #111827;
-      --muted: #6b7280;
-      --accent: #3b82f6;
-      --accent-soft: rgba(59,130,246,0.1);
-      --danger: #ef4444;
+    * {
+      box-sizing: border-box;
     }
-
     body {
-      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",
-      "Hiragino Sans","Yu Gothic",sans-serif;
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Helvetica Neue", Arial, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    .app {
       min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
       padding: 16px;
     }
-
-    .app {
+    header {
       width: 100%;
-      max-width: 1120px;
-      background: var(--bg-soft);
-      border-radius: 20px;
-      border: 1px solid var(--border);
+      max-width: 1100px;
       display: flex;
-      flex-direction: column;
-      min-height: 80vh;
-      overflow: hidden;
-      box-shadow:
-        0 18px 40px rgba(15,23,42,0.06),
-        0 0 0 1px rgba(148,163,184,0.08);
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
     }
-
-    @media (max-width: 768px) {
-      body { padding: 8px; }
-      .app { min-height: 90vh; border-radius: 16px; }
-    }
-
-    .topbar {
+    .logo {
+      font-weight: 700;
+      font-size: 1.4rem;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 8px 14px;
-      background: #ffffff;
-      border-bottom: 1px solid var(--border);
       gap: 8px;
     }
-
-    .brand {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .brand-main {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-
-    .brand-sub {
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .top-nav {
-      display: flex;
-      gap: 4px;
-      flex: 1;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .nav-btn {
+    .logo-mark {
+      width: 26px;
+      height: 26px;
       border-radius: 999px;
-      border: 1px solid transparent;
-      padding: 4px 10px;
-      font-size: 11px;
-      cursor: pointer;
-      background: transparent;
-      color: var(--muted);
+      border: 2px solid #2563eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: #2563eb;
     }
-
-    .nav-btn.active {
-      border-color: var(--accent);
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .top-right {
+    .lang-select {
       display: flex;
       align-items: center;
       gap: 6px;
-      min-width: 0;
+      font-size: 0.8rem;
     }
-
-    .user-label {
-      font-size: 11px;
-      color: var(--muted);
-      max-width: 140px;
-      text-align: right;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     select,
     input,
     textarea,
     button {
       font-family: inherit;
     }
-
-    .lang-select {
-      font-size: 11px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      padding: 3px 8px;
-      background: #fff;
-      outline: none;
+    select,
+    input,
+    textarea {
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      width: 100%;
     }
-
-    .btn {
-      padding: 5px 10px;
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+    button {
       border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #ffffff;
-      font-size: 11px;
+      border: none;
+      padding: 8px 14px;
       cursor: pointer;
-      white-space: nowrap;
+      font-size: 0.9rem;
     }
-
-    .btn.primary {
-      border-color: transparent;
-      background: linear-gradient(to right,#3b82f6,#60a5fa);
+    .btn-primary {
+      background: #2563eb;
       color: #fff;
-      font-weight: 600;
-      box-shadow: 0 8px 18px rgba(59,130,246,0.35);
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
     }
 
-    .btn.small {
-      padding: 3px 8px;
-      font-size: 10px;
+    .layout {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      grid-template-columns: minmax(0, 2.3fr) minmax(260px, 1fr);
+      gap: 16px;
     }
-
-    .btn.danger {
-      border-color: var(--danger);
-      color: var(--danger);
-      background: #fff1f2;
-    }
-
-    .hidden { display: none !important; }
-
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 10px;
-      overflow: hidden;
-    }
-
-    .page {
-      display: none;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    .page.active {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .feed-layout {
-      flex: 1;
-      display: flex;
-      gap: 10px;
-      overflow: hidden;
-    }
-
-    .feed-main {
-      flex: 2;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .feed-side {
-      flex: 1;
-      min-width: 240px;
-      max-width: 340px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    @media (max-width: 768px) {
-      .feed-layout {
-        flex-direction: column;
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
       }
-      .feed-side {
-        max-width: 100%;
-        min-width: 0;
-      }
-    }
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .section-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      background: var(--accent);
-      box-shadow: 0 0 0 4px var(--accent-soft);
-    }
-
-    .section-sub {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 2px;
     }
 
     .card {
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      padding: 8px;
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+    }
+    .card + .card {
+      margin-top: 10px;
     }
 
-    .card.tight {
-      padding: 6px;
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .section-sub {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-bottom: 10px;
     }
 
-    .status {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 3px;
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 600px) {
+      .form-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
     }
 
-    .empty {
-      font-size: 11px;
-      color: var(--muted);
+    .field {
+      margin-bottom: 8px;
+    }
+    .field label {
+      font-size: 0.8rem;
+      display: block;
+      margin-bottom: 3px;
+      color: #4b5563;
+    }
+    .field input[type="file"] {
+      padding: 0;
+      border: none;
+      background: transparent;
+      font-size: 0.8rem;
+    }
+    .secondary-input {
+      margin-top: 4px;
+      font-size: 0.8rem;
+      padding: 6px 9px;
+    }
+
+    .media-preview {
+      margin-top: 6px;
+    }
+    .media-preview img,
+    .media-preview video {
+      max-width: 100%;
+      border-radius: 12px;
+      display: block;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
       margin-top: 4px;
     }
 
-    .field-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
+    .error-text {
+      color: #b91c1c;
+      font-size: 0.8rem;
+      margin-top: 4px;
     }
-
-    label {
-      font-size: 11px;
-      color: var(--muted);
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    input,
-    select,
-    textarea {
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      padding: 6px 7px;
-      font-size: 12px;
-      background: #fff;
-      color: var(--text);
-      outline: none;
-    }
-
-    input:focus,
-    select:focus,
-    textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent-soft);
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 50px;
-      max-height: 120px;
-    }
-
-    .btn-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 6px;
+    .info-text {
+      color: #6b7280;
+      font-size: 0.8rem;
     }
 
     .feed-toolbar {
       display: flex;
-      justify-content: space-between;
       gap: 8px;
-      flex-wrap: wrap;
       align-items: center;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
     }
-
-    .feed-filter {
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #fff;
-      font-size: 11px;
-      padding: 4px 8px;
-      outline: none;
-    }
-
-    .feed-search {
-      display: flex;
-      gap: 4px;
-      flex: 1;
-      min-width: 0;
-    }
-
-    .feed-search input {
-      width: 100%;
-      font-size: 11px;
-      padding: 5px 8px;
+    .feed-toolbar small {
+      font-size: 0.8rem;
+      color: #6b7280;
     }
 
     .feed-list {
-      margin-top: 4px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: calc(100vh - 260px);
-      overflow-y: auto;
-      padding-right: 4px;
+      margin-top: 8px;
     }
-
-    @media (max-width: 768px) {
-      .feed-list { max-height: none; }
-    }
-
     .post-card {
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: #fff;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .post-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .post-meta-left {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      min-width: 0;
-    }
-
-    .avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
-
-    .post-meta-texts {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      min-width: 0;
-    }
-
-    .post-name {
-      font-size: 12px;
-      display: flex;
-      gap: 6px;
-      align-items: baseline;
-    }
-
-    .post-handle {
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .post-sub {
-      font-size: 10px;
-      color: var(--muted);
-    }
-
-    .pill-row {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      align-items: flex-end;
-    }
-
-    .badge {
-      font-size: 10px;
-      padding: 2px 7px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #f9fafb;
-      color: var(--muted);
-    }
-
-    .badge.type {
-      border-color: var(--accent);
-      background: var(--accent-soft);
-      color: var(--accent);
-    }
-
-    .post-body {
-      font-size: 12px;
-    }
-
-    .post-body strong {
-      margin-right: 4px;
-    }
-
-    .post-media {
-      margin-top: 4px;
-      border-radius: 10px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: #f3f4f6;
-    }
-
-    .post-media-inner {
-      position: relative;
-      width: 100%;
-      padding-top: 56.25%;
-    }
-
-    .post-media-inner img,
-    .post-media-inner video {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .post-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 4px;
-    }
-
-    .post-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .icon-btn {
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font-size: 16px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .likes-text {
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .explore-layout {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      overflow: hidden;
-    }
-
-    .explore-search-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .explore-search-row input {
-      flex: 1;
-      min-width: 0;
-      font-size: 12px;
-    }
-
-    .profile-list {
-      flex: 1;
-      overflow-y: auto;
-      padding-right: 4px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-top: 4px;
-    }
-
-    .profile-card {
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #fff;
-      padding: 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 11px;
-    }
-
-    .profile-card-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .profile-main {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .profile-handle {
-      font-weight: 600;
-    }
-
-    .profile-name {
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .profile-meta {
-      font-size: 10px;
-      color: var(--muted);
-    }
-
-    .stats-layout {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      overflow: hidden;
-    }
-
-    .stats-top-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .stats-content {
-      display: grid;
-      grid-template-columns: 1.4fr 1.6fr;
-      gap: 8px;
-      flex: 1;
-      min-height: 0;
-    }
-
-    @media (max-width: 768px) {
-      .stats-content {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 3px;
-      margin-top: 4px;
-    }
-
-    .calendar-day {
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #fff;
-      font-size: 10px;
-      padding: 4px;
-      min-height: 40px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .calendar-day.muted {
-      background: #f9fafb;
-      color: var(--muted);
-    }
-
-    .calendar-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 999px;
-      background: var(--accent);
-    }
-
-    .chart {
-      width: 100%;
-      height: 160px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: #fff;
-      padding: 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 11px;
-    }
-
-    .chart-bars {
-      flex: 1;
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
-    }
-
-    .chart-bar {
-      flex: 1;
-      border-radius: 999px 999px 0 0;
-      background: var(--accent-soft);
-      position: relative;
-    }
-
-    .chart-bar-inner {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      border-radius: 999px 999px 0 0;
-      background: var(--accent);
-    }
-
-    .chart-xlabels {
-      display: flex;
-      justify-content: space-between;
-      gap: 2px;
-      font-size: 9px;
-      color: var(--muted);
-    }
-
-    .profile-layout {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 1.4fr 1.6fr;
-      gap: 10px;
-    }
-
-    @media (max-width: 768px) {
-      .profile-layout {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .profile-summary {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .profile-stats-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 11px;
-    }
-
-    .profile-edit {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15,23,42,0.35);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      z-index: 40;
-    }
-
-    .modal {
-      width: 100%;
-      max-width: 420px;
-      background: #fff;
       border-radius: 16px;
-      border: 1px solid var(--border);
-      padding: 10px;
-      box-shadow: 0 16px 40px rgba(15,23,42,0.25);
+      border: 1px solid #e5e7eb;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #f9fafb;
     }
-
-    .modal-header {
+    .post-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 6px;
     }
-
-    .modal-title {
-      font-size: 14px;
+    .post-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+    .avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .post-meta {
+      font-size: 0.75rem;
+      color: #9ca3af;
+    }
+    .badge {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .badge-public {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .badge-private {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .post-body {
+      font-size: 0.9rem;
+      margin-top: 4px;
+      white-space: pre-wrap;
+    }
+    .post-body strong {
       font-weight: 600;
     }
+    .post-footer {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
 
-    .close-btn {
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font-size: 18px;
-      color: var(--muted);
+    .account-box small {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+    .account-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .debug-card {
+      margin-top: 8px;
+    }
+    .debug-card button {
+      width: 100%;
     }
   </style>
 </head>
 <body>
-<div class="app">
-  <header class="topbar">
-    <div class="brand">
-      <div class="brand-main">Trends</div>
-      <div class="brand-sub">Workout SNS / Feed first, others small</div>
-    </div>
-
-    <nav class="top-nav">
-      <button class="nav-btn active" data-page="feed">Feed</button>
-      <button class="nav-btn" data-page="explore">Explore</button>
-      <button class="nav-btn" data-page="stats">Stats</button>
-      <button class="nav-btn" data-page="profile">Profile</button>
-    </nav>
-
-    <div class="top-right">
-      <select id="lang-select" class="lang-select">
-        <option value="ja">JP</option>
-        <option value="en">EN</option>
-      </select>
-      <div id="user-label" class="user-label">Not logged in</div>
-      <button id="btn-open-auth" class="btn small primary">Log in / Sign up</button>
-      <button id="btn-logout" class="btn small hidden">Logout</button>
-    </div>
-  </header>
-
-  <main>
-    <!-- Feed page -->
-    <section id="page-feed" class="page active">
-      <div class="feed-layout">
-        <div class="feed-main">
-          <div>
-            <div class="section-title">
-              <span class="section-dot"></span>
-              <span>Feed</span>
-            </div>
-            <div class="section-sub">
-              メインのタイムライン。トレ記録 / メモ / Physique 投稿。
-            </div>
-          </div>
-
-          <!-- Post form -->
-          <div class="card">
-            <form id="post-form">
-              <div class="field-row">
-                <label>
-                  日付
-                  <input type="date" id="post-date">
-                </label>
-                <label>
-                  体重 (kg / 任意)
-                  <input type="number" step="0.1" id="post-bodyweight" placeholder="例: 77.4">
-                </label>
-              </div>
-              <label style="margin-top:4px;">
-                キャプション / メモ
-                <textarea id="post-content" placeholder="今日のトレーニングの内容や気づきメモなど"></textarea>
-              </label>
-              <div class="field-row" style="margin-top:4px;">
-                <label>
-                  公開範囲
-                  <select id="post-visibility">
-                    <option value="public">全員</option>
-                    <option value="followers">フォロー中のみ</option>
-                    <option value="private">自分だけ</option>
-                  </select>
-                </label>
-                <label>
-                  画像 / 動画 URL（任意）
-                  <input type="url" id="post-media-url" placeholder="https://..." />
-                </label>
-              </div>
-              <div class="btn-row">
-                <button type="submit" class="btn primary">投稿</button>
-                <button type="button" id="post-reset" class="btn">リセット</button>
-              </div>
-              <div id="post-status" class="status"></div>
-            </form>
-          </div>
-
-          <!-- Feed list -->
-          <div class="card">
-            <div class="feed-toolbar">
-              <div class="feed-search">
-                <input type="text" id="feed-search-input" placeholder="キーワードで投稿検索" />
-              </div>
-              <select id="feed-filter" class="feed-filter">
-                <option value="all">すべて</option>
-                <option value="mine">自分</option>
-                <option value="following">フォロー中＋自分</option>
-              </select>
-            </div>
-            <div id="feed-list" class="feed-list"></div>
-            <div id="feed-empty" class="empty hidden">
-              まだ投稿がありません。上のフォームから投稿してみてください。
-            </div>
-          </div>
-        </div>
-
-        <!-- Side column -->
-        <aside class="feed-side">
-          <div class="card tight">
-            <div class="section-title" style="font-size:13px;">
-              <span class="section-dot"></span>
-              <span>Today</span>
-            </div>
-            <div id="today-summary" class="status">
-              今日の投稿数: 0
-            </div>
-          </div>
-
-          <div class="card tight">
-            <div class="section-title" style="font-size:13px;">
-              Quick links
-            </div>
-            <div class="status">
-              ・Explore で友達を検索 / フォロー  
-              ・Stats でカレンダー & グラフ  
-              ・Profile で自分のプロフィール編集
-            </div>
-          </div>
-        </aside>
+  <div class="app">
+    <header>
+      <div class="logo">
+        <div class="logo-mark">Tr</div>
+        <span>Trends</span>
       </div>
-    </section>
+      <div class="lang-select">
+        <span id="labelLanguage">言語</span>
+        <select id="languageSelect">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </header>
 
-    <!-- Explore page -->
-    <section id="page-explore" class="page">
-      <div class="explore-layout">
-        <div>
-          <div class="section-title">
-            <span class="section-dot"></span>
-            <span>Explore</span>
-          </div>
-          <div class="section-sub">
-            ユーザーを検索してフォロー。投稿もキーワードでざっくり探せます（簡易版）。
-          </div>
-        </div>
-
+    <main class="layout">
+      <!-- Feed / new post -->
+      <section>
         <div class="card">
-          <div class="explore-search-row">
-            <label style="flex:1;min-width:0;">
-              ユーザー検索
-              <input type="text" id="explore-user-search" placeholder="handle / 名前 / 自己紹介などから検索" />
-            </label>
-            <button type="button" id="explore-refresh" class="btn small">再読込</button>
+          <div class="section-title" id="labelFeedTitle">Feed</div>
+          <div class="section-sub" id="labelFeedSub">
+            トレーニング記録・メモ・写真を残すタイムライン。
           </div>
-          <div class="status" id="explore-status"></div>
+
+          <!-- New post form -->
+          <div id="newPostForm">
+            <div class="form-row">
+              <div class="field">
+                <label for="postDate" id="labelDate">日付</label>
+                <input id="postDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="postBodyweight" id="labelBodyweight">体重 (kg)</label>
+                <input
+                  id="postBodyweight"
+                  type="number"
+                  step="0.1"
+                  inputmode="decimal"
+                  placeholder="77.4"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <label for="postVisibility" id="labelVisibility">公開範囲</label>
+                <select id="postVisibility">
+                  <option value="public">Public</option>
+                  <option value="private">自分のみ</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="postMediaFile" id="labelMedia">写真 / 動画</label>
+                <input
+                  id="postMediaFile"
+                  type="file"
+                  accept="image/*,video/*"
+                />
+                <input
+                  id="postMediaUrl"
+                  type="url"
+                  placeholder="外部URLを貼りたい場合のみ"
+                  class="secondary-input"
+                />
+                <div id="mediaPreview" class="media-preview"></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="postNote" id="labelNote">キャプション / トレーニングメモ</label>
+              <textarea id="postNote" placeholder="bench 100kg"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button id="btnSubmitPost" class="btn-primary">
+                <span id="labelPostButton">投稿</span>
+              </button>
+              <button id="btnResetPost" class="btn-secondary" type="button">
+                <span id="labelResetButton">リセット</span>
+              </button>
+              <span id="postStatus" class="info-text"></span>
+            </div>
+            <div id="postError" class="error-text"></div>
+          </div>
         </div>
 
-        <div class="card" style="flex:1;min-height:0;">
-          <div class="section-sub">
-            フォロー情報はサーバーに保存されます。
+        <!-- Feed list -->
+        <div class="card" style="margin-top: 12px">
+          <div class="feed-toolbar">
+            <select id="feedFilter" style="max-width: 120px">
+              <option value="all">すべて</option>
+              <option value="mine">自分のみ</option>
+              <option value="public">Publicのみ</option>
+            </select>
+            <input
+              id="feedSearch"
+              type="search"
+              placeholder="caption / メモ / handle で検索"
+            />
+            <small id="feedCountLabel">0 posts</small>
           </div>
-          <div id="explore-list" class="profile-list"></div>
-          <div id="explore-empty" class="empty hidden">
-            ユーザーが見つかりませんでした。
-          </div>
+          <div id="feedList" class="feed-list"></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Stats page -->
-    <section id="page-stats" class="page">
-      <div class="stats-layout">
-        <div>
-          <div class="section-title">
-            <span class="section-dot"></span>
-            <span>Stats</span>
+      <!-- Account / debug -->
+      <aside>
+        <div class="card account-box">
+          <div class="section-title" id="labelAccountTitle">アカウント</div>
+          <div class="section-sub" id="labelAccountSub">
+            メール & パスワードでログイン / サインアップ。
           </div>
-          <div class="section-sub">
-            自分の投稿をもとに、1ヶ月のカレンダーと簡単なグラフでトレ頻度を確認。
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="stats-top-row">
-            <label>
-              月を選択
-              <input type="month" id="stats-month">
-            </label>
-            <div class="status" id="stats-summary">
-              投稿の読み込み中…
+          <div class="account-row" id="authControls">
+            <input id="authEmail" type="email" placeholder="email@example.com" />
+            <input
+              id="authPassword"
+              type="password"
+              placeholder="password"
+            />
+            <button id="btnAuth" class="btn-primary">
+              <span id="labelAuthButton">Log in / Sign up</span>
+            </button>
+          </div>
+
+          <div class="account-row" id="loggedInInfo" style="display: none">
+            <small id="currentUserLabel"></small>
+            <div style="display: flex; gap: 8px">
+              <button id="btnReloadFeed" class="btn-secondary" type="button">
+                Reload feed
+              </button>
+              <button id="btnLogout" class="btn-secondary" type="button">
+                Log out
+              </button>
             </div>
           </div>
+
+          <div id="authError" class="error-text"></div>
         </div>
 
-        <div class="stats-content">
-          <div class="card">
-            <div class="section-sub">カレンダー（投稿がある日は●で表示）</div>
-            <div id="calendar-grid" class="calendar-grid"></div>
-          </div>
-          <div class="card">
-            <div class="section-sub">週ごとの投稿数（シンプル棒グラフ）</div>
-            <div class="chart">
-              <div id="chart-info" class="status">データなし</div>
-              <div id="chart-bars" class="chart-bars"></div>
-              <div id="chart-xlabels" class="chart-xlabels"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Profile page -->
-    <section id="page-profile" class="page">
-      <div class="profile-layout">
-        <div class="card profile-summary">
-          <div class="section-title">
-            <span class="section-dot"></span>
-            <span>Profile</span>
-          </div>
-          <div id="profile-basic" class="profile-stats-list">
-          </div>
-          <div class="profile-stats-list" id="profile-stats">
-          </div>
-        </div>
-
-        <div class="card profile-edit">
+        <div class="card debug-card">
+          <div class="section-title">Debug / Dev</div>
           <div class="section-sub">
-            プロフィール編集（handle は今のところ変更不可 / bio と display name は変更可能）
+            今は単一ページのプロトタイプです。挙動テスト用。
           </div>
-          <label>
-            表示名（Display name）
-            <input type="text" id="profile-display-name" placeholder="例: Homare" />
-          </label>
-          <label>
-            自己紹介（Bio）
-            <textarea id="profile-bio" placeholder="簡単な自己紹介や目標など"></textarea>
-          </label>
-          <div class="btn-row">
-            <button type="button" id="profile-save" class="btn primary">保存</button>
-          </div>
-          <div id="profile-status" class="status"></div>
-
-          <div class="status" style="margin-top:8px;">
-            ※ 後でここに「設定（通知 / テーマ）」なども増やせる。
-          </div>
+          <button id="btnClearCache" class="btn-secondary" type="button">
+            Clear local cache
+          </button>
         </div>
-      </div>
-    </section>
-  </main>
-</div>
-
-<!-- Auth modal -->
-<div id="auth-backdrop" class="backdrop hidden">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Log in / Sign up</div>
-      <button class="close-btn" id="auth-close">×</button>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:6px;">
-      <button id="auth-tab-login" class="btn small primary" type="button">Log in</button>
-      <button id="auth-tab-signup" class="btn small" type="button">Sign up</button>
-    </div>
-    <form id="auth-form">
-      <div class="field-row">
-        <label>
-          Email
-          <input type="email" id="auth-email" autocomplete="email" required />
-        </label>
-        <label>
-          Handle（Sign up時）
-          <input type="text" id="auth-handle" placeholder="例: homare_pwr" autocomplete="username" />
-        </label>
-      </div>
-      <label style="margin-top:4px;">
-        Password（6文字以上）
-        <input type="password" id="auth-password" autocomplete="current-password" required />
-      </label>
-      <div class="btn-row">
-        <button type="submit" class="btn primary">OK</button>
-      </div>
-      <div id="auth-status" class="status"></div>
-    </form>
+      </aside>
+    </main>
   </div>
-</div>
 
-<script>
-  (function() {
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ==== Supabase 初期化 ====
     const SUPABASE_URL = "https://sfuroqxcljlkbthblqva.supabase.co";
     const SUPABASE_ANON_KEY =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdXJvcXhjbGpsa2J0aGJscXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxOTE0MTQsImV4cCI6MjA4MDc2NzQxNH0.v1qrjQgkPg3hPjIVCsKg3unwM0lvPGXkw8DvVm8YlRI";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
 
-    const pageElems = {
-      feed: document.getElementById("page-feed"),
-      explore: document.getElementById("page-explore"),
-      stats: document.getElementById("page-stats"),
-      profile: document.getElementById("page-profile"),
-    };
-    const navBtns = document.querySelectorAll(".nav-btn");
-    const langSelect = document.getElementById("lang-select");
-    const userLabel = document.getElementById("user-label");
-    const btnOpenAuth = document.getElementById("btn-open-auth");
-    const btnLogout = document.getElementById("btn-logout");
-
-    const postForm = document.getElementById("post-form");
-    const postDate = document.getElementById("post-date");
-    const postBodyweight = document.getElementById("post-bodyweight");
-    const postContent = document.getElementById("post-content");
-    const postVisibility = document.getElementById("post-visibility");
-    const postMediaUrl = document.getElementById("post-media-url");
-    const postReset = document.getElementById("post-reset");
-    const postStatus = document.getElementById("post-status");
-    const feedList = document.getElementById("feed-list");
-    const feedEmpty = document.getElementById("feed-empty");
-    const feedFilter = document.getElementById("feed-filter");
-    const feedSearchInput = document.getElementById("feed-search-input");
-    const todaySummary = document.getElementById("today-summary");
-
-    const exploreUserSearch = document.getElementById("explore-user-search");
-    const exploreRefresh = document.getElementById("explore-refresh");
-    const exploreStatus = document.getElementById("explore-status");
-    const exploreList = document.getElementById("explore-list");
-    const exploreEmpty = document.getElementById("explore-empty");
-
-    const statsMonth = document.getElementById("stats-month");
-    const statsSummary = document.getElementById("stats-summary");
-    const calendarGrid = document.getElementById("calendar-grid");
-    const chartInfo = document.getElementById("chart-info");
-    const chartBars = document.getElementById("chart-bars");
-    const chartXlabels = document.getElementById("chart-xlabels");
-
-    const profileBasic = document.getElementById("profile-basic");
-    const profileStatsBox = document.getElementById("profile-stats");
-    const profileDisplayName = document.getElementById("profile-display-name");
-    const profileBio = document.getElementById("profile-bio");
-    const profileSave = document.getElementById("profile-save");
-    const profileStatus = document.getElementById("profile-status");
-
-    const authBackdrop = document.getElementById("auth-backdrop");
-    const authClose = document.getElementById("auth-close");
-    const authTabLogin = document.getElementById("auth-tab-login");
-    const authTabSignup = document.getElementById("auth-tab-signup");
-    const authForm = document.getElementById("auth-form");
-    const authEmail = document.getElementById("auth-email");
-    const authHandle = document.getElementById("auth-handle");
-    const authPassword = document.getElementById("auth-password");
-    const authStatus = document.getElementById("auth-status");
-
-    let session = null;
-    let currentProfile = null;
-    let allProfiles = [];
+    let currentUser = null;
     let allPosts = [];
-    let authMode = "login";
 
-    // Supabase に保存されたフォロー情報
-    let followingIds = new Set();
+    // ==== 多言語ラベル ====
+    const i18n = {
+      ja: {
+        language: "言語",
+        feedTitle: "Feed",
+        feedSub: "トレーニング記録・メモ・写真を残すタイムライン。",
+        date: "日付",
+        bodyweight: "体重 (kg)",
+        visibility: "公開範囲",
+        media: "写真 / 動画",
+        note: "キャプション / トレーニングメモ",
+        postButton: "投稿",
+        resetButton: "リセット",
+        accountTitle: "アカウント",
+        accountSub: "メール & パスワードでログイン / サインアップ。",
+        authButton: "Log in / Sign up",
+      },
+      en: {
+        language: "Language",
+        feedTitle: "Feed",
+        feedSub: "Timeline for logging your training, notes, and photos.",
+        date: "Date",
+        bodyweight: "Bodyweight (kg)",
+        visibility: "Visibility",
+        media: "Photo / Video",
+        note: "Caption / Training notes",
+        postButton: "Post",
+        resetButton: "Reset",
+        accountTitle: "Account",
+        accountSub: "Log in / sign up with email and password.",
+        authButton: "Log in / Sign up",
+      },
+    };
 
-    function setPage(page) {
-      Object.entries(pageElems).forEach(([key, el]) => {
-        el.classList.toggle("active", key === page);
-      });
-      navBtns.forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.page === page);
-      });
+    function applyLanguage(lang) {
+      const t = i18n[lang] || i18n.ja;
+      document.getElementById("labelLanguage").textContent = t.language;
+      document.getElementById("labelFeedTitle").textContent = t.feedTitle;
+      document.getElementById("labelFeedSub").textContent = t.feedSub;
+      document.getElementById("labelDate").textContent = t.date;
+      document.getElementById("labelBodyweight").textContent = t.bodyweight;
+      document.getElementById("labelVisibility").textContent = t.visibility;
+      document.getElementById("labelMedia").textContent = t.media;
+      document.getElementById("labelNote").textContent = t.note;
+      document.getElementById("labelPostButton").textContent = t.postButton;
+      document.getElementById("labelResetButton").textContent = t.resetButton;
+      document.getElementById("labelAccountTitle").textContent = t.accountTitle;
+      document.getElementById("labelAccountSub").textContent = t.accountSub;
+      document.getElementById("labelAuthButton").textContent = t.authButton;
     }
 
-    function formatDate(dStr) {
-      if (!dStr) return "";
-      const d = new Date(dStr);
-      if (Number.isNaN(d.getTime())) return dStr;
+    // ==== ユーティリティ ====
+    function setToday() {
+      const input = document.getElementById("postDate");
+      const today = new Date();
+      const iso = today.toISOString().slice(0, 10);
+      input.value = iso;
+    }
+
+    function showPostError(msg) {
+      document.getElementById("postError").textContent = msg || "";
+    }
+    function showPostStatus(msg) {
+      document.getElementById("postStatus").textContent = msg || "";
+    }
+    function showAuthError(msg) {
+      document.getElementById("authError").textContent = msg || "";
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime())) return dateStr;
       const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
+      const m = (d.getMonth() + 1).toString().padStart(2, "0");
+      const day = d.getDate().toString().padStart(2, "0");
       return `${y}/${m}/${day}`;
     }
 
-    function formatTime(dStr) {
-      const d = new Date(dStr);
-      if (Number.isNaN(d.getTime())) return "";
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      return `${m}/${day} ${hh}:${mm}`;
-    }
-
-    function visibilityLabel(v) {
-      switch (v) {
-        case "followers": return "フォロー中のみ";
-        case "private": return "自分だけ";
-        default: return "全員";
+    function renderMediaHtml(post) {
+      if (!post.media_url) return "";
+      const type = post.media_type || "";
+      if (type.startsWith("video")) {
+        return `<video src="${post.media_url}" controls></video>`;
       }
-    }
-
-    function todayYMD() {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    }
-
-    function openAuth() {
-      authStatus.textContent = "";
-      authBackdrop.classList.remove("hidden");
-    }
-    function closeAuth() {
-      authBackdrop.classList.add("hidden");
-    }
-
-    function setAuthMode(mode) {
-      authMode = mode;
-      if (mode === "login") {
-        authTabLogin.classList.add("primary");
-        authTabSignup.classList.remove("primary");
-        authHandle.parentElement.style.opacity = 0.4;
-      } else {
-        authTabSignup.classList.add("primary");
-        authTabLogin.classList.remove("primary");
-        authHandle.parentElement.style.opacity = 1;
+      if (type.startsWith("image")) {
+        return `<img src="${post.media_url}" alt="media" />`;
       }
+      // その他はリンクとして扱う
+      return `<a href="${post.media_url}" target="_blank" rel="noopener noreferrer">メディアを開く</a>`;
     }
 
-    async function loadSessionAndData() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      session = sessionData.session || null;
-      await updateAfterSessionChange();
+    async function uploadMediaToStorage(file, userId) {
+      const bucket = "post-media";
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${userId}/${Date.now()}.${ext}`;
 
-      supabase.auth.onAuthStateChange(async (_event, s) => {
-        session = s;
-        await updateAfterSessionChange();
-      });
-    }
-
-    async function ensureProfile() {
-      if (!session) return;
-      const userId = session.user.id;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (error && error.code !== "PGRST116") {
-        console.error(error);
-        return;
-      }
-      if (data) {
-        currentProfile = data;
-        return;
-      }
-
-      const email = session.user.email || "";
-      const baseHandle = email.split("@")[0] || "user";
-      const { data: inserted, error: insertErr } = await supabase
-        .from("profiles")
-        .insert({
-          user_id: userId,
-          handle: baseHandle,
-          display_name: baseHandle,
-          bio: "",
-        })
-        .select("*")
-        .maybeSingle();
-      if (insertErr) {
-        console.error(insertErr);
-        return;
-      }
-      currentProfile = inserted;
-    }
-
-    async function fetchProfiles() {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
       if (error) {
-        console.error(error);
-        return;
+        throw error;
       }
-      allProfiles = data || [];
+
+      const { data: publicData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(path);
+
+      const url = publicData?.publicUrl || null;
+      const type = file.type || "";
+      return { url, type };
     }
 
-    async function fetchPosts() {
+    // ==== 投稿読み込み & レンダリング ====
+    async function loadPosts() {
+      if (!currentUser) {
+        allPosts = [];
+        renderPosts();
+        return;
+      }
+
       const { data, error } = await supabase
         .from("posts")
         .select("*")
+        .order("date", { ascending: false })
         .order("created_at", { ascending: false });
+
       if (error) {
-        console.error(error);
+        console.error("loadPosts error", error);
+        showPostError("Feed の読み込みに失敗しました。");
         return;
       }
       allPosts = data || [];
+      renderPosts();
     }
 
-    async function fetchFollows() {
-      followingIds = new Set();
-      if (!session || !currentProfile) return;
-      const { data, error } = await supabase
-        .from("follows")
-        .select("following_id")
-        .eq("follower_id", currentProfile.user_id);
-      if (error) {
-        console.error(error);
-        return;
-      }
-      const ids = (data || []).map(r => r.following_id);
-      followingIds = new Set(ids);
-    }
+    function renderPosts() {
+      const list = document.getElementById("feedList");
+      const filter = document.getElementById("feedFilter").value;
+      const q = document.getElementById("feedSearch").value.trim().toLowerCase();
 
-    function profileByUserId(userId) {
-      return allProfiles.find(p => p.user_id === userId) || null;
-    }
+      let posts = allPosts.slice();
 
-    async function updateAfterSessionChange() {
-      if (!session) {
-        currentProfile = null;
-        allProfiles = [];
-        allPosts = [];
-        followingIds = new Set();
-        userLabel.textContent = "Not logged in";
-        btnOpenAuth.classList.remove("hidden");
-        btnLogout.classList.add("hidden");
-        renderAll();
-        return;
+      if (filter === "mine" && currentUser) {
+        posts = posts.filter((p) => p.user_id === currentUser.id);
+      } else if (filter === "public") {
+        posts = posts.filter((p) => p.visibility === "public");
       }
 
-      await ensureProfile();
-      await fetchProfiles();
-      await fetchPosts();
-      await fetchFollows();
+      if (q) {
+        posts = posts.filter((p) => {
+          const note = (p.note || "").toLowerCase();
+          const bw = (p.bodyweight || "").toString().toLowerCase();
+          const id = (p.user_id || "").toLowerCase();
+          return (
+            note.includes(q) ||
+            bw.includes(q) ||
+            id.includes(q)
+          );
+        });
+      }
 
-      const label = currentProfile
-        ? `@${currentProfile.handle || "user"}`
-        : (session.user.email || "");
-      userLabel.textContent = label;
-      btnOpenAuth.classList.add("hidden");
-      btnLogout.classList.remove("hidden");
-      renderAll();
-    }
+      document.getElementById(
+        "feedCountLabel"
+      ).textContent = `${posts.length} posts`;
 
-    function renderFeed() {
-      feedList.innerHTML = "";
-      if (!session || !currentProfile) {
-        feedEmpty.classList.add("hidden");
-        feedList.innerHTML =
-          '<div class="status">ログインすると投稿とフィードが表示されます。</div>';
-        todaySummary.textContent = "ログインしていません。";
+      if (!posts.length) {
+        list.innerHTML =
+          '<div class="info-text">まだ投稿がありません。</div>';
         return;
       }
 
-      const filter = feedFilter.value || "all";
-      const keyword = (feedSearchInput.value || "").toLowerCase();
-      const meId = currentProfile.user_id || currentProfile.id;
+      const html = posts
+        .map((p) => {
+          const initials = (p.user_id || "?").slice(0, 2).toUpperCase();
+          const dateLabel = formatDate(p.date || p.created_at);
+          const bwLabel = p.bodyweight
+            ? `<strong>${p.bodyweight}kg</strong>`
+            : "";
+          const vis =
+            p.visibility === "public"
+              ? '<span class="badge badge-public">Public</span>'
+              : '<span class="badge badge-private">自分のみ</span>';
 
-      const today = todayYMD();
-      let todayCount = 0;
-
-      const posts = allPosts.filter(p => {
-        if (p.visibility === "private" && p.user_id !== meId) return false;
-        if (p.visibility === "followers" && p.user_id !== meId) {
-          if (!followingIds.has(p.user_id)) return false;
-        }
-
-        if (filter === "mine" && p.user_id !== meId) return false;
-        if (filter === "following") {
-          if (p.user_id !== meId && !followingIds.has(p.user_id)) return false;
-        }
-
-        if (keyword) {
-          const text = (p.content || p.note || "").toLowerCase();
-          if (!text.includes(keyword)) return false;
-        }
-        return true;
-      });
-
-      posts.forEach(p => {
-        const postDate = p.date || p.created_at;
-        if (postDate && postDate.startsWith(today)) {
-          todayCount += 1;
-        }
-      });
-      todaySummary.textContent = `今日の投稿数: ${todayCount}`;
-
-      if (posts.length === 0) {
-        feedEmpty.classList.remove("hidden");
-        return;
-      }
-      feedEmpty.classList.add("hidden");
-
-      posts.forEach(p => {
-        const profile = profileByUserId(p.user_id);
-        const card = document.createElement("article");
-        card.className = "post-card";
-
-        const header = document.createElement("div");
-        header.className = "post-header";
-
-        const left = document.createElement("div");
-        left.className = "post-meta-left";
-        const avatar = document.createElement("div");
-        avatar.className = "avatar";
-        const initial = (profile?.handle || profile?.display_name || "U").charAt(0).toUpperCase();
-        avatar.textContent = initial;
-
-        const metaTexts = document.createElement("div");
-        metaTexts.className = "post-meta-texts";
-        const nameRow = document.createElement("div");
-        nameRow.className = "post-name";
-        const nameSpan = document.createElement("span");
-        nameSpan.textContent = profile?.display_name || profile?.handle || "user";
-        const handleSpan = document.createElement("span");
-        handleSpan.className = "post-handle";
-        handleSpan.textContent = `@${profile?.handle || "user"}`;
-        nameRow.appendChild(nameSpan);
-        nameRow.appendChild(handleSpan);
-
-        const subRow = document.createElement("div");
-        subRow.className = "post-sub";
-        const dStr = p.date || p.created_at;
-        subRow.textContent = `${formatDate(dStr)} · ${formatTime(p.created_at)}`;
-
-        metaTexts.appendChild(nameRow);
-        metaTexts.appendChild(subRow);
-
-        left.appendChild(avatar);
-        left.appendChild(metaTexts);
-
-        const right = document.createElement("div");
-        right.className = "pill-row";
-        const typeBadge = document.createElement("div");
-        typeBadge.className = "badge type";
-        typeBadge.textContent = "トレ記録";
-        const visBadge = document.createElement("div");
-        visBadge.className = "badge";
-        visBadge.textContent = visibilityLabel(p.visibility || "public");
-        right.appendChild(typeBadge);
-        right.appendChild(visBadge);
-
-        if (p.user_id === meId) {
-          const delBtn = document.createElement("button");
-          delBtn.className = "btn small";
-          delBtn.textContent = "削除";
-          delBtn.addEventListener("click", async () => {
-            if (!confirm("この投稿を削除しますか？")) return;
-            const { error } = await supabase.from("posts").delete().eq("id", p.id);
-            if (error) {
-              alert("削除に失敗しました");
-              console.error(error);
-              return;
+          return `
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-user">
+                <div class="avatar">${initials}</div>
+                <div>
+                  <div>@${(p.user_id || "").slice(0, 8)}</div>
+                  <div class="post-meta">${dateLabel}</div>
+                </div>
+              </div>
+              ${vis}
+            </div>
+            ${
+              bwLabel
+                ? `<div class="post-body">${bwLabel}</div>`
+                : ""
             }
-            allPosts = allPosts.filter(x => x.id !== p.id);
-            renderAll();
-          });
-          right.appendChild(delBtn);
-        }
+            ${
+              p.note
+                ? `<div class="post-body">${escapeHtml(p.note)}</div>`
+                : ""
+            }
+            ${
+              p.media_url
+                ? `<div class="media-preview" style="margin-top:6px;">${renderMediaHtml(
+                    p
+                  )}</div>`
+                : ""
+            }
+          </article>
+        `;
+        })
+        .join("");
 
-        header.appendChild(left);
-        header.appendChild(right);
-        card.appendChild(header);
-
-        const body = document.createElement("div");
-        body.className = "post-body";
-        const strong = document.createElement("strong");
-        strong.textContent = p.bodyweight ? `BW ${p.bodyweight}kg` : "Today";
-        body.appendChild(strong);
-        const textNode = document.createTextNode(" " + (p.content || p.note || ""));
-        body.appendChild(textNode);
-        card.appendChild(body);
-
-        if (p.media_url) {
-          const media = document.createElement("div");
-          media.className = "post-media";
-          const inner = document.createElement("div");
-          inner.className = "post-media-inner";
-
-          const isVideo = /\.(mp4|mov|webm)$/i.test(p.media_url);
-          if (isVideo) {
-            const v = document.createElement("video");
-            v.src = p.media_url;
-            v.controls = true;
-            inner.appendChild(v);
-          } else {
-            const img = document.createElement("img");
-            img.src = p.media_url;
-            img.alt = "media";
-            inner.appendChild(img);
-          }
-          media.appendChild(inner);
-          card.appendChild(media);
-        }
-
-        const footer = document.createElement("div");
-        footer.className = "post-footer";
-        const actions = document.createElement("div");
-        actions.className = "post-actions";
-
-        const followBtn = document.createElement("button");
-        followBtn.className = "icon-btn";
-        const isFollowing = followingIds.has(p.user_id);
-        followBtn.textContent = isFollowing ? "⭐" : "☆";
-        followBtn.title = "フォロー / フォロー解除";
-        followBtn.addEventListener("click", () => {
-          toggleFollow(p.user_id);
-        });
-        actions.appendChild(followBtn);
-
-        const likes = document.createElement("div");
-        likes.className = "likes-text";
-        likes.textContent = "（いいね機能は後で実装予定）";
-
-        footer.appendChild(actions);
-        footer.appendChild(likes);
-        card.appendChild(footer);
-
-        feedList.appendChild(card);
-      });
+      list.innerHTML = html;
     }
 
-    async function toggleFollow(userId) {
-      if (!session || !currentProfile) {
-        openAuth();
-        return;
-      }
-      const meId = currentProfile.user_id;
-      if (followingIds.has(userId)) {
-        const { error } = await supabase
-          .from("follows")
-          .delete()
-          .eq("follower_id", meId)
-          .eq("following_id", userId);
-        if (error) {
-          console.error(error);
-          alert("フォロー解除に失敗しました。");
-          return;
-        }
-        followingIds.delete(userId);
-      } else {
-        const { error } = await supabase
-          .from("follows")
-          .insert({ follower_id: meId, following_id: userId });
-        if (error) {
-          console.error(error);
-          alert("フォローに失敗しました。");
-          return;
-        }
-        followingIds.add(userId);
-      }
-      renderAll();
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
     }
 
-    function renderExplore() {
-      exploreList.innerHTML = "";
-      if (!session || !currentProfile) {
-        exploreStatus.textContent = "ログインするとユーザー一覧を見られます。";
-        exploreEmpty.classList.add("hidden");
-        return;
-      }
-      exploreStatus.textContent = "";
-      const keyword = (exploreUserSearch.value || "").toLowerCase();
-      const myId = currentProfile.user_id;
-      let list = allProfiles.filter(p => p.user_id !== myId);
+    // ==== 投稿送信 ====
+    async function handlePostSubmit() {
+      showPostError("");
+      showPostStatus("");
 
-      if (keyword) {
-        list = list.filter(p => {
-          const text = [
-            p.handle || "",
-            p.display_name || "",
-            p.bio || "",
-          ].join(" ").toLowerCase();
-          return text.includes(keyword);
-        });
-      }
-
-      if (list.length === 0) {
-        exploreEmpty.classList.remove("hidden");
-        return;
-      }
-      exploreEmpty.classList.add("hidden");
-
-      list.forEach(p => {
-        const card = document.createElement("div");
-        card.className = "profile-card";
-
-        const top = document.createElement("div");
-        top.className = "profile-card-top";
-
-        const main = document.createElement("div");
-        main.className = "profile-main";
-        const h = document.createElement("div");
-        h.className = "profile-handle";
-        h.textContent = `@${p.handle || "user"}`;
-        const name = document.createElement("div");
-        name.className = "profile-name";
-        name.textContent = p.display_name || "";
-        main.appendChild(h);
-        main.appendChild(name);
-
-        const btn = document.createElement("button");
-        btn.className = "btn small";
-        const isFollowing = followingIds.has(p.user_id);
-        btn.textContent = isFollowing ? "フォロー中" : "フォロー";
-        btn.addEventListener("click", () => {
-          toggleFollow(p.user_id);
-        });
-
-        top.appendChild(main);
-        top.appendChild(btn);
-
-        const meta = document.createElement("div");
-        meta.className = "profile-meta";
-        meta.textContent = (p.bio || "(自己紹介なし)");
-
-        card.appendChild(top);
-        card.appendChild(meta);
-
-        exploreList.appendChild(card);
-      });
-    }
-
-    function renderStats() {
-      if (!session || !currentProfile) {
-        statsSummary.textContent = "ログインしていません。";
-        calendarGrid.innerHTML = "";
-        chartBars.innerHTML = "";
-        chartXlabels.innerHTML = "";
-        chartInfo.textContent = "データなし";
+      if (!currentUser) {
+        showPostError("投稿するにはログインしてください。");
         return;
       }
 
-      if (!statsMonth.value) {
-        const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        statsMonth.value = `${y}-${m}`;
-      }
+      const dateInput = document.getElementById("postDate");
+      const bwInput = document.getElementById("postBodyweight");
+      const noteInput = document.getElementById("postNote");
+      const visSelect = document.getElementById("postVisibility");
+      const mediaFileInput = document.getElementById("postMediaFile");
+      const mediaUrlInput = document.getElementById("postMediaUrl");
 
-      const [yearStr, monthStr] = statsMonth.value.split("-");
-      const year = parseInt(yearStr, 10);
-      const month = parseInt(monthStr, 10);
-      if (!year || !month) return;
+      const date = dateInput.value || null;
+      const bodyweight = bwInput.value ? Number(bwInput.value) : null;
+      const note = noteInput.value.trim();
+      const visibility = visSelect.value || "public";
 
-      const myId = currentProfile.user_id;
-      const posts = allPosts.filter(p => p.user_id === myId);
-
-      const firstDay = new Date(year, month - 1, 1);
-      const lastDay = new Date(year, month, 0);
-      const daysInMonth = lastDay.getDate();
-
-      const perDayCount = {};
-      posts.forEach(p => {
-        const d = new Date(p.date || p.created_at);
-        if (d.getFullYear() === year && (d.getMonth() + 1) === month) {
-          const day = d.getDate();
-          perDayCount[day] = (perDayCount[day] || 0) + 1;
-        }
-      });
-
-      const total = Object.values(perDayCount).reduce((a, b) => a + b, 0);
-      statsSummary.textContent =
-        `${year}年${month}月の投稿数: ${total}（${Object.keys(perDayCount).length}日）`;
-
-      calendarGrid.innerHTML = "";
-      const startWeekday = firstDay.getDay();
-
-      for (let i = 0; i < startWeekday; i++) {
-        const div = document.createElement("div");
-        div.className = "calendar-day muted";
-        calendarGrid.appendChild(div);
-      }
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        const div = document.createElement("div");
-        const count = perDayCount[day] || 0;
-        div.className = "calendar-day" + (count === 0 ? " muted" : "");
-        const label = document.createElement("div");
-        label.textContent = day;
-        label.style.fontWeight = "600";
-        label.style.fontSize = "10px";
-        const info = document.createElement("div");
-        info.style.display = "flex";
-        info.style.alignItems = "center";
-        info.style.gap = "4px";
-        if (count > 0) {
-          const dot = document.createElement("div");
-          dot.className = "calendar-dot";
-          info.appendChild(dot);
-          const txt = document.createElement("span");
-          txt.style.fontSize = "10px";
-          txt.textContent = `${count}件`;
-          info.appendChild(txt);
-        } else {
-          info.textContent = "-";
-          info.style.fontSize = "10px";
-          info.style.color = "var(--muted)";
-        }
-        div.appendChild(label);
-        div.appendChild(info);
-        calendarGrid.appendChild(div);
-      }
-
-      chartBars.innerHTML = "";
-      chartXlabels.innerHTML = "";
-      if (daysInMonth <= 0) {
-        chartInfo.textContent = "データなし";
+      if (!date && !note && !bodyweight && !mediaFileInput.files[0]) {
+        showPostError("何か1つは入力してください。");
         return;
       }
 
-      const weeks = [0,0,0,0,0,0];
-      for (let day = 1; day <= daysInMonth; day++) {
-        const d = new Date(year, month - 1, day);
-        const weekIndex = Math.floor((d.getDate() + startWeekday - 1) / 7);
-        weeks[weekIndex] += perDayCount[day] || 0;
-      }
-      const maxVal = Math.max(...weeks, 0);
-      chartInfo.textContent = maxVal === 0
-        ? "この月の投稿はまだありません。"
-        : `最大投稿週: ${maxVal}件`;
+      showPostStatus("投稿中...");
+      let mediaUrl = null;
+      let mediaType = null;
 
-      const activeWeeks = weeks.filter((_, i) => i < 5 || weeks[i] > 0);
-      activeWeeks.forEach((v, i) => {
-        const bar = document.createElement("div");
-        bar.className = "chart-bar";
-        const inner = document.createElement("div");
-        inner.className = "chart-bar-inner";
-        const h = maxVal > 0 ? (v / maxVal) * 100 : 0;
-        inner.style.height = `${h}%`;
-        bar.appendChild(inner);
-        chartBars.appendChild(bar);
-
-        const label = document.createElement("div");
-        label.textContent = `W${i+1}`;
-        chartXlabels.appendChild(label);
-      });
-    }
-
-    function renderProfile() {
-      profileBasic.innerHTML = "";
-      profileStatsBox.innerHTML = "";
-      if (!session || !currentProfile) {
-        profileBasic.innerHTML = "<div class='status'>ログインしていません。</div>";
-        profileDisplayName.value = "";
-        profileBio.value = "";
-        return;
-      }
-      const me = currentProfile;
-      const myId = me.user_id;
-
-      const email = session.user.email || "";
-      const created = me.created_at ? formatDate(me.created_at) : "";
-
-      const li1 = document.createElement("div");
-      li1.textContent = `Handle: @${me.handle || "user"}`;
-      const li2 = document.createElement("div");
-      li2.textContent = `Display name: ${me.display_name || ""}`;
-      const li3 = document.createElement("div");
-      li3.textContent = `Email: ${email}`;
-      const li4 = document.createElement("div");
-      li4.textContent = created ? `Joined: ${created}` : "";
-
-      profileBasic.appendChild(li1);
-      profileBasic.appendChild(li2);
-      profileBasic.appendChild(li3);
-      if (created) profileBasic.appendChild(li4);
-
-      profileDisplayName.value = me.display_name || "";
-      profileBio.value = me.bio || "";
-
-      const myPosts = allPosts.filter(p => p.user_id === myId);
-      const total = myPosts.length;
-
-      const dates = myPosts.map(p => new Date(p.date || p.created_at));
-      const last = dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))) : null;
-
-      const stat1 = document.createElement("div");
-      stat1.textContent = `Total posts: ${total}`;
-      const stat2 = document.createElement("div");
-      stat2.textContent = last ? `Last post: ${formatDate(last.toISOString())}` : "Last post: -";
-
-      const followCount = Array.from(followingIds).length;
-      const stat3 = document.createElement("div");
-      stat3.textContent = `Following: ${followCount}`;
-
-      profileStatsBox.appendChild(stat1);
-      profileStatsBox.appendChild(stat2);
-      profileStatsBox.appendChild(stat3);
-    }
-
-    function renderAll() {
-      renderFeed();
-      renderExplore();
-      renderStats();
-      renderProfile();
-    }
-
-    navBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const page = btn.dataset.page;
-        setPage(page);
-        if (page === "stats") renderStats();
-      });
-    });
-
-    btnOpenAuth.addEventListener("click", openAuth);
-    btnLogout.addEventListener("click", async () => {
-      await supabase.auth.signOut();
-      session = null;
-      currentProfile = null;
-      allProfiles = [];
-      allPosts = [];
-      followingIds = new Set();
-      renderAll();
-    });
-
-    authClose.addEventListener("click", closeAuth);
-    authBackdrop.addEventListener("click", (e) => {
-      if (e.target === authBackdrop) closeAuth();
-    });
-
-    authTabLogin.addEventListener("click", () => setAuthMode("login"));
-    authTabSignup.addEventListener("click", () => setAuthMode("signup"));
-
-    authForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      authStatus.textContent = "";
-      const email = authEmail.value.trim();
-      const pw = authPassword.value.trim();
-      const handle = authHandle.value.trim();
+      const file = mediaFileInput.files[0];
 
       try {
-        if (authMode === "login") {
-          const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
-          if (error) throw error;
-          authStatus.textContent = "Logged in.";
-          closeAuth();
-        } else {
-          if (!handle) {
-            authStatus.textContent = "Sign up 時は handle が必要です。";
-            return;
-          }
-          const { error: signErr } = await supabase.auth.signUp({
-            email,
-            password: pw,
-          });
-          if (signErr) throw signErr;
-          authStatus.textContent = "Sign up 成功。ログインします…";
-          setAuthMode("login");
+        if (file) {
+          const uploaded = await uploadMediaToStorage(file, currentUser.id);
+          mediaUrl = uploaded.url;
+          mediaType = uploaded.type;
+        } else if (mediaUrlInput.value.trim()) {
+          mediaUrl = mediaUrlInput.value.trim();
+          mediaType = "external";
         }
-      } catch (err) {
-        console.error(err);
-        authStatus.textContent = err.message || "Auth error.";
+
+        const { error } = await supabase.from("posts").insert([
+          {
+            user_id: currentUser.id,
+            date,
+            bodyweight,
+            note,
+            media_url: mediaUrl,
+            media_type: mediaType,
+            visibility,
+          },
+        ]);
+
+        if (error) {
+          console.error("insert error", error);
+          showPostError("投稿に失敗しました。");
+          showPostStatus("");
+          return;
+        }
+
+        // clear
+        noteInput.value = "";
+        mediaFileInput.value = "";
+        mediaUrlInput.value = "";
+        document.getElementById("mediaPreview").innerHTML = "";
+        showPostStatus("投稿しました。");
+        await loadPosts();
+      } catch (e) {
+        console.error("post submit error", e);
+        showPostError("メディアのアップロードまたは投稿に失敗しました。");
+        showPostStatus("");
       }
-    });
+    }
 
-    postReset.addEventListener("click", () => {
-      const today = todayYMD();
-      postDate.value = today;
-      postBodyweight.value = "";
-      postContent.value = "";
-      postMediaUrl.value = "";
-      postVisibility.value = "public";
-      postStatus.textContent = "リセットしました。";
-    });
+    function handlePostReset() {
+      setToday();
+      document.getElementById("postBodyweight").value = "";
+      document.getElementById("postNote").value = "";
+      document.getElementById("postMediaFile").value = "";
+      document.getElementById("postMediaUrl").value = "";
+      document.getElementById("mediaPreview").innerHTML = "";
+      showPostError("");
+      showPostStatus("");
+    }
 
-    postForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (!session || !currentProfile) {
-        postStatus.textContent = "ログインが必要です。";
-        openAuth();
+    // ==== Auth ====
+    async function handleAuth() {
+      showAuthError("");
+
+      const email = document.getElementById("authEmail").value.trim();
+      const password = document
+        .getElementById("authPassword")
+        .value.trim();
+
+      if (!email || !password) {
+        showAuthError("Email と password を入力してください。");
         return;
       }
-      const dateVal = postDate.value || todayYMD();
-      const bw = postBodyweight.value.trim();
-      const content = postContent.value.trim();
-      const visibility = postVisibility.value || "public";
-      const mediaUrl = postMediaUrl.value.trim();
 
-      if (!content && !mediaUrl) {
-        postStatus.textContent = "キャプションか画像URLのどちらかは入力してください。";
-        return;
+      // まず login を試す。ダメなら sign up
+      const { data: signInData, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+      if (signInError) {
+        // 新規ユーザーかもしれないので signUp を試す
+        const { data: signUpData, error: signUpError } =
+          await supabase.auth.signUp({
+            email,
+            password,
+          });
+
+        if (signUpError) {
+          console.error("auth error", signInError, signUpError);
+          showAuthError("ログイン / サインアップに失敗しました。");
+          return;
+        } else {
+          currentUser = signUpData.user;
+          updateAuthUI();
+          await loadPosts();
+          return;
+        }
+      } else {
+        currentUser = signInData.user;
+        updateAuthUI();
+        await loadPosts();
       }
-      postStatus.textContent = "投稿中…";
+    }
 
-      const insertData = {
-        user_id: currentProfile.user_id,
-        date: dateVal,
-        bodyweight: bw ? Number(bw) : null,
-        content,
-        visibility,
-        media_url: mediaUrl || null,
-      };
+    async function handleLogout() {
+      await supabase.auth.signOut();
+      currentUser = null;
+      updateAuthUI();
+      allPosts = [];
+      renderPosts();
+    }
 
-      const { data, error } = await supabase
-        .from("posts")
-        .insert(insertData)
-        .select("*")
-        .maybeSingle();
-      if (error) {
-        console.error(error);
-        postStatus.textContent = "投稿に失敗しました。";
-        return;
+    function updateAuthUI() {
+      const authControls = document.getElementById("authControls");
+      const loggedInInfo = document.getElementById("loggedInInfo");
+      const newPostForm = document.getElementById("newPostForm");
+
+      if (currentUser) {
+        authControls.style.display = "none";
+        loggedInInfo.style.display = "flex";
+        newPostForm.style.opacity = "1";
+        newPostForm.style.pointerEvents = "auto";
+        document.getElementById(
+          "currentUserLabel"
+        ).textContent = `ログイン中: ${currentUser.email || currentUser.id}`;
+      } else {
+        authControls.style.display = "flex";
+        loggedInInfo.style.display = "none";
+        newPostForm.style.opacity = "0.5";
+        newPostForm.style.pointerEvents = "none";
+        document.getElementById("currentUserLabel").textContent = "";
       }
-      allPosts.unshift(data);
-      postStatus.textContent = "投稿しました。";
-      postContent.value = "";
-      postMediaUrl.value = "";
-      renderAll();
-    });
+    }
 
-    feedFilter.addEventListener("change", renderFeed);
-    feedSearchInput.addEventListener("input", renderFeed);
+    // ==== イベント登録 & 初期化 ====
+    async function init() {
+      // language
+      const langSelect = document.getElementById("languageSelect");
+      const savedLang =
+        localStorage.getItem("trends-lang") || "ja";
+      langSelect.value = savedLang;
+      applyLanguage(savedLang);
+      langSelect.addEventListener("change", () => {
+        const lang = langSelect.value;
+        localStorage.setItem("trends-lang", lang);
+        applyLanguage(lang);
+      });
 
-    exploreUserSearch.addEventListener("input", renderExplore);
-    exploreRefresh.addEventListener("click", async () => {
-      exploreStatus.textContent = "再読込中…";
-      await fetchProfiles();
-      await fetchFollows();
-      exploreStatus.textContent = "";
-      renderExplore();
-    });
+      setToday();
 
-    statsMonth.addEventListener("change", renderStats);
+      // media preview
+      const mediaFileInput = document.getElementById("postMediaFile");
+      const mediaPreview = document.getElementById("mediaPreview");
+      mediaFileInput.addEventListener("change", () => {
+        mediaPreview.innerHTML = "";
+        const file = mediaFileInput.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        if (file.type.startsWith("video")) {
+          const v = document.createElement("video");
+          v.src = url;
+          v.controls = true;
+          mediaPreview.appendChild(v);
+        } else {
+          const img = document.createElement("img");
+          img.src = url;
+          mediaPreview.appendChild(img);
+        }
+      });
 
-    profileSave.addEventListener("click", async () => {
-      if (!session || !currentProfile) {
-        profileStatus.textContent = "ログインしてください。";
-        return;
+      // buttons
+      document
+        .getElementById("btnSubmitPost")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          handlePostSubmit();
+        });
+      document
+        .getElementById("btnResetPost")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          handlePostReset();
+        });
+      document
+        .getElementById("btnAuth")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          handleAuth();
+        });
+      document
+        .getElementById("btnLogout")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          handleLogout();
+        });
+      document
+        .getElementById("btnReloadFeed")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          loadPosts();
+        });
+      document
+        .getElementById("btnClearCache")
+        .addEventListener("click", () => {
+          localStorage.clear();
+          alert("Local cache cleared.");
+        });
+
+      document
+        .getElementById("feedFilter")
+        .addEventListener("change", renderPosts);
+      document
+        .getElementById("feedSearch")
+        .addEventListener("input", renderPosts);
+
+      // auth state
+      supabase.auth.onAuthStateChange((event, session) => {
+        currentUser = session?.user || null;
+        updateAuthUI();
+        if (currentUser) {
+          loadPosts();
+        } else {
+          allPosts = [];
+          renderPosts();
+        }
+      });
+
+      // initial user
+      const { data } = await supabase.auth.getUser();
+      currentUser = data.user || null;
+      updateAuthUI();
+      if (currentUser) {
+        await loadPosts();
       }
-      const newName = profileDisplayName.value.trim();
-      const newBio = profileBio.value.trim();
-      profileStatus.textContent = "保存中…";
-      const { data, error } = await supabase
-        .from("profiles")
-        .update({
-          display_name: newName || null,
-          bio: newBio || null,
-        })
-        .eq("user_id", currentProfile.user_id)
-        .select("*")
-        .maybeSingle();
-      if (error) {
-        console.error(error);
-        profileStatus.textContent = "保存に失敗しました。";
-        return;
-      }
-      currentProfile = data;
-      profileStatus.textContent = "保存しました。";
-      renderAll();
-    });
-
-    langSelect.addEventListener("change", () => {
-      localStorage.setItem("trends_lang", langSelect.value);
-    });
-
-    function init() {
-      const today = todayYMD();
-      if (!postDate.value) postDate.value = today;
-
-      const savedLang = localStorage.getItem("trends_lang");
-      if (savedLang) langSelect.value = savedLang;
-
-      loadSessionAndData();
     }
 
     init();
-  })();
-</script>
+  </script>
 </body>
 </html>
