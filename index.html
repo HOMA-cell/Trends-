@@ -3,923 +3,1092 @@
 <head>
   <meta charset="UTF-8" />
   <title>Trends | Workout SNS</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- ================== Styles (シンプル UI) ================== -->
   <style>
-    * { box-sizing: border-box; }
+    :root {
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --text-main: #111827;
+      --text-sub: #6b7280;
+      --danger: #ef4444;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+    }
+    * {
+      box-sizing: border-box;
+    }
     body {
       margin: 0;
-      font-family: system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
-      background: #f3f4f6;
-      color: #111827;
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
     }
-    .app {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
       padding: 16px;
     }
     header {
-      width: 100%;
-      max-width: 960px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 12px;
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 700;
-      font-size: 1.2rem;
-    }
-    .logo-mark {
-      width: 24px;
-      height: 24px;
-      border-radius: 999px;
-      border: 2px solid #2563eb;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.65rem;
-      color: #2563eb;
-    }
-    .lang {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.8rem;
-    }
-    select,input,textarea,button {
-      font-family: inherit;
-      font-size: 0.9rem;
-    }
-    select,input,textarea {
-      width: 100%;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid #d1d5db;
-      background: #fff;
-    }
-    textarea { min-height: 70px; resize: vertical; }
-    input[type="file"] {
-      padding: 0;
-      border: none;
-      background: transparent;
-      font-size: 0.8rem;
-    }
-    button {
-      border-radius: 999px;
-      border: none;
-      padding: 6px 12px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      white-space: nowrap;
-    }
-    .btn-primary { background: #2563eb; color: #fff; }
-    .btn-secondary { background: #e5e7eb; color: #111827; }
-
-    .layout {
-      width: 100%;
-      max-width: 960px;
-      display: grid;
-      grid-template-columns: minmax(0,2fr) minmax(260px,1fr);
       gap: 12px;
     }
-    @media (max-width: 800px) {
+    .title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    #app-title {
+      font-weight: 700;
+      font-size: 22px;
+    }
+    #app-sub {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .top-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    select,
+    input,
+    textarea {
+      font: inherit;
+    }
+    .select-sm {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 12px;
+    }
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+    }
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
       .layout {
-        grid-template-columns: minmax(0,1fr);
+        grid-template-columns: 1fr;
       }
     }
+
     .card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 14px;
-      box-shadow: 0 6px 20px rgba(15,23,42,0.06);
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: 12px;
     }
-    .title-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .card-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .card-sub {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-top: -4px;
       margin-bottom: 8px;
     }
-    .title {
-      font-size: 0.95rem;
-      font-weight: 600;
-    }
-    .sub {
-      font-size: 0.8rem;
-      color: #6b7280;
-    }
-    .field { margin-bottom: 8px; }
-    .field label {
-      display: block;
-      margin-bottom: 3px;
-      font-size: 0.8rem;
-      color: #4b5563;
-    }
-    .row-2 {
+    .grid-2 {
       display: grid;
-      grid-template-columns: repeat(2,minmax(0,1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
     @media (max-width: 600px) {
-      .row-2 { grid-template-columns: minmax(0,1fr); }
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
     }
-    .secondary-input {
-      margin-top: 4px;
-      padding: 6px 9px;
-      font-size: 0.8rem;
-    }
-    .media-preview img,
-    .media-preview video {
-      max-width: 100%;
-      border-radius: 10px;
-      margin-top: 4px;
-      display: block;
-    }
-    .actions {
+    .field {
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+    }
+    .field label {
+      color: var(--text-sub);
+    }
+    .field input[type="date"],
+    .field input[type="number"],
+    .field input[type="text"],
+    .field textarea,
+    .field select {
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 13px;
+    }
+    .field textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+    .field input[type="file"] {
+      font-size: 12px;
+    }
+    .form-actions {
+      display: flex;
       gap: 8px;
-      margin-top: 2px;
+      margin-top: 8px;
       flex-wrap: wrap;
     }
-    .info { font-size: 0.8rem; color: #6b7280; }
-    .error { font-size: 0.8rem; color: #b91c1c; margin-top: 2px; }
-
-    .feed-toolbar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 6px;
-      flex-wrap: wrap;
-    }
-    .feed-toolbar select {
-      max-width: 120px;
-    }
-    .feed-list { margin-top: 6px; }
-
-    .post {
-      border-radius: 14px;
-      border: 1px solid #e5e7eb;
-      padding: 10px;
-      margin-bottom: 8px;
-      background: #f9fafb;
-    }
-    .post-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-    .post-user {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .avatar {
-      width: 22px;
-      height: 22px;
-      border-radius: 999px;
-      background: #2563eb;
-      color: #fff;
-      font-size: 0.7rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .post-user-main {
-      font-size: 0.8rem;
-    }
-    .post-meta {
-      font-size: 0.75rem;
-      color: #9ca3af;
-    }
-    .badge {
-      font-size: 0.7rem;
-      padding: 2px 7px;
-      border-radius: 999px;
-      background: #e5e7eb;
-      color: #374151;
-    }
-    .badge-public { background: #dbeafe; color: #1d4ed8; }
-    .badge-private { background: #fef3c7; color: #b45309; }
-
-    .post-body {
-      font-size: 0.9rem;
-      margin-top: 2px;
-      white-space: pre-wrap;
-    }
-    .post-body strong { font-weight: 600; }
-    .post-footer {
+    #login-required {
       margin-top: 6px;
+      font-size: 12px;
+      color: var(--danger);
+    }
+
+    .feed-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 8px;
       gap: 8px;
-      flex-wrap: wrap;
-      font-size: 0.8rem;
-      color: #6b7280;
     }
-    .post-footer-left {
+    .chips {
       display: flex;
-      align-items: center;
-      gap: 10px;
+      gap: 6px;
+      flex-wrap: wrap;
     }
-    .icon-btn {
-      border: none;
-      background: transparent;
-      padding: 0;
+    .chip {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      font-size: 11px;
+      background: #fff;
+      color: var(--text-sub);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      font-size: 0.8rem;
-      color: #6b7280;
     }
-    .icon-btn span.icon {
-      font-size: 1rem;
-      line-height: 1;
+    .chip-active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      border-color: var(--primary);
     }
-    .icon-btn.liked { color: #ef4444; }
+    .chip-like {
+      font-size: 13px;
+      border: none;
+      background: transparent;
+    }
+    .chip-like-on {
+      color: #f97316;
+    }
+    .chip-log,
+    .chip-delete {
+      font-size: 11px;
+      padding-inline: 6px;
+    }
+    .chip-delete {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
 
-    .small-buttons {
+    .feed-search-wrap {
+      flex: 1;
+      display: flex;
+      justify-content: flex-end;
+    }
+    #feed-search {
+      width: 100%;
+      max-width: 260px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .post-card {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .post-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      background: #dbeafe;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .post-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .post-user {
+      display: flex;
+      gap: 6px;
+      font-size: 13px;
+      align-items: baseline;
+    }
+    .post-user .handle {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+    .post-sub {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+    .post-actions {
       display: flex;
       gap: 4px;
+      align-items: center;
     }
-    .small-buttons button {
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      border-radius: 999px;
+    .post-media img,
+    .post-media video {
+      width: 100%;
+      border-radius: var(--radius-md);
+      display: block;
+      max-height: 420px;
+      object-fit: cover;
+    }
+    .post-media {
+      margin-bottom: 6px;
+    }
+    .post-body {
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .post-weight {
+      font-weight: 600;
+    }
+    .post-caption {
+      white-space: pre-wrap;
+    }
+    .empty {
+      font-size: 12px;
+      color: var(--text-sub);
+      padding: 8px;
     }
 
     .account-row {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      margin-top: 6px;
+      font-size: 12px;
     }
-    .account-small {
-      font-size: 0.8rem;
-      color: #4b5563;
+    .account-row input {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      font-size: 12px;
     }
-    .debug-card { margin-top: 8px; }
-    .debug-card button { width: 100%; }
+    .account-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .account-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .tips-list {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin: 0;
+      padding-left: 16px;
+    }
+    .tips-list li {
+      margin-bottom: 2px;
+    }
+
+    .debug-msg {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--text-sub);
+    }
   </style>
-</head>
-<body>
-  <div class="app">
-    <header>
-      <div class="logo">
-        <div class="logo-mark">Tr</div>
-        <span>Trends</span>
-      </div>
-      <div class="lang">
-        <span id="labelLanguage">言語</span>
-        <select id="languageSelect">
-          <option value="ja">日本語</option>
-          <option value="en">English</option>
-        </select>
-      </div>
-    </header>
 
-    <main class="layout">
-      <!-- LEFT = 投稿 & Feed -->
-      <section>
-        <!-- New post -->
-        <div class="card">
-          <div class="title-row">
-            <div class="title" id="labelFeedTitle">Feed</div>
-          </div>
+  <!-- ================== Supabase Frontend ================== -->
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/+esm";
 
-          <div id="newPostForm">
-            <div class="row-2">
-              <div class="field">
-                <label for="postDate" id="labelDate">日付</label>
-                <input id="postDate" type="date" />
-              </div>
-              <div class="field">
-                <label for="postBodyweight" id="labelBodyweight">体重 (kg)</label>
-                <input id="postBodyweight" type="number" step="0.1" inputmode="decimal" placeholder="77.4" />
-              </div>
-            </div>
-
-            <div class="row-2">
-              <div class="field">
-                <label for="postVisibility" id="labelVisibility">公開範囲</label>
-                <select id="postVisibility">
-                  <option value="public">Public</option>
-                  <option value="private">自分のみ</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="postMediaFile" id="labelMedia">写真 / 動画</label>
-                <input id="postMediaFile" type="file" accept="image/*,video/*" />
-                <input id="postMediaUrl" type="url" placeholder="外部URLを使う場合だけ" class="secondary-input" />
-                <div id="mediaPreview" class="media-preview"></div>
-              </div>
-            </div>
-
-            <div class="field">
-              <label for="postNote" id="labelNote">メモ / キャプション</label>
-              <textarea id="postNote" placeholder="bench 100kg x5 @8"></textarea>
-            </div>
-
-            <div class="actions">
-              <button id="btnSubmitPost" class="btn-primary">
-                <span id="labelPostButton">投稿</span>
-              </button>
-              <button id="btnResetPost" class="btn-secondary" type="button">
-                <span id="labelResetButton">リセット</span>
-              </button>
-              <span id="postStatus" class="info"></span>
-            </div>
-            <div id="postError" class="error"></div>
-          </div>
-        </div>
-
-        <!-- Feed -->
-        <div class="card" style="margin-top: 10px;">
-          <div class="feed-toolbar">
-            <select id="feedFilter">
-              <option value="all">すべて</option>
-              <option value="mine">自分のみ</option>
-              <option value="public">Publicのみ</option>
-            </select>
-            <input id="feedSearch" type="search" placeholder="caption / メモ / ユーザー検索" />
-            <span class="info" id="feedCountLabel">0 posts</span>
-          </div>
-          <div id="feedList" class="feed-list"></div>
-        </div>
-      </section>
-
-      <!-- RIGHT = アカウント / Debug -->
-      <aside>
-        <div class="card">
-          <div class="title" id="labelAccountTitle">アカウント</div>
-          <div class="sub" id="labelAccountSub">メール & パスワードだけのシンプルログイン。</div>
-
-          <div id="authControls" class="account-row">
-            <input id="authEmail" type="email" placeholder="email@example.com" />
-            <input id="authPassword" type="password" placeholder="password" />
-            <button id="btnAuth" class="btn-primary">
-              <span id="labelAuthButton">Log in / Sign up</span>
-            </button>
-          </div>
-
-          <div id="loggedInInfo" class="account-row" style="display:none;">
-            <div class="account-small" id="currentUserLabel"></div>
-            <div style="display:flex;gap:6px;">
-              <button id="btnReloadFeed" class="btn-secondary" type="button">Reload</button>
-              <button id="btnLogout" class="btn-secondary" type="button">Log out</button>
-            </div>
-          </div>
-
-          <div id="authError" class="error"></div>
-        </div>
-
-        <div class="card debug-card">
-          <div class="title">Debug</div>
-          <div class="sub">今はプロトタイプ。ローカルキャッシュを消すだけ。</div>
-          <button id="btnClearCache" class="btn-secondary" type="button">Clear local cache</button>
-        </div>
-      </aside>
-    </main>
-  </div>
-
-  <!-- Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    // ==== Supabase setup ====
+    // ---- Supabase 設定 ----
     const SUPABASE_URL = "https://sfuroqxcljlkbthblqva.supabase.co";
     const SUPABASE_ANON_KEY =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdXJvcXhjbGpsa2J0aGJscXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxOTE0MTQsImV4cCI6MjA4MDc2NzQxNH0.v1qrjQgkPg3hPjIVCsKg3unwM0lvPGXkw8DvVm8YlRI";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // ---- 状態 ----
     let currentUser = null;
+    let currentProfile = null;
     let allPosts = [];
+    let currentFilter = "all";
+    let currentLang = "ja";
+    let currentMediaFile = null;
 
-    // ==== i18n ====
-    const i18n = {
+    // ---- i18n ----
+    const t = {
       ja: {
-        language: "言語",
-        feedTitle: "Feed",
-        feedSub: "",
+        appTitle: "Trends",
+        appSub: "筋トレ専用SNS / シンプルなログ",
+        newPost: "新規投稿",
         date: "日付",
-        bodyweight: "体重 (kg)",
+        weight: "体重 (kg)",
+        media: "画像 / 動画",
+        caption: "キャプション / トレメモ",
         visibility: "公開範囲",
-        media: "写真 / 動画",
-        note: "メモ / キャプション",
-        postButton: "投稿",
-        resetButton: "リセット",
-        accountTitle: "アカウント",
-        accountSub: "メール & パスワードだけのシンプルログイン。",
-        authButton: "Log in / Sign up",
+        public: "Public",
+        private: "自分のみ",
+        submit: "投稿",
+        reset: "リセット",
+        pleaseLogin: "ログインしてください。",
+        feed: "Feed",
+        all: "すべて",
+        mine: "自分",
+        publicOnly: "Publicのみ",
+        searchPlaceholder: "caption / handle / メモで検索",
+        account: "アカウント",
+        loginSignup: "ログイン / サインアップ",
+        logout: "ログアウト",
+        debugTitle: "Debug / Dev",
+        clearCache: "Clear local cache",
+        cacheCleared: "Local cache cleared.",
+        like: "いいね",
+        log: "Log",
+        delete: "Delete",
+        tipsTitle: "使い方",
+        tip1: "毎日のトレを1行メモ。",
+        tip2: "見られたくない日は「自分のみ」。",
+        tip3: "画像アップでボディ変化を記録。",
       },
       en: {
-        language: "Language",
-        feedTitle: "Feed",
-        feedSub: "",
+        appTitle: "Trends",
+        appSub: "Workout-only SNS / Simple logging",
+        newPost: "New Post",
         date: "Date",
-        bodyweight: "Bodyweight (kg)",
+        weight: "Bodyweight (kg)",
+        media: "Image / Video",
+        caption: "Caption / Training note",
         visibility: "Visibility",
-        media: "Photo / Video",
-        note: "Note / Caption",
-        postButton: "Post",
-        resetButton: "Reset",
-        accountTitle: "Account",
-        accountSub: "Simple email + password login.",
-        authButton: "Log in / Sign up",
+        public: "Public",
+        private: "Private",
+        submit: "Post",
+        reset: "Reset",
+        pleaseLogin: "Please log in.",
+        feed: "Feed",
+        all: "All",
+        mine: "Mine",
+        publicOnly: "Public only",
+        searchPlaceholder: "Search caption / handle / memo",
+        account: "Account",
+        loginSignup: "Log in / Sign up",
+        logout: "Log out",
+        debugTitle: "Debug / Dev",
+        clearCache: "Clear local cache",
+        cacheCleared: "Local cache cleared.",
+        like: "Like",
+        log: "Log",
+        delete: "Delete",
+        tipsTitle: "Tips",
+        tip1: "Log your workout in one line.",
+        tip2: "Use “Private” when you don’t want others to see.",
+        tip3: "Track body changes with photos.",
       },
     };
 
-    function applyLanguage(lang) {
-      const t = i18n[lang] || i18n.ja;
-      document.getElementById("labelLanguage").textContent = t.language;
-      document.getElementById("labelFeedTitle").textContent = t.feedTitle;
-      document.getElementById("labelDate").textContent = t.date;
-      document.getElementById("labelBodyweight").textContent = t.bodyweight;
-      document.getElementById("labelVisibility").textContent = t.visibility;
-      document.getElementById("labelMedia").textContent = t.media;
-      document.getElementById("labelNote").textContent = t.note;
-      document.getElementById("labelPostButton").textContent = t.postButton;
-      document.getElementById("labelResetButton").textContent = t.resetButton;
-      document.getElementById("labelAccountTitle").textContent = t.accountTitle;
-      document.getElementById("labelAccountSub").textContent = t.accountSub;
-      document.getElementById("labelAuthButton").textContent = t.authButton;
+    const $ = (id) => document.getElementById(id);
+
+    // ================== 初期化 ==================
+    window.addEventListener("DOMContentLoaded", init);
+
+    async function init() {
+      setupLanguageSwitcher();
+      setupAuthUI();
+      setupPostForm();
+      setupFeedControls();
+      setupDebug();
+
+      await restoreSession();
+      await loadFeed();
     }
 
-    // ==== Utils ====
-    function setToday() {
-      const input = document.getElementById("postDate");
-      const d = new Date();
-      const iso = d.toISOString().slice(0, 10);
-      input.value = iso;
+    // ------------------ 言語切り替え ------------------
+    function setupLanguageSwitcher() {
+      const select = $("lang-select");
+      select.addEventListener("change", () => {
+        currentLang = select.value;
+        applyTranslations();
+        renderFeed();
+      });
+      applyTranslations();
     }
 
-    function showPostError(msg) {
-      document.getElementById("postError").textContent = msg || "";
-    }
-    function showPostStatus(msg) {
-      document.getElementById("postStatus").textContent = msg || "";
-    }
-    function showAuthError(msg) {
-      document.getElementById("authError").textContent = msg || "";
+    function applyTranslations() {
+      const tr = t[currentLang];
+      $("app-title").textContent = tr.appTitle;
+      $("app-sub").textContent = tr.appSub;
+
+      $("new-post-title").textContent = tr.newPost;
+      $("label-date").textContent = tr.date;
+      $("label-weight").textContent = tr.weight;
+      $("label-media").textContent = tr.media;
+      $("label-caption").textContent = tr.caption;
+      $("label-visibility").textContent = tr.visibility;
+
+      $("visibility-public").textContent = tr.public;
+      $("visibility-private").textContent = tr.private;
+
+      $("btn-submit").textContent = tr.submit;
+      $("btn-reset").textContent = tr.reset;
+
+      $("login-required").textContent = tr.pleaseLogin;
+
+      $("feed-title").textContent = tr.feed;
+      $("filter-all").textContent = tr.all;
+      $("filter-mine").textContent = tr.mine;
+      $("filter-public").textContent = tr.publicOnly;
+      $("feed-search").placeholder = tr.searchPlaceholder;
+
+      $("account-title").textContent = tr.account;
+      $("btn-auth").textContent = tr.loginSignup;
+      $("btn-logout").textContent = tr.logout;
+
+      $("debug-title").textContent = tr.debugTitle;
+      $("btn-clear-cache").textContent = tr.clearCache;
+
+      $("tips-title").textContent = tr.tipsTitle;
+      $("tip1").textContent = tr.tip1;
+      $("tip2").textContent = tr.tip2;
+      $("tip3").textContent = tr.tip3;
     }
 
-    function formatDate(dateStr) {
-      if (!dateStr) return "";
-      const d = new Date(dateStr);
-      if (Number.isNaN(d.getTime())) return dateStr;
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}/${m}/${day}`;
+    // ------------------ Auth ------------------
+    function setupAuthUI() {
+      $("btn-auth").addEventListener("click", handleAuthSubmit);
+      $("btn-logout").addEventListener("click", handleLogout);
     }
 
-    function escapeHtml(str) {
-      if (!str) return "";
-      return str
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
+    async function handleAuthSubmit() {
+      const email = $("auth-email").value.trim();
+      const password = $("auth-password").value.trim();
 
-    // ==== local likes (postId -> true) ====
-    const LIKES_KEY = "trends-likes-v1";
-    function loadLikes() {
-      try {
-        return JSON.parse(localStorage.getItem(LIKES_KEY) || "{}");
-      } catch {
-        return {};
-      }
-    }
-    function saveLikes(map) {
-      localStorage.setItem(LIKES_KEY, JSON.stringify(map));
-    }
-
-    function isLiked(id) {
-      const map = loadLikes();
-      return !!map[id];
-    }
-    function toggleLike(id) {
-      const map = loadLikes();
-      if (map[id]) delete map[id];
-      else map[id] = true;
-      saveLikes(map);
-      renderPosts(); // 再描画
-    }
-
-    // ==== Storage にメディアアップロード ====
-    async function uploadMediaToStorage(file, userId) {
-      const bucket = "post-media";
-      const ext = file.name.split(".").pop() || "bin";
-      const path = `${userId}/${Date.now()}.${ext}`;
-
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-      if (error) throw error;
-
-      const { data: publicData } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(path);
-
-      const url = publicData?.publicUrl || null;
-      const type = file.type || "";
-      return { url, type };
-    }
-
-    function renderMediaHtml(post) {
-      if (!post.media_url) return "";
-      const type = post.media_type || "";
-      if (type.startsWith("video")) {
-        return `<video src="${post.media_url}" controls></video>`;
-      }
-      if (type.startsWith("image")) {
-        return `<img src="${post.media_url}" alt="media" />`;
-      }
-      return `<a href="${post.media_url}" target="_blank" rel="noopener noreferrer">メディアを開く</a>`;
-    }
-
-    // ==== Feed ====
-    async function loadPosts() {
-      if (!currentUser) {
-        allPosts = [];
-        renderPosts();
+      if (!email || !password) {
+        alert("Email と Password を入力してください。");
         return;
       }
+
+      let user = null;
+
+      // 1. まずログインを試す
+      let { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        // ログイン失敗 → サインアップに切り替え
+        const ok = window.confirm(
+          "アカウントが見つかりません。新しく作成しますか？"
+        );
+        if (!ok) return;
+
+        const signUpRes = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (signUpRes.error) {
+          alert("Sign up error: " + signUpRes.error.message);
+          return;
+        }
+
+        user = signUpRes.data.user;
+        alert("アカウントを作成しました。必要ならメール確認をしてください。");
+      } else {
+        user = data.user;
+      }
+
+      currentUser = user;
+      await ensureProfile(user);
+      updateAuthUIState();
+      await loadFeed();
+    }
+
+    async function handleLogout() {
+      await supabase.auth.signOut();
+      currentUser = null;
+      currentProfile = null;
+      updateAuthUIState();
+      renderFeed();
+    }
+
+    function updateAuthUIState() {
+      const loggedIn = !!currentUser;
+
+      $("auth-email").disabled = loggedIn;
+      $("auth-password").disabled = loggedIn;
+      $("btn-auth").style.display = loggedIn ? "none" : "inline-flex";
+      $("btn-logout").style.display = loggedIn ? "inline-flex" : "none";
+      $("login-required").style.display = loggedIn ? "none" : "block";
+      $("btn-submit").disabled = !loggedIn;
+
+      const accountLabel = $("account-user");
+      if (loggedIn && currentProfile) {
+        accountLabel.textContent =
+          (currentProfile.display_name || "user") +
+          " " +
+          (currentProfile.handle || "");
+      } else if (loggedIn && currentUser?.email) {
+        accountLabel.textContent = currentUser.email;
+      } else {
+        accountLabel.textContent = "-";
+      }
+    }
+
+    async function restoreSession() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.user) {
+        currentUser = data.session.user;
+        await ensureProfile(currentUser);
+      }
+      updateAuthUIState();
+    }
+
+    async function ensureProfile(user) {
       const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        currentProfile = data;
+        return;
+      }
+
+      const baseHandle = user.email ? user.email.split("@")[0] : "user";
+      const newProfile = {
+        id: user.id,
+        handle: "@" + baseHandle,
+        display_name: "user",
+        created_at: new Date().toISOString(),
+      };
+
+      const { data: inserted, error: upsertErr } = await supabase
+        .from("profiles")
+        .upsert(newProfile)
+        .select()
+        .single();
+
+      if (upsertErr) {
+        console.error("Profile upsert error", upsertErr);
+      } else {
+        currentProfile = inserted;
+      }
+    }
+
+    // ------------------ 投稿フォーム ------------------
+    function setupPostForm() {
+      const mediaInput = $("post-media");
+      mediaInput.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        currentMediaFile = file || null;
+      });
+
+      $("btn-submit").addEventListener("click", handleSubmitPost);
+      $("btn-reset").addEventListener("click", resetPostForm);
+
+      $("post-date").valueAsDate = new Date();
+    }
+
+    function resetPostForm() {
+      $("post-date").valueAsDate = new Date();
+      $("post-weight").value = "";
+      $("post-caption").value = "";
+      $("post-visibility").value = "public";
+      $("post-media").value = "";
+      currentMediaFile = null;
+    }
+
+    async function handleSubmitPost() {
+      if (!currentUser) {
+        alert("ログインしてください。");
+        return;
+      }
+
+      const date = $("post-date").value;
+      const weight = $("post-weight").value;
+      const caption = $("post-caption").value.trim();
+      const visibility = $("post-visibility").value;
+
+      if (!date && !caption && !currentMediaFile) {
+        alert("何かしら入力してください。");
+        return;
+      }
+
+      let mediaUrl = null;
+      let mediaType = null;
+
+      if (currentMediaFile) {
+        const ext = currentMediaFile.name.split(".").pop();
+        const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("post-media")
+          .upload(path, currentMediaFile);
+
+        if (uploadErr) {
+          alert("画像アップロードに失敗しました: " + uploadErr.message);
+          return;
+        }
+
+        const { data: publicData } = supabase.storage
+          .from("post-media")
+          .getPublicUrl(path);
+
+        mediaUrl = publicData.publicUrl;
+        mediaType = currentMediaFile.type.startsWith("video") ? "video" : "image";
+      }
+
+      const payload = {
+        user_id: currentUser.id,
+        date: date || null,
+        bodyweight: weight ? Number(weight) : null,
+        note: caption || null,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        visibility,
+      };
+
+      const { error } = await supabase.from("posts").insert(payload);
+
+      if (error) {
+        alert("投稿エラー: " + error.message);
+        console.error(error);
+        return;
+      }
+
+      resetPostForm();
+      await loadFeed();
+    }
+
+    // ------------------ Feed & フィルタ ------------------
+    function setupFeedControls() {
+      $("filter-all").addEventListener("click", () => {
+        currentFilter = "all";
+        updateFilterButtons();
+        renderFeed();
+      });
+      $("filter-mine").addEventListener("click", () => {
+        currentFilter = "mine";
+        updateFilterButtons();
+        renderFeed();
+      });
+      $("filter-public").addEventListener("click", () => {
+        currentFilter = "public";
+        updateFilterButtons();
+        renderFeed();
+      });
+
+      $("feed-search").addEventListener("input", () => {
+        renderFeed();
+      });
+
+      updateFilterButtons();
+    }
+
+    function updateFilterButtons() {
+      const buttons = ["filter-all", "filter-mine", "filter-public"];
+      buttons.forEach((id) => {
+        const el = $(id);
+        el.classList.toggle("chip-active", id === "filter-" + currentFilter);
+      });
+    }
+
+    async function loadFeed() {
+      const { data: posts, error } = await supabase
         .from("posts")
         .select("*")
         .order("date", { ascending: false })
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("loadPosts error", error);
-        showPostError("Feedの読み込みに失敗しました。");
+        console.error("Load posts error", error);
         return;
       }
-      allPosts = data || [];
-      renderPosts();
-    }
 
-    function renderPosts() {
-      const list = document.getElementById("feedList");
-      const filter = document.getElementById("feedFilter").value;
-      const q = document.getElementById("feedSearch").value.trim().toLowerCase();
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, handle, display_name");
 
-      let posts = allPosts.slice();
-
-      if (filter === "mine" && currentUser) {
-        posts = posts.filter(p => p.user_id === currentUser.id);
-      } else if (filter === "public") {
-        posts = posts.filter(p => p.visibility === "public");
+      if (pErr) {
+        console.error("Load profiles error", pErr);
       }
 
-      if (q) {
-        posts = posts.filter(p => {
-          const note = (p.note || "").toLowerCase();
-          const id = (p.user_id || "").toLowerCase();
-          const bw = (p.bodyweight || "").toString().toLowerCase();
-          return (
-            note.includes(q) ||
-            id.includes(q) ||
-            bw.includes(q)
-          );
+      const map = new Map();
+      (profiles || []).forEach((p) => map.set(p.id, p));
+
+      allPosts = (posts || []).map((p) => ({
+        ...p,
+        profile: map.get(p.user_id) || null,
+      }));
+
+      renderFeed();
+    }
+
+    function getLikedIds() {
+      try {
+        return JSON.parse(localStorage.getItem("trends_likes") || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function setLikedIds(ids) {
+      localStorage.setItem("trends_likes", JSON.stringify(ids));
+    }
+
+    function toggleLike(postId) {
+      const liked = getLikedIds();
+      const idx = liked.indexOf(postId);
+      if (idx >= 0) {
+        liked.splice(idx, 1);
+      } else {
+        liked.push(postId);
+      }
+      setLikedIds(liked);
+      renderFeed();
+    }
+
+    function renderFeed() {
+      const container = $("feed-list");
+      container.innerHTML = "";
+
+      const tr = t[currentLang];
+      const search = $("feed-search").value.trim().toLowerCase();
+      const liked = getLikedIds();
+
+      let posts = [...allPosts];
+
+      if (currentFilter === "mine" && currentUser) {
+        posts = posts.filter((p) => p.user_id === currentUser.id);
+      } else if (currentFilter === "public") {
+        posts = posts.filter((p) => p.visibility === "public");
+      }
+
+      if (search) {
+        posts = posts.filter((p) => {
+          const profile = p.profile || {};
+          const text = (
+            (p.note || "") +
+            " " +
+            (profile.handle || "") +
+            " " +
+            (profile.display_name || "")
+          )
+            .toLowerCase()
+            .trim();
+          return text.includes(search);
         });
       }
 
-      document.getElementById("feedCountLabel").textContent = `${posts.length} posts`;
-
       if (!posts.length) {
-        list.innerHTML = '<div class="info">まだ投稿がありません。</div>';
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "まだ投稿がありません。";
+        container.appendChild(empty);
         return;
       }
 
-      const likesMap = loadLikes();
+      posts.forEach((p) => {
+        const card = document.createElement("div");
+        card.className = "post-card";
 
-      const html = posts.map(p => {
-        const initials = (p.user_id || "?").slice(0, 2).toUpperCase();
-        const dateLabel = formatDate(p.date || p.created_at);
-        const bwLabel = p.bodyweight ? `<strong>${p.bodyweight}kg</strong>` : "";
-        const vis =
-          p.visibility === "public"
-            ? '<span class="badge badge-public">Public</span>'
-            : '<span class="badge badge-private">自分のみ</span>';
+        // header
+        const header = document.createElement("div");
+        header.className = "post-header";
 
-        const liked = !!likesMap[p.id];
-        const likeClass = liked ? "icon-btn liked" : "icon-btn";
-        const likeIcon = liked ? "♥" : "♡";
-        const likeText = liked ? "Liked" : "Like";
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        const initials =
+          (p.profile?.display_name || "U").substring(0, 1).toUpperCase();
+        avatar.textContent = initials;
 
-        const canDelete = currentUser && p.user_id === currentUser.id;
+        const meta = document.createElement("div");
+        meta.className = "post-meta";
 
-        return `
-          <article class="post">
-            <div class="post-header">
-              <div class="post-user">
-                <div class="avatar">${initials}</div>
-                <div>
-                  <div class="post-user-main">@${(p.user_id || "").slice(0, 8)}</div>
-                  <div class="post-meta">${dateLabel}</div>
-                </div>
-              </div>
-              ${vis}
-            </div>
-            ${bwLabel ? `<div class="post-body">${bwLabel}</div>` : ""}
-            ${p.note ? `<div class="post-body">${escapeHtml(p.note)}</div>` : ""}
-            ${p.media_url ? `<div class="media-preview">${renderMediaHtml(p)}</div>` : ""}
-            <div class="post-footer">
-              <div class="post-footer-left">
-                <button class="${likeClass}" onclick="handleLikeClick('${p.id}')">
-                  <span class="icon">${likeIcon}</span><span>${likeText}</span>
-                </button>
-              </div>
-              <div class="small-buttons">
-                <button class="btn-secondary" onclick="handleLogPost('${p.id}')">Log</button>
-                ${
-                  canDelete
-                    ? `<button class="btn-secondary" onclick="handleDeletePost('${p.id}')">Delete</button>`
-                    : ""
-                }
-              </div>
-            </div>
-          </article>
-        `;
-      }).join("");
+        const line1 = document.createElement("div");
+        line1.className = "post-user";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = p.profile?.display_name || "user";
+        const handleSpan = document.createElement("span");
+        handleSpan.className = "handle";
+        handleSpan.textContent = p.profile?.handle || "@user";
+        line1.appendChild(nameSpan);
+        line1.appendChild(handleSpan);
 
-      list.innerHTML = html;
+        const line2 = document.createElement("div");
+        line2.className = "post-sub";
+        const dt = p.date || p.created_at;
+        line2.textContent =
+          (dt ? new Date(dt).toLocaleString("ja-JP") : "") +
+          (p.visibility === "private" ? " · Private" : " · Public");
+
+        meta.appendChild(line1);
+        meta.appendChild(line2);
+
+        const right = document.createElement("div");
+        right.className = "post-actions";
+
+        const likeBtn = document.createElement("button");
+        likeBtn.className =
+          "chip chip-like " + (liked.includes(p.id) ? "chip-like-on" : "");
+        likeBtn.textContent = "❤";
+        likeBtn.title = tr.like;
+        likeBtn.addEventListener("click", () => toggleLike(p.id));
+
+        const logBtn = document.createElement("button");
+        logBtn.className = "chip chip-log";
+        logBtn.textContent = tr.log;
+        logBtn.addEventListener("click", () => {
+          console.log("Post detail:", p);
+        });
+
+        right.appendChild(likeBtn);
+        right.appendChild(logBtn);
+
+        if (currentUser && currentUser.id === p.user_id) {
+          const delBtn = document.createElement("button");
+          delBtn.className = "chip chip-delete";
+          delBtn.textContent = tr.delete;
+          delBtn.addEventListener("click", () => deletePost(p.id));
+          right.appendChild(delBtn);
+        }
+
+        header.appendChild(avatar);
+        header.appendChild(meta);
+        header.appendChild(right);
+        card.appendChild(header);
+
+        // media
+        if (p.media_url) {
+          const mediaWrap = document.createElement("div");
+          mediaWrap.className = "post-media";
+
+          if (p.media_type === "video") {
+            const v = document.createElement("video");
+            v.src = p.media_url;
+            v.controls = true;
+            mediaWrap.appendChild(v);
+          } else {
+            const img = document.createElement("img");
+            img.src = p.media_url;
+            img.alt = "media";
+            mediaWrap.appendChild(img);
+          }
+          card.appendChild(mediaWrap);
+        }
+
+        // body
+        if (p.bodyweight || p.note) {
+          const body = document.createElement("div");
+          body.className = "post-body";
+          if (p.bodyweight) {
+            const w = document.createElement("div");
+            w.className = "post-weight";
+            w.textContent = `${p.bodyweight} kg`;
+            body.appendChild(w);
+          }
+          if (p.note) {
+            const c = document.createElement("div");
+            c.className = "post-caption";
+            c.textContent = p.note;
+            body.appendChild(c);
+          }
+          card.appendChild(body);
+        }
+
+        container.appendChild(card);
+      });
     }
 
-    // ==== いいね / Log / Delete (イベントハンドラ) ====
-    window.handleLikeClick = function (id) {
-      toggleLike(id);
-    };
-
-    window.handleLogPost = function (id) {
-      const p = allPosts.find(x => x.id === id);
-      if (!p) return;
-      console.log("Post detail", p);
-      alert(JSON.stringify(p, null, 2));
-    };
-
-    window.handleDeletePost = async function (id) {
-      if (!currentUser) return;
-      const post = allPosts.find(p => p.id === id);
-      if (!post) return;
-      if (post.user_id !== currentUser.id) return;
-      if (!confirm("この投稿を削除しますか？")) return;
-
+    async function deletePost(id) {
+      const ok = window.confirm("この投稿を削除しますか？");
+      if (!ok) return;
       const { error } = await supabase.from("posts").delete().eq("id", id);
       if (error) {
-        console.error("delete error", error);
-        alert("削除に失敗しました。");
+        alert("削除エラー: " + error.message);
         return;
       }
-      await loadPosts();
-    };
-
-    // ==== 投稿処理 ====
-    async function handlePostSubmit() {
-      showPostError("");
-      showPostStatus("");
-
-      if (!currentUser) {
-        showPostError("投稿するにはログインしてください。");
-        return;
-      }
-
-      const dateInput = document.getElementById("postDate");
-      const bwInput = document.getElementById("postBodyweight");
-      const noteInput = document.getElementById("postNote");
-      const visSelect = document.getElementById("postVisibility");
-      const mediaFileInput = document.getElementById("postMediaFile");
-      const mediaUrlInput = document.getElementById("postMediaUrl");
-
-      const date = dateInput.value || null;
-      const bodyweight = bwInput.value ? Number(bwInput.value) : null;
-      const note = noteInput.value.trim();
-      const visibility = visSelect.value || "public";
-
-      if (!date && !note && !bodyweight && !mediaFileInput.files[0]) {
-        showPostError("何か1つは入力してください。");
-        return;
-      }
-
-      showPostStatus("投稿中...");
-
-      let mediaUrl = null;
-      let mediaType = null;
-      const file = mediaFileInput.files[0];
-
-      try {
-        if (file) {
-          const uploaded = await uploadMediaToStorage(file, currentUser.id);
-          mediaUrl = uploaded.url;
-          mediaType = uploaded.type;
-        } else if (mediaUrlInput.value.trim()) {
-          mediaUrl = mediaUrlInput.value.trim();
-          mediaType = "external";
-        }
-
-        const { error } = await supabase.from("posts").insert([
-          {
-            user_id: currentUser.id,
-            date,
-            bodyweight,
-            note,
-            media_url: mediaUrl,
-            media_type: mediaType,
-            visibility,
-          },
-        ]);
-
-        if (error) {
-          console.error("insert error", error);
-          showPostError("投稿に失敗しました。");
-          showPostStatus("");
-          return;
-        }
-
-        // reset
-        noteInput.value = "";
-        bwInput.value = "";
-        mediaFileInput.value = "";
-        mediaUrlInput.value = "";
-        document.getElementById("mediaPreview").innerHTML = "";
-        showPostStatus("投稿しました。");
-        await loadPosts();
-      } catch (e) {
-        console.error("post error", e);
-        showPostError("メディアのアップロードまたは投稿に失敗しました。");
-        showPostStatus("");
-      }
+      await loadFeed();
     }
 
-    function handlePostReset() {
-      setToday();
-      document.getElementById("postBodyweight").value = "";
-      document.getElementById("postNote").value = "";
-      document.getElementById("postMediaFile").value = "";
-      document.getElementById("postMediaUrl").value = "";
-      document.getElementById("mediaPreview").innerHTML = "";
-      showPostError("");
-      showPostStatus("");
+    // ------------------ Debug ------------------
+    function setupDebug() {
+      $("btn-clear-cache").addEventListener("click", () => {
+        localStorage.removeItem("trends_likes");
+        const msg = $("debug-msg");
+        msg.textContent = t[currentLang].cacheCleared;
+        setTimeout(() => (msg.textContent = ""), 2000);
+      });
     }
-
-    // ==== Auth ====
-    async function handleAuth() {
-      showAuthError("");
-
-      const email = document.getElementById("authEmail").value.trim();
-      const password = document.getElementById("authPassword").value.trim();
-
-      if (!email || !password) {
-        showAuthError("Email と password を入力してください。");
-        return;
-      }
-
-      const { data: signInData, error: signInError } =
-        await supabase.auth.signInWithPassword({ email, password });
-
-      if (signInError) {
-        const { data: signUpData, error: signUpError } =
-          await supabase.auth.signUp({ email, password });
-
-        if (signUpError) {
-          console.error("auth error", signInError, signUpError);
-          showAuthError("ログイン / サインアップに失敗しました。");
-          return;
-        }
-        currentUser = signUpData.user;
-      } else {
-        currentUser = signInData.user;
-      }
-
-      updateAuthUI();
-      await loadPosts();
-    }
-
-    async function handleLogout() {
-      await supabase.auth.signOut();
-      currentUser = null;
-      updateAuthUI();
-      allPosts = [];
-      renderPosts();
-    }
-
-    function updateAuthUI() {
-      const authControls = document.getElementById("authControls");
-      const loggedInInfo = document.getElementById("loggedInInfo");
-      const newPostForm = document.getElementById("newPostForm");
-
-      if (currentUser) {
-        authControls.style.display = "none";
-        loggedInInfo.style.display = "flex";
-        newPostForm.style.opacity = "1";
-        newPostForm.style.pointerEvents = "auto";
-        document.getElementById("currentUserLabel").textContent =
-          `ログイン中: ${currentUser.email || currentUser.id}`;
-      } else {
-        authControls.style.display = "flex";
-        loggedInInfo.style.display = "none";
-        newPostForm.style.opacity = "0.45";
-        newPostForm.style.pointerEvents = "none";
-        document.getElementById("currentUserLabel").textContent = "";
-      }
-    }
-
-    // ==== init ====
-    async function init() {
-      // lang
-      const langSelect = document.getElementById("languageSelect");
-      const savedLang = localStorage.getItem("trends-lang") || "ja";
-      langSelect.value = savedLang;
-      applyLanguage(savedLang);
-      langSelect.addEventListener("change", () => {
-        const lang = langSelect.value;
-        localStorage.setItem("trends-lang", lang);
-        applyLanguage(lang);
-      });
-
-      setToday();
-
-      // media preview
-      const mediaFileInput = document.getElementById("postMediaFile");
-      const mediaPreview = document.getElementById("mediaPreview");
-      mediaFileInput.addEventListener("change", () => {
-        mediaPreview.innerHTML = "";
-        const file = mediaFileInput.files[0];
-        if (!file) return;
-        const url = URL.createObjectURL(file);
-        if (file.type.startsWith("video")) {
-          const v = document.createElement("video");
-          v.src = url;
-          v.controls = true;
-          mediaPreview.appendChild(v);
-        } else {
-          const img = document.createElement("img");
-          img.src = url;
-          mediaPreview.appendChild(img);
-        }
-      });
-
-      // buttons
-      document.getElementById("btnSubmitPost").addEventListener("click", e => {
-        e.preventDefault();
-        handlePostSubmit();
-      });
-      document.getElementById("btnResetPost").addEventListener("click", e => {
-        e.preventDefault();
-        handlePostReset();
-      });
-      document.getElementById("btnAuth").addEventListener("click", e => {
-        e.preventDefault();
-        handleAuth();
-      });
-      document.getElementById("btnLogout").addEventListener("click", e => {
-        e.preventDefault();
-        handleLogout();
-      });
-      document.getElementById("btnReloadFeed").addEventListener("click", e => {
-        e.preventDefault();
-        loadPosts();
-      });
-      document.getElementById("btnClearCache").addEventListener("click", () => {
-        localStorage.clear();
-        alert("Local cache cleared.");
-      });
-
-      document.getElementById("feedFilter").addEventListener("change", renderPosts);
-      document.getElementById("feedSearch").addEventListener("input", renderPosts);
-
-      // auth state
-      supabase.auth.onAuthStateChange((event, session) => {
-        currentUser = session?.user || null;
-        updateAuthUI();
-        if (currentUser) loadPosts();
-        else {
-          allPosts = [];
-          renderPosts();
-        }
-      });
-
-      // initial user
-      const { data } = await supabase.auth.getUser();
-      currentUser = data.user || null;
-      updateAuthUI();
-      if (currentUser) await loadPosts();
-    }
-
-    init();
   </script>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="title-block">
+        <div id="app-title">Trends</div>
+        <div id="app-sub">筋トレ専用SNS / シンプルなログ</div>
+      </div>
+      <div class="top-controls">
+        <select id="lang-select" class="select-sm">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- 左：投稿フォーム + Feed -->
+      <div>
+        <!-- 投稿フォーム -->
+        <section class="card">
+          <div class="card-title" id="new-post-title">新規投稿</div>
+          <div class="grid-2">
+            <div class="field">
+              <label id="label-date">日付</label>
+              <input type="date" id="post-date" />
+            </div>
+            <div class="field">
+              <label id="label-weight">体重 (kg)</label>
+              <input type="number" id="post-weight" step="0.1" placeholder="77.4" />
+            </div>
+          </div>
+          <div class="field" style="margin-top: 8px;">
+            <label id="label-media">画像 / 動画</label>
+            <input id="post-media" type="file" accept="image/*,video/*" />
+          </div>
+          <div class="field" style="margin-top: 8px;">
+            <label id="label-caption">キャプション / トレメモ</label>
+            <textarea id="post-caption" placeholder="bench 100kg"></textarea>
+          </div>
+          <div class="grid-2" style="margin-top: 8px;">
+            <div class="field">
+              <label id="label-visibility">公開範囲</label>
+              <select id="post-visibility">
+                <option value="public" id="visibility-public">Public</option>
+                <option value="private" id="visibility-private">自分のみ</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="btn-submit">投稿</button>
+            <button class="btn btn-ghost" type="button" id="btn-reset">リセット</button>
+          </div>
+          <div id="login-required">ログインしてください。</div>
+        </section>
+
+        <!-- Feed -->
+        <section class="card" style="margin-top: 12px;">
+          <div class="feed-header">
+            <div class="card-title" id="feed-title">Feed</div>
+            <div class="feed-search-wrap">
+              <input
+                id="feed-search"
+                type="text"
+                placeholder="caption / handle / メモで検索"
+              />
+            </div>
+          </div>
+          <div class="chips" style="margin-bottom: 8px;">
+            <button class="chip chip-active" id="filter-all">すべて</button>
+            <button class="chip" id="filter-mine">自分</button>
+            <button class="chip" id="filter-public">Publicのみ</button>
+          </div>
+          <div id="feed-list"></div>
+        </section>
+      </div>
+
+      <!-- 右：アカウント + Tips + Debug -->
+      <div>
+        <section class="card">
+          <div class="card-title" id="account-title">アカウント</div>
+          <div class="account-row">
+            <div class="account-name" id="account-user">-</div>
+            <input id="auth-email" type="email" placeholder="email@example.com" />
+            <input id="auth-password" type="password" placeholder="Password" />
+            <div class="account-buttons">
+              <button class="btn btn-primary" id="btn-auth">
+                ログイン / サインアップ
+              </button>
+              <button class="btn btn-ghost" id="btn-logout" style="display: none;">
+                ログアウト
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" style="margin-top: 12px;">
+          <div class="card-title" id="tips-title">使い方</div>
+          <ul class="tips-list">
+            <li id="tip1">毎日のトレを1行メモ。</li>
+            <li id="tip2">見られたくない日は「自分のみ」。</li>
+            <li id="tip3">画像アップでボディ変化を記録。</li>
+          </ul>
+        </section>
+
+        <section class="card" style="margin-top: 12px;">
+          <div class="card-title" id="debug-title">Debug / Dev</div>
+          <button class="btn btn-ghost" id="btn-clear-cache">Clear local cache</button>
+          <div class="debug-msg" id="debug-msg"></div>
+        </section>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
