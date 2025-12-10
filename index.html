@@ -404,8 +404,70 @@
       cursor: pointer;
       color: var(--text-sub);
     }
-  </style>
+    /* 右上の小さいナビボタン */
+    .top-right-mini-nav {
+      position: fixed;
+      top: 16px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      z-index: 50;
+    }
 
+    .top-right-mini-nav button {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      border: none;
+      background: #eef2ff;
+      color: #4b5563;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+    }
+
+    .top-right-mini-nav button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(15, 23, 42, 0.25);
+      background: #e0e7ff;
+    } 
+    .mini-nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.mini-nav-btn {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+.mini-nav-btn.active {
+  background-color: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.side-panel {
+  display: none;
+}
+
+.side-panel.is-open {
+  display: block;
+}
+  </style>
+  
+
+  <!-- 右上の小さいナビボタン -->
+  <div class="top-right-mini-nav">
+    <button data-scroll="#account-section" class="mini-nav-btn">アカ</button>
+    <button data-scroll="#tips-section" class="mini-nav-btn">設定</button>
+  </div>
   <!-- ================== Supabase Frontend ================== -->
   <script type="module">
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/+esm";
@@ -449,7 +511,7 @@
         account: "アカウント",
         loginSignup: "ログイン / サインアップ",
         logout: "ログアウト",
-        debugTitle: "Debug / Dev",
+        debugTitle: "設定",
         clearCache: "Clear local cache",
         cacheCleared: "Local cache cleared.",
         like: "いいね",
@@ -483,7 +545,7 @@
         account: "Account",
         loginSignup: "Log in / Sign up",
         logout: "Log out",
-        debugTitle: "Debug / Dev",
+        debugTitle: "Settings",
         clearCache: "Clear local cache",
         cacheCleared: "Local cache cleared.",
         like: "Like",
@@ -507,6 +569,7 @@
       setupAuthUI();
       setupPostForm();
       setupFeedControls();
+      setupMiniNav(); 
       setupDebug();
 
       await restoreSession();
@@ -523,47 +586,87 @@
       });
       applyTranslations();
     }
+    
+    
+    // 右上の小さいナビボタン（アカ / 使い方 / Dev）
+    function setupMiniNav() {
+      const nav = document.querySelector(".top-right-mini-nav");
+      if (!nav) return;
 
-    function applyTranslations() {
-      const tr = t[currentLang];
-      $("app-title").textContent = tr.appTitle;
-      $("app-sub").textContent = tr.appSub;
+      const buttons = nav.querySelectorAll("[data-scroll]");
+       buttons.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
 
-      $("new-post-title").textContent = tr.newPost;
-      $("label-date").textContent = tr.date;
-      $("label-weight").textContent = tr.weight;
-      $("label-media").textContent = tr.media;
-      $("label-caption").textContent = tr.caption;
-      $("label-visibility").textContent = tr.visibility;
+          const selector = btn.getAttribute("data-scroll");
+          if (!selector) return;
 
-      $("visibility-public").textContent = tr.public;
-      $("visibility-private").textContent = tr.private;
+          const target = document.querySelector(selector);
+          if (!target) return;
 
-      $("btn-submit").textContent = tr.submit;
-      $("btn-reset").textContent = tr.reset;
-
-      $("login-required").textContent = tr.pleaseLogin;
-
-      $("feed-title").textContent = tr.feed;
-      $("filter-all").textContent = tr.all;
-      $("filter-mine").textContent = tr.mine;
-      $("filter-public").textContent = tr.publicOnly;
-      $("feed-search").placeholder = tr.searchPlaceholder;
-
-      $("account-title").textContent = tr.account;
-      $("btn-auth").textContent = tr.loginSignup;
-      $("btn-logout").textContent = tr.logout;
-
-      $("debug-title").textContent = tr.debugTitle;
-      $("btn-clear-cache").textContent = tr.clearCache;
-
-      $("tips-title").textContent = tr.tipsTitle;
-      $("tip1").textContent = tr.tip1;
-      $("tip2").textContent = tr.tip2;
-      $("tip3").textContent = tr.tip3;
+          target.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+          });
+        });
+      });
     }
 
-    // ------------------ Auth ------------------
+    function applyTranslations() {
+      const tr = t[currentLang] || t.ja;
+
+      // 要素が無いときは何もしない安全版セット関数
+      const setText = (id, key) => {
+        const el = $(id); // = document.getElementById(id)
+        if (el && tr[key] !== undefined) {
+          el.textContent = tr[key];
+        }
+      };
+
+      const setPlaceholder = (id, key) => {
+        const el = $(id);
+        if (el && tr[key] !== undefined) {
+          el.placeholder = tr[key];
+        }
+      };
+
+      // タイトル
+      setText("app-title", "appTitle");
+      setText("app-sub", "appSub");
+
+      // 新規投稿まわり（要素がなければ自動的にスキップされる）
+      setText("new-post-title", "newPost");
+      setText("label-date", "date");
+      setText("label-weight", "weight");
+      setText("label-media", "media");
+      setText("label-caption", "caption");
+      setText("label-visibility", "visibility");
+      setText("visibility-public", "public");
+      setText("visibility-private", "private");
+      setText("btn-submit", "submit");
+      setText("btn-reset", "reset");
+      setText("login-required", "pleaseLogin");
+
+      // Feed
+      setText("feed-title", "feed");
+      setText("filter-all", "all");
+      setText("filter-mine", "mine");
+      setText("filter-public", "publicOnly");
+      setPlaceholder("search-input", "searchPlaceholder");
+
+      // アカウント / Tips / Debug
+      setText("account-title", "account");
+      setText("btn-login-signup", "loginSignup");
+      setText("btn-logout", "logout");
+
+      setText("tips-title", "tipsTitle");
+
+      setText("debug-title", "debugTitle");
+      setText("btn-clear-cache", "clearCache");
+      setText("cache-cleared-msg", "cacheCleared");
+    }
+
+      // ------------------ Auth ------------------
     function setupAuthUI() {
       $("btn-auth").addEventListener("click", handleAuthSubmit);
       $("btn-logout").addEventListener("click", handleLogout);
@@ -588,7 +691,7 @@
 
       if (error) {
         const ok = window.confirm(
-          "アカウントが見つかりません。新しく作成しますか？"
+          "アカウントが見りません。新しく作成しますか？"
         );
         if (!ok) return;
 
@@ -1069,6 +1172,7 @@
     <header>
       <div class="title-block">
         <div id="app-title">Trends</div>
+        
         <div id="app-sub">筋トレ専用SNS / シンプルなログ</div>
       </div>
       <div class="top-controls">
@@ -1102,9 +1206,10 @@
         </section>
       </div>
 
-      <!-- 右：アカウント + Tips + Debug -->
+      <!-- ← 右：アカウント + Tips + Debug -->
       <div>
-        <section class="card">
+        <!-- アカウントのパネル -->
+        <section id="panel-account" class="card side-panel" id="account-section">
           <div class="card-title" id="account-title">アカウント</div>
           <div class="account-row">
             <div class="account-name" id="account-user">-</div>
@@ -1120,9 +1225,14 @@
             </div>
           </div>
         </section>
+      </div>
+        </section>
 
-        <section class="card" style="margin-top: 12px;">
-          <div class="card-title" id="tips-title">使い方</div>
+        <section class="card" style="margin-top: 12px;" id="tips-section">
+          <div class="card-title">使い方</div>
+            
+          
+        
           <ul class="tips-list">
             <li id="tip1">毎日のトレを1行メモ。</li>
             <li id="tip2">見られたくない日は「自分のみ」。</li>
@@ -1130,8 +1240,8 @@
           </ul>
         </section>
 
-        <section class="card" style="margin-top: 12px;">
-          <div class="card-title" id="debug-title">Debug / Dev</div>
+        <section class="card" style="margin-top: 12px;" id="settings-section">
+          <div class="card-title" id="debug-title" id="debug-section">Debug / Dev</div>
           <button class="btn btn-ghost" id="btn-clear-cache">Clear local cache</button>
           <div class="debug-msg" id="debug-msg"></div>
         </section>
