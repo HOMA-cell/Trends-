@@ -5,7 +5,7 @@
   <title>Trends | Workout SNS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- ================== Styles (シンプル UI) ================== -->
+  <!-- ================== Styles ================== -->
   <style>
     :root {
       --bg: #f3f4f6;
@@ -21,6 +21,9 @@
     }
     * {
       box-sizing: border-box;
+    }
+    .hidden {
+      display: none !important;
     }
     body {
       margin: 0;
@@ -343,10 +346,62 @@
     .tips-list li {
       margin-bottom: 2px;
     }
-
     .debug-msg {
       margin-top: 4px;
       font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    /* ---- FAB（投稿ボタン） ---- */
+    .fab {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4);
+      z-index: 50;
+    }
+
+    /* ---- 投稿モーダル ---- */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+      padding: 16px;
+    }
+    .modal-panel {
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border-radius: var(--radius-lg);
+      position: relative;
+    }
+    .modal-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .modal-close-btn {
+      border: none;
+      background: transparent;
+      font-size: 18px;
+      cursor: pointer;
       color: var(--text-sub);
     }
   </style>
@@ -404,6 +459,7 @@
         tip1: "毎日のトレを1行メモ。",
         tip2: "見られたくない日は「自分のみ」。",
         tip3: "画像アップでボディ変化を記録。",
+        newPostFab: "投稿",
       },
       en: {
         appTitle: "Trends",
@@ -437,6 +493,7 @@
         tip1: "Log your workout in one line.",
         tip2: "Use “Private” when you don’t want others to see.",
         tip3: "Track body changes with photos.",
+        newPostFab: "Post",
       },
     };
 
@@ -523,14 +580,13 @@
 
       let user = null;
 
-      // 1. まずログインを試す
+      // 1. ログインを試す
       let { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        // ログイン失敗 → サインアップに切り替え
         const ok = window.confirm(
           "アカウントが見つかりません。新しく作成しますか？"
         );
@@ -631,7 +687,7 @@
       }
     }
 
-    // ------------------ 投稿フォーム ------------------
+    // ------------------ 投稿フォーム（モーダル） ------------------
     function setupPostForm() {
       const mediaInput = $("post-media");
       mediaInput.addEventListener("change", (e) => {
@@ -640,9 +696,37 @@
       });
 
       $("btn-submit").addEventListener("click", handleSubmitPost);
-      $("btn-reset").addEventListener("click", resetPostForm);
+      $("btn-reset").addEventListener("click", () => {
+        resetPostForm();
+      });
 
       $("post-date").valueAsDate = new Date();
+
+      // モーダル開閉
+      const fab = $("fab-open-post");
+      const backdrop = $("post-modal-backdrop");
+      const closeBtn = $("btn-post-close");
+
+      const openModal = () => {
+        if (!currentUser) {
+          alert("投稿するにはログインが必要です。");
+          return;
+        }
+        backdrop.classList.remove("hidden");
+      };
+      const closeModal = () => {
+        backdrop.classList.add("hidden");
+      };
+
+      if (fab) fab.addEventListener("click", openModal);
+      if (closeBtn) closeBtn.addEventListener("click", closeModal);
+      if (backdrop) {
+        backdrop.addEventListener("click", (e) => {
+          if (e.target === backdrop) {
+            closeModal();
+          }
+        });
+      }
     }
 
     function resetPostForm() {
@@ -713,6 +797,8 @@
       }
 
       resetPostForm();
+      const backdrop = $("post-modal-backdrop");
+      if (backdrop) backdrop.classList.add("hidden");
       await loadFeed();
     }
 
@@ -994,47 +1080,9 @@
     </header>
 
     <div class="layout">
-      <!-- 左：投稿フォーム + Feed -->
+      <!-- 左：Feed メイン -->
       <div>
-        <!-- 投稿フォーム -->
         <section class="card">
-          <div class="card-title" id="new-post-title">新規投稿</div>
-          <div class="grid-2">
-            <div class="field">
-              <label id="label-date">日付</label>
-              <input type="date" id="post-date" />
-            </div>
-            <div class="field">
-              <label id="label-weight">体重 (kg)</label>
-              <input type="number" id="post-weight" step="0.1" placeholder="77.4" />
-            </div>
-          </div>
-          <div class="field" style="margin-top: 8px;">
-            <label id="label-media">画像 / 動画</label>
-            <input id="post-media" type="file" accept="image/*,video/*" />
-          </div>
-          <div class="field" style="margin-top: 8px;">
-            <label id="label-caption">キャプション / トレメモ</label>
-            <textarea id="post-caption" placeholder="bench 100kg"></textarea>
-          </div>
-          <div class="grid-2" style="margin-top: 8px;">
-            <div class="field">
-              <label id="label-visibility">公開範囲</label>
-              <select id="post-visibility">
-                <option value="public" id="visibility-public">Public</option>
-                <option value="private" id="visibility-private">自分のみ</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" id="btn-submit">投稿</button>
-            <button class="btn btn-ghost" type="button" id="btn-reset">リセット</button>
-          </div>
-          <div id="login-required">ログインしてください。</div>
-        </section>
-
-        <!-- Feed -->
-        <section class="card" style="margin-top: 12px;">
           <div class="feed-header">
             <div class="card-title" id="feed-title">Feed</div>
             <div class="feed-search-wrap">
@@ -1089,6 +1137,51 @@
         </section>
       </div>
     </div>
+  </div>
+
+  <!-- 右下の小さい投稿ボタン -->
+  <button class="fab" id="fab-open-post">＋</button>
+
+  <!-- 投稿モーダル -->
+  <div class="modal-backdrop hidden" id="post-modal-backdrop">
+    <section class="card modal-panel">
+      <div class="modal-header-row">
+        <div class="card-title" id="new-post-title">新規投稿</div>
+        <button class="modal-close-btn" id="btn-post-close">×</button>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label id="label-date">日付</label>
+          <input type="date" id="post-date" />
+        </div>
+        <div class="field">
+          <label id="label-weight">体重 (kg)</label>
+          <input type="number" id="post-weight" step="0.1" placeholder="77.4" />
+        </div>
+      </div>
+      <div class="field" style="margin-top: 8px;">
+        <label id="label-media">画像 / 動画</label>
+        <input id="post-media" type="file" accept="image/*,video/*" />
+      </div>
+      <div class="field" style="margin-top: 8px;">
+        <label id="label-caption">キャプション / トレメモ</label>
+        <textarea id="post-caption" placeholder="bench 100kg"></textarea>
+      </div>
+      <div class="grid-2" style="margin-top: 8px;">
+        <div class="field">
+          <label id="label-visibility">公開範囲</label>
+          <select id="post-visibility">
+            <option value="public" id="visibility-public">Public</option>
+            <option value="private" id="visibility-private">自分のみ</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btn-submit">投稿</button>
+        <button class="btn btn-ghost" type="button" id="btn-reset">リセット</button>
+      </div>
+      <div id="login-required">ログインしてください。</div>
+    </section>
   </div>
 </body>
 </html>
