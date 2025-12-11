@@ -453,20 +453,21 @@
   border-color: #111827;
 }
 
-.side-panel {
+.page-view {
   display: none;
 }
 
-.side-panel.is-open {
+.page-view.is-active {
   display: block;
-}
+}  
   </style>
   
 
   <!-- 右上の小さいナビボタン -->
-  <div class="top-right-mini-nav">
-    <button data-scroll="#account-section" class="mini-nav-btn">アカ</button>
-    <button data-scroll="#tips-section" class="mini-nav-btn">設定</button>
+  <div class="mini-nav">
+    <button class="mini-nav-btn" data-page-target="feed">フィード</button>
+    <button class="mini-nav-btn" data-page-target="account">アカ</button>
+    <button class="mini-nav-btn" data-page-target="settings">設定</button>
   </div>
   <!-- ================== Supabase Frontend ================== -->
   <script type="module">
@@ -571,6 +572,7 @@
       setupFeedControls();
       setupMiniNav(); 
       setupDebug();
+      setupPageTabs();
 
       await restoreSession();
       await loadFeed();
@@ -587,27 +589,27 @@
       applyTranslations();
     }
     
-    
-    // 右上の小さいナビボタン（アカ / 使い方 / Dev）
+    // ---- ページ切り替え ----
+    function setPage(page) {
+      document.querySelectorAll(".page-view").forEach((view) => {
+      if (view.dataset.page === page) {
+      view.classList.add("is-active");
+      } else {
+      view.classList.remove("is-active");
+      }
+      });
+    }
+
     function setupMiniNav() {
-      const nav = document.querySelector(".top-right-mini-nav");
+      const nav = document.querySelector(".mini-nav");
       if (!nav) return;
 
-      const buttons = nav.querySelectorAll("[data-scroll]");
-       buttons.forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-
-          const selector = btn.getAttribute("data-scroll");
-          if (!selector) return;
-
-          const target = document.querySelector(selector);
-          if (!target) return;
-
-          target.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-          });
+      const buttons = nav.querySelectorAll("[data-page-target]");
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+        const page = btn.getAttribute("data-page-target");
+        if (!page) return;
+        setPage(page);
         });
       });
     }
@@ -790,7 +792,38 @@
       }
     }
 
+    function setupPageTabs() {
+      const tabs = document.querySelectorAll("[data-page-target]");
+      const views = document.querySelectorAll(".page-view");
+      if (!tabs.length || !views.length) return;
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const targetPage = tab.getAttribute("data-page-target");
+          if (!targetPage) return;
+
+          // タブ側の見た目を更新
+          tabs.forEach((t) => t.classList.remove("chip-active"));
+          tab.classList.add("chip-active");
+
+          // ページの表示/非表示を切り替え
+          views.forEach((view) => {
+            if (view.dataset.page === targetPage) {
+              view.classList.add("is-active");
+            } else {
+              view.classList.remove("is-active");
+            }
+          });
+
+          // ページ切り替え時は一番上にスクロール
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+    }
+    
+    
     // ------------------ 投稿フォーム（モーダル） ------------------
+    
     function setupPostForm() {
       const mediaInput = $("post-media");
       mediaInput.addEventListener("change", (e) => {
@@ -1172,9 +1205,17 @@
     <header>
       <div class="title-block">
         <div id="app-title">Trends</div>
-        
-        <div id="app-sub">筋トレ専用SNS / シンプルなログ</div>
+    
+        <!-- ここがミニナビ -->
+        <div class="mini-nav">
+          <button class="top-nav-tab is-active" data-page-target="feed">フィード</button>
+          <button class="top-nav-tab" data-page-target="account">アカ</button>
+          <button class="top-nav-tab" data-page-target="settings">設定</button>
+        </div>
       </div>
+    
+      <div id="app-sub">筋トレ専用SNS / シンプルなログ</div>
+    
       <div class="top-controls">
         <select id="lang-select" class="select-sm">
           <option value="ja">日本語</option>
@@ -1184,8 +1225,9 @@
     </header>
 
     <div class="layout">
-      <!-- 左：Feed メイン -->
-      <div>
+
+      <!-- Feed ページ -->
+      <div class="page-view is-active" data-page="feed">
         <section class="card">
           <div class="feed-header">
             <div class="card-title" id="feed-title">Feed</div>
@@ -1197,57 +1239,72 @@
               />
             </div>
           </div>
+  
+          <!-- すべて / 自分 / Publicのみ chips -->
           <div class="chips" style="margin-bottom: 8px;">
             <button class="chip chip-active" id="filter-all">すべて</button>
             <button class="chip" id="filter-mine">自分</button>
             <button class="chip" id="filter-public">Publicのみ</button>
           </div>
+  
+          <!-- 投稿一覧 -->
           <div id="feed-list"></div>
         </section>
       </div>
-
-      <!-- ← 右：アカウント + Tips + Debug -->
-      <div>
-        <!-- アカウントのパネル -->
-        <section id="panel-account" class="card side-panel" id="account-section">
+  
+      <!-- アカウント ページ -->
+      <div class="page-view" data-page="account">
+        <section id="account-section" class="card">
           <div class="card-title" id="account-title">アカウント</div>
           <div class="account-row">
-            <div class="account-name" id="account-user">-</div>
-            <input id="auth-email" type="email" placeholder="email@example.com" />
-            <input id="auth-password" type="password" placeholder="Password" />
+            <div class="account-name" id="account-user"></div>
+            <input
+              id="auth-email"
+              type="email"
+              placeholder="email@example.com"
+            />
+            <input
+              id="auth-password"
+              type="password"
+              placeholder="Password"
+            />
             <div class="account-buttons">
               <button class="btn btn-primary" id="btn-auth">
                 ログイン / サインアップ
               </button>
-              <button class="btn btn-ghost" id="btn-logout" style="display: none;">
+              <button
+                class="btn btn-ghost"
+                id="btn-logout"
+                style="display: none;"
+              >
                 ログアウト
               </button>
             </div>
           </div>
         </section>
       </div>
-        </section>
-
+  
+      <!-- 設定 ページ（使い方 + Debug） -->
+      <div class="page-view" data-page="settings">
         <section class="card" style="margin-top: 12px;" id="tips-section">
           <div class="card-title">使い方</div>
-            
-          
-        
           <ul class="tips-list">
             <li id="tip1">毎日のトレを1行メモ。</li>
             <li id="tip2">見られたくない日は「自分のみ」。</li>
             <li id="tip3">画像アップでボディ変化を記録。</li>
           </ul>
         </section>
-
-        <section class="card" style="margin-top: 12px;" id="settings-section">
-          <div class="card-title" id="debug-title" id="debug-section">Debug / Dev</div>
-          <button class="btn btn-ghost" id="btn-clear-cache">Clear local cache</button>
+  
+        <section class="card" style="margin-top: 12px;" id="debug-section">
+          <div class="card-title" id="debug-title">Debug / Dev</div>
+          <button class="btn btn-ghost" id="btn-clear-cache">
+            Clear local cache
+          </button>
           <div class="debug-msg" id="debug-msg"></div>
         </section>
       </div>
-    </div>
-  </div>
+  
+    </div> <!-- .layout 終わり -->
 
   <!-- 右下の小さい投稿ボタン -->
   <button class="fab" id="fab-open-post">＋</button>
