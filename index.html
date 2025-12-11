@@ -405,32 +405,7 @@
       color: var(--text-sub);
     }
     /* 右上の小さいナビボタン */
-    .top-right-mini-nav {
-      position: fixed;
-      top: 16px;
-      right: 24px;
-      display: flex;
-      gap: 8px;
-      z-index: 50;
-    }
-
-    .top-right-mini-nav button {
-      border-radius: 999px;
-      padding: 4px 10px;
-      font-size: 11px;
-      border: none;
-      background: #eef2ff;
-      color: #4b5563;
-      cursor: pointer;
-      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
-      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
-    }
-
-    .top-right-mini-nav button:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 3px 8px rgba(15, 23, 42, 0.25);
-      background: #e0e7ff;
-    } 
+    
     .mini-nav {
   display: flex;
   gap: 8px;
@@ -464,11 +439,7 @@
   
 
   <!-- 右上の小さいナビボタン -->
-  <div class="mini-nav">
-    <button class="mini-nav-btn" data-page-target="feed">フィード</button>
-    <button class="mini-nav-btn" data-page-target="account">アカ</button>
-    <button class="mini-nav-btn" data-page-target="settings">設定</button>
-  </div>
+  
   <!-- ================== Supabase Frontend ================== -->
   <script type="module">
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/+esm";
