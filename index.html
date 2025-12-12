@@ -337,6 +337,28 @@
       font-weight: 600;
       font-size: 13px;
     }
+    .profile-body {
+      padding: 8px 12px 12px;
+    }
+
+    .profile-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .profile-email {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+    }
+
+    .profile-meta {
+      font-size: 12px;
+      color: var(--text-sub);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
     .tips-list {
       font-size: 11px;
       color: var(--text-sub);
@@ -459,6 +481,8 @@
     let currentLang = "ja";
     let currentMediaFile = null;
 
+    
+
     // ---- i18n ----
     const t = {
       ja: {
@@ -494,6 +518,12 @@
         tip2: "見られたくない日は「自分のみ」。",
         tip3: "画像アップでボディ変化を記録。",
         newPostFab: "投稿",
+        profileTitle: "プロフィール",
+        profileJoined: "登録日",
+        profilePosts: "投稿数",
+        profileToday: "今日の投稿数",
+        profileStreak: "連続記録",
+        profileStreakUnit: "日",
       },
       en: {
         appTitle: "Trends",
@@ -528,6 +558,12 @@
         tip2: "Use “Private” when you don’t want others to see.",
         tip3: "Track body changes with photos.",
         newPostFab: "Post",
+        profileTitle: "Profile",
+        profileJoined: "Joined",
+        profilePosts: "Posts",
+        profileToday: "Posts today",
+        profileStreak: "Streak",
+        profileStreakUnit: " days",
       },
     };
 
@@ -536,7 +572,7 @@
     // ================== 初期化 ==================
     window.addEventListener("DOMContentLoaded", init);
 
-    async function init() {
+     async function init() {
       setupLanguageSwitcher();
       setupAuthUI();
       setupPostForm();
@@ -547,7 +583,10 @@
 
       await restoreSession();
       await loadFeed();
-    }
+    
+      updateProfileSummary();
+     }
+    
 
     // ------------------ 言語切り替え ------------------
     function setupLanguageSwitcher() {
@@ -559,6 +598,81 @@
       });
       applyTranslations();
     }
+
+    function updateProfileSummary() {
+      const nameEl   = $("profile-name");
+      const emailEl  = $("profile-email");
+      const joinedEl = $("profile-joined");
+      const postsEl  = $("profile-posts");
+      const todayEl  = $("profile-today");
+      const streakEl = $("profile-streak");
+
+      if (!nameEl || !emailEl || !joinedEl || !postsEl || !todayEl || !streakEl) return;
+
+      const tr = t[currentLang] || t.ja;
+
+      // 未ログイン時
+      if (!currentUser || !currentProfile) {
+        nameEl.textContent   = tr.loginRequired || "ログインしてください。";
+        emailEl.textContent  = "";
+        joinedEl.textContent = "";
+        postsEl.textContent  = "";
+        todayEl.textContent  = "";
+        streakEl.textContent = "";
+        return;
+      }
+
+      // 自分の全投稿
+      const userPosts = allPosts.filter(p => p.user_id === currentUser.id);
+
+      // joined
+      const joinedAt = currentProfile.created_at
+        ? new Date(currentProfile.created_at)
+        : null;
+
+      let joinedLabel = "";
+      if (joinedAt && !isNaN(joinedAt)) {
+        const locale = currentLang === "en" ? "en-US" : "ja-JP";
+        joinedLabel = joinedAt.toLocaleDateString(locale);
+      }
+
+      // 総投稿数
+      const totalPosts = userPosts.length;
+
+      // ---- 今日の投稿数 ----
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+      const todayCount = userPosts.filter(p => {
+        // ★ ここはあなたのカラム名に合わせて調整してね
+        // 例: p.date が "2025-12-10" 形式ならそのまま比較でOK
+        return p.date === todayStr;
+      }).length;
+
+      // ---- 連続日数（streak） ----
+      const dateSet = new Set(
+        userPosts
+          .map(p => p.date)
+          .filter(Boolean)
+      );
+
+      let streak = 0;
+      let cursor = new Date(todayStr);
+
+      while (dateSet.has(cursor.toISOString().slice(0, 10))) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+
+      // 表示反映
+      nameEl.textContent   = currentProfile.username || currentProfile.email;
+      emailEl.textContent  = currentProfile.email || "";
+      joinedEl.textContent = tr.profileJoined + ": " + (joinedLabel || "-");
+      postsEl.textContent  = tr.profilePosts  + ": " + totalPosts;
+      todayEl.textContent  = tr.profileToday  + ": " + todayCount;
+      streakEl.textContent = tr.profileStreak + ": " + streak + tr.profileStreakUnit;
+    }
+
     
     // ---- ページ切り替え ----
     function setPage(page) {
@@ -637,6 +751,7 @@
       setText("debug-title", "debugTitle");
       setText("btn-clear-cache", "clearCache");
       setText("cache-cleared-msg", "cacheCleared");
+      setText("profile-title", "profileTitle");
     }
 
       // ------------------ Auth ------------------
@@ -688,6 +803,7 @@
       await ensureProfile(user);
       updateAuthUIState();
       await loadFeed();
+      updateProfileSummary();
     }
 
     async function handleLogout() {
@@ -696,6 +812,7 @@
       currentProfile = null;
       updateAuthUIState();
       renderFeed();
+      updateProfileSummary();
     }
 
     function updateAuthUIState() {
@@ -1250,6 +1367,19 @@
               >
                 ログアウト
               </button>
+            </div>
+          </div>
+        </section>
+        <section class="card" id="profile-card" style="margin-top: 16px;">
+          <div class="card-title" id="profile-title">プロフィール</div>
+          <div class="profile-body">
+            <div id="profile-name" class="profile-name">-</div>
+            <div id="profile-email" class="profile-email">-</div>
+            <div class="profile-meta">
+              <span id="profile-joined"></span>
+              <span id="profile-posts"></span>
+              <div id="profile-today"></div>
+              <div id="profile-streak"></div>
             </div>
           </div>
         </section>
