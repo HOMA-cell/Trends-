@@ -102,6 +102,7 @@ let feedLastLoadedAt = null;
 let currentDetailPostId = null;
 let feedRenderToken = 0;
 let feedPendingScrollIndex = null;
+const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const MODAL_ANIM_MS = 200;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
@@ -124,6 +125,29 @@ const closeBackdrop = (backdrop) => {
         backdrop.classList.add("hidden");
       }, MODAL_ANIM_MS);
     };
+function saveFeedCache(posts = []) {
+      try {
+        const payload = {
+          saved_at: Date.now(),
+          posts: Array.isArray(posts) ? posts : [],
+        };
+        localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.warn("saveFeedCache failed", error);
+      }
+    }
+function loadFeedCache() {
+      try {
+        const raw = localStorage.getItem(FEED_CACHE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed?.posts)) return [];
+        return parsed.posts;
+      } catch (error) {
+        console.warn("loadFeedCache failed", error);
+        return [];
+      }
+    }
 export function resetFeedPagination() {
       feedVisibleCount = feedPageSize;
     }
@@ -310,6 +334,27 @@ export async function loadFeed() {
 
       if (error) {
         console.error("loadFeed error", error);
+        const cachedPosts = loadFeedCache();
+        if (cachedPosts.length) {
+          setAllPosts(cachedPosts);
+          feedLastLoadedAt = Date.now();
+          resetFeedPagination();
+          updateFeedStats(cachedPosts);
+          isFeedLoading = false;
+          const tr = t[getCurrentLang()] || t.ja;
+          feedError =
+            tr.feedCachedNotice ||
+            "Network issue. Showing last saved feed.";
+          renderFeed();
+          updateProfileSummary();
+          renderWorkoutHistory();
+          renderTrainingSummary();
+          renderPrList();
+          renderInsights();
+          renderOnboardingChecklist();
+          showToast(feedError, "warning");
+          return;
+        }
         feedError = error.message || "Failed to load feed.";
         isFeedLoading = false;
         renderFeed();
@@ -329,6 +374,7 @@ export async function loadFeed() {
       await loadLikes(postIds);
 
       setAllPosts(postsWithProfile);
+      saveFeedCache(postsWithProfile);
       feedLastLoadedAt = Date.now();
       resetFeedPagination();
       updateFeedStats(postsWithProfile);

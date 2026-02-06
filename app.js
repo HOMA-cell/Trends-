@@ -95,6 +95,23 @@ import {
 
     const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
+    const FILE_LIMITS = {
+      avatar: 5 * 1024 * 1024,
+      banner: 8 * 1024 * 1024,
+      postImage: 12 * 1024 * 1024,
+      postVideo: 50 * 1024 * 1024,
+    };
+    const ALLOWED_IMAGE_TYPES = new Set([
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ]);
+    const ALLOWED_VIDEO_TYPES = new Set([
+      "video/mp4",
+      "video/quicktime",
+      "video/webm",
+    ]);
     const defaultSettings = {
       compactMode: false,
       showExtraSections: false,
@@ -116,6 +133,59 @@ import {
       heightUnit: "cm",
     };
     let settings = { ...defaultSettings };
+    const PROFILE_EDIT_COLLAPSIBLE_KEYS = [
+      "profile-edit-identity",
+      "profile-edit-training",
+      "profile-edit-media",
+      "profile-edit-links",
+    ];
+
+function formatFileSizeMb(bytes) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    }
+function getSafeFileExtension(file) {
+      const name = file?.name || "";
+      const parts = name.split(".");
+      const raw = parts.length > 1 ? parts.pop().toLowerCase() : "";
+      if (raw && /^[a-z0-9]+$/.test(raw)) return raw;
+      const fromType = (file?.type || "").split("/")[1] || "";
+      const safe = fromType.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return safe || "bin";
+    }
+function getFileValidationError(file, kind) {
+      if (!file) return null;
+      const lang = currentLang === "en" ? "en" : "ja";
+      const isImage = ALLOWED_IMAGE_TYPES.has(file.type);
+      const isVideo = ALLOWED_VIDEO_TYPES.has(file.type);
+      if (kind === "avatar" || kind === "banner") {
+        if (!isImage) {
+          return lang === "ja"
+            ? "画像ファイル（jpg/png/webp/gif）を選択してください。"
+            : "Please choose an image file (jpg/png/webp/gif).";
+        }
+        const limit = kind === "avatar" ? FILE_LIMITS.avatar : FILE_LIMITS.banner;
+        if (file.size > limit) {
+          return lang === "ja"
+            ? `ファイルサイズが大きすぎます（上限 ${formatFileSizeMb(limit)}）。`
+            : `File is too large (max ${formatFileSizeMb(limit)}).`;
+        }
+        return null;
+      }
+      if (kind === "post") {
+        if (!isImage && !isVideo) {
+          return lang === "ja"
+            ? "画像または動画ファイル（mp4/mov/webm）を選択してください。"
+            : "Please choose an image or video file (mp4/mov/webm).";
+        }
+        const limit = isVideo ? FILE_LIMITS.postVideo : FILE_LIMITS.postImage;
+        if (file.size > limit) {
+          return lang === "ja"
+            ? `ファイルサイズが大きすぎます（上限 ${formatFileSizeMb(limit)}）。`
+            : `File is too large (max ${formatFileSizeMb(limit)}).`;
+        }
+      }
+      return null;
+    }
 function loadSettings() {
       let stored = {};
       try {
@@ -905,6 +975,11 @@ async function loadProfilePostCount() {
               updateSettingsExpandLabel();
             }
           }
+          if (key && key.startsWith("profile-edit-")) {
+            if (typeof updateProfileEditAdvancedToggleLabel === "function") {
+              updateProfileEditAdvancedToggleLabel();
+            }
+          }
         };
 
         btn.addEventListener("click", () => applyState(!isOpen));
@@ -930,6 +1005,54 @@ async function loadProfilePostCount() {
       if (typeof applyState === "function") {
         applyState(isOpen);
       }
+    }
+
+    function isCollapsibleOpenByKey(key) {
+      const wrapper = document.querySelector(`[data-collapsible="${key}"]`);
+      const content = wrapper?.querySelector("[data-collapsible-content]");
+      return !!content?.classList.contains("is-open");
+    }
+
+    function areProfileEditGroupsOpen() {
+      return PROFILE_EDIT_COLLAPSIBLE_KEYS.every((key) => isCollapsibleOpenByKey(key));
+    }
+
+    function setProfileEditGroupsOpen(isOpen) {
+      PROFILE_EDIT_COLLAPSIBLE_KEYS.forEach((key) => {
+        setCollapsibleOpen(key, isOpen);
+      });
+      updateProfileEditAdvancedToggleLabel();
+    }
+
+    function updateProfileEditAdvancedToggleLabel() {
+      const btn = $("btn-profile-edit-toggle-advanced");
+      if (!btn) return;
+      const tr = t[currentLang] || t.ja;
+      btn.textContent = areProfileEditGroupsOpen()
+        ? tr.profileEditCollapseAll || "詳細を閉じる"
+        : tr.profileEditExpandAll || "詳細をまとめて表示";
+    }
+
+    function setupProfileEditAdvancedToggle() {
+      const btn = $("btn-profile-edit-toggle-advanced");
+      if (!btn) return;
+      if (btn.dataset.bound !== "true") {
+        btn.dataset.bound = "true";
+        btn.addEventListener("click", () => {
+          setProfileEditGroupsOpen(!areProfileEditGroupsOpen());
+        });
+      }
+      const activePage =
+        document.querySelector(".page-view.is-active")?.dataset.page || "";
+      collapseProfileEditGroupsOnMobile(activePage);
+      updateProfileEditAdvancedToggleLabel();
+    }
+
+    function collapseProfileEditGroupsOnMobile(page = "") {
+      if (page !== "account") return;
+      if (window.innerWidth > 700) return;
+      PROFILE_EDIT_COLLAPSIBLE_KEYS.forEach((key) => setCollapsibleOpen(key, false));
+      updateProfileEditAdvancedToggleLabel();
     }
 
     function setupExtraSectionsToggle() {
@@ -976,6 +1099,7 @@ async function loadProfilePostCount() {
       setupMiniHeader();
       setupPostDetailModal();
       setupCollapsibles();
+      setupProfileEditAdvancedToggle();
       setupSettingsUI();
       setupExtraSectionsToggle();
       setupDebug();
@@ -1345,6 +1469,7 @@ async function loadProfilePostCount() {
       setText("profile-edit-training-title", "profileEditTrainingTitle");
       setText("profile-edit-media-title", "profileEditMediaTitle");
       setText("profile-edit-links-title", "profileEditLinksTitle");
+      setText("btn-profile-edit-toggle-advanced", "profileEditExpandAll");
       setText("profile-display-label", "profileDisplayName");
       setText("profile-handle-label", "profileHandle");
       setText("profile-bio-label", "profileBio");
@@ -1433,6 +1558,9 @@ async function loadProfilePostCount() {
       if (typeof updateCollapsibleLabels === "function") {
         updateCollapsibleLabels();
       }
+      if (typeof updateProfileEditAdvancedToggleLabel === "function") {
+        updateProfileEditAdvancedToggleLabel();
+      }
       if (typeof setupExtraSectionsToggle === "function") {
         setupExtraSectionsToggle();
       }
@@ -1443,21 +1571,43 @@ async function loadProfilePostCount() {
 
       // ------------------ Auth ------------------
     function setupAuthUI() {
-      $("btn-auth").addEventListener("click", handleAuthSubmit);
-      $("btn-logout").addEventListener("click", handleLogout);
+      const authBtn = $("btn-auth");
+      const logoutBtn = $("btn-logout");
+      if (authBtn) {
+        authBtn.addEventListener("click", handleAuthSubmit);
+      }
+      if (logoutBtn) {
+        logoutBtn.addEventListener("click", handleLogout);
+      }
     }
 
     function setupProfileEditor() {
       const fileInput = $("profile-avatar-file");
       if (fileInput) {
         fileInput.addEventListener("change", (e) => {
-          pendingAvatarFile = e.target.files?.[0] || null;
+          const file = e.target.files?.[0] || null;
+          const error = getFileValidationError(file, "avatar");
+          if (error) {
+            pendingAvatarFile = null;
+            e.target.value = "";
+            showToast(error, "warning");
+            return;
+          }
+          pendingAvatarFile = file;
         });
       }
       const bannerInput = $("profile-banner-file");
       if (bannerInput) {
         bannerInput.addEventListener("change", (e) => {
-          pendingBannerFile = e.target.files?.[0] || null;
+          const file = e.target.files?.[0] || null;
+          const error = getFileValidationError(file, "banner");
+          if (error) {
+            pendingBannerFile = null;
+            e.target.value = "";
+            showToast(error, "warning");
+            return;
+          }
+          pendingBannerFile = file;
         });
       }
       const accentInput = $("profile-accent");
@@ -1673,8 +1823,21 @@ async function loadProfilePostCount() {
         const website = websiteEl?.value.trim() || null;
         const accent = accentEl?.value || "#e4572e";
 
+        const avatarValidationError = getFileValidationError(pendingAvatarFile, "avatar");
+        if (avatarValidationError) {
+          if (status) status.textContent = avatarValidationError;
+          showToast(avatarValidationError, "warning");
+          return;
+        }
+        const bannerValidationError = getFileValidationError(pendingBannerFile, "banner");
+        if (bannerValidationError) {
+          if (status) status.textContent = bannerValidationError;
+          showToast(bannerValidationError, "warning");
+          return;
+        }
+
         if (pendingAvatarFile) {
-          const ext = pendingAvatarFile.name.split(".").pop();
+          const ext = getSafeFileExtension(pendingAvatarFile);
           const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
 
           const { error: uploadErr } = await supabase.storage
@@ -1696,7 +1859,7 @@ async function loadProfilePostCount() {
         }
 
         if (pendingBannerFile) {
-          const ext = pendingBannerFile.name.split(".").pop();
+          const ext = getSafeFileExtension(pendingBannerFile);
           const path = `public/${currentUser.id}/banner_${Date.now()}.${ext}`;
 
           const { error: uploadErr } = await supabase.storage
@@ -1989,6 +2152,10 @@ async function loadProfilePostCount() {
           const target = tab.getAttribute("data-page-target");
           tab.classList.toggle("is-active", target === page);
         });
+        collapseProfileEditGroupsOnMobile(page);
+        if (page === "account") {
+          updateProfileEditAdvancedToggleLabel();
+        }
       };
       setActivePage = setPage;
 
@@ -2272,6 +2439,14 @@ async function loadProfilePostCount() {
       if (mediaInput) {
         mediaInput.addEventListener("change", (e) => {
           const file = e.target.files?.[0];
+          const error = getFileValidationError(file, "post");
+          if (error) {
+            currentMediaFile = null;
+            e.target.value = "";
+            renderMediaPreview(null);
+            showToast(error, "warning");
+            return;
+          }
           currentMediaFile = file || null;
           renderMediaPreview(currentMediaFile);
           queueDraftSave();
@@ -2302,13 +2477,19 @@ async function loadProfilePostCount() {
       }
       setupLogBuilder();
 
-      $("btn-submit").addEventListener("click", handleSubmitPost);
-      $("btn-reset").addEventListener("click", () => {
-        resetPostForm();
-        clearPostDraft();
-        const tr = t[currentLang] || t.ja;
-        setDraftStatus(tr.draftCleared || "下書きを削除しました");
-      });
+      const submitBtn = $("btn-submit");
+      if (submitBtn) {
+        submitBtn.addEventListener("click", handleSubmitPost);
+      }
+      const resetBtn = $("btn-reset");
+      if (resetBtn) {
+        resetBtn.addEventListener("click", () => {
+          resetPostForm();
+          clearPostDraft();
+          const tr = t[currentLang] || t.ja;
+          setDraftStatus(tr.draftCleared || "下書きを削除しました");
+        });
+      }
       const clearDraftBtn = $("btn-clear-draft");
       if (clearDraftBtn && clearDraftBtn.dataset.bound !== "true") {
         clearDraftBtn.dataset.bound = "true";
@@ -4103,7 +4284,12 @@ async function loadProfilePostCount() {
         let mediaType = null;
 
         if (currentMediaFile) {
-          const ext = currentMediaFile.name.split(".").pop();
+          const mediaValidationError = getFileValidationError(currentMediaFile, "post");
+          if (mediaValidationError) {
+            showToast(mediaValidationError, "warning");
+            return;
+          }
+          const ext = getSafeFileExtension(currentMediaFile);
           const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
 
           const { error: uploadErr } = await supabase.storage
