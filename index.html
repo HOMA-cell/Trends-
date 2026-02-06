@@ -6,1287 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- ================== Styles ================== -->
-  <style>
-    :root {
-      --bg: #f3f4f6;
-      --card: #ffffff;
-      --border: #e5e7eb;
-      --primary: #2563eb;
-      --primary-soft: #eff6ff;
-      --text-main: #111827;
-      --text-sub: #6b7280;
-      --danger: #ef4444;
-      --radius-lg: 16px;
-      --radius-md: 10px;
-    }
-    * {
-      box-sizing: border-box;
-    }
-    .hidden {
-      display: none !important;
-    }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, system-ui, "SF Pro Text",
-        "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text-main);
-    }
-    .page {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 16px;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      gap: 12px;
-    }
-    .title-block {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    #app-title {
-      font-weight: 700;
-      font-size: 22px;
-    }
-    #app-sub {
-      font-size: 12px;
-      color: var(--text-sub);
-    }
-    .top-controls {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    select,
-    input,
-    textarea {
-      font: inherit;
-    }
-    .select-sm {
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #fff;
-      font-size: 12px;
-    }
-    .btn {
-      border: none;
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 13px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-    .btn-primary {
-      background: var(--primary);
-      color: #fff;
-    }
-    .btn-ghost {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text-main);
-    }
-    .btn-danger {
-      background: var(--danger);
-      color: #fff;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
-      gap: 16px;
-    }
-    @media (max-width: 900px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border);
-      padding: 12px;
-    }
-    .card-title {
-      font-weight: 600;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-    .card-sub {
-      font-size: 11px;
-      color: var(--text-sub);
-      margin-top: -4px;
-      margin-bottom: 8px;
-    }
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-    }
-    @media (max-width: 600px) {
-      .grid-2 {
-        grid-template-columns: 1fr;
-      }
-    }
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 12px;
-    }
-    .field label {
-      color: var(--text-sub);
-    }
-    .field input[type="date"],
-    .field input[type="number"],
-    .field input[type="text"],
-    .field textarea,
-    .field select {
-      padding: 6px 8px;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border);
-      background: #fff;
-      font-size: 13px;
-    }
-    .field textarea {
-      min-height: 70px;
-      resize: vertical;
-    }
-    .field input[type="file"] {
-      font-size: 12px;
-    }
-    .form-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-      flex-wrap: wrap;
-    }
-    #login-required {
-      margin-top: 6px;
-      font-size: 12px;
-      color: var(--danger);
-    }
-
-    .feed-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      gap: 8px;
-    }
-    .chips {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .chip {
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      padding: 4px 8px;
-      font-size: 11px;
-      background: #fff;
-      color: var(--text-sub);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .chip-active {
-      background: var(--primary-soft);
-      color: var(--primary);
-      border-color: var(--primary);
-    }
-    .chip-like {
-      font-size: 13px;
-      border: none;
-      background: transparent;
-    }
-    .chip-like-on {
-      color: #f97316;
-    }
-    .chip-log,
-    .chip-delete {
-      font-size: 11px;
-      padding-inline: 6px;
-    }
-    .chip-delete {
-      border-color: var(--danger);
-      color: var(--danger);
-    }
-
-    .feed-search-wrap {
-      flex: 1;
-      display: flex;
-      justify-content: flex-end;
-    }
-    #feed-search {
-      width: 100%;
-      max-width: 260px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      font-size: 12px;
-    }
-
-    .post-card {
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border);
-      background: #fff;
-      padding: 10px;
-      margin-bottom: 8px;
-    }
-    .post-header {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-    .avatar {
-      width: 30px;
-      height: 30px;
-      border-radius: 999px;
-      background: #dbeafe;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 600;
-    }
-    .post-meta {
-      flex: 1;
-      min-width: 0;
-    }
-    .post-user {
-      display: flex;
-      gap: 6px;
-      font-size: 13px;
-      align-items: baseline;
-    }
-    .post-user .handle {
-      font-size: 11px;
-      color: var(--text-sub);
-    }
-    .post-sub {
-      font-size: 11px;
-      color: var(--text-sub);
-      margin-top: 2px;
-    }
-    .post-actions {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-    }
-    .post-media img,
-    .post-media video {
-      width: 100%;
-      border-radius: var(--radius-md);
-      display: block;
-      max-height: 420px;
-      object-fit: cover;
-    }
-    .post-media {
-      margin-bottom: 6px;
-    }
-    .post-body {
-      font-size: 13px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .post-weight {
-      font-weight: 600;
-    }
-    .post-caption {
-      white-space: pre-wrap;
-    }
-    .empty {
-      font-size: 12px;
-      color: var(--text-sub);
-      padding: 8px;
-    }
-
-    .account-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 12px;
-    }
-    .account-row input {
-      width: 100%;
-      padding: 6px 8px;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border);
-      font-size: 12px;
-    }
-    .account-buttons {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .account-name {
-      font-weight: 600;
-      font-size: 13px;
-    }
-    .profile-body {
-      padding: 8px 12px 12px;
-    }
-
-    .profile-name {
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .profile-email {
-      font-size: 13px;
-      color: var(--text-sub);
-      margin-bottom: 8px;
-    }
-
-    .profile-meta {
-      font-size: 12px;
-      color: var(--text-sub);
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .tips-list {
-      font-size: 11px;
-      color: var(--text-sub);
-      margin: 0;
-      padding-left: 16px;
-    }
-    .tips-list li {
-      margin-bottom: 2px;
-    }
-    .debug-msg {
-      margin-top: 4px;
-      font-size: 11px;
-      color: var(--text-sub);
-    }
-
-    /* ---- FAB（投稿ボタン） ---- */
-    .fab {
-      position: fixed;
-      right: 18px;
-      bottom: 18px;
-      width: 44px;
-      height: 44px;
-      border-radius: 999px;
-      border: none;
-      background: var(--primary);
-      color: #fff;
-      font-size: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4);
-      z-index: 50;
-    }
-
-    /* ---- 投稿モーダル ---- */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.35);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 40;
-      padding: 16px;
-    }
-    .modal-panel {
-      width: 100%;
-      max-width: 480px;
-      max-height: 90vh;
-      overflow-y: auto;
-      border-radius: var(--radius-lg);
-      position: relative;
-    }
-    .modal-header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-    }
-    .modal-close-btn {
-      border: none;
-      background: transparent;
-      font-size: 18px;
-      cursor: pointer;
-      color: var(--text-sub);
-    }
-    /* 右上の小さいナビボタン */
-    
-    .mini-nav {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-left: auto;
-}
-
-.mini-nav-btn {
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  border: 1px solid #e5e7eb;
-  background-color: #ffffff;
-  cursor: pointer;
-}
-
-.mini-nav-btn.active {
-  background-color: #111827;
-  color: #ffffff;
-  border-color: #111827;
-}
-
-.page-view {
-  display: none;
-}
-
-.page-view.is-active {
-  display: block;
-}  
-  </style>
+  <link rel="stylesheet" href="styles.css">
   
 
   <!-- 右上の小さいナビボタン -->
   
   <!-- ================== Supabase Frontend ================== -->
-  <script type="module">
-    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/+esm";
-
-    // ---- Supabase 設定 ----
-    const SUPABASE_URL = "https://sfuroqxcljlkbthblqva.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdXJvcXhjbGpsa2J0aGJscXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxOTE0MTQsImV4cCI6MjA4MDc2NzQxNH0.v1qrjQgkPg3hPjIVCsKg3unwM0lvPGXkw8DvVm8YlRI";
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // ---- 状態 ----
-    let currentUser = null;
-    let currentProfile = null;
-    let allPosts = [];
-    let currentFilter = "all";
-    let currentLang = "ja";
-    let currentMediaFile = null;
-
-    
-
-    // ---- i18n ----
-    const t = {
-      ja: {
-        appTitle: "Trends",
-        appSub: "筋トレ専用SNS / シンプルなログ",
-        newPost: "新規投稿",
-        date: "日付",
-        weight: "体重 (kg)",
-        media: "画像 / 動画",
-        caption: "キャプション / トレメモ",
-        visibility: "公開範囲",
-        public: "Public",
-        private: "自分のみ",
-        submit: "投稿",
-        reset: "リセット",
-        pleaseLogin: "ログインしてください。",
-        feed: "Feed",
-        all: "すべて",
-        mine: "自分",
-        publicOnly: "Publicのみ",
-        searchPlaceholder: "caption / handle / メモで検索",
-        account: "アカウント",
-        loginSignup: "ログイン / サインアップ",
-        logout: "ログアウト",
-        debugTitle: "設定",
-        clearCache: "Clear local cache",
-        cacheCleared: "Local cache cleared.",
-        like: "いいね",
-        log: "Log",
-        delete: "Delete",
-        tipsTitle: "使い方",
-        tip1: "毎日のトレを1行メモ。",
-        tip2: "見られたくない日は「自分のみ」。",
-        tip3: "画像アップでボディ変化を記録。",
-        newPostFab: "投稿",
-        profileTitle: "プロフィール",
-        profileJoined: "登録日",
-        profilePosts: "投稿数",
-        profileToday: "今日の投稿数",
-        profileStreak: "連続記録",
-        profileStreakUnit: "日",
-      },
-      en: {
-        appTitle: "Trends",
-        appSub: "Workout-only SNS / Simple logging",
-        newPost: "New Post",
-        date: "Date",
-        weight: "Bodyweight (kg)",
-        media: "Image / Video",
-        caption: "Caption / Training note",
-        visibility: "Visibility",
-        public: "Public",
-        private: "Private",
-        submit: "Post",
-        reset: "Reset",
-        pleaseLogin: "Please log in.",
-        feed: "Feed",
-        all: "All",
-        mine: "Mine",
-        publicOnly: "Public only",
-        searchPlaceholder: "Search caption / handle / memo",
-        account: "Account",
-        loginSignup: "Log in / Sign up",
-        logout: "Log out",
-        debugTitle: "Settings",
-        clearCache: "Clear local cache",
-        cacheCleared: "Local cache cleared.",
-        like: "Like",
-        log: "Log",
-        delete: "Delete",
-        tipsTitle: "Tips",
-        tip1: "Log your workout in one line.",
-        tip2: "Use “Private” when you don’t want others to see.",
-        tip3: "Track body changes with photos.",
-        newPostFab: "Post",
-        profileTitle: "Profile",
-        profileJoined: "Joined",
-        profilePosts: "Posts",
-        profileToday: "Posts today",
-        profileStreak: "Streak",
-        profileStreakUnit: " days",
-      },
-    };
-
-    const $ = (id) => document.getElementById(id);
-
-    // ================== 初期化 ==================
-    window.addEventListener("DOMContentLoaded", init);
-
-     async function init() {
-      setupLanguageSwitcher();
-      setupAuthUI();
-      setupPostForm();
-      setupFeedControls();
-      setupMiniNav(); 
-      setupDebug();
-      setupPageTabs();
-
-      await restoreSession();
-      await loadFeed();
-    
-      updateProfileSummary();
-     }
-    
-
-    // ------------------ 言語切り替え ------------------
-    function setupLanguageSwitcher() {
-      const select = $("lang-select");
-      select.addEventListener("change", () => {
-        currentLang = select.value;
-        applyTranslations();
-        renderFeed();
-      });
-      applyTranslations();
-    }
-
-    function updateProfileSummary() {
-      const nameEl   = $("profile-name");
-      const emailEl  = $("profile-email");
-      const joinedEl = $("profile-joined");
-      const postsEl  = $("profile-posts");
-      const todayEl  = $("profile-today");
-      const streakEl = $("profile-streak");
-
-      if (!nameEl || !emailEl || !joinedEl || !postsEl || !todayEl || !streakEl) return;
-
-      const tr = t[currentLang] || t.ja;
-
-      // 未ログイン時
-      if (!currentUser || !currentProfile) {
-        nameEl.textContent   = tr.loginRequired || "ログインしてください。";
-        emailEl.textContent  = "";
-        joinedEl.textContent = "";
-        postsEl.textContent  = "";
-        todayEl.textContent  = "";
-        streakEl.textContent = "";
-        return;
-      }
-
-      // 自分の全投稿
-      const userPosts = allPosts.filter(p => p.user_id === currentUser.id);
-
-      // joined
-      const joinedAt = currentProfile.created_at
-        ? new Date(currentProfile.created_at)
-        : null;
-
-      let joinedLabel = "";
-      if (joinedAt && !isNaN(joinedAt)) {
-        const locale = currentLang === "en" ? "en-US" : "ja-JP";
-        joinedLabel = joinedAt.toLocaleDateString(locale);
-      }
-
-      // 総投稿数
-      const totalPosts = userPosts.length;
-
-      // ---- 今日の投稿数 ----
-      const today = new Date();
-      const todayStr = today.toISOString().slice(0, 10); // "YYYY-MM-DD"
-
-      const todayCount = userPosts.filter(p => {
-        // ★ ここはあなたのカラム名に合わせて調整してね
-        // 例: p.date が "2025-12-10" 形式ならそのまま比較でOK
-        return p.date === todayStr;
-      }).length;
-
-      // ---- 連続日数（streak） ----
-      const dateSet = new Set(
-        userPosts
-          .map(p => p.date)
-          .filter(Boolean)
-      );
-
-      let streak = 0;
-      let cursor = new Date(todayStr);
-
-      while (dateSet.has(cursor.toISOString().slice(0, 10))) {
-        streak++;
-        cursor.setDate(cursor.getDate() - 1);
-      }
-
-      // 表示反映
-      nameEl.textContent   = currentProfile.username || currentProfile.email;
-      emailEl.textContent  = currentProfile.email || "";
-      joinedEl.textContent = tr.profileJoined + ": " + (joinedLabel || "-");
-      postsEl.textContent  = tr.profilePosts  + ": " + totalPosts;
-      todayEl.textContent  = tr.profileToday  + ": " + todayCount;
-      streakEl.textContent = tr.profileStreak + ": " + streak + tr.profileStreakUnit;
-    }
-
-    
-    // ---- ページ切り替え ----
-    function setPage(page) {
-      document.querySelectorAll(".page-view").forEach((view) => {
-      if (view.dataset.page === page) {
-      view.classList.add("is-active");
-      } else {
-      view.classList.remove("is-active");
-      }
-      });
-    }
-
-    function setupMiniNav() {
-      const nav = document.querySelector(".mini-nav");
-      if (!nav) return;
-
-      const buttons = nav.querySelectorAll("[data-page-target]");
-      buttons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-        const page = btn.getAttribute("data-page-target");
-        if (!page) return;
-        setPage(page);
-        });
-      });
-    }
-
-    function applyTranslations() {
-      const tr = t[currentLang] || t.ja;
-
-      // 要素が無いときは何もしない安全版セット関数
-      const setText = (id, key) => {
-        const el = $(id); // = document.getElementById(id)
-        if (el && tr[key] !== undefined) {
-          el.textContent = tr[key];
-        }
-      };
-
-      const setPlaceholder = (id, key) => {
-        const el = $(id);
-        if (el && tr[key] !== undefined) {
-          el.placeholder = tr[key];
-        }
-      };
-
-      // タイトル
-      setText("app-title", "appTitle");
-      setText("app-sub", "appSub");
-
-      // 新規投稿まわり（要素がなければ自動的にスキップされる）
-      setText("new-post-title", "newPost");
-      setText("label-date", "date");
-      setText("label-weight", "weight");
-      setText("label-media", "media");
-      setText("label-caption", "caption");
-      setText("label-visibility", "visibility");
-      setText("visibility-public", "public");
-      setText("visibility-private", "private");
-      setText("btn-submit", "submit");
-      setText("btn-reset", "reset");
-      setText("login-required", "pleaseLogin");
-
-      // Feed
-      setText("feed-title", "feed");
-      setText("filter-all", "all");
-      setText("filter-mine", "mine");
-      setText("filter-public", "publicOnly");
-      setPlaceholder("search-input", "searchPlaceholder");
-
-      // アカウント / Tips / Debug
-      setText("account-title", "account");
-      setText("btn-login-signup", "loginSignup");
-      setText("btn-logout", "logout");
-
-      setText("tips-title", "tipsTitle");
-
-      setText("debug-title", "debugTitle");
-      setText("btn-clear-cache", "clearCache");
-      setText("cache-cleared-msg", "cacheCleared");
-      setText("profile-title", "profileTitle");
-    }
-
-      // ------------------ Auth ------------------
-    function setupAuthUI() {
-      $("btn-auth").addEventListener("click", handleAuthSubmit);
-      $("btn-logout").addEventListener("click", handleLogout);
-    }
-
-    async function handleAuthSubmit() {
-      const email = $("auth-email").value.trim();
-      const password = $("auth-password").value.trim();
-
-      if (!email || !password) {
-        alert("Email と Password を入力してください。");
-        return;
-      }
-
-      let user = null;
-
-      // 1. ログインを試す
-      let { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        const ok = window.confirm(
-          "アカウントが見りません。新しく作成しますか？"
-        );
-        if (!ok) return;
-
-        const signUpRes = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (signUpRes.error) {
-          alert("Sign up error: " + signUpRes.error.message);
-          return;
-        }
-
-        user = signUpRes.data.user;
-        alert("アカウントを作成しました。必要ならメール確認をしてください。");
-      } else {
-        user = data.user;
-      }
-
-      currentUser = user;
-      await ensureProfile(user);
-      updateAuthUIState();
-      await loadFeed();
-      updateProfileSummary();
-    }
-
-    async function handleLogout() {
-      await supabase.auth.signOut();
-      currentUser = null;
-      currentProfile = null;
-      updateAuthUIState();
-      renderFeed();
-      updateProfileSummary();
-    }
-
-    function updateAuthUIState() {
-      const loggedIn = !!currentUser;
-
-      $("auth-email").disabled = loggedIn;
-      $("auth-password").disabled = loggedIn;
-      $("btn-auth").style.display = loggedIn ? "none" : "inline-flex";
-      $("btn-logout").style.display = loggedIn ? "inline-flex" : "none";
-      $("login-required").style.display = loggedIn ? "none" : "block";
-      $("btn-submit").disabled = !loggedIn;
-
-      const accountLabel = $("account-user");
-      if (loggedIn && currentProfile) {
-        accountLabel.textContent =
-          (currentProfile.display_name || "user") +
-          " " +
-          (currentProfile.handle || "");
-      } else if (loggedIn && currentUser?.email) {
-        accountLabel.textContent = currentUser.email;
-      } else {
-        accountLabel.textContent = "-";
-      }
-    }
-
-    async function restoreSession() {
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.user) {
-        currentUser = data.session.user;
-        await ensureProfile(currentUser);
-      }
-      updateAuthUIState();
-    }
-
-    async function ensureProfile(user) {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        currentProfile = data;
-        return;
-      }
-
-      const baseHandle = user.email ? user.email.split("@")[0] : "user";
-      const newProfile = {
-        id: user.id,
-        handle: "@" + baseHandle,
-        display_name: "user",
-        created_at: new Date().toISOString(),
-      };
-
-      const { data: inserted, error: upsertErr } = await supabase
-        .from("profiles")
-        .upsert(newProfile)
-        .select()
-        .single();
-
-      if (upsertErr) {
-        console.error("Profile upsert error", upsertErr);
-      } else {
-        currentProfile = inserted;
-      }
-    }
-
-    function setupPageTabs() {
-      const tabs = document.querySelectorAll("[data-page-target]");
-      const views = document.querySelectorAll(".page-view");
-      if (!tabs.length || !views.length) return;
-
-      tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-          const targetPage = tab.getAttribute("data-page-target");
-          if (!targetPage) return;
-
-          // タブ側の見た目を更新
-          tabs.forEach((t) => t.classList.remove("chip-active"));
-          tab.classList.add("chip-active");
-
-          // ページの表示/非表示を切り替え
-          views.forEach((view) => {
-            if (view.dataset.page === targetPage) {
-              view.classList.add("is-active");
-            } else {
-              view.classList.remove("is-active");
-            }
-          });
-
-          // ページ切り替え時は一番上にスクロール
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
-      });
-    }
-    
-    
-    // ------------------ 投稿フォーム（モーダル） ------------------
-    
-    function setupPostForm() {
-      const mediaInput = $("post-media");
-      mediaInput.addEventListener("change", (e) => {
-        const file = e.target.files?.[0];
-        currentMediaFile = file || null;
-      });
-
-      $("btn-submit").addEventListener("click", handleSubmitPost);
-      $("btn-reset").addEventListener("click", () => {
-        resetPostForm();
-      });
-
-      $("post-date").valueAsDate = new Date();
-
-      // モーダル開閉
-      const fab = $("fab-open-post");
-      const backdrop = $("post-modal-backdrop");
-      const closeBtn = $("btn-post-close");
-
-      const openModal = () => {
-        if (!currentUser) {
-          alert("投稿するにはログインが必要です。");
-          return;
-        }
-        backdrop.classList.remove("hidden");
-      };
-      const closeModal = () => {
-        backdrop.classList.add("hidden");
-      };
-
-      if (fab) fab.addEventListener("click", openModal);
-      if (closeBtn) closeBtn.addEventListener("click", closeModal);
-      if (backdrop) {
-        backdrop.addEventListener("click", (e) => {
-          if (e.target === backdrop) {
-            closeModal();
-          }
-        });
-      }
-    }
-
-    function resetPostForm() {
-      $("post-date").valueAsDate = new Date();
-      $("post-weight").value = "";
-      $("post-caption").value = "";
-      $("post-visibility").value = "public";
-      $("post-media").value = "";
-      currentMediaFile = null;
-    }
-
-    async function handleSubmitPost() {
-      if (!currentUser) {
-        alert("ログインしてください。");
-        return;
-      }
-
-      const date = $("post-date").value;
-      const weight = $("post-weight").value;
-      const caption = $("post-caption").value.trim();
-      const visibility = $("post-visibility").value;
-
-      if (!date && !caption && !currentMediaFile) {
-        alert("何かしら入力してください。");
-        return;
-      }
-
-      let mediaUrl = null;
-      let mediaType = null;
-
-      if (currentMediaFile) {
-        const ext = currentMediaFile.name.split(".").pop();
-        const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
-
-        const { error: uploadErr } = await supabase.storage
-          .from("post-media")
-          .upload(path, currentMediaFile);
-
-        if (uploadErr) {
-          alert("画像アップロードに失敗しました: " + uploadErr.message);
-          return;
-        }
-
-        const { data: publicData } = supabase.storage
-          .from("post-media")
-          .getPublicUrl(path);
-
-        mediaUrl = publicData.publicUrl;
-        mediaType = currentMediaFile.type.startsWith("video") ? "video" : "image";
-      }
-
-      const payload = {
-        user_id: currentUser.id,
-        date: date || null,
-        bodyweight: weight ? Number(weight) : null,
-        note: caption || null,
-        media_url: mediaUrl,
-        media_type: mediaType,
-        visibility,
-      };
-
-      const { error } = await supabase.from("posts").insert(payload);
-
-      if (error) {
-        alert("投稿エラー: " + error.message);
-        console.error(error);
-        return;
-      }
-
-      resetPostForm();
-      const backdrop = $("post-modal-backdrop");
-      if (backdrop) backdrop.classList.add("hidden");
-      await loadFeed();
-    }
-
-    // ------------------ Feed & フィルタ ------------------
-    function setupFeedControls() {
-      $("filter-all").addEventListener("click", () => {
-        currentFilter = "all";
-        updateFilterButtons();
-        renderFeed();
-      });
-      $("filter-mine").addEventListener("click", () => {
-        currentFilter = "mine";
-        updateFilterButtons();
-        renderFeed();
-      });
-      $("filter-public").addEventListener("click", () => {
-        currentFilter = "public";
-        updateFilterButtons();
-        renderFeed();
-      });
-
-      $("feed-search").addEventListener("input", () => {
-        renderFeed();
-      });
-
-      updateFilterButtons();
-    }
-
-    function updateFilterButtons() {
-      const buttons = ["filter-all", "filter-mine", "filter-public"];
-      buttons.forEach((id) => {
-        const el = $(id);
-        el.classList.toggle("chip-active", id === "filter-" + currentFilter);
-      });
-    }
-
-    async function loadFeed() {
-      const { data: posts, error } = await supabase
-        .from("posts")
-        .select("*")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Load posts error", error);
-        return;
-      }
-
-      const { data: profiles, error: pErr } = await supabase
-        .from("profiles")
-        .select("id, handle, display_name");
-
-      if (pErr) {
-        console.error("Load profiles error", pErr);
-      }
-
-      const map = new Map();
-      (profiles || []).forEach((p) => map.set(p.id, p));
-
-      allPosts = (posts || []).map((p) => ({
-        ...p,
-        profile: map.get(p.user_id) || null,
-      }));
-
-      renderFeed();
-    }
-
-    function getLikedIds() {
-      try {
-        return JSON.parse(localStorage.getItem("trends_likes") || "[]");
-      } catch {
-        return [];
-      }
-    }
-
-    function setLikedIds(ids) {
-      localStorage.setItem("trends_likes", JSON.stringify(ids));
-    }
-
-    function toggleLike(postId) {
-      const liked = getLikedIds();
-      const idx = liked.indexOf(postId);
-      if (idx >= 0) {
-        liked.splice(idx, 1);
-      } else {
-        liked.push(postId);
-      }
-      setLikedIds(liked);
-      renderFeed();
-    }
-
-    function renderFeed() {
-      const container = $("feed-list");
-      container.innerHTML = "";
-
-      const tr = t[currentLang];
-      const search = $("feed-search").value.trim().toLowerCase();
-      const liked = getLikedIds();
-
-      let posts = [...allPosts];
-
-      if (currentFilter === "mine" && currentUser) {
-        posts = posts.filter((p) => p.user_id === currentUser.id);
-      } else if (currentFilter === "public") {
-        posts = posts.filter((p) => p.visibility === "public");
-      }
-
-      if (search) {
-        posts = posts.filter((p) => {
-          const profile = p.profile || {};
-          const text = (
-            (p.note || "") +
-            " " +
-            (profile.handle || "") +
-            " " +
-            (profile.display_name || "")
-          )
-            .toLowerCase()
-            .trim();
-          return text.includes(search);
-        });
-      }
-
-      if (!posts.length) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "まだ投稿がありません。";
-        container.appendChild(empty);
-        return;
-      }
-
-      posts.forEach((p) => {
-        const card = document.createElement("div");
-        card.className = "post-card";
-
-        // header
-        const header = document.createElement("div");
-        header.className = "post-header";
-
-        const avatar = document.createElement("div");
-        avatar.className = "avatar";
-        const initials =
-          (p.profile?.display_name || "U").substring(0, 1).toUpperCase();
-        avatar.textContent = initials;
-
-        const meta = document.createElement("div");
-        meta.className = "post-meta";
-
-        const line1 = document.createElement("div");
-        line1.className = "post-user";
-        const nameSpan = document.createElement("span");
-        nameSpan.textContent = p.profile?.display_name || "user";
-        const handleSpan = document.createElement("span");
-        handleSpan.className = "handle";
-        handleSpan.textContent = p.profile?.handle || "@user";
-        line1.appendChild(nameSpan);
-        line1.appendChild(handleSpan);
-
-        const line2 = document.createElement("div");
-        line2.className = "post-sub";
-        const dt = p.date || p.created_at;
-        line2.textContent =
-          (dt ? new Date(dt).toLocaleString("ja-JP") : "") +
-          (p.visibility === "private" ? " · Private" : " · Public");
-
-        meta.appendChild(line1);
-        meta.appendChild(line2);
-
-        const right = document.createElement("div");
-        right.className = "post-actions";
-
-        const likeBtn = document.createElement("button");
-        likeBtn.className =
-          "chip chip-like " + (liked.includes(p.id) ? "chip-like-on" : "");
-        likeBtn.textContent = "❤";
-        likeBtn.title = tr.like;
-        likeBtn.addEventListener("click", () => toggleLike(p.id));
-
-        const logBtn = document.createElement("button");
-        logBtn.className = "chip chip-log";
-        logBtn.textContent = tr.log;
-        logBtn.addEventListener("click", () => {
-          console.log("Post detail:", p);
-        });
-
-        right.appendChild(likeBtn);
-        right.appendChild(logBtn);
-
-        if (currentUser && currentUser.id === p.user_id) {
-          const delBtn = document.createElement("button");
-          delBtn.className = "chip chip-delete";
-          delBtn.textContent = tr.delete;
-          delBtn.addEventListener("click", () => deletePost(p.id));
-          right.appendChild(delBtn);
-        }
-
-        header.appendChild(avatar);
-        header.appendChild(meta);
-        header.appendChild(right);
-        card.appendChild(header);
-
-        // media
-        if (p.media_url) {
-          const mediaWrap = document.createElement("div");
-          mediaWrap.className = "post-media";
-
-          if (p.media_type === "video") {
-            const v = document.createElement("video");
-            v.src = p.media_url;
-            v.controls = true;
-            mediaWrap.appendChild(v);
-          } else {
-            const img = document.createElement("img");
-            img.src = p.media_url;
-            img.alt = "media";
-            mediaWrap.appendChild(img);
-          }
-          card.appendChild(mediaWrap);
-        }
-
-        // body
-        if (p.bodyweight || p.note) {
-          const body = document.createElement("div");
-          body.className = "post-body";
-          if (p.bodyweight) {
-            const w = document.createElement("div");
-            w.className = "post-weight";
-            w.textContent = `${p.bodyweight} kg`;
-            body.appendChild(w);
-          }
-          if (p.note) {
-            const c = document.createElement("div");
-            c.className = "post-caption";
-            c.textContent = p.note;
-            body.appendChild(c);
-          }
-          card.appendChild(body);
-        }
-
-        container.appendChild(card);
-      });
-    }
-
-    async function deletePost(id) {
-      const ok = window.confirm("この投稿を削除しますか？");
-      if (!ok) return;
-      const { error } = await supabase.from("posts").delete().eq("id", id);
-      if (error) {
-        alert("削除エラー: " + error.message);
-        return;
-      }
-      await loadFeed();
-    }
-
-    // ------------------ Debug ------------------
-    function setupDebug() {
-      $("btn-clear-cache").addEventListener("click", () => {
-        localStorage.removeItem("trends_likes");
-        const msg = $("debug-msg");
-        msg.textContent = t[currentLang].cacheCleared;
-        setTimeout(() => (msg.textContent = ""), 2000);
-      });
-    }
-  </script>
+  <script type="module" src="app.js"></script>
 </head>
 <body>
   <div class="page">
@@ -1296,21 +22,37 @@
     
         <!-- ここがミニナビ -->
         <div class="mini-nav">
-          <button class="top-nav-tab is-active" data-page-target="feed">フィード</button>
-          <button class="top-nav-tab" data-page-target="account">アカ</button>
-          <button class="top-nav-tab" data-page-target="settings">設定</button>
+          <button class="mini-nav-btn is-active" data-page-target="feed" id="nav-feed">フィード</button>
+          <button class="mini-nav-btn" data-page-target="account" id="nav-account">アカウント</button>
+          <button class="mini-nav-btn" data-page-target="settings" id="nav-settings">設定</button>
         </div>
       </div>
     
       <div id="app-sub">筋トレ専用SNS / シンプルなログ</div>
     
       <div class="top-controls">
+        <button class="btn btn-primary" id="btn-open-post">新規投稿</button>
         <select id="lang-select" class="select-sm">
           <option value="ja">日本語</option>
           <option value="en">English</option>
         </select>
       </div>
     </header>
+    <div class="mini-header" id="mini-header">
+      <div class="mini-header-title" id="mini-header-title">Trends</div>
+      <div class="mini-nav">
+        <button class="mini-nav-btn" data-page-target="feed" id="mini-nav-feed">フィード</button>
+        <button class="mini-nav-btn" data-page-target="account" id="mini-nav-account">アカウント</button>
+        <button class="mini-nav-btn" data-page-target="settings" id="mini-nav-settings">設定</button>
+      </div>
+      <div class="mini-header-actions">
+        <button class="btn btn-ghost btn-xs" id="mini-btn-top">上へ</button>
+        <button class="btn btn-primary" id="mini-btn-post">投稿</button>
+      </div>
+      <div class="mini-progress" aria-hidden="true">
+        <div class="mini-progress-bar" id="mini-progress-bar"></div>
+      </div>
+    </div>
 
     <div class="layout">
 
@@ -1325,84 +67,767 @@
                 type="text"
                 placeholder="caption / handle / メモで検索"
               />
+              <button class="btn btn-ghost btn-xs" id="btn-feed-refresh">更新</button>
             </div>
           </div>
   
-          <!-- すべて / 自分 / Publicのみ chips -->
-          <div class="chips" style="margin-bottom: 8px;">
-            <button class="chip chip-active" id="filter-all">すべて</button>
-            <button class="chip" id="filter-mine">自分</button>
-            <button class="chip" id="filter-public">Publicのみ</button>
+          <!-- すべて / 自分 -->
+          <div class="feed-filters">
+            <div class="chips">
+              <button class="chip chip-active" id="filter-all">すべて</button>
+              <button class="chip" id="filter-mine">自分</button>
+            </div>
+            <div class="feed-actions">
+              <div class="feed-sort">
+                <select id="feed-sort" class="select-sm">
+                  <option value="newest" id="sort-newest">Newest</option>
+                  <option value="oldest" id="sort-oldest">Oldest</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-xs" id="btn-feed-layout">グリッド</button>
+            </div>
           </div>
-  
+
+          <div class="stat-grid" id="feed-stat-grid">
+            <div class="stat-item">
+              <div class="stat-label" id="stat-today-label">今日の投稿</div>
+              <div class="stat-value" id="stat-today">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label" id="stat-streak-label">連続記録</div>
+              <div class="stat-value" id="stat-streak">-</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label" id="stat-total-label">合計</div>
+              <div class="stat-value" id="stat-total">-</div>
+            </div>
+          </div>
+
+          <div id="feed-status" class="template-status"></div>
+
           <!-- 投稿一覧 -->
-          <div id="feed-list"></div>
+          <div id="feed-list" class="feed-list"></div>
+          <div class="feed-more hidden" id="feed-more-wrap">
+            <div class="feed-more-hint" id="feed-more-hint"></div>
+            <button class="btn btn-ghost" id="btn-feed-more">もっと見る</button>
+          </div>
+         
         </section>
       </div>
   
       <!-- アカウント ページ -->
       <div class="page-view" data-page="account">
-        <section id="account-section" class="card">
+        <section id="panel-account" class="card side-panel">
           <div class="card-title" id="account-title">アカウント</div>
+      
+          <!-- ログイン中のユーザー名を表示 -->
           <div class="account-row">
             <div class="account-name" id="account-user"></div>
-            <input
-              id="auth-email"
-              type="email"
-              placeholder="email@example.com"
-            />
-            <input
-              id="auth-password"
-              type="password"
-              placeholder="Password"
-            />
-            <div class="account-buttons">
-              <button class="btn btn-primary" id="btn-auth">
-                ログイン / サインアップ
-              </button>
-              <button
-                class="btn btn-ghost"
-                id="btn-logout"
-                style="display: none;"
-              >
-                ログアウト
-              </button>
+          </div>
+      
+          <input id="auth-email" type="email" placeholder="email@example.com" />
+          <input id="auth-password" type="password" placeholder="Password" />
+      
+          <div class="account-buttons">
+            <button class="btn btn-primary" id="btn-auth">
+              ログイン / サインアップ
+            </button>
+            <button class="btn btn-ghost" id="btn-logout" style="display: none;">
+              ログアウト
+            </button>
+          </div>
+          <div class="account-buttons" style="margin-top: 8px;">
+            <button class="btn btn-ghost" id="btn-toggle-sections">追加パネルを表示</button>
+          </div>
+        </section>
+      
+        <section class="card profile-card" id="profile-section" data-collapsible="profile-details" data-default-open="false">
+          <div class="card-header">
+            <div class="card-title" id="profile-title">プロフィール</div>
+            <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+          </div>
+          <div class="profile-body">
+            <div class="profile-header">
+              <div class="avatar avatar-lg" id="profile-avatar">-</div>
+              <div class="profile-identity">
+                <div id="profile-name" class="profile-name">-</div>
+                <div id="profile-email" class="profile-email">-</div>
+              </div>
+            </div>
+            <div class="profile-meta" id="profile-meta">
+              <span id="profile-posts">投稿数: -</span>
+              <span id="profile-streak">-</span>
+            </div>
+            <div class="collapsible-content" data-collapsible-content>
+              <div id="profile-bio" class="profile-bio">-</div>
+              <div class="profile-quick-stats" id="profile-quick-stats"></div>
+              <div class="profile-stats-grid" id="profile-stats-grid"></div>
+              <div class="profile-banner" id="profile-banner"></div>
+              <div class="card-sub" id="profile-facts-title">プロフィール情報</div>
+              <div class="profile-facts" id="profile-facts"></div>
+              <div class="card-sub" id="profile-highlights-title">ハイライト</div>
+              <div class="profile-highlights" id="profile-highlights"></div>
+              <div class="card-sub" id="profile-links-title">リンク</div>
+              <div class="profile-links" id="profile-links"></div>
             </div>
           </div>
         </section>
-        <section class="card" id="profile-card" style="margin-top: 16px;">
-          <div class="card-title" id="profile-title">プロフィール</div>
-          <div class="profile-body">
-            <div id="profile-name" class="profile-name">-</div>
-            <div id="profile-email" class="profile-email">-</div>
-            <div class="profile-meta">
-              <span id="profile-joined"></span>
-              <span id="profile-posts"></span>
-              <div id="profile-today"></div>
-              <div id="profile-streak"></div>
+
+        <section class="card extra-section hidden" id="onboarding-section" style="margin-top: 12px;">
+          <div class="card-title" id="onboarding-title">はじめての設定</div>
+          <div class="card-sub" id="onboarding-sub">チェックしながら始めましょう。</div>
+          <div class="onboarding-progress">
+            <div class="onboarding-progress-bar" id="onboarding-bar"></div>
+          </div>
+          <div class="onboarding-meta" id="onboarding-meta">0/0</div>
+          <div id="checklist" class="checklist"></div>
+          <div class="onboarding-actions">
+            <button class="btn btn-primary" id="btn-onboarding-post">初投稿する</button>
+            <button class="btn btn-ghost" id="btn-onboarding-profile">プロフィールを整える</button>
+          </div>
+          <div id="onboarding-status" class="template-status"></div>
+        </section>
+
+        <section class="card" id="profile-edit-section" style="margin-top: 12px;">
+          <div class="card-title" id="profile-edit-title">プロフィール編集</div>
+          <div class="card-sub" id="profile-edit-sub">
+            表示名や自己紹介を更新できます。
+          </div>
+
+          <div class="profile-edit-group">
+            <div class="profile-edit-group-title" id="profile-edit-basics-title">基本</div>
+            <div class="profile-editor">
+              <div class="field">
+                <label id="profile-display-label">表示名</label>
+                <input id="profile-display" type="text" placeholder="表示名を入力" />
+              </div>
+              <div class="field field-span">
+                <label id="profile-bio-label">自己紹介</label>
+                <textarea id="profile-bio-input" placeholder="筋トレのこだわりなど"></textarea>
+              </div>
             </div>
+          </div>
+
+          <div class="profile-edit-group" data-collapsible="profile-edit-identity" data-default-open="false">
+            <div class="profile-edit-group-header">
+              <div class="profile-edit-group-title" id="profile-edit-identity-title">プロフィール詳細</div>
+              <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+            </div>
+            <div class="profile-editor collapsible-content" data-collapsible-content>
+              <div class="field">
+                <label id="profile-handle-label">ハンドル</label>
+                <input id="profile-handle" type="text" placeholder="handle" />
+              </div>
+              <div class="field">
+                <label id="profile-location-label">場所</label>
+                <input id="profile-location" type="text" placeholder="Tokyo" />
+              </div>
+              <div class="field">
+                <label id="profile-height-label">身長</label>
+                <input id="profile-height" type="number" placeholder="170" />
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-edit-group" data-collapsible="profile-edit-training" data-default-open="false">
+            <div class="profile-edit-group-header">
+              <div class="profile-edit-group-title" id="profile-edit-training-title">トレーニング詳細</div>
+              <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+            </div>
+            <div class="profile-editor collapsible-content" data-collapsible-content>
+              <div class="field">
+                <label id="profile-experience-label">経験</label>
+                <select id="profile-experience"></select>
+              </div>
+              <div class="field">
+                <label id="profile-goal-label">目標</label>
+                <input id="profile-goal" type="text" placeholder="筋肥大 / パワーアップ" />
+              </div>
+              <div class="field">
+                <label id="profile-gym-label">ジム</label>
+                <input id="profile-gym" type="text" placeholder="Anytime Fitness" />
+              </div>
+              <div class="field">
+                <label id="profile-split-label">分割</label>
+                <input id="profile-split" type="text" placeholder="Push/Pull/Legs" />
+              </div>
+              <div class="field field-span">
+                <label id="profile-favorite-label">好きな種目</label>
+                <textarea id="profile-favorite" placeholder="Bench, Squat, Deadlift"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-edit-group" data-collapsible="profile-edit-media" data-default-open="false">
+            <div class="profile-edit-group-header">
+              <div class="profile-edit-group-title" id="profile-edit-media-title">メディア / テーマ</div>
+              <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+            </div>
+            <div class="profile-editor collapsible-content" data-collapsible-content>
+              <div class="field">
+                <label id="profile-avatar-label">アバターURL</label>
+                <input id="profile-avatar-url" type="text" placeholder="https://" />
+              </div>
+              <div class="field">
+                <label id="profile-avatar-upload-label">アバターをアップロード</label>
+                <input id="profile-avatar-file" type="file" accept="image/*" />
+              </div>
+              <div class="field">
+                <label id="profile-banner-label">バナーURL</label>
+                <input id="profile-banner-url" type="text" placeholder="https://" />
+              </div>
+              <div class="field">
+                <label id="profile-banner-upload-label">バナーをアップロード</label>
+                <input id="profile-banner-file" type="file" accept="image/*" />
+              </div>
+              <div class="field">
+                <label id="profile-accent-label">アクセント色</label>
+                <input id="profile-accent" type="color" value="#e4572e" />
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-edit-group" data-collapsible="profile-edit-links" data-default-open="false">
+            <div class="profile-edit-group-header">
+              <div class="profile-edit-group-title" id="profile-edit-links-title">リンク</div>
+              <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+            </div>
+            <div class="profile-editor collapsible-content" data-collapsible-content>
+              <div class="field">
+                <label id="profile-instagram-label">Instagram</label>
+                <input id="profile-instagram" type="text" placeholder="instagram_id" />
+              </div>
+              <div class="field">
+                <label id="profile-tiktok-label">TikTok</label>
+                <input id="profile-tiktok" type="text" placeholder="tiktok_id" />
+              </div>
+              <div class="field">
+                <label id="profile-youtube-label">YouTube</label>
+                <input id="profile-youtube" type="text" placeholder="youtube.com/..." />
+              </div>
+              <div class="field">
+                <label id="profile-website-label">Web</label>
+                <input id="profile-website" type="text" placeholder="https://" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 8px;">
+            <button class="btn btn-primary" id="btn-save-profile">保存</button>
+          </div>
+          <div class="template-status" id="profile-edit-status"></div>
+        </section>
+
+        <section class="card" id="notifications-section" style="margin-top: 12px;">
+          <div class="card-title" id="notifications-title">通知</div>
+          <div class="card-sub" id="notifications-sub">
+            コメントやフォローがここに届きます。
+          </div>
+          <div class="notification-actions">
+            <button class="btn btn-ghost" id="btn-refresh-notifications">更新</button>
+            <button class="btn btn-ghost" id="btn-mark-all-read">全て既読</button>
+          </div>
+          <div id="notification-list" class="notification-list"></div>
+          <div id="notification-status" class="template-status"></div>
+        </section>
+
+        <section class="card" id="history-section" style="margin-top: 12px;">
+          <div class="card-title" id="history-title">ワークアウト履歴</div>
+          <div class="card-sub" id="history-sub">
+            最近のトレーニングを確認できます。
+          </div>
+          <div id="history-list" class="notification-list"></div>
+          <div id="history-status" class="template-status"></div>
+        </section>
+
+        <section class="card" id="summary-section" style="margin-top: 12px;" data-collapsible="summary-details" data-default-open="false">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="summary-title">トレーニングまとめ</div>
+              <div class="card-sub" id="summary-sub">直近7日間のサマリー</div>
+            </div>
+            <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+          </div>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label" id="summary-workouts-label">ワークアウト数(7日)</div>
+              <div class="summary-value" id="summary-workouts">-</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label" id="summary-volume-label">総ボリューム</div>
+              <div class="summary-value" id="summary-volume">-</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label" id="summary-exercises-label">種目数</div>
+              <div class="summary-value" id="summary-exercises">-</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label" id="summary-prs-label">今週のPR</div>
+              <div class="summary-value" id="summary-prs">-</div>
+            </div>
+          </div>
+          <div id="summary-status" class="template-status"></div>
+          <div class="collapsible-content" data-collapsible-content>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label" id="summary-sets-label">総セット数</div>
+                <div class="summary-value" id="summary-sets">-</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label" id="summary-reps-label">総レップ数</div>
+                <div class="summary-value" id="summary-reps">-</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label" id="summary-avg-reps-label">平均レップ/セット</div>
+                <div class="summary-value" id="summary-avg-reps">-</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label" id="summary-weight-label">最新体重</div>
+                <div class="summary-value" id="summary-weight">-</div>
+              </div>
+            </div>
+            <div class="card-title" id="summary-activity-title" style="margin-top: 12px;">7日間の活動</div>
+            <div id="summary-chart" class="summary-chart"></div>
+            <div class="card-title" id="summary-top-title" style="margin-top: 12px;">今週の上位種目</div>
+            <div id="summary-toplist" class="summary-toplist"></div>
+            <div class="card-title" id="pr-title" style="margin-top: 12px;">パーソナルレコード</div>
+            <div class="card-sub" id="pr-sub">自己ベスト</div>
+            <div id="pr-list" class="notification-list"></div>
+            <div id="pr-status" class="template-status"></div>
+          </div>
+        </section>
+
+        <section class="card extra-section hidden" id="insights-section" style="margin-top: 12px;">
+          <div class="card-title" id="insights-title">週間インサイト</div>
+          <div class="card-sub" id="insights-sub">今週のハイライト</div>
+          <div id="insights-grid" class="insight-grid"></div>
+          <div id="insights-status" class="template-status"></div>
+        </section>
+      </div>
+
+      <!-- 公開プロフィール ページ -->
+      <div class="page-view" data-page="public-profile">
+        <section class="card profile-card" id="public-profile-card" data-collapsible="public-profile-details" data-default-open="false">
+          <div class="card-header">
+            <div class="card-title" id="public-profile-title">Profile</div>
+            <div class="public-profile-header-actions">
+              <button class="btn btn-ghost btn-xs" id="btn-back-to-feed">戻る</button>
+              <button class="btn btn-ghost btn-xs" id="btn-share-profile">共有</button>
+              <button class="btn btn-ghost btn-xs" data-collapsible-btn>Show more</button>
+            </div>
+          </div>
+          <div class="public-profile-header">
+            <div class="public-profile-main">
+              <div class="avatar avatar-lg" id="public-profile-avatar">-</div>
+              <div>
+                <div class="public-profile-name" id="public-profile-name">-</div>
+                <div class="card-sub" id="public-profile-handle">-</div>
+              </div>
+            </div>
+            <div class="public-profile-actions">
+              <button class="btn btn-primary" id="btn-public-follow">フォロー</button>
+            </div>
+          </div>
+          <div class="profile-meta" id="public-profile-meta">
+            <span id="public-profile-posts">-</span>
+            <span id="public-profile-streak">-</span>
+          </div>
+          <div class="public-profile-bio" id="public-profile-bio"></div>
+          <div class="profile-quick-stats hidden" id="public-profile-quick-stats"></div>
+          <div class="collapsible-content" data-collapsible-content>
+            <div class="profile-stats-grid hidden" id="public-profile-stats-grid"></div>
+            <div class="profile-banner" id="public-profile-banner"></div>
+            <div class="card-sub" id="public-profile-facts-title">プロフィール情報</div>
+            <div class="profile-facts" id="public-profile-facts"></div>
+            <div class="card-sub" id="public-profile-highlights-title">ハイライト</div>
+            <div class="profile-highlights" id="public-profile-highlights"></div>
+            <div class="card-sub" id="public-profile-links-title">リンク</div>
+            <div class="profile-links" id="public-profile-links"></div>
+          </div>
+          <div id="public-profile-posts-list" class="feed-list public-profile-posts" style="margin-top: 12px;"></div>
+          <div class="feed-more hidden" id="public-posts-more">
+            <div class="feed-more-hint" id="public-posts-hint"></div>
+            <button class="btn btn-ghost" id="btn-public-posts-more">もっと見る</button>
+          </div>
+        </section>
+        <section class="card" style="margin-top: 12px;">
+          <div class="card-title" id="gallery-title">Progress Gallery</div>
+          <div id="public-profile-gallery" class="gallery-grid"></div>
+          <div id="public-profile-gallery-status" class="template-status"></div>
+          <div class="gallery-pagination">
+            <button class="btn btn-ghost" id="btn-gallery-prev">Prev</button>
+            <div class="gallery-page" id="gallery-page">1 / 1</div>
+            <button class="btn btn-ghost" id="btn-gallery-next">Next</button>
           </div>
         </section>
       </div>
   
-      <!-- 設定 ページ（使い方 + Debug） -->
+      <!-- 設定 ページ -->
       <div class="page-view" data-page="settings">
-        <section class="card" style="margin-top: 12px;" id="tips-section">
-          <div class="card-title">使い方</div>
-          <ul class="tips-list">
-            <li id="tip1">毎日のトレを1行メモ。</li>
-            <li id="tip2">見られたくない日は「自分のみ」。</li>
-            <li id="tip3">画像アップでボディ変化を記録。</li>
-          </ul>
+        <section class="card" id="settings-overview">
+          <div class="card-title" id="settings-title">Settings</div>
+          <div class="card-sub" id="settings-sub">
+            アプリの表示や通知、単位をまとめて調整できます。
+          </div>
+          <div class="settings-actions">
+            <button class="btn btn-ghost" id="btn-settings-expand">全部表示</button>
+          </div>
+          <div class="settings-summary" id="settings-summary"></div>
+          <div class="settings-hero" id="settings-hero">
+            <div class="settings-hero-item">
+              <div class="settings-info">
+                <div class="settings-title" id="settings-compact-title">コンパクトモード</div>
+                <div class="settings-desc" id="settings-compact-desc">カード間の余白を減らします。</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="settings-compact" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-hero-item">
+              <div class="settings-info">
+                <div class="settings-title" id="settings-show-feed-stats-title">フィード統計を表示</div>
+                <div class="settings-desc" id="settings-show-feed-stats-desc">今日/連続/合計の統計を表示。</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="settings-show-feed-stats" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-hero-item">
+              <div class="settings-info">
+                <div class="settings-title" id="settings-show-extra-title">追加パネルを表示</div>
+                <div class="settings-desc" id="settings-show-extra-desc">オンボーディングとインサイトを表示します。</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="settings-show-extra" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-presets" id="settings-presets">
+            <button class="btn btn-ghost" id="btn-settings-recommended">おすすめ</button>
+            <button class="btn btn-ghost" id="btn-settings-minimal">ミニマル</button>
+            <button class="btn btn-ghost" id="btn-settings-full">フル表示</button>
+          </div>
+          <div class="settings-quick" id="settings-quick">
+            <button class="settings-quick-card" data-preset="recommended" id="preset-card-recommended">
+              <div class="settings-quick-icon">R</div>
+              <div>
+                <div class="settings-quick-title" id="preset-recommended-title">おすすめ</div>
+                <div class="settings-quick-desc" id="preset-recommended-desc">毎日使いやすい</div>
+              </div>
+              <div class="settings-quick-badge" id="preset-badge-recommended">選択中</div>
+            </button>
+            <button class="settings-quick-card" data-preset="minimal" id="preset-card-minimal">
+              <div class="settings-quick-icon">M</div>
+              <div>
+                <div class="settings-quick-title" id="preset-minimal-title">ミニマル</div>
+                <div class="settings-quick-desc" id="preset-minimal-desc">軽く見たい人向け</div>
+              </div>
+              <div class="settings-quick-badge" id="preset-badge-minimal">選択中</div>
+            </button>
+            <button class="settings-quick-card" data-preset="balanced" id="preset-card-balanced">
+              <div class="settings-quick-icon">B</div>
+              <div>
+                <div class="settings-quick-title" id="preset-balanced-title">バランス</div>
+                <div class="settings-quick-desc" id="preset-balanced-desc">必要な情報だけ</div>
+              </div>
+              <div class="settings-quick-badge" id="preset-badge-balanced">選択中</div>
+            </button>
+            <button class="settings-quick-card" data-preset="full" id="preset-card-full">
+              <div class="settings-quick-icon">F</div>
+              <div>
+                <div class="settings-quick-title" id="preset-full-title">フル表示</div>
+                <div class="settings-quick-desc" id="preset-full-desc">全部見たい人向け</div>
+              </div>
+              <div class="settings-quick-badge" id="preset-badge-full">選択中</div>
+            </button>
+          </div>
         </section>
-  
-        <section class="card" style="margin-top: 12px;" id="debug-section">
-          <div class="card-title" id="debug-title">Debug / Dev</div>
-          <button class="btn btn-ghost" id="btn-clear-cache">
-            Clear local cache
-          </button>
-          <div class="debug-msg" id="debug-msg"></div>
-        </section>
+
+        <div class="settings-group">
+          <div class="settings-group-title" id="settings-group-basics">基本</div>
+          <div class="settings-group-grid">
+            <section class="card" data-collapsible="settings-preferences" data-default-open="true">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="settings-preferences-title">基本設定</div>
+                  <div class="card-sub" id="settings-preferences-sub">表示と投稿のデフォルト</div>
+                </div>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+              </div>
+              <div class="collapsible-content" data-collapsible-content>
+                <div class="settings-list settings-grid">
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-default-filter-title">フィードの初期フィルター</div>
+                      <div class="settings-desc" id="settings-default-filter-desc">アプリ起動時のデフォルト。</div>
+                    </div>
+                    <div class="settings-control">
+                      <select class="settings-select" id="settings-default-filter">
+                        <option value="all" id="settings-default-filter-all">すべて</option>
+                        <option value="mine" id="settings-default-filter-mine">自分</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-feed-layout-title">フィード表示</div>
+                      <div class="settings-desc" id="settings-feed-layout-desc">リスト or グリッド。</div>
+                    </div>
+                    <div class="settings-control">
+                      <select class="settings-select" id="settings-feed-layout">
+                        <option value="list" id="settings-feed-layout-list">リスト</option>
+                        <option value="grid" id="settings-feed-layout-grid">グリッド</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-default-visibility-title">投稿の初期公開範囲</div>
+                      <div class="settings-desc" id="settings-default-visibility-desc">新規投稿の公開範囲。</div>
+                    </div>
+                    <div class="settings-control">
+                      <select class="settings-select" id="settings-default-visibility">
+                        <option value="public" id="settings-default-visibility-public">Public</option>
+                        <option value="private" id="settings-default-visibility-private">自分のみ</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card" data-collapsible="settings-privacy" data-default-open="false">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="settings-privacy-title">プロフィールと表示</div>
+                  <div class="card-sub" id="settings-privacy-sub">見せる情報を調整します。</div>
+                </div>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+              </div>
+              <div class="collapsible-content" data-collapsible-content>
+                <div class="settings-list settings-grid">
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-show-email-title">メールを表示</div>
+                      <div class="settings-desc" id="settings-show-email-desc">プロフィールのメール欄を表示。</div>
+                    </div>
+                    <label class="toggle">
+                      <input type="checkbox" id="settings-show-email" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-show-profile-stats-title">プロフィール統計を表示</div>
+                      <div class="settings-desc" id="settings-show-profile-stats-desc">投稿数やフォロー数を表示。</div>
+                    </div>
+                    <label class="toggle">
+                      <input type="checkbox" id="settings-show-profile-stats" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-show-bodyweight-title">体重を表示</div>
+                      <div class="settings-desc" id="settings-show-bodyweight-desc">フィード内の体重表示を切替。</div>
+                    </div>
+                    <label class="toggle">
+                      <input type="checkbox" id="settings-show-bodyweight" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title" id="settings-group-social">通知・表示</div>
+          <div class="settings-group-grid">
+            <section class="card" data-collapsible="settings-notifications" data-default-open="false">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="settings-notifications-title">通知</div>
+                  <div class="card-sub" id="settings-notifications-sub">表示する通知タイプ。</div>
+                </div>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+              </div>
+              <div class="collapsible-content" data-collapsible-content>
+                <div class="settings-list settings-grid">
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-notify-like-title">いいね通知</div>
+                      <div class="settings-desc" id="settings-notify-like-desc">いいねの通知を表示。</div>
+                    </div>
+                    <label class="toggle">
+                      <input type="checkbox" id="settings-notify-like" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-notify-comment-title">コメント通知</div>
+                      <div class="settings-desc" id="settings-notify-comment-desc">コメントの通知を表示。</div>
+                    </div>
+                    <label class="toggle">
+                      <input type="checkbox" id="settings-notify-comment" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-notify-follow-title">フォロー通知</div>
+                      <div class="settings-desc" id="settings-notify-follow-desc">フォローの通知を表示。</div>
+                    </div>
+                    <label class="toggle">
+                      <input type="checkbox" id="settings-notify-follow" />
+                      <span class="toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="settings-actions">
+                  <button class="btn btn-ghost" id="btn-settings-mark-read">全て既読</button>
+                </div>
+                <div class="settings-note" id="settings-notifications-note">
+                  この設定は端末内の表示にのみ反映されます。
+                </div>
+              </div>
+            </section>
+
+            <section class="card" data-collapsible="settings-language" data-default-open="false">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="settings-language-title">言語と単位</div>
+                  <div class="card-sub" id="settings-language-sub">表示形式と単位を切り替え。</div>
+                </div>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+              </div>
+              <div class="collapsible-content" data-collapsible-content>
+                <div class="settings-list settings-grid">
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-language-label">言語</div>
+                      <div class="settings-desc" id="settings-language-desc">UIの表示言語。</div>
+                    </div>
+                    <div class="settings-control">
+                      <select class="settings-select" id="settings-language">
+                        <option value="ja">日本語</option>
+                        <option value="en">English</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-date-format-label">日付形式</div>
+                      <div class="settings-desc" id="settings-date-format-desc">フィードや通知の日付表示。</div>
+                    </div>
+                    <div class="settings-control">
+                      <select class="settings-select" id="settings-date-format">
+                        <option value="auto" id="settings-date-format-auto">自動</option>
+                        <option value="ymd" id="settings-date-format-ymd">YYYY/MM/DD</option>
+                        <option value="mdy" id="settings-date-format-mdy">MM/DD/YYYY</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-weight-unit-label">重量単位</div>
+                      <div class="settings-desc" id="settings-weight-unit-desc">体重とセットの重さ。</div>
+                    </div>
+                    <div class="settings-control">
+                      <select class="settings-select" id="settings-weight-unit">
+                        <option value="kg" id="settings-weight-unit-kg">kg</option>
+                        <option value="lb" id="settings-weight-unit-lb">lb</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="settings-item">
+                    <div class="settings-info">
+                      <div class="settings-title" id="settings-height-unit-label">身長単位</div>
+                      <div class="settings-desc" id="settings-height-unit-desc">プロフィールの身長表示。</div>
+                    </div>
+                    <div class="settings-control">
+                      <select class="settings-select" id="settings-height-unit">
+                        <option value="cm" id="settings-height-unit-cm">cm</option>
+                        <option value="in" id="settings-height-unit-in">in</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title" id="settings-group-tools">管理・ツール</div>
+          <div class="settings-group-grid">
+            <section class="card" data-collapsible="settings-data" data-default-open="false">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="settings-data-title">データ管理</div>
+                  <div class="card-sub" id="settings-data-sub">書き出しやリセット。</div>
+                </div>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+              </div>
+              <div class="collapsible-content" data-collapsible-content>
+                <div class="settings-actions">
+                  <button class="btn btn-ghost" id="btn-export-data">データを書き出す</button>
+                  <button class="btn btn-ghost" id="btn-clear-cache">キャッシュを削除</button>
+                  <button class="btn btn-danger" id="btn-reset-settings">設定をリセット</button>
+                </div>
+                <div class="settings-note" id="settings-data-status"></div>
+              </div>
+            </section>
+
+            <section class="card" data-collapsible="settings-templates" data-default-open="false" id="templates-section">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="templates-title">テンプレート</div>
+                  <div class="card-sub" id="templates-sub">
+                    よく使うメニューを保存しておくと投稿が早くなります。
+                  </div>
+                </div>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+              </div>
+              <div class="collapsible-content" data-collapsible-content>
+                <div class="field">
+                  <label id="template-name-label">テンプレ名</label>
+                  <input id="template-name" type="text" placeholder="Push Day" />
+                </div>
+                <div class="field" style="margin-top: 8px;">
+                  <label id="template-body-label">内容</label>
+                  <textarea id="template-body" placeholder="Bench 5x5&#10;Incline DB 4x10"></textarea>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-primary" id="btn-save-template">保存</button>
+                </div>
+                <div id="template-list" class="template-list"></div>
+                <div id="template-status" class="template-status"></div>
+              </div>
+            </section>
+
+            <section class="card" data-collapsible="settings-tips" data-default-open="false" id="tips-section">
+              <div class="card-header">
+                <div>
+                  <div class="card-title" id="tips-title">使い方</div>
+                </div>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
+              </div>
+              <div class="collapsible-content" data-collapsible-content>
+                <ul class="tips-list">
+                  <li id="tip1">毎日のトレを1行メモ。</li>
+                  <li id="tip2">見られたくない日は「自分のみ」。</li>
+                  <li id="tip3">画像アップでボディ変化を記録。</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
   
     </div> <!-- .layout 終わり -->
@@ -1415,41 +840,118 @@
     <section class="card modal-panel">
       <div class="modal-header-row">
         <div class="card-title" id="new-post-title">新規投稿</div>
-        <button class="modal-close-btn" id="btn-post-close">×</button>
-      </div>
-      <div class="grid-2">
-        <div class="field">
-          <label id="label-date">日付</label>
-          <input type="date" id="post-date" />
-        </div>
-        <div class="field">
-          <label id="label-weight">体重 (kg)</label>
-          <input type="number" id="post-weight" step="0.1" placeholder="77.4" />
+        <div class="modal-header-actions">
+          <span class="draft-status" id="draft-status"></span>
+          <button class="modal-close-btn" id="btn-post-close">×</button>
         </div>
       </div>
-      <div class="field" style="margin-top: 8px;">
-        <label id="label-media">画像 / 動画</label>
-        <input id="post-media" type="file" accept="image/*,video/*" />
+      <div class="modal-section">
+        <div class="modal-section-title" id="post-section-basic">基本</div>
+        <div class="grid-2">
+          <div class="field">
+            <label id="label-date">日付</label>
+            <input type="date" id="post-date" />
+          </div>
+          <div class="field">
+            <label id="label-weight">体重</label>
+            <input type="number" id="post-weight" step="0.1" placeholder="77.4" />
+          </div>
+        </div>
       </div>
-      <div class="field" style="margin-top: 8px;">
-        <label id="label-caption">キャプション / トレメモ</label>
-        <textarea id="post-caption" placeholder="bench 100kg"></textarea>
-      </div>
-      <div class="grid-2" style="margin-top: 8px;">
+      <div class="modal-section">
+        <div class="modal-section-title" id="post-section-media">メディア</div>
         <div class="field">
-          <label id="label-visibility">公開範囲</label>
-          <select id="post-visibility">
-            <option value="public" id="visibility-public">Public</option>
-            <option value="private" id="visibility-private">自分のみ</option>
-          </select>
+          <label id="label-media">画像 / 動画</label>
+          <input id="post-media" type="file" accept="image/*,video/*" />
+        </div>
+        <div class="media-preview hidden" id="post-media-preview">
+          <div class="media-preview-body" id="post-media-preview-body"></div>
+          <div class="media-preview-actions">
+            <span class="media-preview-note" id="post-media-preview-note"></span>
+            <button class="btn btn-ghost btn-xs" type="button" id="btn-remove-media">削除</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title" id="post-section-workout">ワークアウト</div>
+        <div class="field">
+          <label id="label-log">ワークアウトログ</label>
+          <div class="log-builder" id="log-builder">
+            <div class="rest-timer">
+              <span id="rest-timer-label">レストタイマー</span>
+              <span class="rest-display" id="rest-timer-display">00:00</span>
+              <button class="btn btn-ghost" id="btn-rest-stop">停止</button>
+            </div>
+            <div id="workout-exercises" class="workout-builder"></div>
+            <button class="btn btn-ghost" id="btn-add-exercise">種目を追加</button>
+            <div class="template-status" id="log-status"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title" id="post-section-caption">キャプション</div>
+        <div class="field">
+          <label id="label-caption">キャプション / トレメモ</label>
+          <textarea id="post-caption" placeholder="bench 100"></textarea>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title" id="post-section-template">テンプレート</div>
+        <div class="field">
+          <label id="label-template">テンプレート</label>
+          <select id="post-template"></select>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title" id="post-section-visibility">公開範囲</div>
+        <div class="grid-2">
+          <div class="field">
+            <label id="label-visibility">公開範囲</label>
+            <select id="post-visibility">
+              <option value="public" id="visibility-public">Public</option>
+              <option value="private" id="visibility-private">自分のみ</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="form-actions">
+        <button class="btn btn-ghost" type="button" id="btn-clear-draft">下書きを削除</button>
         <button class="btn btn-primary" id="btn-submit">投稿</button>
         <button class="btn btn-ghost" type="button" id="btn-reset">リセット</button>
       </div>
+      <div class="draft-hint" id="draft-hint">下書きは自動保存されます。</div>
       <div id="login-required">ログインしてください。</div>
     </section>
   </div>
+
+  <!-- 投稿詳細モーダル -->
+  <div class="modal-backdrop hidden" id="detail-modal-backdrop">
+    <section class="card modal-panel detail-panel">
+      <div class="modal-header-row">
+        <div class="card-title" id="detail-title">投稿詳細</div>
+        <button class="modal-close-btn" id="btn-detail-close">×</button>
+      </div>
+      <div class="detail-header" id="detail-header"></div>
+      <div id="detail-media"></div>
+      <div class="detail-section" id="detail-body"></div>
+      <div class="detail-section">
+        <div class="card-sub" id="detail-workout-title">Workout</div>
+        <div class="detail-workout" id="detail-workout"></div>
+      </div>
+      <div class="detail-section">
+        <div class="card-sub" id="detail-comments-title">Comments</div>
+        <div id="detail-comments"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="media-modal-backdrop">
+    <section class="media-modal-content">
+      <button class="modal-close-btn" id="btn-media-close">×</button>
+      <div id="media-modal-body"></div>
+    </section>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
 </body>
 </html>
