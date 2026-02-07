@@ -106,6 +106,13 @@ let feedNotice = "";
 let feedNoticeTone = "";
 let feedNoticeTimer = null;
 let deferredVideoObserver = null;
+let feedQueryCache = {
+  queryKey: "",
+  postsRef: null,
+  workoutLogsRef: null,
+  gridCandidates: [],
+};
+const postSearchHaystackCache = new Map();
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const MODAL_ANIM_MS = 200;
 const openBackdrop = (backdrop) => {
@@ -177,6 +184,42 @@ function resetDeferredVideoObserver() {
       if (!deferredVideoObserver) return;
       deferredVideoObserver.disconnect();
       deferredVideoObserver = null;
+    }
+function invalidateFeedQueryCache() {
+      feedQueryCache = {
+        queryKey: "",
+        postsRef: null,
+        workoutLogsRef: null,
+        gridCandidates: [],
+      };
+    }
+function getPostSearchHaystack(post, workoutLogsMap) {
+      if (!post) return "";
+      const logs = workoutLogsMap.get(post.id) || [];
+      const cached = postSearchHaystackCache.get(post.id);
+      if (cached && cached.postRef === post && cached.logsRef === logs) {
+        return cached.haystack;
+      }
+      const logText = logs
+        .map((exercise) => `${exercise.exercise || ""} ${exercise.note || ""}`)
+        .join(" ");
+      const haystack = [
+        post.note,
+        post.caption,
+        post.bodyweight,
+        post.profile?.handle,
+        post.profile?.display_name,
+        logText,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      postSearchHaystackCache.set(post.id, {
+        postRef: post,
+        logsRef: logs,
+        haystack,
+      });
+      return haystack;
     }
 function saveFeedCache(posts = []) {
       try {
@@ -427,6 +470,8 @@ export async function loadFeed(options = {}) {
             const cachedPosts = loadFeedCache();
             if (cachedPosts.length) {
               setAllPosts(cachedPosts);
+              invalidateFeedQueryCache();
+              postSearchHaystackCache.clear();
               feedLastLoadedAt = Date.now();
               resetFeedPagination();
               updateFeedStats(cachedPosts);
@@ -465,6 +510,8 @@ export async function loadFeed(options = {}) {
           await loadLikes(postIds);
 
           setAllPosts(postsWithProfile);
+          invalidateFeedQueryCache();
+          postSearchHaystackCache.clear();
           saveFeedCache(postsWithProfile);
           feedLastLoadedAt = Date.now();
           resetFeedPagination();
@@ -561,38 +608,66 @@ export function renderFeed(options = {}) {
 
     const matchesSearch = (post) => {
       if (!searchValue) return true;
-      const logs = workoutLogsByPost.get(post.id) || [];
-      const logText = logs
-        .map((exercise) => `${exercise.exercise || ""} ${exercise.note || ""}`)
-        .join(" ");
-      const haystack = [
-        post.note,
-        post.caption,
-        post.bodyweight,
-        post.profile?.handle,
-        post.profile?.display_name,
-        logText,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+      const haystack = getPostSearchHaystack(post, workoutLogsByPost);
       return haystack.includes(searchValue);
     };
 
-    const visiblePosts = Array.isArray(allPosts)
-      ? allPosts.filter((post) => {
-          if (!canSeePost(post) || !matchesFilter(post) || !matchesSearch(post)) {
-            return false;
-          }
-          if (filterMedia && !post.media_url) {
-            return false;
-          }
-          if (filterWorkout && !(workoutLogsByPost.get(post.id) || []).length) {
-            return false;
-          }
-          return true;
-        })
-      : [];
+    const firstPostId = Array.isArray(allPosts) && allPosts.length ? allPosts[0]?.id || "" : "";
+    const lastPostId = Array.isArray(allPosts) && allPosts.length
+      ? allPosts[allPosts.length - 1]?.id || ""
+      : "";
+    const queryKey = [
+      currentUser?.id || "",
+      currentFilter,
+      filterMedia ? "1" : "0",
+      filterWorkout ? "1" : "0",
+      sortOrder,
+      feedLayout,
+      searchValue,
+      Array.isArray(allPosts) ? allPosts.length : 0,
+      firstPostId,
+      lastPostId,
+    ].join("|");
+    let gridCandidates = [];
+    const canUseQueryCache =
+      feedQueryCache.queryKey === queryKey &&
+      feedQueryCache.postsRef === allPosts &&
+      feedQueryCache.workoutLogsRef === workoutLogsByPost;
+    if (canUseQueryCache) {
+      gridCandidates = feedQueryCache.gridCandidates;
+    } else {
+      const visiblePosts = Array.isArray(allPosts)
+        ? allPosts.filter((post) => {
+            if (!canSeePost(post) || !matchesFilter(post) || !matchesSearch(post)) {
+              return false;
+            }
+            if (filterMedia && !post.media_url) {
+              return false;
+            }
+            if (filterWorkout && !(workoutLogsByPost.get(post.id) || []).length) {
+              return false;
+            }
+            return true;
+          })
+        : [];
+      const sortedPosts = visiblePosts.slice().sort((a, b) => {
+        const aTime = new Date(a.date || a.created_at || 0).getTime();
+        const bTime = new Date(b.date || b.created_at || 0).getTime();
+        if (sortOrder === "oldest") {
+          return aTime - bTime;
+        }
+        return bTime - aTime;
+      });
+      gridCandidates = feedLayout === "grid"
+        ? sortedPosts.filter((post) => post.media_url)
+        : sortedPosts;
+      feedQueryCache = {
+        queryKey,
+        postsRef: allPosts,
+        workoutLogsRef: workoutLogsByPost,
+        gridCandidates,
+      };
+    }
 
     container.classList.toggle("grid-view", feedLayout === "grid");
     if (layoutBtn) {
@@ -658,18 +733,6 @@ export function renderFeed(options = {}) {
       }
     }
 
-    const sortedPosts = visiblePosts.slice().sort((a, b) => {
-      const aTime = new Date(a.date || a.created_at || 0).getTime();
-      const bTime = new Date(b.date || b.created_at || 0).getTime();
-      if (sortOrder === "oldest") {
-        return aTime - bTime;
-      }
-      return bTime - aTime;
-    });
-
-    const gridCandidates = feedLayout === "grid"
-      ? sortedPosts.filter((post) => post.media_url)
-      : sortedPosts;
     const visibleSlice = gridCandidates.slice(0, feedVisibleCount);
     const renderSignature = [
       feedLayout,
