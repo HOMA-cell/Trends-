@@ -439,7 +439,7 @@ export async function loadFeed(options = {}) {
 
       return feedLoadPromise;
     }
-export function renderFeed() {
+export function renderFeed(options = {}) {
     const container = document.getElementById("feed-list");
     const status = $("feed-status");
     const moreWrap = $("feed-more-wrap");
@@ -447,6 +447,7 @@ export function renderFeed() {
     const moreBtn = $("btn-feed-more");
     const layoutBtn = $("btn-feed-layout");
     if (!container) return;
+    const appendOnly = !!options.appendOnly;
     const renderToken = ++feedRenderToken;
 
     const currentUser = getCurrentUser();
@@ -543,18 +544,6 @@ export function renderFeed() {
         })
       : [];
 
-    container.innerHTML = "";
-    if (status) {
-      status.textContent = "";
-      status.classList.remove(
-        "feed-status-loading",
-        "feed-status-success",
-        "feed-status-warning",
-        "feed-status-error"
-      );
-    }
-    if (moreWrap) moreWrap.classList.add("hidden");
-
     container.classList.toggle("grid-view", feedLayout === "grid");
     if (layoutBtn) {
       const label =
@@ -564,13 +553,33 @@ export function renderFeed() {
       layoutBtn.textContent = label;
     }
 
+    const resetStatusState = () => {
+      if (!status) return;
+      status.textContent = "";
+      status.classList.remove(
+        "feed-status-loading",
+        "feed-status-success",
+        "feed-status-warning",
+        "feed-status-error"
+      );
+    };
+
     if (isFeedLoading) {
       if (Array.isArray(allPosts) && allPosts.length > 0) {
         if (status) {
+          resetStatusState();
           status.textContent = feedNotice || tr.feedRefreshing || "更新中...";
           status.classList.add("feed-status-loading");
         }
       } else {
+        resetStatusState();
+        if (status) {
+          status.textContent = tr.feedRefreshing || "更新中...";
+          status.classList.add("feed-status-loading");
+        }
+        container.innerHTML = "";
+        delete container.dataset.feedSignature;
+        if (moreWrap) moreWrap.classList.add("hidden");
         const skeletonCount = 3;
         for (let i = 0; i < skeletonCount; i += 1) {
           const skeleton = document.createElement("div");
@@ -581,6 +590,7 @@ export function renderFeed() {
       return;
     }
 
+    resetStatusState();
     if (status) {
       if (feedError) {
         status.textContent = feedError;
@@ -609,8 +619,30 @@ export function renderFeed() {
     const gridCandidates = feedLayout === "grid"
       ? sortedPosts.filter((post) => post.media_url)
       : sortedPosts;
+    const visibleSlice = gridCandidates.slice(0, feedVisibleCount);
+    const renderSignature = [
+      feedLayout,
+      currentFilter,
+      filterMedia ? "1" : "0",
+      filterWorkout ? "1" : "0",
+      sortOrder,
+      searchValue,
+      currentUser?.id || "",
+      String(gridCandidates.length),
+      gridCandidates[0]?.id || "",
+      gridCandidates[gridCandidates.length - 1]?.id || "",
+    ].join("|");
+    const existingCount = container.querySelectorAll(".post-card:not(.skeleton)").length;
+    const canAppend =
+      appendOnly &&
+      container.dataset.feedSignature === renderSignature &&
+      existingCount > 0 &&
+      existingCount < visibleSlice.length;
 
     if (!gridCandidates.length) {
+      container.innerHTML = "";
+      delete container.dataset.feedSignature;
+      if (moreWrap) moreWrap.classList.add("hidden");
       const empty = document.createElement("div");
       empty.className = "empty-state";
 
@@ -661,9 +693,13 @@ export function renderFeed() {
       return;
     }
 
-    const localLikedIds = getLikedIds();
+    if (!canAppend) {
+      container.innerHTML = "";
+      if (moreWrap) moreWrap.classList.add("hidden");
+    }
+    container.dataset.feedSignature = renderSignature;
 
-    const visibleSlice = gridCandidates.slice(0, feedVisibleCount);
+    const localLikedIds = getLikedIds();
     const createPostCard = (post) => {
       const card = document.createElement("div");
       card.className = "post-card";
@@ -971,7 +1007,7 @@ export function renderFeed() {
       return card;
     };
 
-    let index = 0;
+    let index = canAppend ? existingCount : 0;
     const batchSize = feedLayout === "grid" ? 6 : 4;
     const finalizeMore = () => {
       if (moreWrap && moreBtn && moreHint) {
@@ -985,16 +1021,8 @@ export function renderFeed() {
         if (!moreBtn.dataset.bound) {
           moreBtn.dataset.bound = "true";
           moreBtn.addEventListener("click", () => {
-            const anchorTop = moreBtn.getBoundingClientRect().top;
             feedVisibleCount += feedPageSize;
-            renderFeed();
-            requestAnimationFrame(() => {
-              const nextTop = moreBtn.getBoundingClientRect().top;
-              const delta = nextTop - anchorTop;
-              if (Math.abs(delta) > 1) {
-                window.scrollBy({ top: delta, behavior: "auto" });
-              }
-            });
+            renderFeed({ appendOnly: true });
           });
         }
         if (hasMore) {

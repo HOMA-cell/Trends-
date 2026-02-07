@@ -446,6 +446,8 @@
       margin-bottom: 8px;
       box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
       transition: transform 0.18s ease, box-shadow 0.18s ease;
+      content-visibility: auto;
+      contain-intrinsic-size: 320px;
     }
     .post-card:hover {
       transform: translateY(-1px);
