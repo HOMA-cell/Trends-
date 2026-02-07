@@ -105,6 +105,7 @@ let feedLoadPromise = null;
 let feedNotice = "";
 let feedNoticeTone = "";
 let feedNoticeTimer = null;
+let deferredVideoObserver = null;
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const MODAL_ANIM_MS = 200;
 const openBackdrop = (backdrop) => {
@@ -128,6 +129,55 @@ const closeBackdrop = (backdrop) => {
         backdrop.classList.add("hidden");
       }, MODAL_ANIM_MS);
     };
+function hydrateDeferredVideo(videoEl) {
+      if (!videoEl) return;
+      if (videoEl.dataset.deferredLoaded === "true") return;
+      const src = videoEl.dataset.src;
+      if (!src) return;
+      videoEl.preload = "metadata";
+      videoEl.src = src;
+      videoEl.dataset.deferredLoaded = "true";
+      delete videoEl.dataset.src;
+      videoEl.classList.remove("video-deferred");
+    }
+function ensureDeferredVideoObserver() {
+      if (deferredVideoObserver) {
+        return deferredVideoObserver;
+      }
+      if (typeof IntersectionObserver === "undefined") {
+        return null;
+      }
+      deferredVideoObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const videoEl = entry.target;
+            hydrateDeferredVideo(videoEl);
+            deferredVideoObserver?.unobserve(videoEl);
+          });
+        },
+        {
+          root: null,
+          rootMargin: "320px 0px",
+          threshold: 0.01,
+        }
+      );
+      return deferredVideoObserver;
+    }
+function observeDeferredVideo(videoEl) {
+      if (!videoEl) return;
+      const observer = ensureDeferredVideoObserver();
+      if (!observer) {
+        hydrateDeferredVideo(videoEl);
+        return;
+      }
+      observer.observe(videoEl);
+    }
+function resetDeferredVideoObserver() {
+      if (!deferredVideoObserver) return;
+      deferredVideoObserver.disconnect();
+      deferredVideoObserver = null;
+    }
 function saveFeedCache(posts = []) {
       try {
         const payload = {
@@ -577,6 +627,7 @@ export function renderFeed(options = {}) {
           status.textContent = tr.feedRefreshing || "更新中...";
           status.classList.add("feed-status-loading");
         }
+        resetDeferredVideoObserver();
         container.innerHTML = "";
         delete container.dataset.feedSignature;
         if (moreWrap) moreWrap.classList.add("hidden");
@@ -640,6 +691,7 @@ export function renderFeed(options = {}) {
       existingCount < visibleSlice.length;
 
     if (!gridCandidates.length) {
+      resetDeferredVideoObserver();
       container.innerHTML = "";
       delete container.dataset.feedSignature;
       if (moreWrap) moreWrap.classList.add("hidden");
@@ -694,6 +746,7 @@ export function renderFeed(options = {}) {
     }
 
     if (!canAppend) {
+      resetDeferredVideoObserver();
       container.innerHTML = "";
       if (moreWrap) moreWrap.classList.add("hidden");
     }
@@ -823,9 +876,12 @@ export function renderFeed(options = {}) {
         mediaWrap.className = "post-media";
         if (post.media_type === "video") {
           const video = document.createElement("video");
-          video.src = post.media_url;
-          video.preload = "metadata";
+          video.preload = "none";
           video.controls = true;
+          video.playsInline = true;
+          video.classList.add("video-deferred");
+          video.dataset.src = post.media_url;
+          observeDeferredVideo(video);
           mediaWrap.appendChild(video);
         } else {
           const img = document.createElement("img");

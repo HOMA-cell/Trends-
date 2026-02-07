@@ -567,6 +567,10 @@
       background: #f4efe6;
       aspect-ratio: 4 / 5;
     }
+    .post-media video.video-deferred {
+      background: linear-gradient(120deg, #f3ede3 0%, #ece4d8 100%);
+      min-height: 100%;
+    }
     .detail-panel .post-media {
       aspect-ratio: auto;
       max-height: 70vh;
