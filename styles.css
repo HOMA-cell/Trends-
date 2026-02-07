@@ -1315,6 +1315,18 @@
       color: var(--text-sub);
       margin-top: 6px;
     }
+    .template-status.feed-status-loading {
+      color: #2563eb;
+    }
+    .template-status.feed-status-success {
+      color: #15803d;
+    }
+    .template-status.feed-status-warning {
+      color: #b45309;
+    }
+    .template-status.feed-status-error {
+      color: #b91c1c;
+    }
     .settings-list {
       display: flex;
       flex-direction: column;

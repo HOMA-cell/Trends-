@@ -101,7 +101,10 @@ let feedVisibleCount = 8;
 let feedLastLoadedAt = null;
 let currentDetailPostId = null;
 let feedRenderToken = 0;
-let feedPendingScrollIndex = null;
+let feedLoadPromise = null;
+let feedNotice = "";
+let feedNoticeTone = "";
+let feedNoticeTimer = null;
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const MODAL_ANIM_MS = 200;
 const openBackdrop = (backdrop) => {
@@ -146,6 +149,21 @@ function loadFeedCache() {
       } catch (error) {
         console.warn("loadFeedCache failed", error);
         return [];
+      }
+    }
+function setFeedNotice(message = "", tone = "", autoClearMs = 0) {
+      feedNotice = message || "";
+      feedNoticeTone = tone || "";
+      if (feedNoticeTimer) {
+        clearTimeout(feedNoticeTimer);
+        feedNoticeTimer = null;
+      }
+      if (autoClearMs > 0 && feedNotice) {
+        feedNoticeTimer = setTimeout(() => {
+          feedNotice = "";
+          feedNoticeTone = "";
+          renderFeed();
+        }, autoClearMs);
       }
     }
 export function resetFeedPagination() {
@@ -270,7 +288,15 @@ export function setupFeedControls() {
       if (refreshBtn && refreshBtn.dataset.bound !== "true") {
         refreshBtn.dataset.bound = "true";
         refreshBtn.addEventListener("click", async () => {
-          await loadFeed();
+          if (refreshBtn.classList.contains("is-loading")) return;
+          refreshBtn.classList.add("is-loading");
+          refreshBtn.disabled = true;
+          try {
+            await loadFeed({ softRefresh: true });
+          } finally {
+            refreshBtn.classList.remove("is-loading");
+            refreshBtn.disabled = false;
+          }
         });
       }
 
@@ -304,47 +330,101 @@ export function updateFilterButtons() {
       if (mediaBtn) mediaBtn.classList.toggle("chip-active", filterMedia);
       if (workoutBtn) workoutBtn.classList.toggle("chip-active", filterWorkout);
     }
-export async function loadFeed() {
-      isFeedLoading = true;
+export async function loadFeed(options = {}) {
+      if (feedLoadPromise) {
+        return feedLoadPromise;
+      }
+
+      const softRefresh = !!options.softRefresh && getAllPosts().length > 0;
+      const tr = t[getCurrentLang()] || t.ja;
+      if (softRefresh) {
+        setFeedNotice(tr.feedRefreshing || "更新中...", "loading");
+      } else {
+        setFeedNotice("", "");
+        isFeedLoading = true;
+      }
       feedError = "";
       renderFeed();
 
       if (!supabase) {
         feedError = "Supabase not initialized.";
         isFeedLoading = false;
+        setFeedNotice("", "");
         renderFeed();
         return;
       }
 
-      let { data, error } = await supabase
-        .from("posts")
-        .select("*")
-        .order("date", { ascending: false });  // もともとの order に合わせてね
+      feedLoadPromise = (async () => {
+        try {
+          let { data, error } = await supabase
+            .from("posts")
+            .select("*")
+            .order("date", { ascending: false });
 
-      if (error) {
-        const fallback = await supabase
-          .from("posts")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (!fallback.error) {
-          data = fallback.data;
-          error = null;
-        }
-      }
+          if (error) {
+            const fallback = await supabase
+              .from("posts")
+              .select("*")
+              .order("created_at", { ascending: false });
+            if (!fallback.error) {
+              data = fallback.data;
+              error = null;
+            }
+          }
 
-      if (error) {
-        console.error("loadFeed error", error);
-        const cachedPosts = loadFeedCache();
-        if (cachedPosts.length) {
-          setAllPosts(cachedPosts);
+          if (error) {
+            console.error("loadFeed error", error);
+            const cachedPosts = loadFeedCache();
+            if (cachedPosts.length) {
+              setAllPosts(cachedPosts);
+              feedLastLoadedAt = Date.now();
+              resetFeedPagination();
+              updateFeedStats(cachedPosts);
+              isFeedLoading = false;
+              const message =
+                tr.feedCachedNotice ||
+                "Network issue. Showing last saved feed.";
+              setFeedNotice(message, "warning", 2800);
+              renderFeed();
+              updateProfileSummary();
+              renderWorkoutHistory();
+              renderTrainingSummary();
+              renderPrList();
+              renderInsights();
+              renderOnboardingChecklist();
+              showToast(message, "warning");
+              return;
+            }
+            feedError = error.message || "Failed to load feed.";
+            isFeedLoading = false;
+            setFeedNotice("", "");
+            renderFeed();
+            return;
+          }
+
+          const safeData = Array.isArray(data) ? data : [];
+          const postsWithProfile = await Promise.all(
+            safeData.map(async (post) => {
+              const profile = await getProfile(post.user_id);
+              return { ...post, profile };
+            })
+          );
+
+          const postIds = postsWithProfile.map((post) => post.id).filter(Boolean);
+          await loadWorkoutLogs(postIds);
+          await loadLikes(postIds);
+
+          setAllPosts(postsWithProfile);
+          saveFeedCache(postsWithProfile);
           feedLastLoadedAt = Date.now();
           resetFeedPagination();
-          updateFeedStats(cachedPosts);
+          updateFeedStats(postsWithProfile);
           isFeedLoading = false;
-          const tr = t[getCurrentLang()] || t.ja;
-          feedError =
-            tr.feedCachedNotice ||
-            "Network issue. Showing last saved feed.";
+          if (softRefresh) {
+            setFeedNotice(tr.feedRefreshDone || "更新しました。", "success", 1400);
+          } else {
+            setFeedNotice("", "");
+          }
           renderFeed();
           updateProfileSummary();
           renderWorkoutHistory();
@@ -352,40 +432,12 @@ export async function loadFeed() {
           renderPrList();
           renderInsights();
           renderOnboardingChecklist();
-          showToast(feedError, "warning");
-          return;
+        } finally {
+          feedLoadPromise = null;
         }
-        feedError = error.message || "Failed to load feed.";
-        isFeedLoading = false;
-        renderFeed();
-        return;
-      }
+      })();
 
-      const safeData = Array.isArray(data) ? data : [];
-      const postsWithProfile = await Promise.all(
-        safeData.map(async (post) => {
-          const profile = await getProfile(post.user_id);
-          return { ...post, profile };
-        })
-      );
-
-      const postIds = postsWithProfile.map((post) => post.id).filter(Boolean);
-      await loadWorkoutLogs(postIds);
-      await loadLikes(postIds);
-
-      setAllPosts(postsWithProfile);
-      saveFeedCache(postsWithProfile);
-      feedLastLoadedAt = Date.now();
-      resetFeedPagination();
-      updateFeedStats(postsWithProfile);
-      isFeedLoading = false;
-      renderFeed();
-      updateProfileSummary();
-      renderWorkoutHistory();
-      renderTrainingSummary();
-      renderPrList();
-      renderInsights();
-      renderOnboardingChecklist();
+      return feedLoadPromise;
     }
 export function renderFeed() {
     const container = document.getElementById("feed-list");
@@ -396,8 +448,6 @@ export function renderFeed() {
     const layoutBtn = $("btn-feed-layout");
     if (!container) return;
     const renderToken = ++feedRenderToken;
-    const pendingScrollIndex = feedPendingScrollIndex;
-    feedPendingScrollIndex = null;
 
     const currentUser = getCurrentUser();
     const currentLang = getCurrentLang();
@@ -494,7 +544,15 @@ export function renderFeed() {
       : [];
 
     container.innerHTML = "";
-    if (status) status.textContent = "";
+    if (status) {
+      status.textContent = "";
+      status.classList.remove(
+        "feed-status-loading",
+        "feed-status-success",
+        "feed-status-warning",
+        "feed-status-error"
+      );
+    }
     if (moreWrap) moreWrap.classList.add("hidden");
 
     container.classList.toggle("grid-view", feedLayout === "grid");
@@ -507,17 +565,36 @@ export function renderFeed() {
     }
 
     if (isFeedLoading) {
-      const skeletonCount = 3;
-      for (let i = 0; i < skeletonCount; i += 1) {
-        const skeleton = document.createElement("div");
-        skeleton.className = "post-card skeleton feed-skeleton";
-        container.appendChild(skeleton);
+      if (Array.isArray(allPosts) && allPosts.length > 0) {
+        if (status) {
+          status.textContent = feedNotice || tr.feedRefreshing || "更新中...";
+          status.classList.add("feed-status-loading");
+        }
+      } else {
+        const skeletonCount = 3;
+        for (let i = 0; i < skeletonCount; i += 1) {
+          const skeleton = document.createElement("div");
+          skeleton.className = "post-card skeleton feed-skeleton";
+          container.appendChild(skeleton);
+        }
       }
       return;
     }
 
-    if (feedError && status) {
-      status.textContent = feedError;
+    if (status) {
+      if (feedError) {
+        status.textContent = feedError;
+        status.classList.add("feed-status-error");
+      } else if (feedNotice) {
+        status.textContent = feedNotice;
+        if (feedNoticeTone === "success") {
+          status.classList.add("feed-status-success");
+        } else if (feedNoticeTone === "warning") {
+          status.classList.add("feed-status-warning");
+        } else if (feedNoticeTone === "loading") {
+          status.classList.add("feed-status-loading");
+        }
+      }
     }
 
     const sortedPosts = visiblePosts.slice().sort((a, b) => {
@@ -908,10 +985,16 @@ export function renderFeed() {
         if (!moreBtn.dataset.bound) {
           moreBtn.dataset.bound = "true";
           moreBtn.addEventListener("click", () => {
-            const prevCount = feedVisibleCount;
+            const anchorTop = moreBtn.getBoundingClientRect().top;
             feedVisibleCount += feedPageSize;
-            feedPendingScrollIndex = prevCount;
             renderFeed();
+            requestAnimationFrame(() => {
+              const nextTop = moreBtn.getBoundingClientRect().top;
+              const delta = nextTop - anchorTop;
+              if (Math.abs(delta) > 1) {
+                window.scrollBy({ top: delta, behavior: "auto" });
+              }
+            });
           });
         }
         if (hasMore) {
@@ -921,15 +1004,6 @@ export function renderFeed() {
         } else if (moreWrap.parentElement === container) {
           moreWrap.remove();
         }
-      }
-      if (pendingScrollIndex !== null && pendingScrollIndex >= 0) {
-        requestAnimationFrame(() => {
-          const cards = container.querySelectorAll(".post-card:not(.skeleton)");
-          const target = cards[pendingScrollIndex];
-          if (target) {
-            target.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        });
       }
     };
 
