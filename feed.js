@@ -114,6 +114,7 @@ let feedQueryCache = {
 };
 const postSearchHaystackCache = new Map();
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
+const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
@@ -220,6 +221,39 @@ function getPostSearchHaystack(post, workoutLogsMap) {
         haystack,
       });
       return haystack;
+    }
+function isPerfDebugEnabled() {
+      try {
+        return localStorage.getItem(PERF_DEBUG_KEY) === "true";
+      } catch {
+        return false;
+      }
+    }
+function renderFeedPerfPanel(payload = null) {
+      const el = $("feed-perf");
+      if (!el) return;
+      const enabled = isPerfDebugEnabled();
+      el.classList.toggle("hidden", !enabled);
+      if (!enabled) {
+        el.textContent = "";
+        return;
+      }
+      if (!payload) {
+        el.textContent = "";
+        return;
+      }
+      if (payload.type === "loading") {
+        el.textContent = payload.message || "render loading";
+        return;
+      }
+      const parts = [
+        `render ${payload.durationMs.toFixed(1)}ms`,
+        `total ${payload.totalCount}`,
+        `visible ${payload.visibleCount}`,
+        `mode ${payload.mode}`,
+        `query ${payload.queryCacheHit ? "hit" : "miss"}`,
+      ];
+      el.textContent = parts.join(" | ");
     }
 function saveFeedCache(posts = []) {
       try {
@@ -546,6 +580,11 @@ export function renderFeed(options = {}) {
     if (!container) return;
     const appendOnly = !!options.appendOnly;
     const renderToken = ++feedRenderToken;
+    const perfNow = () =>
+      typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now();
+    const renderStartedAt = perfNow();
 
     const currentUser = getCurrentUser();
     const currentLang = getCurrentLang();
@@ -633,6 +672,7 @@ export function renderFeed(options = {}) {
       feedQueryCache.queryKey === queryKey &&
       feedQueryCache.postsRef === allPosts &&
       feedQueryCache.workoutLogsRef === workoutLogsByPost;
+    const queryCacheHit = canUseQueryCache;
     if (canUseQueryCache) {
       gridCandidates = feedQueryCache.gridCandidates;
     } else {
@@ -696,6 +736,10 @@ export function renderFeed(options = {}) {
           status.textContent = feedNotice || tr.feedRefreshing || "更新中...";
           status.classList.add("feed-status-loading");
         }
+        renderFeedPerfPanel({
+          type: "loading",
+          message: tr.feedRefreshing || "Updating feed...",
+        });
       } else {
         resetStatusState();
         if (status) {
@@ -712,6 +756,10 @@ export function renderFeed(options = {}) {
           skeleton.className = "post-card skeleton feed-skeleton";
           container.appendChild(skeleton);
         }
+        renderFeedPerfPanel({
+          type: "loading",
+          message: tr.feedRefreshing || "Updating feed...",
+        });
       }
       return;
     }
@@ -752,6 +800,7 @@ export function renderFeed(options = {}) {
       container.dataset.feedSignature === renderSignature &&
       existingCount > 0 &&
       existingCount < visibleSlice.length;
+    const renderMode = canAppend ? "append" : "full";
 
     if (!gridCandidates.length) {
       resetDeferredVideoObserver();
@@ -805,6 +854,13 @@ export function renderFeed(options = {}) {
       empty.appendChild(desc);
       empty.appendChild(actions);
       container.appendChild(empty);
+      renderFeedPerfPanel({
+        durationMs: perfNow() - renderStartedAt,
+        totalCount: 0,
+        visibleCount: 0,
+        mode: "full",
+        queryCacheHit,
+      });
       return;
     }
 
@@ -1152,6 +1208,13 @@ export function renderFeed(options = {}) {
           moreWrap.remove();
         }
       }
+      renderFeedPerfPanel({
+        durationMs: perfNow() - renderStartedAt,
+        totalCount: gridCandidates.length,
+        visibleCount: visibleSlice.length,
+        mode: renderMode,
+        queryCacheHit,
+      });
     };
 
     const renderChunk = () => {

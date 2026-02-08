@@ -95,6 +95,7 @@ import {
 
     const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
+    const PERF_DEBUG_KEY = "trends_perf_debug";
     const FILE_LIMITS = {
       avatar: 5 * 1024 * 1024,
       banner: 8 * 1024 * 1024,
@@ -1427,6 +1428,7 @@ async function loadProfilePostCount() {
       setText("settings-data-sub", "settingsDataSub");
       setText("btn-export-data", "settingsExportData");
       setText("btn-reset-settings", "settingsReset");
+      setText("btn-toggle-perf-debug", "perfDebugEnable");
 
       setText("tips-title", "tipsTitle");
       setText("tip1", "tip1");
@@ -1563,6 +1565,9 @@ async function loadProfilePostCount() {
       }
       if (typeof setupExtraSectionsToggle === "function") {
         setupExtraSectionsToggle();
+      }
+      if (typeof setupDebug === "function") {
+        setupDebug();
       }
       if (typeof openPublicProfile === "function" && currentPublicProfileId) {
         openPublicProfile(currentPublicProfileId);
@@ -4501,13 +4506,56 @@ async function loadProfilePostCount() {
           statusEl.textContent = "";
         }, 2500);
       };
+      const isPerfDebugEnabled = () => {
+        try {
+          return localStorage.getItem(PERF_DEBUG_KEY) === "true";
+        } catch {
+          return false;
+        }
+      };
+      const setPerfDebugEnabled = (next) => {
+        try {
+          localStorage.setItem(PERF_DEBUG_KEY, next ? "true" : "false");
+        } catch {
+          // ignore localStorage write failure
+        }
+      };
+      const perfBtn = $("btn-toggle-perf-debug");
+      const updatePerfDebugButton = () => {
+        if (!perfBtn) return;
+        const tr = t[currentLang] || t.ja;
+        const enabled = isPerfDebugEnabled();
+        perfBtn.textContent = enabled
+          ? tr.perfDebugDisable || "Disable render perf"
+          : tr.perfDebugEnable || "Enable render perf";
+        perfBtn.classList.toggle("is-active", enabled);
+      };
+      updatePerfDebugButton();
+
+      if (perfBtn && perfBtn.dataset.bound !== "true") {
+        perfBtn.dataset.bound = "true";
+        perfBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          const next = !isPerfDebugEnabled();
+          setPerfDebugEnabled(next);
+          updatePerfDebugButton();
+          renderFeed();
+          setStatus(
+            next
+              ? tr.perfDebugEnabledMsg || "Render performance panel enabled."
+              : tr.perfDebugDisabledMsg || "Render performance panel disabled."
+          );
+        });
+      }
 
       const clearBtn = $("btn-clear-cache");
       if (clearBtn && clearBtn.dataset.bound !== "true") {
         clearBtn.dataset.bound = "true";
         clearBtn.addEventListener("click", () => {
           localStorage.removeItem("trends_likes");
+          localStorage.removeItem("trends_feed_cache_v1");
           setStatus(t[currentLang].cacheCleared || "Cache cleared.");
+          renderFeed();
         });
       }
 

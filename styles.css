@@ -1321,6 +1321,11 @@
       color: var(--text-sub);
       margin-top: 6px;
     }
+    .feed-perf {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      opacity: 0.88;
+    }
     .template-status.feed-status-loading {
       color: #2563eb;
     }
