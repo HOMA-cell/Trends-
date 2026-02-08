@@ -106,6 +106,9 @@ let feedNotice = "";
 let feedNoticeTone = "";
 let feedNoticeTimer = null;
 let deferredVideoObserver = null;
+let feedMoreObserver = null;
+let feedAutoLoadingMore = false;
+let feedLastAutoLoadAt = 0;
 let feedQueryCache = {
   queryKey: "",
   postsRef: null,
@@ -185,6 +188,47 @@ function resetDeferredVideoObserver() {
       if (!deferredVideoObserver) return;
       deferredVideoObserver.disconnect();
       deferredVideoObserver = null;
+    }
+function ensureFeedMoreObserver() {
+      if (feedMoreObserver) {
+        return feedMoreObserver;
+      }
+      if (typeof IntersectionObserver === "undefined") {
+        return null;
+      }
+      feedMoreObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const btn = entry.target;
+            const wrap = btn?.closest?.("#feed-more-wrap");
+            if (!btn || !wrap || wrap.classList.contains("hidden")) return;
+            const now = Date.now();
+            if (feedAutoLoadingMore || now - feedLastAutoLoadAt < 700) return;
+            feedAutoLoadingMore = true;
+            feedLastAutoLoadAt = now;
+            btn.click();
+            setTimeout(() => {
+              feedAutoLoadingMore = false;
+            }, 120);
+          });
+        },
+        {
+          root: null,
+          rootMargin: "280px 0px",
+          threshold: 0.01,
+        }
+      );
+      return feedMoreObserver;
+    }
+function observeFeedMoreButton(btn, shouldObserve) {
+      if (!btn) return;
+      const observer = ensureFeedMoreObserver();
+      if (!observer) return;
+      observer.unobserve(btn);
+      if (shouldObserve) {
+        observer.observe(btn);
+      }
     }
 function invalidateFeedQueryCache() {
       feedQueryCache = {
@@ -1189,9 +1233,15 @@ export function renderFeed(options = {}) {
         const remaining = Math.max(0, gridCandidates.length - visibleSlice.length);
         const hasMore = remaining > 0;
         moreWrap.classList.toggle("hidden", !hasMore);
-        moreHint.textContent = hasMore
+        const baseHint = hasMore
           ? (tr.feedMoreHint || "あと{count}件").replace("{count}", remaining)
           : "";
+        if (hasMore && appendOnly) {
+          const autoHint = tr.feedAutoLoadHint || "スクロールで自動読み込み";
+          moreHint.textContent = `${baseHint} · ${autoHint}`;
+        } else {
+          moreHint.textContent = baseHint;
+        }
         moreBtn.textContent = tr.feedMore || "もっと見る";
         if (!moreBtn.dataset.bound) {
           moreBtn.dataset.bound = "true";
@@ -1200,6 +1250,7 @@ export function renderFeed(options = {}) {
             renderFeed({ appendOnly: true });
           });
         }
+        observeFeedMoreButton(moreBtn, hasMore && appendOnly);
         if (hasMore) {
           if (moreWrap.parentElement !== container) {
             container.appendChild(moreWrap);
