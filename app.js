@@ -92,10 +92,14 @@ import {
     let prTrackingEnabled = true;
     let setActivePage = null;
     const collapsibleControllers = new Map();
+    let collapsibleHeightRaf = 0;
+    let collapsibleResizeBound = false;
+    let profileEditCompact = true;
 
     const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
     const PERF_DEBUG_KEY = "trends_perf_debug";
+    const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const FILE_LIMITS = {
       avatar: 5 * 1024 * 1024,
       banner: 8 * 1024 * 1024,
@@ -629,6 +633,10 @@ function updateSettingsSummary() {
               ? tr.feedLayoutGrid || "Grid"
               : tr.feedLayoutList || "List",
         },
+        {
+          label: tr.settingsFeedAutoLoadTitle || "Feed auto-load",
+          value: settings.feedAutoLoadMore !== false ? "ON" : "OFF",
+        },
       ];
       summary.innerHTML = "";
       items.forEach((item) => {
@@ -651,6 +659,7 @@ function applySettingsPreset(preset) {
           compactMode: true,
           showExtraSections: false,
           showFeedStats: false,
+          feedAutoLoadMore: false,
           showProfileStats: true,
           showBodyweight: false,
           notifications: { like: true, comment: true, follow: true },
@@ -663,6 +672,7 @@ function applySettingsPreset(preset) {
           compactMode: false,
           showExtraSections: false,
           showFeedStats: true,
+          feedAutoLoadMore: true,
           showProfileStats: true,
           showBodyweight: true,
           notifications: { like: true, comment: true, follow: true },
@@ -675,6 +685,7 @@ function applySettingsPreset(preset) {
           compactMode: false,
           showExtraSections: false,
           showFeedStats: true,
+          feedAutoLoadMore: true,
           showProfileStats: true,
           showBodyweight: false,
           notifications: { like: true, comment: true, follow: true },
@@ -687,6 +698,7 @@ function applySettingsPreset(preset) {
           compactMode: false,
           showExtraSections: true,
           showFeedStats: true,
+          feedAutoLoadMore: true,
           showProfileStats: true,
           showBodyweight: true,
           notifications: { like: true, comment: true, follow: true },
@@ -706,6 +718,7 @@ function detectPresetFromSettings() {
         settings.compactMode === target.compactMode &&
         settings.showExtraSections === target.showExtraSections &&
         settings.showFeedStats === target.showFeedStats &&
+        settings.feedAutoLoadMore === target.feedAutoLoadMore &&
         settings.showBodyweight === target.showBodyweight;
 
       if (
@@ -713,6 +726,7 @@ function detectPresetFromSettings() {
           compactMode: true,
           showExtraSections: false,
           showFeedStats: false,
+          feedAutoLoadMore: false,
           showBodyweight: false,
         })
       ) {
@@ -724,6 +738,7 @@ function detectPresetFromSettings() {
           compactMode: false,
           showExtraSections: true,
           showFeedStats: true,
+          feedAutoLoadMore: true,
           showBodyweight: true,
         })
       ) {
@@ -735,6 +750,7 @@ function detectPresetFromSettings() {
           compactMode: false,
           showExtraSections: false,
           showFeedStats: true,
+          feedAutoLoadMore: true,
           showBodyweight: true,
         })
       ) {
@@ -746,6 +762,7 @@ function detectPresetFromSettings() {
           compactMode: false,
           showExtraSections: false,
           showFeedStats: true,
+          feedAutoLoadMore: true,
           showBodyweight: false,
         })
       ) {
@@ -939,6 +956,79 @@ async function loadProfilePostCount() {
 
 
 
+    function queueCollapsibleHeightRefresh() {
+      if (typeof window === "undefined") return;
+      if (collapsibleHeightRaf) {
+        cancelAnimationFrame(collapsibleHeightRaf);
+      }
+      collapsibleHeightRaf = requestAnimationFrame(() => {
+        collapsibleHeightRaf = 0;
+        document.querySelectorAll(".collapsible-content.is-open").forEach((content) => {
+          if (content.style.maxHeight === "none") return;
+          content.style.maxHeight = `${content.scrollHeight}px`;
+        });
+      });
+    }
+
+    function applyCollapsibleContentState(content, isOpen, options = {}) {
+      if (!content) return;
+      const immediate = !!options.immediate;
+      if (isOpen) {
+        content.classList.add("is-open");
+        content.setAttribute("aria-hidden", "false");
+        if (content._collapseTransitionEndHandler) {
+          content.removeEventListener(
+            "transitionend",
+            content._collapseTransitionEndHandler
+          );
+        }
+        const onTransitionEnd = (event) => {
+          if (event.propertyName !== "max-height") return;
+          if (content.classList.contains("is-open")) {
+            content.style.maxHeight = "none";
+          }
+          content.removeEventListener("transitionend", onTransitionEnd);
+          content._collapseTransitionEndHandler = null;
+        };
+        content._collapseTransitionEndHandler = onTransitionEnd;
+        content.addEventListener("transitionend", onTransitionEnd);
+        content.style.maxHeight = `${content.scrollHeight}px`;
+        if (immediate) {
+          content.style.maxHeight = "none";
+          content.removeEventListener("transitionend", onTransitionEnd);
+          content._collapseTransitionEndHandler = null;
+          return;
+        }
+        if (!immediate) {
+          requestAnimationFrame(() => {
+            if (content.classList.contains("is-open")) {
+              content.style.maxHeight = `${content.scrollHeight}px`;
+            }
+          });
+        }
+        return;
+      }
+
+      if (content._collapseTransitionEndHandler) {
+        content.removeEventListener(
+          "transitionend",
+          content._collapseTransitionEndHandler
+        );
+        content._collapseTransitionEndHandler = null;
+      }
+      const collapse = () => {
+        content.classList.remove("is-open");
+        content.style.maxHeight = "0px";
+        content.setAttribute("aria-hidden", "true");
+      };
+      if (immediate) {
+        collapse();
+        return;
+      }
+      content.style.maxHeight = `${content.scrollHeight}px`;
+      requestAnimationFrame(collapse);
+    }
+
     function updateCollapsibleButton(btn, isOpen) {
       if (!btn) return;
       const tr = t[currentLang] || t.ja;
@@ -969,9 +1059,9 @@ async function loadProfilePostCount() {
             ? false
             : wrapper.dataset.defaultOpen === "true";
 
-        const applyState = (next) => {
-          isOpen = next;
-          content.classList.toggle("is-open", isOpen);
+        const applyState = (next, options = {}) => {
+          isOpen = !!next;
+          applyCollapsibleContentState(content, isOpen, options);
           updateCollapsibleButton(btn, isOpen);
           if (key) {
             localStorage.setItem(
@@ -989,14 +1079,22 @@ async function loadProfilePostCount() {
               updateProfileEditAdvancedToggleLabel();
             }
           }
+          queueCollapsibleHeightRefresh();
         };
 
         btn.addEventListener("click", () => applyState(!isOpen));
-        applyState(isOpen);
+        applyState(isOpen, { immediate: true });
         if (key) {
           collapsibleControllers.set(key, applyState);
         }
       });
+      if (!collapsibleResizeBound && typeof window !== "undefined") {
+        collapsibleResizeBound = true;
+        window.addEventListener("resize", queueCollapsibleHeightRefresh, {
+          passive: true,
+        });
+      }
+      queueCollapsibleHeightRefresh();
     }
 
     function updateCollapsibleLabels() {
@@ -1006,6 +1104,7 @@ async function loadProfilePostCount() {
         if (!content || !btn) return;
         updateCollapsibleButton(btn, content.classList.contains("is-open"));
       });
+      queueCollapsibleHeightRefresh();
     }
 
     function setCollapsibleOpen(key, isOpen) {
@@ -1033,32 +1132,96 @@ async function loadProfilePostCount() {
       updateProfileEditAdvancedToggleLabel();
     }
 
+    function loadProfileEditCompactPreference() {
+      try {
+        const stored = localStorage.getItem(PROFILE_EDIT_COMPACT_KEY);
+        if (stored === "0") {
+          profileEditCompact = false;
+          return;
+        }
+        if (stored === "1") {
+          profileEditCompact = true;
+          return;
+        }
+      } catch (error) {
+        console.warn("profile edit compact preference load failed", error);
+      }
+      profileEditCompact = true;
+    }
+
+    function updateProfileEditCompactToggleLabel() {
+      const btn = $("btn-profile-edit-compact");
+      if (!btn) return;
+      const tr = t[currentLang] || t.ja;
+      btn.textContent = profileEditCompact
+        ? tr.profileEditShowAdvanced || "項目を増やす"
+        : tr.profileEditShowBasic || "項目を減らす";
+      btn.setAttribute("aria-pressed", profileEditCompact ? "false" : "true");
+    }
+
+    function applyProfileEditCompactMode() {
+      const section = $("profile-edit-section");
+      if (!section) return;
+      section.classList.toggle("profile-edit-compact", profileEditCompact);
+      if (profileEditCompact) {
+        setProfileEditGroupsOpen(false);
+      }
+      updateProfileEditCompactToggleLabel();
+      queueCollapsibleHeightRefresh();
+    }
+
     function updateProfileEditAdvancedToggleLabel() {
       const btn = $("btn-profile-edit-toggle-advanced");
       if (!btn) return;
       const tr = t[currentLang] || t.ja;
+      if (profileEditCompact) {
+        btn.textContent = tr.profileEditExpandAll || "詳細をまとめて表示";
+        return;
+      }
       btn.textContent = areProfileEditGroupsOpen()
         ? tr.profileEditCollapseAll || "詳細を閉じる"
         : tr.profileEditExpandAll || "詳細をまとめて表示";
     }
 
     function setupProfileEditAdvancedToggle() {
-      const btn = $("btn-profile-edit-toggle-advanced");
-      if (!btn) return;
-      if (btn.dataset.bound !== "true") {
-        btn.dataset.bound = "true";
-        btn.addEventListener("click", () => {
+      const advancedBtn = $("btn-profile-edit-toggle-advanced");
+      if (advancedBtn && advancedBtn.dataset.bound !== "true") {
+        advancedBtn.dataset.bound = "true";
+        advancedBtn.addEventListener("click", () => {
           setProfileEditGroupsOpen(!areProfileEditGroupsOpen());
+        });
+      }
+      const compactBtn = $("btn-profile-edit-compact");
+      if (compactBtn && compactBtn.dataset.bound !== "true") {
+        compactBtn.dataset.bound = "true";
+        compactBtn.addEventListener("click", () => {
+          profileEditCompact = !profileEditCompact;
+          try {
+            localStorage.setItem(
+              PROFILE_EDIT_COMPACT_KEY,
+              profileEditCompact ? "1" : "0"
+            );
+          } catch (error) {
+            console.warn("profile edit compact preference save failed", error);
+          }
+          applyProfileEditCompactMode();
+          updateProfileEditAdvancedToggleLabel();
         });
       }
       const activePage =
         document.querySelector(".page-view.is-active")?.dataset.page || "";
       collapseProfileEditGroupsOnMobile(activePage);
+      applyProfileEditCompactMode();
       updateProfileEditAdvancedToggleLabel();
     }
 
     function collapseProfileEditGroupsOnMobile(page = "") {
       if (page !== "account") return;
+      if (profileEditCompact) {
+        PROFILE_EDIT_COLLAPSIBLE_KEYS.forEach((key) => setCollapsibleOpen(key, false));
+        updateProfileEditAdvancedToggleLabel();
+        return;
+      }
       if (window.innerWidth > 700) return;
       PROFILE_EDIT_COLLAPSIBLE_KEYS.forEach((key) => setCollapsibleOpen(key, false));
       updateProfileEditAdvancedToggleLabel();
@@ -1093,7 +1256,7 @@ async function loadProfilePostCount() {
     window.addEventListener("DOMContentLoaded", init);
     window.addEventListener("hashchange", handleHashRoute);
 
-     async function init() {
+    async function init() {
       loadSettings();
       setupLanguageSwitcher();
       setupAuthUI();
@@ -1108,6 +1271,7 @@ async function loadProfilePostCount() {
       setupMiniHeader();
       setupPostDetailModal();
       setupCollapsibles();
+      loadProfileEditCompactPreference();
       setupProfileEditAdvancedToggle();
       setupSettingsUI();
       setupExtraSectionsToggle();
@@ -1118,7 +1282,7 @@ async function loadProfilePostCount() {
       await restoreSession();
       await loadFeed();
       handleHashRoute();
-     }
+    }
     
 
     // ------------------ 言語切り替え ------------------
@@ -1339,6 +1503,7 @@ async function loadProfilePostCount() {
       // Feed
       setText("feed-title", "feed");
       setText("btn-feed-refresh", "feedRefresh");
+      setText("btn-feed-retry", "feedRetry");
       setText("btn-feed-options", "feedOptions");
       setText("btn-feed-layout", "feedLayoutGrid");
       setText("filter-all", "all");
@@ -1481,7 +1646,9 @@ async function loadProfilePostCount() {
       setText("profile-edit-training-title", "profileEditTrainingTitle");
       setText("profile-edit-media-title", "profileEditMediaTitle");
       setText("profile-edit-links-title", "profileEditLinksTitle");
+      setText("btn-profile-edit-compact", "profileEditShowAdvanced");
       setText("btn-profile-edit-toggle-advanced", "profileEditExpandAll");
+      setText("profile-edit-compact-hint", "profileEditCompactHint");
       setText("profile-display-label", "profileDisplayName");
       setText("profile-handle-label", "profileHandle");
       setText("profile-bio-label", "profileBio");
@@ -1572,6 +1739,9 @@ async function loadProfilePostCount() {
       }
       if (typeof updateProfileEditAdvancedToggleLabel === "function") {
         updateProfileEditAdvancedToggleLabel();
+      }
+      if (typeof updateProfileEditCompactToggleLabel === "function") {
+        updateProfileEditCompactToggleLabel();
       }
       if (typeof setupExtraSectionsToggle === "function") {
         setupExtraSectionsToggle();
@@ -2169,8 +2339,10 @@ async function loadProfilePostCount() {
         });
         collapseProfileEditGroupsOnMobile(page);
         if (page === "account") {
+          applyProfileEditCompactMode();
           updateProfileEditAdvancedToggleLabel();
         }
+        queueCollapsibleHeightRefresh();
       };
       setActivePage = setPage;
 

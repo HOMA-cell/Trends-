@@ -88,6 +88,11 @@ const toggleCollapsibleVisibility = (key, hasContent) => {
     content.classList.toggle("hidden", !hasContent);
     if (!hasContent) {
       content.classList.remove("is-open");
+      content.style.maxHeight = "0px";
+      content.setAttribute("aria-hidden", "true");
+    } else if (content.classList.contains("is-open")) {
+      content.style.maxHeight = `${content.scrollHeight}px`;
+      content.setAttribute("aria-hidden", "false");
     }
   }
 };

@@ -25,7 +25,8 @@
       }
       .modal-backdrop,
       .modal-panel,
-      .media-modal-content {
+      .media-modal-content,
+      .collapsible-content {
         transition: none;
       }
     }
@@ -755,11 +756,21 @@
       margin-bottom: 8px;
     }
     .collapsible-content {
-      display: none;
-      margin-top: 8px;
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      margin-top: 0;
+      transition:
+        max-height 0.24s ease,
+        opacity 0.2s ease,
+        margin-top 0.2s ease;
+      will-change: max-height;
     }
     .collapsible-content.is-open {
-      display: block;
+      opacity: 1;
+      pointer-events: auto;
+      margin-top: 8px;
     }
     .profile-link-pill {
       border: 1px solid var(--border);
@@ -1155,7 +1166,18 @@
     .profile-edit-toolbar {
       display: flex;
       justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
       margin-top: 8px;
+    }
+    .profile-edit-compact-hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text-sub);
+      background: #fffaf5;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
     }
     .profile-edit-group {
       margin-top: 12px;
@@ -1193,6 +1215,15 @@
     }
     .profile-editor .field-span textarea {
       min-height: 90px;
+    }
+    #profile-edit-section.profile-edit-compact [data-collapsible^="profile-edit-"] {
+      display: none;
+    }
+    #profile-edit-section.profile-edit-compact #btn-profile-edit-toggle-advanced {
+      display: none;
+    }
+    #profile-edit-section.profile-edit-compact .form-actions {
+      margin-top: 12px;
     }
     @media (max-width: 700px) {
       .profile-editor {
@@ -1320,6 +1351,19 @@
       font-size: 12px;
       color: var(--text-sub);
       margin-top: 6px;
+    }
+    .feed-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .feed-status-row .template-status {
+      margin-top: 0;
+      flex: 1;
+      min-width: 0;
     }
     .feed-perf {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;

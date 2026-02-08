@@ -109,6 +109,9 @@ let deferredVideoObserver = null;
 let feedMoreObserver = null;
 let feedAutoLoadingMore = false;
 let feedLastAutoLoadAt = 0;
+let feedIsOnline =
+  typeof navigator === "undefined" ? true : navigator.onLine !== false;
+let feedNetworkListenersBound = false;
 let feedQueryCache = {
   queryKey: "",
   postsRef: null,
@@ -299,6 +302,9 @@ function renderFeedPerfPanel(payload = null) {
       ];
       el.textContent = parts.join(" | ");
     }
+function getOnlineState() {
+      return typeof navigator === "undefined" ? true : navigator.onLine !== false;
+    }
 function saveFeedCache(posts = []) {
       try {
         const payload = {
@@ -364,6 +370,7 @@ export function setFeedState(next = {}) {
       }
     }
 export function setupFeedControls() {
+      feedIsOnline = getOnlineState();
       const filterAll = $("filter-all");
       if (filterAll) {
         filterAll.addEventListener("click", () => {
@@ -460,6 +467,17 @@ export function setupFeedControls() {
         refreshBtn.dataset.bound = "true";
         refreshBtn.addEventListener("click", async () => {
           if (refreshBtn.classList.contains("is-loading")) return;
+          if (!getOnlineState()) {
+            const tr = t[getCurrentLang()] || t.ja;
+            feedIsOnline = false;
+            setFeedNotice(
+              tr.feedOfflineNotice || "Offline. Latest posts cannot be fetched.",
+              "warning",
+              2600
+            );
+            renderFeed();
+            return;
+          }
           refreshBtn.classList.add("is-loading");
           refreshBtn.disabled = true;
           try {
@@ -487,6 +505,46 @@ export function setupFeedControls() {
         });
       }
 
+      const retryBtn = $("btn-feed-retry");
+      if (retryBtn && retryBtn.dataset.bound !== "true") {
+        retryBtn.dataset.bound = "true";
+        retryBtn.addEventListener("click", async () => {
+          if (retryBtn.classList.contains("is-loading")) return;
+          retryBtn.classList.add("is-loading");
+          retryBtn.disabled = true;
+          try {
+            await loadFeed({ softRefresh: true });
+          } finally {
+            retryBtn.classList.remove("is-loading");
+            retryBtn.disabled = false;
+          }
+        });
+      }
+
+      if (!feedNetworkListenersBound && typeof window !== "undefined") {
+        feedNetworkListenersBound = true;
+        window.addEventListener("online", () => {
+          feedIsOnline = true;
+          const tr = t[getCurrentLang()] || t.ja;
+          setFeedNotice(
+            tr.feedBackOnline || "Back online. You can refresh now.",
+            "success",
+            2200
+          );
+          renderFeed();
+        });
+        window.addEventListener("offline", () => {
+          feedIsOnline = false;
+          const tr = t[getCurrentLang()] || t.ja;
+          setFeedNotice(
+            tr.feedOfflineNotice || "Offline. Latest posts cannot be fetched.",
+            "warning",
+            2600
+          );
+          renderFeed();
+        });
+      }
+
       updateFilterButtons();
     }
 export function updateFilterButtons() {
@@ -508,6 +566,27 @@ export async function loadFeed(options = {}) {
 
       const softRefresh = !!options.softRefresh && getAllPosts().length > 0;
       const tr = t[getCurrentLang()] || t.ja;
+      feedIsOnline = getOnlineState();
+
+      if (!feedIsOnline) {
+        isFeedLoading = false;
+        feedError = "";
+        const cachedPosts = loadFeedCache();
+        if (!getAllPosts().length && cachedPosts.length) {
+          setAllPosts(cachedPosts);
+          invalidateFeedQueryCache();
+          postSearchHaystackCache.clear();
+          updateFeedStats(cachedPosts);
+        }
+        setFeedNotice(
+          tr.feedOfflineNotice || "Offline. Latest posts cannot be fetched.",
+          "warning",
+          2600
+        );
+        renderFeed();
+        return;
+      }
+
       if (softRefresh) {
         setFeedNotice(tr.feedRefreshing || "更新中...", "loading");
       } else {
@@ -617,6 +696,7 @@ export async function loadFeed(options = {}) {
 export function renderFeed(options = {}) {
     const container = document.getElementById("feed-list");
     const status = $("feed-status");
+    const retryBtn = $("btn-feed-retry");
     const moreWrap = $("feed-more-wrap");
     const moreHint = $("feed-more-hint");
     const moreBtn = $("btn-feed-more");
@@ -653,6 +733,15 @@ export function renderFeed(options = {}) {
       currentFilter = "all";
     }
     updateFilterButtons();
+
+    const updateRetryButton = (show = false) => {
+      if (!retryBtn) return;
+      retryBtn.classList.toggle("hidden", !show);
+      if (!show) {
+        retryBtn.classList.remove("is-loading");
+        retryBtn.disabled = false;
+      }
+    };
 
     const formatPostDate = (post) => {
       const value = post.date || post.created_at;
@@ -775,6 +864,7 @@ export function renderFeed(options = {}) {
     };
 
     if (isFeedLoading) {
+      updateRetryButton(false);
       if (Array.isArray(allPosts) && allPosts.length > 0) {
         if (status) {
           resetStatusState();
@@ -825,6 +915,7 @@ export function renderFeed(options = {}) {
         }
       }
     }
+    updateRetryButton(Boolean(feedError) || (!feedIsOnline && !isFeedLoading));
 
     const visibleSlice = gridCandidates.slice(0, feedVisibleCount);
     const renderSignature = [

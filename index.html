@@ -103,7 +103,10 @@
             </div>
           </div>
 
-          <div id="feed-status" class="template-status"></div>
+          <div class="feed-status-row">
+            <div id="feed-status" class="template-status"></div>
+            <button class="btn btn-ghost btn-xs hidden" id="btn-feed-retry">再試行</button>
+          </div>
           <div id="feed-perf" class="template-status feed-perf hidden"></div>
 
           <!-- 投稿一覧 -->
@@ -195,7 +198,11 @@
             表示名や自己紹介を更新できます。
           </div>
           <div class="profile-edit-toolbar">
+            <button class="btn btn-ghost btn-xs" id="btn-profile-edit-compact">項目を増やす</button>
             <button class="btn btn-ghost btn-xs" id="btn-profile-edit-toggle-advanced">詳細をまとめて表示</button>
+          </div>
+          <div class="profile-edit-compact-hint hidden" id="profile-edit-compact-hint">
+            基本項目のみ表示中。必要なときだけ項目を増やせます。
           </div>
 
           <div class="profile-edit-group">
@@ -322,26 +329,40 @@
           <div class="template-status" id="profile-edit-status"></div>
         </section>
 
-        <section class="card" id="notifications-section" style="margin-top: 12px;">
-          <div class="card-title" id="notifications-title">通知</div>
-          <div class="card-sub" id="notifications-sub">
-            コメントやフォローがここに届きます。
+        <section class="card" id="notifications-section" style="margin-top: 12px;" data-collapsible="notifications-details" data-default-open="false">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="notifications-title">通知</div>
+              <div class="card-sub" id="notifications-sub">
+                コメントやフォローがここに届きます。
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
           </div>
-          <div class="notification-actions">
-            <button class="btn btn-ghost" id="btn-refresh-notifications">更新</button>
-            <button class="btn btn-ghost" id="btn-mark-all-read">全て既読</button>
+          <div class="collapsible-content" data-collapsible-content>
+            <div class="notification-actions">
+              <button class="btn btn-ghost" id="btn-refresh-notifications">更新</button>
+              <button class="btn btn-ghost" id="btn-mark-all-read">全て既読</button>
+            </div>
+            <div id="notification-list" class="notification-list"></div>
+            <div id="notification-status" class="template-status"></div>
           </div>
-          <div id="notification-list" class="notification-list"></div>
-          <div id="notification-status" class="template-status"></div>
         </section>
 
-        <section class="card" id="history-section" style="margin-top: 12px;">
-          <div class="card-title" id="history-title">ワークアウト履歴</div>
-          <div class="card-sub" id="history-sub">
-            最近のトレーニングを確認できます。
+        <section class="card" id="history-section" style="margin-top: 12px;" data-collapsible="history-details" data-default-open="false">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="history-title">ワークアウト履歴</div>
+              <div class="card-sub" id="history-sub">
+                最近のトレーニングを確認できます。
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
           </div>
-          <div id="history-list" class="notification-list"></div>
-          <div id="history-status" class="template-status"></div>
+          <div class="collapsible-content" data-collapsible-content>
+            <div id="history-list" class="notification-list"></div>
+            <div id="history-status" class="template-status"></div>
+          </div>
         </section>
 
         <section class="card" id="summary-section" style="margin-top: 12px;" data-collapsible="summary-details" data-default-open="false">
