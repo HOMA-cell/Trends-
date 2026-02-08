@@ -639,6 +639,7 @@ export function renderFeed(options = {}) {
     const commentsExpanded = getCommentsExpanded();
     const commentsLoading = getCommentsLoading();
     const commentsEnabled = isCommentsEnabled();
+    const autoLoadMoreEnabled = settings.feedAutoLoadMore !== false;
     const likedPostIds = getLikedPostIds();
     const likesByPost = getLikesByPost();
     const followingIds = getFollowingIds();
@@ -1236,7 +1237,7 @@ export function renderFeed(options = {}) {
         const baseHint = hasMore
           ? (tr.feedMoreHint || "あと{count}件").replace("{count}", remaining)
           : "";
-        if (hasMore && appendOnly) {
+        if (hasMore && appendOnly && autoLoadMoreEnabled) {
           const autoHint = tr.feedAutoLoadHint || "スクロールで自動読み込み";
           moreHint.textContent = `${baseHint} · ${autoHint}`;
         } else {
@@ -1250,7 +1251,7 @@ export function renderFeed(options = {}) {
             renderFeed({ appendOnly: true });
           });
         }
-        observeFeedMoreButton(moreBtn, hasMore && appendOnly);
+        observeFeedMoreButton(moreBtn, hasMore && appendOnly && autoLoadMoreEnabled);
         if (hasMore) {
           if (moreWrap.parentElement !== container) {
             container.appendChild(moreWrap);

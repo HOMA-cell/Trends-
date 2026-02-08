@@ -117,6 +117,7 @@ import {
       compactMode: false,
       showExtraSections: false,
       showFeedStats: true,
+      feedAutoLoadMore: true,
       defaultFilter: "all",
       feedLayout: "list",
       defaultVisibility: "public",
@@ -212,6 +213,9 @@ function loadSettings() {
       }
       if (!["list", "grid"].includes(merged.feedLayout)) {
         merged.feedLayout = "list";
+      }
+      if (typeof merged.feedAutoLoadMore !== "boolean") {
+        merged.feedAutoLoadMore = true;
       }
       if (!["public", "private"].includes(merged.defaultVisibility)) {
         merged.defaultVisibility = "public";
@@ -313,6 +317,7 @@ function populateSettingsUI() {
       setChecked("settings-compact", settings.compactMode);
       setChecked("settings-show-extra", settings.showExtraSections);
       setChecked("settings-show-feed-stats", settings.showFeedStats);
+      setChecked("settings-feed-auto-load", settings.feedAutoLoadMore);
       setChecked("settings-show-email", settings.showEmail);
       setChecked("settings-show-profile-stats", settings.showProfileStats);
       setChecked("settings-show-bodyweight", settings.showBodyweight);
@@ -389,6 +394,9 @@ function setupSettingsUI() {
       );
       bindToggle("settings-show-feed-stats", (value) =>
         saveSettings({ showFeedStats: value })
+      );
+      bindToggle("settings-feed-auto-load", (value) =>
+        saveSettings({ feedAutoLoadMore: value })
       );
       bindSelect("settings-default-filter", (value) =>
         saveSettings({ defaultFilter: value })
@@ -1381,6 +1389,8 @@ async function loadProfilePostCount() {
       setText("settings-show-extra-desc", "settingsShowExtraDesc");
       setText("settings-show-feed-stats-title", "settingsShowFeedStatsTitle");
       setText("settings-show-feed-stats-desc", "settingsShowFeedStatsDesc");
+      setText("settings-feed-auto-load-title", "settingsFeedAutoLoadTitle");
+      setText("settings-feed-auto-load-desc", "settingsFeedAutoLoadDesc");
       setText("settings-default-filter-title", "settingsDefaultFilterTitle");
       setText("settings-default-filter-desc", "settingsDefaultFilterDesc");
       setText("settings-default-filter-all", "all");
