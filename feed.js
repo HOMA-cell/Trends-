@@ -115,6 +115,7 @@ let feedLastAutoLoadAt = 0;
 let feedIsOnline =
   typeof navigator === "undefined" ? true : navigator.onLine !== false;
 let feedNetworkListenersBound = false;
+let feedVisibilityListenerBound = false;
 let feedQueryCache = {
   queryKey: "",
   postsRef: null,
@@ -567,6 +568,22 @@ export function setupFeedControls() {
             2600
           );
           renderFeed();
+        });
+      }
+      if (
+        !feedVisibilityListenerBound &&
+        typeof document !== "undefined" &&
+        typeof document.addEventListener === "function"
+      ) {
+        feedVisibilityListenerBound = true;
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState !== "visible") return;
+          if (isFeedLoading || feedLoadPromise) return;
+          if (!getOnlineState()) return;
+          const staleMs = 2 * 60 * 1000;
+          const now = Date.now();
+          if (!feedLastLoadedAt || now - feedLastLoadedAt < staleMs) return;
+          loadFeed({ softRefresh: true });
         });
       }
 
