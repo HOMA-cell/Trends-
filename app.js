@@ -919,31 +919,67 @@ async function loadProfilePostCount() {
 
     // ---- プロフィール用キャッシュ ----
     const profileCache = new Map();
+    const PROFILE_SELECT_FIELDS =
+      "id, handle, created_at, display_name, bio, avatar_url, banner_url, location, height_cm, experience_level, training_goal, gym, training_split, favorite_lifts, instagram, tiktok, youtube, website, accent_color";
+
+    async function loadProfilesForUsers(userIds = []) {
+      const ids = Array.from(
+        new Set(
+          (Array.isArray(userIds) ? userIds : [])
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+        )
+      );
+      const result = new Map();
+      if (!ids.length) return result;
+      if (!supabase) return result;
+
+      const missingIds = ids.filter((id) => !profileCache.has(id));
+      if (missingIds.length) {
+        const fetchedIds = new Set();
+        const checkedIds = new Set();
+        const batchSize = 100;
+        for (let i = 0; i < missingIds.length; i += batchSize) {
+          const batchIds = missingIds.slice(i, i + batchSize);
+          const { data, error } = await supabase
+            .from("profiles")
+            .select(PROFILE_SELECT_FIELDS)
+            .in("id", batchIds);
+
+          if (error) {
+            console.error("loadProfilesForUsers error", error);
+            continue;
+          }
+          batchIds.forEach((id) => checkedIds.add(id));
+          (data || []).forEach((profile) => {
+            if (!profile?.id) return;
+            profileCache.set(profile.id, profile);
+            fetchedIds.add(profile.id);
+          });
+        }
+        checkedIds.forEach((id) => {
+          if (!fetchedIds.has(id)) {
+            profileCache.set(id, null);
+          }
+        });
+      }
+
+      ids.forEach((id) => {
+        result.set(id, profileCache.has(id) ? profileCache.get(id) : null);
+      });
+      return result;
+    }
 
     async function getProfile(userId) {
-  if (!userId) return null;
-  if (profileCache.has(userId)) {
-    return profileCache.get(userId);
-  }
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(
-      "id, handle, created_at, display_name, bio, avatar_url, banner_url, location, height_cm, experience_level, training_goal, gym, training_split, favorite_lifts, instagram, tiktok, youtube, website, accent_color"
-    )
-    .eq("id", userId)
-    .maybeSingle(); // 1件 or null
-
-  if (error) {
-    console.error("getProfile error", error);
-    return null;
-  }
-
-  if (data) {
-    profileCache.set(userId, data);
-  }
-  return data;
-}
+      if (!userId) return null;
+      const id = `${userId}`.trim();
+      if (!id) return null;
+      if (profileCache.has(id)) {
+        return profileCache.get(id);
+      }
+      const map = await loadProfilesForUsers([id]);
+      return map.get(id) || null;
+    }
 
 
 
@@ -1351,6 +1387,7 @@ async function loadProfilePostCount() {
       createNotification,
       deletePost,
       getProfile,
+      getProfilesForUsers: loadProfilesForUsers,
       toggleFollowForUser,
       loadFollowStats,
       getFollowingIds: () => followingIds,
@@ -3401,12 +3438,13 @@ async function loadProfilePostCount() {
         console.error("loadNotifications error:", error);
         notificationsEnabled = false;
       } else {
-        const enriched = await Promise.all(
-          (data || []).map(async (item) => {
-            const actor = await getProfile(item.actor_id);
-            return { ...item, actor };
-          })
+        const actorMap = await loadProfilesForUsers(
+          (data || []).map((item) => item.actor_id)
         );
+        const enriched = (data || []).map((item) => ({
+          ...item,
+          actor: actorMap.get(item.actor_id) || null,
+        }));
         notifications = enriched;
       }
       renderNotifications();
@@ -4596,12 +4634,13 @@ async function loadProfilePostCount() {
         return [];
       }
 
-      const withProfiles = await Promise.all(
-        (data || []).map(async (comment) => {
-          const profile = await getProfile(comment.user_id);
-          return { ...comment, profile };
-        })
+      const profileMap = await loadProfilesForUsers(
+        (data || []).map((comment) => comment.user_id)
       );
+      const withProfiles = (data || []).map((comment) => ({
+        ...comment,
+        profile: profileMap.get(comment.user_id) || null,
+      }));
       commentsByPost.set(postId, withProfiles);
       return withProfiles;
     }

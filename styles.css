@@ -1945,20 +1945,30 @@
     /* 右上の小さいナビボタン */
     
     .mini-nav {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-left: auto;
-}
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-left: auto;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .mini-nav::-webkit-scrollbar {
+      display: none;
+    }
 
-.mini-nav-btn {
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  border: 1px solid #e5e7eb;
-  background-color: #ffffff;
-  cursor: pointer;
-}
+    .mini-nav-btn {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      border: 1px solid #e5e7eb;
+      background-color: #ffffff;
+      cursor: pointer;
+      white-space: nowrap;
+      writing-mode: horizontal-tb;
+      line-height: 1.1;
+      flex: 0 0 auto;
+    }
 
 .mini-nav-btn.is-active {
   background-color: #111827;

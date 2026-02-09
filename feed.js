@@ -29,6 +29,7 @@ let feedContext = {
   createNotification: async () => {},
   deletePost: async () => {},
   getProfile: async () => null,
+  getProfilesForUsers: async () => new Map(),
   toggleFollowForUser: async () => {},
   loadFollowStats: async () => {},
   getFollowingIds: () => new Set(),
@@ -70,6 +71,8 @@ const toggleComments = (...args) => feedContext.toggleComments?.(...args);
 const createNotification = (...args) => feedContext.createNotification?.(...args);
 const deletePost = (...args) => feedContext.deletePost?.(...args);
 const getProfile = (...args) => feedContext.getProfile?.(...args);
+const getProfilesForUsers = (...args) =>
+  feedContext.getProfilesForUsers?.(...args) || new Map();
 const toggleFollowForUser = (...args) => feedContext.toggleFollowForUser?.(...args);
 const loadFollowStats = (...args) => feedContext.loadFollowStats?.(...args);
 const getFollowingIds = () => feedContext.getFollowingIds?.() || new Set();
@@ -655,8 +658,22 @@ export async function loadFeed(options = {}) {
           }
 
           const safeData = Array.isArray(data) ? data : [];
+          let profileMap = null;
+          try {
+            profileMap = await getProfilesForUsers(
+              safeData.map((post) => post.user_id)
+            );
+          } catch (profileBatchError) {
+            console.error("loadFeed profile batch error", profileBatchError);
+          }
           const postsWithProfile = await Promise.all(
             safeData.map(async (post) => {
+              if (profileMap && typeof profileMap.get === "function") {
+                return {
+                  ...post,
+                  profile: profileMap.get(post.user_id) || null,
+                };
+              }
               const profile = await getProfile(post.user_id);
               return { ...post, profile };
             })
