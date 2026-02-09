@@ -1970,11 +1970,11 @@
       flex: 0 0 auto;
     }
 
-.mini-nav-btn.is-active {
-  background-color: #111827;
-  color: #ffffff;
-  border-color: #111827;
-}
+    .mini-nav-btn.is-active {
+      background-color: #111827;
+      color: #ffffff;
+      border-color: #111827;
+    }
 
 .feed-list {
   display: flex;

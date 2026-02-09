@@ -122,6 +122,7 @@ let feedQueryCache = {
   gridCandidates: [],
 };
 const postSearchHaystackCache = new Map();
+let secondaryRenderScheduled = false;
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
@@ -345,6 +346,27 @@ function setFeedNotice(message = "", tone = "", autoClearMs = 0) {
           renderFeed();
         }, autoClearMs);
       }
+    }
+function scheduleSecondaryRenders() {
+      if (secondaryRenderScheduled) return;
+      secondaryRenderScheduled = true;
+      const run = () => {
+        secondaryRenderScheduled = false;
+        updateProfileSummary();
+        renderWorkoutHistory();
+        renderTrainingSummary();
+        renderPrList();
+        renderInsights();
+        renderOnboardingChecklist();
+      };
+      if (
+        typeof window !== "undefined" &&
+        typeof window.requestIdleCallback === "function"
+      ) {
+        window.requestIdleCallback(run, { timeout: 450 });
+        return;
+      }
+      setTimeout(run, 0);
     }
 export function resetFeedPagination() {
       feedVisibleCount = feedPageSize;
@@ -641,12 +663,7 @@ export async function loadFeed(options = {}) {
                 "Network issue. Showing last saved feed.";
               setFeedNotice(message, "warning", 2800);
               renderFeed();
-              updateProfileSummary();
-              renderWorkoutHistory();
-              renderTrainingSummary();
-              renderPrList();
-              renderInsights();
-              renderOnboardingChecklist();
+              scheduleSecondaryRenders();
               showToast(message, "warning");
               return;
             }
@@ -697,12 +714,7 @@ export async function loadFeed(options = {}) {
             setFeedNotice("", "");
           }
           renderFeed();
-          updateProfileSummary();
-          renderWorkoutHistory();
-          renderTrainingSummary();
-          renderPrList();
-          renderInsights();
-          renderOnboardingChecklist();
+          scheduleSecondaryRenders();
         } finally {
           feedLoadPromise = null;
         }
