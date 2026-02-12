@@ -124,6 +124,7 @@ let feedQueryCache = {
 };
 const postSearchHaystackCache = new Map();
 let secondaryRenderScheduled = false;
+const pendingLikePostIds = new Set();
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
@@ -766,8 +767,6 @@ export function renderFeed(options = {}) {
     const commentsLoading = getCommentsLoading();
     const commentsEnabled = isCommentsEnabled();
     const autoLoadMoreEnabled = settings.feedAutoLoadMore !== false;
-    const likedPostIds = getLikedPostIds();
-    const likesByPost = getLikesByPost();
     const followingIds = getFollowingIds();
     const tr = t[currentLang] || t.ja;
     const searchValue = $("feed-search")?.value?.trim().toLowerCase() || "";
@@ -1122,15 +1121,8 @@ export function renderFeed(options = {}) {
 
       const likeBtn = document.createElement("button");
       likeBtn.className = "chip chip-like";
-      const likesEnabled = getLikesEnabled();
-      const isLiked = likesEnabled
-        ? likedPostIds.has(post.id)
-        : localLikedIds.includes(post.id);
-      const likeCount = likesEnabled ? likesByPost.get(post.id) || 0 : isLiked ? 1 : 0;
-      if (isLiked) {
-        likeBtn.classList.add("chip-like-on");
-      }
-      likeBtn.textContent = `${tr.like || "Like"}${likeCount ? ` (${likeCount})` : ""}`;
+      const likeState = getLikeUiState(post.id, localLikedIds);
+      applyLikeButtonState(likeBtn, likeState, tr);
       likeBtn.addEventListener("click", () => toggleLikeForPost(post));
       actions.appendChild(likeBtn);
 
@@ -1517,6 +1509,39 @@ export async function loadLikes(postIds) {
         }
       });
     }
+function getLikeUiState(postId, localLikedIds = null) {
+      const likesEnabled = getLikesEnabled();
+      const likedPostIds = getLikedPostIds();
+      const likesByPost = getLikesByPost();
+      const fallbackLikedIds = Array.isArray(localLikedIds) ? localLikedIds : getLikedIds();
+      const isLiked = likesEnabled ? likedPostIds.has(postId) : fallbackLikedIds.includes(postId);
+      const likeCount = likesEnabled ? likesByPost.get(postId) || 0 : isLiked ? 1 : 0;
+      return {
+        isLiked,
+        likeCount,
+        isLoading: pendingLikePostIds.has(postId),
+      };
+    }
+function applyLikeButtonState(likeBtn, state, tr) {
+      if (!likeBtn || !state) return;
+      likeBtn.classList.toggle("chip-like-on", state.isLiked);
+      likeBtn.classList.toggle("is-loading", state.isLoading);
+      likeBtn.disabled = !!state.isLoading;
+      likeBtn.setAttribute("aria-pressed", state.isLiked ? "true" : "false");
+      likeBtn.setAttribute("aria-busy", state.isLoading ? "true" : "false");
+      likeBtn.textContent = `${tr.like || "Like"}${state.likeCount ? ` (${state.likeCount})` : ""}`;
+    }
+function updateLikeButtonsForPost(postId) {
+      if (!postId) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      const likeState = getLikeUiState(postId);
+      const cards = document.querySelectorAll(".post-card[data-post-id]");
+      cards.forEach((card) => {
+        if (card.getAttribute("data-post-id") !== postId) return;
+        const likeBtn = card.querySelector(".chip-like");
+        applyLikeButtonState(likeBtn, likeState, tr);
+      });
+    }
 export function getLikedIds() {
       try {
         return JSON.parse(localStorage.getItem("trends_likes") || "[]");
@@ -1529,10 +1554,12 @@ export function setLikedIds(ids) {
     }
 export async function toggleLikeForPost(post) {
       if (!post?.id) return;
+      if (pendingLikePostIds.has(post.id)) return;
       const currentUser = getCurrentUser();
       const likedPostIds = getLikedPostIds();
       const likesByPost = getLikesByPost();
       const likesEnabled = getLikesEnabled();
+      const tr = t[getCurrentLang()] || t.ja;
       if (!currentUser) {
         showToast("ログインしてください。", "warning");
         return;
@@ -1547,44 +1574,70 @@ export async function toggleLikeForPost(post) {
           liked.push(post.id);
         }
         setLikedIds(liked);
-        renderFeed();
+        updateLikeButtonsForPost(post.id);
         return;
       }
 
-      if (likedPostIds.has(post.id)) {
-        const { error } = await supabase
-          .from("post_likes")
-          .delete()
-          .eq("post_id", post.id)
-          .eq("user_id", currentUser.id);
-        if (error) {
-          console.error("like delete error:", error);
-          return;
-        }
+      const wasLiked = likedPostIds.has(post.id);
+      const previousCount = likesByPost.get(post.id) || 0;
+      let shouldNotify = false;
+
+      pendingLikePostIds.add(post.id);
+      if (wasLiked) {
         likedPostIds.delete(post.id);
-        likesByPost.set(post.id, Math.max(0, (likesByPost.get(post.id) || 1) - 1));
+        likesByPost.set(post.id, Math.max(0, previousCount - 1));
       } else {
-        const { error } = await supabase
-          .from("post_likes")
-          .insert({
-            post_id: post.id,
-            user_id: currentUser.id,
-          });
-        if (error) {
-          console.error("like insert error:", error);
-          return;
-        }
         likedPostIds.add(post.id);
-        likesByPost.set(post.id, (likesByPost.get(post.id) || 0) + 1);
-        await createNotification({
+        likesByPost.set(post.id, previousCount + 1);
+      }
+      updateLikeButtonsForPost(post.id);
+
+      try {
+        if (wasLiked) {
+          const { error } = await supabase
+            .from("post_likes")
+            .delete()
+            .eq("post_id", post.id)
+            .eq("user_id", currentUser.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("post_likes")
+            .insert({
+              post_id: post.id,
+              user_id: currentUser.id,
+            });
+          if (error && error.code !== "23505") throw error;
+          shouldNotify =
+            !error &&
+            post.user_id &&
+            currentUser.id &&
+            post.user_id !== currentUser.id;
+        }
+      } catch (error) {
+        console.error("like toggle error:", error);
+        if (wasLiked) {
+          likedPostIds.add(post.id);
+        } else {
+          likedPostIds.delete(post.id);
+        }
+        likesByPost.set(post.id, previousCount);
+        showToast(tr.likeUpdateFailed || "いいねの更新に失敗しました。", "warning");
+      } finally {
+        pendingLikePostIds.delete(post.id);
+        updateLikeButtonsForPost(post.id);
+      }
+
+      if (shouldNotify) {
+        createNotification({
           userId: post.user_id,
           actorId: currentUser.id,
           type: "like",
           postId: post.id,
+        }).catch((error) => {
+          console.error("like notification error:", error);
         });
       }
-
-      renderFeed();
     }
 export function setupPostDetailModal() {
       const feedList = $("feed-list");
