@@ -1175,6 +1175,15 @@ export function renderFeed(options = {}) {
       if (post.media_url) {
         const mediaWrap = document.createElement("div");
         mediaWrap.className = "post-media";
+        const renderMediaFallback = () => {
+          mediaWrap.classList.add("is-error");
+          mediaWrap.innerHTML = "";
+          const fallback = document.createElement("div");
+          fallback.className = "media-fallback";
+          fallback.textContent =
+            tr.mediaUnavailable || "Media unavailable";
+          mediaWrap.appendChild(fallback);
+        };
         if (post.media_type === "video") {
           const video = document.createElement("video");
           video.preload = "none";
@@ -1182,6 +1191,7 @@ export function renderFeed(options = {}) {
           video.playsInline = true;
           video.classList.add("video-deferred");
           video.dataset.src = post.media_url;
+          video.addEventListener("error", renderMediaFallback, { once: true });
           observeDeferredVideo(video);
           mediaWrap.appendChild(video);
         } else {
@@ -1189,7 +1199,9 @@ export function renderFeed(options = {}) {
           img.src = post.media_url;
           img.loading = "lazy";
           img.decoding = "async";
+          img.referrerPolicy = "no-referrer";
           img.alt = "post media";
+          img.addEventListener("error", renderMediaFallback, { once: true });
           mediaWrap.appendChild(img);
         }
         card.appendChild(mediaWrap);
@@ -1691,15 +1703,27 @@ export function renderPostDetail() {
         if (post.media_url) {
           const wrap = document.createElement("div");
           wrap.className = "post-media";
+          const renderMediaFallback = () => {
+            wrap.classList.add("is-error");
+            wrap.innerHTML = "";
+            const fallback = document.createElement("div");
+            fallback.className = "media-fallback";
+            fallback.textContent = tr.mediaUnavailable || "Media unavailable";
+            wrap.appendChild(fallback);
+          };
           if (post.media_type === "video") {
             const video = document.createElement("video");
             video.src = post.media_url;
             video.controls = true;
+            video.playsInline = true;
+            video.addEventListener("error", renderMediaFallback, { once: true });
             wrap.appendChild(video);
           } else {
             const img = document.createElement("img");
             img.src = post.media_url;
+            img.referrerPolicy = "no-referrer";
             img.alt = "media";
+            img.addEventListener("error", renderMediaFallback, { once: true });
             wrap.appendChild(img);
           }
           mediaEl.appendChild(wrap);
