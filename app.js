@@ -2366,7 +2366,25 @@ async function loadProfilePostCount() {
       const views = document.querySelectorAll(".page-view");
       if (!tabs.length || !views.length) return;
 
-      const setPage = (page) => {
+      const pageScrollMap = new Map();
+      const getVisiblePage = () =>
+        document.querySelector(".page-view.is-active")?.dataset.page || "";
+      const rememberScroll = (page) => {
+        if (!page) return;
+        pageScrollMap.set(page, Math.max(0, window.scrollY || window.pageYOffset || 0));
+      };
+      const restoreScroll = (page, behavior = "auto") => {
+        const top = pageScrollMap.has(page) ? pageScrollMap.get(page) : 0;
+        requestAnimationFrame(() => {
+          window.scrollTo({ top, behavior });
+        });
+      };
+
+      const setPage = (page, options = {}) => {
+        const prevPage = getVisiblePage();
+        if (prevPage && prevPage !== page) {
+          rememberScroll(prevPage);
+        }
         views.forEach((view) => {
           view.classList.toggle("is-active", view.dataset.page === page);
         });
@@ -2380,6 +2398,9 @@ async function loadProfilePostCount() {
           updateProfileEditAdvancedToggleLabel();
         }
         queueCollapsibleHeightRefresh();
+        if (options.restoreScroll !== false) {
+          restoreScroll(page, options.scrollBehavior || "auto");
+        }
       };
       setActivePage = setPage;
 
@@ -2387,14 +2408,14 @@ async function loadProfilePostCount() {
         document.querySelector(".page-view.is-active")?.dataset.page ||
         tabs[0].getAttribute("data-page-target") ||
         "feed";
-      setPage(initialPage);
+      setPage(initialPage, { restoreScroll: false });
+      pageScrollMap.set(initialPage, 0);
 
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
           const targetPage = tab.getAttribute("data-page-target");
           if (!targetPage) return;
-          setPage(targetPage);
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          setPage(targetPage, { scrollBehavior: "smooth" });
         });
       });
     }
