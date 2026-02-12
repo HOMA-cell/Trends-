@@ -99,9 +99,11 @@ import {
     let profileEditDirty = false;
     let profileEditUnloadGuardBound = false;
     let profileEditShortcutsBound = false;
+    let profileDraftSaveTimer = null;
 
     const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
+    const PROFILE_EDIT_DRAFT_KEY = "trends_profile_edit_draft_v1";
     const PERF_DEBUG_KEY = "trends_perf_debug";
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const FILE_LIMITS = {
@@ -1848,6 +1850,108 @@ async function loadProfilePostCount() {
       return snapshot;
     }
 
+    function getProfileEditDraftKey(userId = currentUser?.id) {
+      if (!userId) return "";
+      return `${PROFILE_EDIT_DRAFT_KEY}:${userId}`;
+    }
+
+    function loadProfileEditDraft(userId = currentUser?.id) {
+      const key = getProfileEditDraftKey(userId);
+      if (!key) return null;
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.userId !== userId || typeof parsed.fields !== "object") {
+          return null;
+        }
+        return parsed;
+      } catch (error) {
+        console.warn("profile draft load failed", error);
+        return null;
+      }
+    }
+
+    function clearProfileEditDraft(userId = currentUser?.id) {
+      const key = getProfileEditDraftKey(userId);
+      if (!key) return;
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn("profile draft clear failed", error);
+      }
+    }
+
+    function buildProfileEditDraftPayload() {
+      const fields = {};
+      PROFILE_EDIT_TRACKED_FIELD_IDS.forEach((id) => {
+        const el = $(id);
+        fields[id] = el ? `${el.value ?? ""}` : "";
+      });
+      return {
+        version: 1,
+        userId: currentUser?.id || "",
+        fields,
+        savedAt: Date.now(),
+      };
+    }
+
+    function saveProfileEditDraft() {
+      if (profileDraftSaveTimer) {
+        clearTimeout(profileDraftSaveTimer);
+        profileDraftSaveTimer = null;
+      }
+      if (!currentUser) return;
+      const currentSnapshot = JSON.stringify(buildProfileEditSnapshot());
+      if (!profileEditBaseline || currentSnapshot === profileEditBaseline) {
+        clearProfileEditDraft(currentUser.id);
+        return;
+      }
+      const key = getProfileEditDraftKey(currentUser.id);
+      if (!key) return;
+      const payload = buildProfileEditDraftPayload();
+      try {
+        localStorage.setItem(key, JSON.stringify(payload));
+      } catch (error) {
+        console.warn("profile draft save failed", error);
+      }
+    }
+
+    function scheduleProfileEditDraftSave() {
+      if (!currentUser) return;
+      if (profileDraftSaveTimer) {
+        clearTimeout(profileDraftSaveTimer);
+      }
+      profileDraftSaveTimer = setTimeout(saveProfileEditDraft, 280);
+    }
+
+    function applyProfileEditDraftIfAvailable() {
+      if (!currentUser) return false;
+      const draft = loadProfileEditDraft(currentUser.id);
+      if (!draft?.fields) return false;
+      let restored = false;
+      PROFILE_EDIT_TRACKED_FIELD_IDS.forEach((id) => {
+        const el = $(id);
+        if (!el) return;
+        const next = `${draft.fields[id] ?? ""}`;
+        if (`${el.value ?? ""}` === next) return;
+        el.value = next;
+        restored = true;
+      });
+      if (!restored) {
+        clearProfileEditDraft(currentUser.id);
+        return false;
+      }
+      refreshProfileEditDirtyState();
+      const status = $("profile-edit-status");
+      const tr = t[currentLang] || t.ja;
+      if (status) {
+        status.textContent =
+          tr.profileDraftRestored || "プロフィール下書きを復元しました。";
+      }
+      return true;
+    }
+
     function updateProfileEditDirtyUI() {
       const tr = t[currentLang] || t.ja;
       const section = $("profile-edit-section");
@@ -1896,6 +2000,11 @@ async function loadProfilePostCount() {
         showToast(tr.profileNoChanges || "変更はありません。", "warning");
         return;
       }
+      if (profileDraftSaveTimer) {
+        clearTimeout(profileDraftSaveTimer);
+        profileDraftSaveTimer = null;
+      }
+      clearProfileEditDraft(currentUser.id);
       populateProfileEditor();
       const status = $("profile-edit-status");
       if (status) status.textContent = "";
@@ -1953,6 +2062,7 @@ async function loadProfilePostCount() {
           }
           pendingAvatarFile = file;
           refreshProfileEditDirtyState();
+          scheduleProfileEditDraftSave();
         });
       }
       const bannerInput = $("profile-banner-file");
@@ -1968,6 +2078,7 @@ async function loadProfilePostCount() {
           }
           pendingBannerFile = file;
           refreshProfileEditDirtyState();
+          scheduleProfileEditDraftSave();
         });
       }
       const accentInput = $("profile-accent");
@@ -1978,6 +2089,7 @@ async function loadProfilePostCount() {
             applyProfileTheme(card, { accent_color: accentInput.value });
           }
           refreshProfileEditDirtyState();
+          scheduleProfileEditDraftSave();
         });
       }
       const bannerUrlInput = $("profile-banner-url");
@@ -1986,6 +2098,7 @@ async function loadProfilePostCount() {
           const banner = $("profile-banner");
           applyProfileBanner(banner, { banner_url: bannerUrlInput.value });
           refreshProfileEditDirtyState();
+          scheduleProfileEditDraftSave();
         });
       }
 
@@ -2001,6 +2114,7 @@ async function loadProfilePostCount() {
           }
           if (target.matches("input, textarea, select")) {
             refreshProfileEditDirtyState();
+            scheduleProfileEditDraftSave();
           }
         };
         editSection.addEventListener("input", onProfileInput);
@@ -2088,6 +2202,10 @@ async function loadProfilePostCount() {
       if (status) status.textContent = "";
 
       if (!currentUser) {
+        if (profileDraftSaveTimer) {
+          clearTimeout(profileDraftSaveTimer);
+          profileDraftSaveTimer = null;
+        }
         if (displayEl) displayEl.value = "";
         if (handleEl) handleEl.value = "";
         if (bioEl) bioEl.value = "";
@@ -2147,6 +2265,7 @@ async function loadProfilePostCount() {
       pendingAvatarFile = null;
       pendingBannerFile = null;
       captureProfileEditBaseline();
+      applyProfileEditDraftIfAvailable();
     }
 
     async function handleSaveProfile() {
@@ -2327,6 +2446,11 @@ async function loadProfilePostCount() {
         if (bannerFileEl) bannerFileEl.value = "";
         pendingAvatarFile = null;
         pendingBannerFile = null;
+        if (profileDraftSaveTimer) {
+          clearTimeout(profileDraftSaveTimer);
+          profileDraftSaveTimer = null;
+        }
+        clearProfileEditDraft(currentUser.id);
         updateAuthUIState();
         updateProfileSummary();
         populateProfileEditor();
