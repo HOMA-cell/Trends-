@@ -1219,6 +1219,25 @@
       gap: 8px;
       margin-bottom: 6px;
     }
+    .profile-edit-dirty {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .profile-edit-actions {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      align-items: center;
+    }
+    .profile-edit-actions .btn {
+      min-width: 88px;
+    }
+    #profile-edit-section.is-dirty .profile-edit-actions {
+      border-color: rgba(228, 87, 46, 0.28);
+    }
     .profile-edit-group-title {
       font-size: 12px;
       font-weight: 600;
@@ -1251,6 +1270,19 @@
     @media (max-width: 700px) {
       .profile-editor {
         grid-template-columns: 1fr;
+      }
+      .profile-edit-actions {
+        position: sticky;
+        bottom: 8px;
+        z-index: 3;
+        padding: 8px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(4px);
+      }
+      .profile-edit-actions .btn {
+        flex: 1;
       }
     }
     .tips-list {

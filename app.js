@@ -95,6 +95,8 @@ import {
     let collapsibleHeightRaf = 0;
     let collapsibleResizeBound = false;
     let profileEditCompact = true;
+    let profileEditBaseline = "";
+    let profileEditDirty = false;
 
     const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
@@ -144,6 +146,25 @@ import {
       "profile-edit-training",
       "profile-edit-media",
       "profile-edit-links",
+    ];
+    const PROFILE_EDIT_TRACKED_FIELD_IDS = [
+      "profile-display",
+      "profile-handle",
+      "profile-bio-input",
+      "profile-avatar-url",
+      "profile-banner-url",
+      "profile-location",
+      "profile-height",
+      "profile-experience",
+      "profile-goal",
+      "profile-gym",
+      "profile-split",
+      "profile-favorite",
+      "profile-instagram",
+      "profile-tiktok",
+      "profile-youtube",
+      "profile-website",
+      "profile-accent",
     ];
 
 function formatFileSizeMb(bytes) {
@@ -1705,6 +1726,8 @@ async function loadProfilePostCount() {
       setText("profile-youtube-label", "profileYouTube");
       setText("profile-website-label", "profileWebsite");
       setText("profile-accent-label", "profileAccent");
+      setText("profile-edit-dirty", "profileUnsaved");
+      setText("btn-reset-profile", "profileReset");
       setText("btn-save-profile", "profileSave");
       setPlaceholder("profile-display", "profileDisplayPlaceholder");
       setPlaceholder("profile-handle", "profileHandlePlaceholder");
@@ -1780,6 +1803,9 @@ async function loadProfilePostCount() {
       if (typeof updateProfileEditCompactToggleLabel === "function") {
         updateProfileEditCompactToggleLabel();
       }
+      if (typeof updateProfileEditDirtyUI === "function") {
+        updateProfileEditDirtyUI();
+      }
       if (typeof setupExtraSectionsToggle === "function") {
         setupExtraSectionsToggle();
       }
@@ -1803,6 +1829,78 @@ async function loadProfilePostCount() {
       }
     }
 
+    function buildProfileEditSnapshot() {
+      const snapshot = {};
+      PROFILE_EDIT_TRACKED_FIELD_IDS.forEach((id) => {
+        const el = $(id);
+        snapshot[id] = el ? `${el.value ?? ""}` : "";
+      });
+      snapshot.pendingAvatarFile = pendingAvatarFile
+        ? `${pendingAvatarFile.name}:${pendingAvatarFile.size}`
+        : "";
+      snapshot.pendingBannerFile = pendingBannerFile
+        ? `${pendingBannerFile.name}:${pendingBannerFile.size}`
+        : "";
+      return snapshot;
+    }
+
+    function updateProfileEditDirtyUI() {
+      const tr = t[currentLang] || t.ja;
+      const section = $("profile-edit-section");
+      const dirtyBadge = $("profile-edit-dirty");
+      const saveBtn = $("btn-save-profile");
+      const resetBtn = $("btn-reset-profile");
+
+      if (section) {
+        section.classList.toggle("is-dirty", profileEditDirty);
+      }
+      if (dirtyBadge) {
+        dirtyBadge.textContent =
+          tr.profileUnsaved || "未保存の変更があります。";
+        dirtyBadge.classList.toggle("hidden", !profileEditDirty);
+      }
+      if (resetBtn) {
+        resetBtn.disabled = !currentUser || !profileEditDirty;
+      }
+      if (saveBtn && !saveBtn.classList.contains("is-loading")) {
+        saveBtn.disabled = !currentUser || !profileEditDirty;
+      }
+    }
+
+    function refreshProfileEditDirtyState() {
+      if (!currentUser) {
+        profileEditDirty = false;
+        updateProfileEditDirtyUI();
+        return;
+      }
+      const next =
+        JSON.stringify(buildProfileEditSnapshot()) !== profileEditBaseline;
+      profileEditDirty = !!next;
+      updateProfileEditDirtyUI();
+    }
+
+    function captureProfileEditBaseline() {
+      profileEditBaseline = JSON.stringify(buildProfileEditSnapshot());
+      profileEditDirty = false;
+      updateProfileEditDirtyUI();
+    }
+
+    function handleResetProfileEditor() {
+      const tr = t[currentLang] || t.ja;
+      if (!currentUser) return;
+      if (!profileEditDirty) {
+        showToast(tr.profileNoChanges || "変更はありません。", "warning");
+        return;
+      }
+      populateProfileEditor();
+      const status = $("profile-edit-status");
+      if (status) status.textContent = "";
+      showToast(
+        tr.profileResetDone || "編集内容を元に戻しました。",
+        "success"
+      );
+    }
+
     function setupProfileEditor() {
       const fileInput = $("profile-avatar-file");
       if (fileInput) {
@@ -1816,6 +1914,7 @@ async function loadProfilePostCount() {
             return;
           }
           pendingAvatarFile = file;
+          refreshProfileEditDirtyState();
         });
       }
       const bannerInput = $("profile-banner-file");
@@ -1830,6 +1929,7 @@ async function loadProfilePostCount() {
             return;
           }
           pendingBannerFile = file;
+          refreshProfileEditDirtyState();
         });
       }
       const accentInput = $("profile-accent");
@@ -1839,6 +1939,7 @@ async function loadProfilePostCount() {
           if (card) {
             applyProfileTheme(card, { accent_color: accentInput.value });
           }
+          refreshProfileEditDirtyState();
         });
       }
       const bannerUrlInput = $("profile-banner-url");
@@ -1846,12 +1947,35 @@ async function loadProfilePostCount() {
         bannerUrlInput.addEventListener("input", () => {
           const banner = $("profile-banner");
           applyProfileBanner(banner, { banner_url: bannerUrlInput.value });
+          refreshProfileEditDirtyState();
         });
+      }
+
+      const editSection = $("profile-edit-section");
+      if (editSection && editSection.dataset.dirtyBound !== "true") {
+        editSection.dataset.dirtyBound = "true";
+        const onProfileInput = (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (!target.closest("#profile-edit-section")) return;
+          if (target.id === "profile-avatar-file" || target.id === "profile-banner-file") {
+            return;
+          }
+          if (target.matches("input, textarea, select")) {
+            refreshProfileEditDirtyState();
+          }
+        };
+        editSection.addEventListener("input", onProfileInput);
+        editSection.addEventListener("change", onProfileInput);
       }
 
       const saveBtn = $("btn-save-profile");
       if (saveBtn) {
         saveBtn.addEventListener("click", handleSaveProfile);
+      }
+      const resetBtn = $("btn-reset-profile");
+      if (resetBtn) {
+        resetBtn.addEventListener("click", handleResetProfileEditor);
       }
 
       populateProfileEditor();
@@ -1898,6 +2022,8 @@ async function loadProfilePostCount() {
       const websiteEl = $("profile-website");
       const accentEl = $("profile-accent");
       const status = $("profile-edit-status");
+      const saveBtn = $("btn-save-profile");
+      const resetBtn = $("btn-reset-profile");
       const disabled = !currentUser;
 
       if (displayEl) displayEl.disabled = disabled;
@@ -1919,6 +2045,8 @@ async function loadProfilePostCount() {
       if (youtubeEl) youtubeEl.disabled = disabled;
       if (websiteEl) websiteEl.disabled = disabled;
       if (accentEl) accentEl.disabled = disabled;
+      if (saveBtn && !saveBtn.classList.contains("is-loading")) saveBtn.disabled = disabled;
+      if (resetBtn) resetBtn.disabled = true;
       if (status) status.textContent = "";
 
       if (!currentUser) {
@@ -1943,6 +2071,7 @@ async function loadProfilePostCount() {
         if (accentEl) accentEl.value = "#e4572e";
         pendingAvatarFile = null;
         pendingBannerFile = null;
+        captureProfileEditBaseline();
         return;
       }
 
@@ -1979,6 +2108,7 @@ async function loadProfilePostCount() {
       if (accentEl) accentEl.value = currentProfile?.accent_color || "#e4572e";
       pendingAvatarFile = null;
       pendingBannerFile = null;
+      captureProfileEditBaseline();
     }
 
     async function handleSaveProfile() {
@@ -1991,6 +2121,12 @@ async function loadProfilePostCount() {
       const status = $("profile-edit-status");
       const saveBtn = $("btn-save-profile");
       if (status) status.textContent = "";
+      refreshProfileEditDirtyState();
+      if (!profileEditDirty) {
+        showToast(tr.profileNoChanges || "変更はありません。", "warning");
+        updateProfileEditDirtyUI();
+        return;
+      }
       setButtonLoading(saveBtn, true, "Saving...");
 
       try {
@@ -2167,6 +2303,7 @@ async function loadProfilePostCount() {
         showToast(tr.profileSaveSuccess || "Profile updated.", "success");
       } finally {
         setButtonLoading(saveBtn, false);
+        updateProfileEditDirtyUI();
       }
     }
 
