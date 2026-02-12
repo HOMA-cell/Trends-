@@ -630,6 +630,17 @@ export async function loadFeed(options = {}) {
         return;
       }
 
+      if (!softRefresh && !getAllPosts().length) {
+        const cachedPosts = loadFeedCache();
+        if (cachedPosts.length) {
+          setAllPosts(cachedPosts);
+          invalidateFeedQueryCache();
+          postSearchHaystackCache.clear();
+          resetFeedPagination();
+          updateFeedStats(cachedPosts);
+        }
+      }
+
       if (softRefresh) {
         setFeedNotice(tr.feedRefreshing || "更新中...", "loading");
       } else {
