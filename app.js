@@ -97,6 +97,7 @@ import {
     let profileEditCompact = true;
     let profileEditBaseline = "";
     let profileEditDirty = false;
+    let profileEditUnloadGuardBound = false;
 
     const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
@@ -1330,6 +1331,7 @@ async function loadProfilePostCount() {
       setupCollapsibles();
       loadProfileEditCompactPreference();
       setupProfileEditAdvancedToggle();
+      setupProfileEditUnloadGuard();
       setupSettingsUI();
       setupExtraSectionsToggle();
       setupDebug();
@@ -1901,6 +1903,24 @@ async function loadProfilePostCount() {
       );
     }
 
+    function confirmDiscardProfileChanges() {
+      if (!profileEditDirty) return true;
+      const tr = t[currentLang] || t.ja;
+      return window.confirm(
+        tr.profileLeaveConfirm || "未保存の変更があります。ページを移動しますか？"
+      );
+    }
+
+    function setupProfileEditUnloadGuard() {
+      if (profileEditUnloadGuardBound || typeof window === "undefined") return;
+      profileEditUnloadGuardBound = true;
+      window.addEventListener("beforeunload", (event) => {
+        if (!profileEditDirty) return;
+        event.preventDefault();
+        event.returnValue = "";
+      });
+    }
+
     function setupProfileEditor() {
       const fileInput = $("profile-avatar-file");
       if (fileInput) {
@@ -2383,6 +2403,9 @@ async function loadProfilePostCount() {
 
 
     async function handleLogout() {
+      if (!confirmDiscardProfileChanges()) {
+        return;
+      }
       await supabase.auth.signOut();
       currentUser = null;
       currentProfile = null;
@@ -2519,6 +2542,17 @@ async function loadProfilePostCount() {
 
       const setPage = (page, options = {}) => {
         const prevPage = getVisiblePage();
+        if (
+          prevPage &&
+          prevPage !== page &&
+          prevPage === "account" &&
+          !options.skipUnsavedConfirm
+        ) {
+          if (!confirmDiscardProfileChanges()) {
+            updateProfileEditDirtyUI();
+            return false;
+          }
+        }
         if (prevPage && prevPage !== page) {
           rememberScroll(prevPage);
         }
@@ -2538,6 +2572,7 @@ async function loadProfilePostCount() {
         if (options.restoreScroll !== false) {
           restoreScroll(page, options.scrollBehavior || "auto");
         }
+        return true;
       };
       setActivePage = setPage;
 
