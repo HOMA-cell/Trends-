@@ -98,6 +98,7 @@ import {
     let profileEditBaseline = "";
     let profileEditDirty = false;
     let profileEditUnloadGuardBound = false;
+    let profileEditShortcutsBound = false;
 
     const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
@@ -1332,6 +1333,7 @@ async function loadProfilePostCount() {
       loadProfileEditCompactPreference();
       setupProfileEditAdvancedToggle();
       setupProfileEditUnloadGuard();
+      setupProfileEditShortcuts();
       setupSettingsUI();
       setupExtraSectionsToggle();
       setupDebug();
@@ -1921,6 +1923,22 @@ async function loadProfilePostCount() {
       });
     }
 
+    function setupProfileEditShortcuts() {
+      if (profileEditShortcutsBound || typeof window === "undefined") return;
+      profileEditShortcutsBound = true;
+      window.addEventListener("keydown", (event) => {
+        const isSaveKey =
+          (event.metaKey || event.ctrlKey) &&
+          (event.key === "s" || event.key === "S");
+        if (!isSaveKey) return;
+        const activePage =
+          document.querySelector(".page-view.is-active")?.dataset.page || "";
+        if (activePage !== "account" || !currentUser || !profileEditDirty) return;
+        event.preventDefault();
+        handleSaveProfile();
+      });
+    }
+
     function setupProfileEditor() {
       const fileInput = $("profile-avatar-file");
       if (fileInput) {
@@ -2140,6 +2158,9 @@ async function loadProfilePostCount() {
       const tr = t[currentLang] || t.ja;
       const status = $("profile-edit-status");
       const saveBtn = $("btn-save-profile");
+      if (saveBtn?.classList.contains("is-loading")) {
+        return;
+      }
       if (status) status.textContent = "";
       refreshProfileEditDirtyState();
       if (!profileEditDirty) {
