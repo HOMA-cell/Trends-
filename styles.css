@@ -560,6 +560,7 @@
       height: 100%;
       display: block;
       object-fit: cover;
+      transition: opacity 0.2s ease;
     }
     .post-media {
       margin-bottom: 6px;
@@ -569,6 +570,17 @@
       aspect-ratio: 4 / 5;
       min-height: 140px;
       position: relative;
+    }
+    .post-media.is-loading img,
+    .post-media.is-loading video {
+      opacity: 0;
+    }
+    .post-media .media-skeleton {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      border-radius: inherit;
     }
     .post-media video.video-deferred {
       background: linear-gradient(120deg, #f3ede3 0%, #ece4d8 100%);

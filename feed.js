@@ -198,6 +198,23 @@ function resetDeferredVideoObserver() {
       deferredVideoObserver.disconnect();
       deferredVideoObserver = null;
     }
+function mountMediaSkeleton(mediaWrap) {
+      if (!mediaWrap) return;
+      if (mediaWrap.querySelector(".media-skeleton")) return;
+      mediaWrap.classList.add("is-loading");
+      const skeleton = document.createElement("div");
+      skeleton.className = "media-skeleton skeleton";
+      skeleton.setAttribute("aria-hidden", "true");
+      mediaWrap.appendChild(skeleton);
+    }
+function clearMediaSkeleton(mediaWrap) {
+      if (!mediaWrap) return;
+      mediaWrap.classList.remove("is-loading");
+      const skeleton = mediaWrap.querySelector(".media-skeleton");
+      if (skeleton) {
+        skeleton.remove();
+      }
+    }
 function ensureFeedMoreObserver() {
       if (feedMoreObserver) {
         return feedMoreObserver;
@@ -1178,7 +1195,9 @@ export function renderFeed(options = {}) {
       if (post.media_url) {
         const mediaWrap = document.createElement("div");
         mediaWrap.className = "post-media";
+        mountMediaSkeleton(mediaWrap);
         const renderMediaFallback = () => {
+          clearMediaSkeleton(mediaWrap);
           mediaWrap.classList.add("is-error");
           mediaWrap.innerHTML = "";
           const fallback = document.createElement("div");
@@ -1194,17 +1213,23 @@ export function renderFeed(options = {}) {
           video.playsInline = true;
           video.classList.add("video-deferred");
           video.dataset.src = post.media_url;
+          video.addEventListener("loadeddata", () => {
+            clearMediaSkeleton(mediaWrap);
+          }, { once: true });
           video.addEventListener("error", renderMediaFallback, { once: true });
           observeDeferredVideo(video);
           mediaWrap.appendChild(video);
         } else {
           const img = document.createElement("img");
-          img.src = post.media_url;
           img.loading = "lazy";
           img.decoding = "async";
           img.referrerPolicy = "no-referrer";
           img.alt = "post media";
+          img.addEventListener("load", () => {
+            clearMediaSkeleton(mediaWrap);
+          }, { once: true });
           img.addEventListener("error", renderMediaFallback, { once: true });
+          img.src = post.media_url;
           mediaWrap.appendChild(img);
         }
         card.appendChild(mediaWrap);
@@ -1767,7 +1792,9 @@ export function renderPostDetail() {
         if (post.media_url) {
           const wrap = document.createElement("div");
           wrap.className = "post-media";
+          mountMediaSkeleton(wrap);
           const renderMediaFallback = () => {
+            clearMediaSkeleton(wrap);
             wrap.classList.add("is-error");
             wrap.innerHTML = "";
             const fallback = document.createElement("div");
@@ -1777,17 +1804,31 @@ export function renderPostDetail() {
           };
           if (post.media_type === "video") {
             const video = document.createElement("video");
-            video.src = post.media_url;
             video.controls = true;
             video.playsInline = true;
+            video.addEventListener(
+              "loadeddata",
+              () => {
+                clearMediaSkeleton(wrap);
+              },
+              { once: true }
+            );
             video.addEventListener("error", renderMediaFallback, { once: true });
+            video.src = post.media_url;
             wrap.appendChild(video);
           } else {
             const img = document.createElement("img");
-            img.src = post.media_url;
             img.referrerPolicy = "no-referrer";
             img.alt = "media";
+            img.addEventListener(
+              "load",
+              () => {
+                clearMediaSkeleton(wrap);
+              },
+              { once: true }
+            );
             img.addEventListener("error", renderMediaFallback, { once: true });
+            img.src = post.media_url;
             wrap.appendChild(img);
           }
           mediaEl.appendChild(wrap);
