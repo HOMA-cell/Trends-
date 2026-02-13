@@ -116,6 +116,11 @@ let feedIsOnline =
   typeof navigator === "undefined" ? true : navigator.onLine !== false;
 let feedNetworkListenersBound = false;
 let feedVisibilityListenerBound = false;
+let feedPullListenersBound = false;
+let feedPullActive = false;
+let feedPullStartY = 0;
+let feedPullDistance = 0;
+let feedPullLastTriggeredAt = 0;
 let feedQueryCache = {
   queryKey: "",
   postsRef: null,
@@ -128,6 +133,9 @@ const pendingLikePostIds = new Set();
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
+const FEED_PULL_THRESHOLD = 70;
+const FEED_PULL_MAX = 128;
+const FEED_PULL_COOLDOWN_MS = 1600;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -366,6 +374,52 @@ function setFeedNotice(message = "", tone = "", autoClearMs = 0) {
         }, autoClearMs);
       }
     }
+function ensureFeedPullIndicator() {
+      let el = $("feed-pull-indicator");
+      if (el) return el;
+      const feedList = $("feed-list");
+      if (!feedList || !feedList.parentElement) return null;
+      el = document.createElement("div");
+      el.id = "feed-pull-indicator";
+      el.className = "feed-pull-indicator";
+      el.setAttribute("aria-live", "polite");
+      el.style.height = "0px";
+      feedList.parentElement.insertBefore(el, feedList);
+      return el;
+    }
+function setFeedPullIndicator(distance = 0, mode = "hint") {
+      const indicator = ensureFeedPullIndicator();
+      if (!indicator) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      const clamped = Math.max(0, Math.min(FEED_PULL_MAX, distance));
+      const height = Math.round(Math.min(56, 16 + clamped * 0.42));
+      indicator.classList.add("is-visible");
+      indicator.classList.toggle("is-ready", mode === "ready");
+      indicator.classList.toggle("is-loading", mode === "loading");
+      indicator.style.height = `${height}px`;
+      if (mode === "loading") {
+        indicator.textContent =
+          tr.feedPullLoading || tr.feedRefreshing || "フィードを更新中...";
+      } else if (mode === "ready") {
+        indicator.textContent = tr.feedPullRelease || "離して更新";
+      } else {
+        indicator.textContent = tr.feedPullHint || "下に引いて更新";
+      }
+    }
+function resetFeedPullIndicator(immediate = false) {
+      const indicator = $("feed-pull-indicator");
+      if (!indicator) return;
+      indicator.classList.remove("is-ready", "is-loading");
+      indicator.style.height = "0px";
+      if (immediate) {
+        indicator.classList.remove("is-visible");
+        return;
+      }
+      setTimeout(() => {
+        if (indicator.classList.contains("is-loading")) return;
+        indicator.classList.remove("is-visible");
+      }, 180);
+    }
 function scheduleSecondaryRenders() {
       if (secondaryRenderScheduled) return;
       secondaryRenderScheduled = true;
@@ -506,26 +560,32 @@ export function setupFeedControls() {
         });
       }
 
+      const runFeedSoftRefresh = async () => {
+        if (isFeedLoading || feedLoadPromise) return false;
+        if (!getOnlineState()) {
+          const tr = t[getCurrentLang()] || t.ja;
+          feedIsOnline = false;
+          setFeedNotice(
+            tr.feedOfflineNotice || "Offline. Latest posts cannot be fetched.",
+            "warning",
+            2600
+          );
+          renderFeed();
+          return false;
+        }
+        await loadFeed({ softRefresh: true });
+        return true;
+      };
+
       const refreshBtn = $("btn-feed-refresh");
       if (refreshBtn && refreshBtn.dataset.bound !== "true") {
         refreshBtn.dataset.bound = "true";
         refreshBtn.addEventListener("click", async () => {
           if (refreshBtn.classList.contains("is-loading")) return;
-          if (!getOnlineState()) {
-            const tr = t[getCurrentLang()] || t.ja;
-            feedIsOnline = false;
-            setFeedNotice(
-              tr.feedOfflineNotice || "Offline. Latest posts cannot be fetched.",
-              "warning",
-              2600
-            );
-            renderFeed();
-            return;
-          }
           refreshBtn.classList.add("is-loading");
           refreshBtn.disabled = true;
           try {
-            await loadFeed({ softRefresh: true });
+            await runFeedSoftRefresh();
           } finally {
             refreshBtn.classList.remove("is-loading");
             refreshBtn.disabled = false;
@@ -563,6 +623,115 @@ export function setupFeedControls() {
             retryBtn.disabled = false;
           }
         });
+      }
+
+      if (!feedPullListenersBound && typeof window !== "undefined") {
+        const touchCapable =
+          "ontouchstart" in window ||
+          (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+        if (touchCapable) {
+          feedPullListenersBound = true;
+          ensureFeedPullIndicator();
+
+          const canStartPull = (target) => {
+            if (!target || !(target instanceof Element)) return false;
+            const activePage =
+              document.querySelector(".page-view.is-active")?.dataset.page || "";
+            if (activePage !== "feed") return false;
+            if ((window.scrollY || window.pageYOffset || 0) > 2) return false;
+            if (isFeedLoading || feedLoadPromise) return false;
+            const feedList = $("feed-list");
+            if (!feedList || !feedList.contains(target)) return false;
+            if (target.closest("button, a, input, textarea, select, video")) return false;
+            return true;
+          };
+
+          const cancelPullGesture = (immediate = false) => {
+            feedPullActive = false;
+            feedPullDistance = 0;
+            const indicator = $("feed-pull-indicator");
+            if (indicator?.classList.contains("is-loading")) return;
+            resetFeedPullIndicator(immediate);
+          };
+
+          window.addEventListener(
+            "touchstart",
+            (event) => {
+              const touch = event.touches?.[0];
+              if (!touch) return;
+              if (!canStartPull(event.target)) {
+                cancelPullGesture(true);
+                return;
+              }
+              feedPullActive = true;
+              feedPullStartY = touch.clientY;
+              feedPullDistance = 0;
+            },
+            { passive: true }
+          );
+
+          window.addEventListener(
+            "touchmove",
+            (event) => {
+              if (!feedPullActive) return;
+              const touch = event.touches?.[0];
+              if (!touch) return;
+              if ((window.scrollY || window.pageYOffset || 0) > 2) {
+                cancelPullGesture(true);
+                return;
+              }
+              const delta = touch.clientY - feedPullStartY;
+              if (delta <= 0) {
+                cancelPullGesture(true);
+                return;
+              }
+              if (delta < 8) {
+                return;
+              }
+              feedPullDistance = Math.min(FEED_PULL_MAX, delta * 0.62);
+              const mode = feedPullDistance >= FEED_PULL_THRESHOLD ? "ready" : "hint";
+              setFeedPullIndicator(feedPullDistance, mode);
+              if (event.cancelable) {
+                event.preventDefault();
+              }
+            },
+            { passive: false }
+          );
+
+          window.addEventListener(
+            "touchend",
+            async () => {
+              if (!feedPullActive) return;
+              const pulledDistance = feedPullDistance;
+              feedPullActive = false;
+              feedPullDistance = 0;
+              if (pulledDistance < FEED_PULL_THRESHOLD) {
+                resetFeedPullIndicator(false);
+                return;
+              }
+              const now = Date.now();
+              if (now - feedPullLastTriggeredAt < FEED_PULL_COOLDOWN_MS) {
+                resetFeedPullIndicator(false);
+                return;
+              }
+              feedPullLastTriggeredAt = now;
+              setFeedPullIndicator(FEED_PULL_THRESHOLD, "loading");
+              await runFeedSoftRefresh();
+              setTimeout(() => {
+                resetFeedPullIndicator(false);
+              }, 220);
+            },
+            { passive: true }
+          );
+
+          window.addEventListener(
+            "touchcancel",
+            () => {
+              cancelPullGesture(false);
+            },
+            { passive: true }
+          );
+        }
       }
 
       if (!feedNetworkListenersBound && typeof window !== "undefined") {
@@ -797,6 +966,14 @@ export function renderFeed(options = {}) {
     const autoLoadMoreEnabled = settings.feedAutoLoadMore !== false;
     const followingIds = getFollowingIds();
     const tr = t[currentLang] || t.ja;
+    const pullIndicator = $("feed-pull-indicator");
+    if (
+      pullIndicator &&
+      !pullIndicator.classList.contains("is-loading") &&
+      !pullIndicator.classList.contains("is-ready")
+    ) {
+      pullIndicator.textContent = tr.feedPullHint || "下に引いて更新";
+    }
     const searchValue = $("feed-search")?.value?.trim().toLowerCase() || "";
     const allowedFilters = ["all", "mine"];
     if (!allowedFilters.includes(currentFilter)) {

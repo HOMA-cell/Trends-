@@ -1432,6 +1432,32 @@
       flex: 1;
       min-width: 0;
     }
+    .feed-pull-indicator {
+      height: 0;
+      opacity: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--text-sub);
+      transition: height 0.18s ease, opacity 0.18s ease, color 0.18s ease;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    .feed-pull-indicator.is-visible {
+      opacity: 0.92;
+      margin-top: 2px;
+    }
+    .feed-pull-indicator.is-ready {
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .feed-pull-indicator.is-loading {
+      color: #2563eb;
+      font-weight: 600;
+    }
     .feed-perf {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 11px;
