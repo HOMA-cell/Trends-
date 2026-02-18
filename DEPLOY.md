@@ -1,7 +1,8 @@
 # Deploy And Update (Static + Supabase)
 
 This app is static (`index.html` + JS/CSS) and connects to Supabase.
-Recommended host: Netlify (auto deploys on every Git push).
+Primary host: GitHub Pages via GitHub Actions (auto deploys on every push to `main`).
+Netlify is still available as an alternative.
 
 ## 1) One-time setup
 
@@ -14,7 +15,18 @@ git commit -m "Initial commit"
 git push -u origin main
 ```
 
-### B. Connect GitHub repo to Netlify
+### B. Enable GitHub Pages (recommended)
+
+1. Open your repo on GitHub:
+ - `https://github.com/HOMA-cell/Trends-`
+2. Go to `Settings` -> `Pages`.
+3. Under `Build and deployment`, set:
+ - `Source`: `GitHub Actions`
+4. The workflow `.github/workflows/deploy-pages.yml` will publish on next push.
+5. Expected site URL:
+ - `https://homa-cell.github.io/Trends-/`
+
+### C. Optional: Connect GitHub repo to Netlify
 
 1. Open [https://app.netlify.com](https://app.netlify.com)
 2. `Add new site` -> `Import an existing project`
@@ -35,13 +47,20 @@ git commit -m "Your update message"
 git push origin main
 ```
 
-After push, Netlify redeploys automatically.
+After push:
+- GitHub Pages deploy runs automatically (`Actions` tab).
+- If you also connected Netlify, Netlify redeploys too.
 
 ## 3) Verify the internet deploy
 
-1. Open your Netlify URL in a normal browser tab.
+1. Open your Pages URL: `https://homa-cell.github.io/Trends-/`
 2. Confirm the latest UI/feature is visible.
 3. If not visible yet, wait 30-90 seconds and reload once.
+
+Alternative:
+- Open your Netlify URL if you are using Netlify.
+- Confirm the latest UI/feature is visible.
+- If not visible yet, wait 30-90 seconds and reload once.
 
 ## 4) Local preview
 
