@@ -4,25 +4,17 @@ import {
   $,
   setButtonLoading,
   showToast,
-  renderAvatar,
-  normalizeUrl,
-  normalizeHandleUrl,
   formatHandle,
   normalizeExerciseName,
   toDateKey,
-  parseDateValue,
   formatDateDisplay,
   formatDateTimeDisplay,
   formatNumber,
   convertWeightValue,
   convertHeightValue,
   toKg,
-  fromKg,
   formatWeight,
-  formatHeight,
   formatVolume,
-  computeStreak,
-  computeWorkoutStats,
   setUtilsContext,
 } from "./utils.js";
 import {
@@ -34,7 +26,6 @@ import {
   updateFilterButtons,
   loadFeed,
   renderFeed,
-  resetFeedPagination,
 } from "./feed.js";
 import {
   setProfileContext,
@@ -45,6 +36,12 @@ import {
   applyProfileBanner,
   getProfileDisplayName,
 } from "./profile.js";
+import { createCommentSync } from "./commentSync.js";
+import { createProfileEditState } from "./profileEditState.js";
+import {
+  createSettingsController,
+  defaultSettings,
+} from "./settings.js";
 
     // ---- 状態 ----
     let currentUser = null;
@@ -79,6 +76,7 @@ import {
     let likedPostIds = new Set();
     let workoutExercises = [];
     let workoutLogsByPost = new Map();
+    let loadedWorkoutLogPostIds = new Set();
     let workoutLogsEnabled = true;
     let notifications = [];
     let notificationsEnabled = true;
@@ -95,13 +93,10 @@ import {
     let collapsibleHeightRaf = 0;
     let collapsibleResizeBound = false;
     let profileEditCompact = true;
-    let profileEditBaseline = "";
-    let profileEditDirty = false;
-    let profileEditUnloadGuardBound = false;
-    let profileEditShortcutsBound = false;
-    let profileDraftSaveTimer = null;
+    let serviceWorkerSetupDone = false;
+    let serviceWorkerControllerReloaded = false;
+    let serviceWorkerVisibilityListenerBound = false;
 
-    const SETTINGS_KEY = "trends_settings_v1";
     const POST_DRAFT_KEY = "trends_post_draft_v1";
     const PROFILE_EDIT_DRAFT_KEY = "trends_profile_edit_draft_v1";
     const PERF_DEBUG_KEY = "trends_perf_debug";
@@ -123,27 +118,6 @@ import {
       "video/quicktime",
       "video/webm",
     ]);
-    const defaultSettings = {
-      compactMode: false,
-      showExtraSections: false,
-      showFeedStats: true,
-      feedAutoLoadMore: true,
-      defaultFilter: "all",
-      feedLayout: "list",
-      defaultVisibility: "public",
-      showEmail: true,
-      showProfileStats: true,
-      showBodyweight: true,
-      notifications: {
-        like: true,
-        comment: true,
-        follow: true,
-      },
-      language: "ja",
-      dateFormat: "auto",
-      weightUnit: "kg",
-      heightUnit: "cm",
-    };
     let settings = { ...defaultSettings };
     const PROFILE_EDIT_COLLAPSIBLE_KEYS = [
       "profile-edit-identity",
@@ -170,6 +144,69 @@ import {
       "profile-website",
       "profile-accent",
     ];
+    const commentSync = createCommentSync({
+      supabase,
+      translations: t,
+      getCurrentUser: () => currentUser,
+      getCurrentProfile: () => currentProfile,
+      getCurrentLang: () => currentLang,
+      getCommentsByPost: () => commentsByPost,
+      renderFeed: () => renderFeed(),
+      createNotification: (payload) => createNotification(payload),
+      showToast: (message, tone) => showToast(message, tone),
+    });
+    const profileEditState = createProfileEditState({
+      $,
+      translations: t,
+      getCurrentLang: () => currentLang,
+      getCurrentUser: () => currentUser,
+      trackedFieldIds: PROFILE_EDIT_TRACKED_FIELD_IDS,
+      draftKeyBase: PROFILE_EDIT_DRAFT_KEY,
+      getPendingAvatarFile: () => pendingAvatarFile,
+      getPendingBannerFile: () => pendingBannerFile,
+    });
+    const settingsController = createSettingsController({
+      $,
+      translations: t,
+      getSettings: () => settings,
+      setSettings: (next) => {
+        settings = next;
+      },
+      getCurrentLang: () => currentLang,
+      setCurrentLang: (next) => {
+        currentLang = next;
+      },
+      getShowExtraSections: () => showExtraSections,
+      setShowExtraSections: (next) => {
+        showExtraSections = !!next;
+      },
+      setCollapsibleOpen: (key, open, options) =>
+        setCollapsibleOpen(key, open, options),
+      setFeedState: (next) => setFeedState(next),
+      updateFilterButtons: () => updateFilterButtons(),
+      convertWeightValue,
+      convertHeightValue,
+      formatNumber,
+      getWorkoutExercises: () => workoutExercises,
+      renderWorkoutRows: () => {
+        if (typeof renderWorkoutRows === "function") {
+          renderWorkoutRows();
+        }
+      },
+      applyTranslations: () => applyTranslations(),
+      updateCollapsibleLabels: () => updateCollapsibleLabels(),
+      renderFeed: () => renderFeed(),
+      updateProfileSummary: () => updateProfileSummary(),
+      renderWorkoutHistory: () => renderWorkoutHistory(),
+      renderTrainingSummary: () => renderTrainingSummary(),
+      renderPrList: () => renderPrList(),
+      renderInsights: () => renderInsights(),
+      renderOnboardingChecklist: () => renderOnboardingChecklist(),
+      renderNotifications: () => renderNotifications(),
+      getCurrentPublicProfileId: () => currentPublicProfileId,
+      openPublicProfile: (userId) => openPublicProfile(userId),
+      showToast: (message, tone) => showToast(message, tone),
+    });
 
 function formatFileSizeMb(bytes) {
       return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
@@ -218,583 +255,25 @@ function getFileValidationError(file, kind) {
       return null;
     }
 function loadSettings() {
-      let stored = {};
-      try {
-        stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
-      } catch {
-        stored = {};
-      }
-
-      const legacyExtra = localStorage.getItem("trends_show_extra_sections");
-      const merged = {
-        ...defaultSettings,
-        ...stored,
-        notifications: {
-          ...defaultSettings.notifications,
-          ...(stored.notifications || {}),
-        },
-      };
-      if (legacyExtra !== null && stored.showExtraSections === undefined) {
-        merged.showExtraSections = legacyExtra === "true";
-      }
-      if (!["all", "mine"].includes(merged.defaultFilter)) {
-        merged.defaultFilter = "all";
-      }
-      if (!["list", "grid"].includes(merged.feedLayout)) {
-        merged.feedLayout = "list";
-      }
-      if (typeof merged.feedAutoLoadMore !== "boolean") {
-        merged.feedAutoLoadMore = true;
-      }
-      if (!["public", "private"].includes(merged.defaultVisibility)) {
-        merged.defaultVisibility = "public";
-      }
-      if (!["ja", "en"].includes(merged.language)) {
-        merged.language = "ja";
-      }
-      if (!["auto", "ymd", "mdy"].includes(merged.dateFormat)) {
-        merged.dateFormat = "auto";
-      }
-      if (!["kg", "lb"].includes(merged.weightUnit)) {
-        merged.weightUnit = "kg";
-      }
-      if (!["cm", "in"].includes(merged.heightUnit)) {
-        merged.heightUnit = "cm";
-      }
-
-      settings = merged;
-      showExtraSections = !!settings.showExtraSections;
-      if (settings.language) {
-        currentLang = settings.language;
-      }
-      return settings;
+      return settingsController.loadSettings();
     }
 function saveSettings(next, options = {}) {
-      settings = {
-        ...settings,
-        ...next,
-        notifications: {
-          ...settings.notifications,
-          ...(next.notifications || {}),
-        },
-      };
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      localStorage.removeItem("trends_show_extra_sections");
-      showExtraSections = !!settings.showExtraSections;
-      if (!options.skipApply) {
-        applySettings();
-      }
-    }
-function updateWeightLabels() {
-      const tr = t[currentLang] || t.ja;
-      const unit = settings.weightUnit === "lb" ? "lb" : "kg";
-      const label = $("label-weight");
-      if (label) {
-        label.textContent = `${tr.weight || "Bodyweight"} (${unit})`;
-      }
-      const input = $("post-weight");
-      if (input) {
-        input.placeholder = settings.weightUnit === "lb" ? "170" : "77.4";
-      }
-    }
-function updateHeightLabel() {
-      const tr = t[currentLang] || t.ja;
-      const unit = settings.heightUnit === "in" ? "in" : "cm";
-      const label = $("profile-height-label");
-      if (label) {
-        label.textContent = `${tr.profileHeight || "Height"} (${unit})`;
-      }
-      const input = $("profile-height");
-      if (input) {
-        input.placeholder = settings.heightUnit === "in" ? "66" : "170";
-      }
+      return settingsController.saveSettings(next, options);
     }
 function updateSettingsExpandLabel() {
-      const btn = $("btn-settings-expand");
-      if (!btn) return;
-      const tr = t[currentLang] || t.ja;
-      const keys = [
-        "settings-preferences",
-        "settings-privacy",
-        "settings-notifications",
-        "settings-language",
-        "settings-data",
-        "settings-templates",
-        "settings-tips",
-      ];
-      const allOpen = keys.every((key) => {
-        const wrapper = document.querySelector(`[data-collapsible="${key}"]`);
-        const content = wrapper?.querySelector("[data-collapsible-content]");
-        return content?.classList.contains("is-open");
-      });
-      btn.textContent = allOpen
-        ? tr.settingsCollapse || "Collapse"
-        : tr.settingsExpand || "Expand all";
-      btn.setAttribute("aria-expanded", allOpen ? "true" : "false");
-    }
-function populateSettingsUI() {
-      const setChecked = (id, value) => {
-        const el = $(id);
-        if (el) el.checked = !!value;
-      };
-      const setValue = (id, value) => {
-        const el = $(id);
-        if (el && value !== undefined && value !== null) {
-          el.value = value;
-        }
-      };
-      setChecked("settings-compact", settings.compactMode);
-      setChecked("settings-show-extra", settings.showExtraSections);
-      setChecked("settings-show-feed-stats", settings.showFeedStats);
-      setChecked("settings-feed-auto-load", settings.feedAutoLoadMore);
-      setChecked("settings-show-email", settings.showEmail);
-      setChecked("settings-show-profile-stats", settings.showProfileStats);
-      setChecked("settings-show-bodyweight", settings.showBodyweight);
-      setChecked("settings-notify-like", settings.notifications?.like);
-      setChecked("settings-notify-comment", settings.notifications?.comment);
-      setChecked("settings-notify-follow", settings.notifications?.follow);
-      setValue("settings-default-filter", settings.defaultFilter);
-      setValue("settings-feed-layout", settings.feedLayout || "list");
-      setValue("settings-default-visibility", settings.defaultVisibility);
-      setValue("settings-language", settings.language);
-      setValue("settings-date-format", settings.dateFormat);
-      setValue("settings-weight-unit", settings.weightUnit);
-      setValue("settings-height-unit", settings.heightUnit);
-      updateSettingsExpandLabel();
+      return settingsController.updateSettingsExpandLabel();
     }
 function updateExtraSectionsVisibility() {
-      const tr = t[currentLang] || t.ja;
-      const btn = $("btn-toggle-sections");
-      const label = showExtraSections
-        ? tr.hideExtraSections || "Hide sections"
-        : tr.showMoreSections || "Show more sections";
-      if (btn) {
-        btn.textContent = label;
-      }
-      document.querySelectorAll(".extra-section").forEach((el) => {
-        el.classList.toggle("hidden", !showExtraSections);
-      });
-      [
-        "profile-details",
-        "profile-edit-identity",
-        "profile-edit-training",
-        "profile-edit-media",
-        "profile-edit-links",
-        "summary-details",
-      ].forEach((key) => setCollapsibleOpen(key, showExtraSections));
-    }
-function toggleSettingsSections() {
-      const keys = [
-        "settings-preferences",
-        "settings-privacy",
-        "settings-notifications",
-        "settings-language",
-        "settings-data",
-        "settings-templates",
-        "settings-tips",
-      ];
-      const shouldOpen = keys.some((key) => {
-        const wrapper = document.querySelector(`[data-collapsible="${key}"]`);
-        const content = wrapper?.querySelector("[data-collapsible-content]");
-        return !content?.classList.contains("is-open");
-      });
-      keys.forEach((key) => setCollapsibleOpen(key, shouldOpen));
-      updateSettingsExpandLabel();
+      return settingsController.updateExtraSectionsVisibility();
     }
 function setupSettingsUI() {
-      const bindToggle = (id, handler) => {
-        const el = $(id);
-        if (!el || el.dataset.bound === "true") return;
-        el.dataset.bound = "true";
-        el.addEventListener("change", () => handler(el.checked));
-      };
-      const bindSelect = (id, handler) => {
-        const el = $(id);
-        if (!el || el.dataset.bound === "true") return;
-        el.dataset.bound = "true";
-        el.addEventListener("change", () => handler(el.value));
-      };
-
-      bindToggle("settings-compact", (value) =>
-        saveSettings({ compactMode: value })
-      );
-      bindToggle("settings-show-extra", (value) =>
-        saveSettings({ showExtraSections: value })
-      );
-      bindToggle("settings-show-feed-stats", (value) =>
-        saveSettings({ showFeedStats: value })
-      );
-      bindToggle("settings-feed-auto-load", (value) =>
-        saveSettings({ feedAutoLoadMore: value })
-      );
-      bindSelect("settings-default-filter", (value) =>
-        saveSettings({ defaultFilter: value })
-      );
-      bindSelect("settings-default-visibility", (value) =>
-        saveSettings({ defaultVisibility: value })
-      );
-      bindToggle("settings-show-email", (value) =>
-        saveSettings({ showEmail: value })
-      );
-      bindToggle("settings-show-profile-stats", (value) =>
-        saveSettings({ showProfileStats: value })
-      );
-      bindToggle("settings-show-bodyweight", (value) =>
-        saveSettings({ showBodyweight: value })
-      );
-      bindToggle("settings-notify-like", (value) =>
-        saveSettings({ notifications: { like: value } })
-      );
-      bindToggle("settings-notify-comment", (value) =>
-        saveSettings({ notifications: { comment: value } })
-      );
-      bindToggle("settings-notify-follow", (value) =>
-        saveSettings({ notifications: { follow: value } })
-      );
-      bindSelect("settings-language", (value) =>
-        saveSettings({ language: value })
-      );
-      bindSelect("settings-date-format", (value) =>
-        saveSettings({ dateFormat: value })
-      );
-      bindSelect("settings-feed-layout", (value) =>
-        saveSettings({ feedLayout: value })
-      );
-      bindSelect("settings-weight-unit", (value) =>
-        saveSettings({ weightUnit: value })
-      );
-      bindSelect("settings-height-unit", (value) =>
-        saveSettings({ heightUnit: value })
-      );
-
-      const expandBtn = $("btn-settings-expand");
-      if (expandBtn && expandBtn.dataset.bound !== "true") {
-        expandBtn.dataset.bound = "true";
-        expandBtn.addEventListener("click", toggleSettingsSections);
-      }
-
-      const quickCards = document.querySelectorAll("[data-preset]");
-      quickCards.forEach((card) => {
-        if (card.dataset.bound === "true") return;
-        card.dataset.bound = "true";
-        card.addEventListener("click", () => {
-          const preset = card.getAttribute("data-preset");
-          if (!preset) return;
-          applySettingsPreset(preset);
-          showToast(
-            t[currentLang]?.settingsPresetApplied || "Preset applied.",
-            "success"
-          );
-        });
-      });
+      return settingsController.setupSettingsUI();
     }
 function applySettings() {
-      const prev = applySettings.prev || {};
-      const prevWeightUnit = prev.weightUnit || settings.weightUnit;
-      const prevHeightUnit = prev.heightUnit || settings.heightUnit;
-      const weightUnitChanged = prevWeightUnit !== settings.weightUnit;
-      const heightUnitChanged = prevHeightUnit !== settings.heightUnit;
-      const languageChanged =
-        !applySettings.prev || settings.language !== currentLang;
-
-      document.body.classList.toggle("compact-mode", settings.compactMode);
-
-      const feedStats = $("feed-stat-grid");
-      if (feedStats) {
-        feedStats.classList.toggle("hidden", !settings.showFeedStats);
-      }
-
-      const emailEl = $("profile-email");
-      if (emailEl) {
-        emailEl.classList.toggle("hidden", !settings.showEmail);
-      }
-      const profileMeta = $("profile-meta");
-      if (profileMeta) {
-        profileMeta.classList.toggle("hidden", !settings.showProfileStats);
-      }
-      const publicMeta = $("public-profile-meta");
-      if (publicMeta) {
-        publicMeta.classList.toggle("hidden", !settings.showProfileStats);
-      }
-
-      showExtraSections = !!settings.showExtraSections;
-      updateExtraSectionsVisibility();
-
-      if (settings.defaultFilter) {
-        setFeedState({ currentFilter: settings.defaultFilter });
-        updateFilterButtons();
-      }
-      if (settings.feedLayout) {
-        setFeedState({ feedLayout: settings.feedLayout });
-      }
-
-      const visibilitySelect = $("post-visibility");
-      if (visibilitySelect && settings.defaultVisibility) {
-        visibilitySelect.value = settings.defaultVisibility;
-      }
-
-      if (settings.language && settings.language !== currentLang) {
-        currentLang = settings.language;
-      }
-
-      if (weightUnitChanged) {
-        const weightInput = $("post-weight");
-        if (weightInput && weightInput.value) {
-          const converted = convertWeightValue(
-            weightInput.value,
-            prevWeightUnit,
-            settings.weightUnit
-          );
-          if (converted !== null) {
-            weightInput.value = formatNumber(converted, 1);
-          }
-        }
-        workoutExercises.forEach((exercise) => {
-          exercise.sets.forEach((setItem) => {
-            if (
-              setItem.weight !== null &&
-              setItem.weight !== undefined &&
-              setItem.weight !== ""
-            ) {
-              const converted = convertWeightValue(
-                setItem.weight,
-                prevWeightUnit,
-                settings.weightUnit
-              );
-              if (converted !== null) {
-                setItem.weight = formatNumber(converted, 1);
-              }
-            }
-          });
-        });
-        if (typeof renderWorkoutRows === "function") {
-          renderWorkoutRows();
-        }
-      }
-
-      if (heightUnitChanged) {
-        const heightInput = $("profile-height");
-        if (heightInput && heightInput.value) {
-          const converted = convertHeightValue(
-            heightInput.value,
-            prevHeightUnit,
-            settings.heightUnit
-          );
-          if (converted !== null) {
-            heightInput.value = formatNumber(converted, 1);
-          }
-        }
-      }
-
-      const langSelect = $("lang-select");
-      if (langSelect) langSelect.value = currentLang;
-      const settingsLang = $("settings-language");
-      if (settingsLang) settingsLang.value = currentLang;
-
-      if (languageChanged) {
-        applyTranslations();
-      } else if (typeof updateCollapsibleLabels === "function") {
-        updateCollapsibleLabels();
-      }
-
-      updateWeightLabels();
-      updateHeightLabel();
-      updateSettingsExpandLabel();
-      populateSettingsUI();
-      updateSettingsSummary();
-      updatePresetActive(detectPresetFromSettings());
-
-      renderFeed();
-      updateProfileSummary();
-      renderWorkoutHistory();
-      renderTrainingSummary();
-      renderPrList();
-      renderInsights();
-      renderOnboardingChecklist();
-      renderNotifications();
-      if (currentPublicProfileId) {
-        openPublicProfile(currentPublicProfileId);
-      }
-
-      applySettings.prev = { ...settings };
-    }
-function updateSettingsSummary() {
-      const summary = $("settings-summary");
-      if (!summary) return;
-      const tr = t[currentLang] || t.ja;
-      const formatMap = {
-        auto: tr.settingsDateFormatAuto || "Auto",
-        ymd: tr.settingsDateFormatYmd || "YYYY/MM/DD",
-        mdy: tr.settingsDateFormatMdy || "MM/DD/YYYY",
-      };
-      const items = [
-        {
-          label: tr.settingsSummaryLanguage || "Language",
-          value: settings.language === "ja" ? "日本語" : "English",
-        },
-        {
-          label: tr.settingsSummaryDate || "Date",
-          value: formatMap[settings.dateFormat] || formatMap.auto,
-        },
-        {
-          label: tr.settingsSummaryWeight || "Weight",
-          value: settings.weightUnit === "lb" ? "lb" : "kg",
-        },
-        {
-          label: tr.settingsSummaryHeight || "Height",
-          value: settings.heightUnit === "in" ? "in" : "cm",
-        },
-        {
-          label: tr.settingsSummaryFilter || "Default feed",
-          value:
-            settings.defaultFilter === "mine"
-              ? tr.mine || "Mine"
-              : tr.all || "All",
-        },
-        {
-          label: tr.settingsFeedLayoutTitle || "Feed layout",
-          value:
-            settings.feedLayout === "grid"
-              ? tr.feedLayoutGrid || "Grid"
-              : tr.feedLayoutList || "List",
-        },
-        {
-          label: tr.settingsFeedAutoLoadTitle || "Feed auto-load",
-          value: settings.feedAutoLoadMore !== false ? "ON" : "OFF",
-        },
-      ];
-      summary.innerHTML = "";
-      items.forEach((item) => {
-        const pill = document.createElement("div");
-        pill.className = "settings-summary-pill";
-        const label = document.createElement("span");
-        label.className = "settings-summary-label";
-        label.textContent = item.label;
-        const value = document.createElement("span");
-        value.className = "settings-summary-value";
-        value.textContent = item.value;
-        pill.appendChild(label);
-        pill.appendChild(value);
-        summary.appendChild(pill);
-      });
+      return settingsController.applySettings();
     }
 function applySettingsPreset(preset) {
-      if (preset === "minimal") {
-        saveSettings({
-          compactMode: true,
-          showExtraSections: false,
-          showFeedStats: false,
-          feedAutoLoadMore: false,
-          showProfileStats: true,
-          showBodyweight: false,
-          notifications: { like: true, comment: true, follow: true },
-        });
-        updatePresetActive("minimal");
-        return;
-      }
-      if (preset === "recommended") {
-        saveSettings({
-          compactMode: false,
-          showExtraSections: false,
-          showFeedStats: true,
-          feedAutoLoadMore: true,
-          showProfileStats: true,
-          showBodyweight: true,
-          notifications: { like: true, comment: true, follow: true },
-        });
-        updatePresetActive("recommended");
-        return;
-      }
-      if (preset === "balanced") {
-        saveSettings({
-          compactMode: false,
-          showExtraSections: false,
-          showFeedStats: true,
-          feedAutoLoadMore: true,
-          showProfileStats: true,
-          showBodyweight: false,
-          notifications: { like: true, comment: true, follow: true },
-        });
-        updatePresetActive("balanced");
-        return;
-      }
-      if (preset === "full") {
-        saveSettings({
-          compactMode: false,
-          showExtraSections: true,
-          showFeedStats: true,
-          feedAutoLoadMore: true,
-          showProfileStats: true,
-          showBodyweight: true,
-          notifications: { like: true, comment: true, follow: true },
-        });
-        updatePresetActive("full");
-      }
-    }
-function updatePresetActive(preset) {
-      const cards = document.querySelectorAll("[data-preset]");
-      cards.forEach((card) => {
-        const value = card.getAttribute("data-preset");
-        card.classList.toggle("is-active", value === preset);
-      });
-    }
-function detectPresetFromSettings() {
-      const matches = (target) =>
-        settings.compactMode === target.compactMode &&
-        settings.showExtraSections === target.showExtraSections &&
-        settings.showFeedStats === target.showFeedStats &&
-        settings.feedAutoLoadMore === target.feedAutoLoadMore &&
-        settings.showBodyweight === target.showBodyweight;
-
-      if (
-        matches({
-          compactMode: true,
-          showExtraSections: false,
-          showFeedStats: false,
-          feedAutoLoadMore: false,
-          showBodyweight: false,
-        })
-      ) {
-        return "minimal";
-      }
-
-      if (
-        matches({
-          compactMode: false,
-          showExtraSections: true,
-          showFeedStats: true,
-          feedAutoLoadMore: true,
-          showBodyweight: true,
-        })
-      ) {
-        return "full";
-      }
-
-      if (
-        matches({
-          compactMode: false,
-          showExtraSections: false,
-          showFeedStats: true,
-          feedAutoLoadMore: true,
-          showBodyweight: true,
-        })
-      ) {
-        return "recommended";
-      }
-
-      if (
-        matches({
-          compactMode: false,
-          showExtraSections: false,
-          showFeedStats: true,
-          feedAutoLoadMore: true,
-          showBodyweight: false,
-        })
-      ) {
-        return "balanced";
-      }
-
-      return "balanced";
+      return settingsController.applySettingsPreset(preset);
     }
 
 
@@ -1317,8 +796,70 @@ async function loadProfilePostCount() {
     window.addEventListener("DOMContentLoaded", init);
     window.addEventListener("hashchange", handleHashRoute);
 
+    function setupServiceWorker() {
+      if (serviceWorkerSetupDone) return;
+      serviceWorkerSetupDone = true;
+      if (typeof window === "undefined" || typeof navigator === "undefined") return;
+      if (!("serviceWorker" in navigator)) return;
+      const hostname = window.location.hostname || "";
+      const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
+      if (window.location.protocol !== "https:" && !isLocalhost) return;
+
+      const tr = () => t[currentLang] || t.ja;
+      const activateWaitingWorker = (registration) => {
+        const waiting = registration?.waiting;
+        if (!waiting) return false;
+        waiting.postMessage({ type: "SKIP_WAITING" });
+        showToast(tr().appUpdateReady || "App updated. Reloading…", "success");
+        return true;
+      };
+
+      navigator.serviceWorker
+        .register("./sw.js", { updateViaCache: "none" })
+        .then((registration) => {
+          if (!registration) return;
+
+          if (!serviceWorkerControllerReloaded) {
+            navigator.serviceWorker.addEventListener("controllerchange", () => {
+              if (serviceWorkerControllerReloaded) return;
+              serviceWorkerControllerReloaded = true;
+              window.location.reload();
+            });
+          }
+
+          if (!serviceWorkerVisibilityListenerBound) {
+            serviceWorkerVisibilityListenerBound = true;
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState !== "visible") return;
+              registration.update().catch(() => {});
+            });
+          }
+
+          activateWaitingWorker(registration);
+          registration.update().catch(() => {});
+          registration.addEventListener("updatefound", () => {
+            const installing = registration.installing;
+            if (!installing) return;
+            installing.addEventListener("statechange", () => {
+              if (
+                installing.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+                activateWaitingWorker(registration);
+              }
+            });
+          });
+        })
+        .catch((error) => {
+          console.warn("service worker registration failed", error);
+        });
+    }
+
     async function init() {
+      setupServiceWorker();
       loadSettings();
+      commentSync.loadQueue();
+      commentSync.setupOnlineSync();
       setupLanguageSwitcher();
       setupAuthUI();
       setupProfileEditor();
@@ -1344,6 +885,7 @@ async function loadProfilePostCount() {
       applySettings();
       await restoreSession();
       await loadFeed();
+      await commentSync.flushQueue({ silent: true });
       handleHashRoute();
     }
     
@@ -1376,13 +918,6 @@ async function loadProfilePostCount() {
         setActivePage("feed");
       }
     }
-
-
-
-    function resetPublicProfilePagination() {
-      publicPostsVisibleCount = publicPostsPageSize;
-    }
-
     const KG_TO_LB = 2.2046226218;
     const CM_TO_IN = 0.3937007874;
 
@@ -1567,6 +1102,7 @@ async function loadProfilePostCount() {
       // Feed
       setText("feed-title", "feed");
       setText("btn-feed-refresh", "feedRefresh");
+      setText("btn-feed-clear", "feedClear");
       setText("btn-feed-retry", "feedRetry");
       setText("btn-feed-options", "feedOptions");
       setText("btn-feed-layout", "feedLayoutGrid");
@@ -1666,6 +1202,7 @@ async function loadProfilePostCount() {
       setText("settings-data-title", "settingsDataTitle");
       setText("settings-data-sub", "settingsDataSub");
       setText("btn-export-data", "settingsExportData");
+      setText("btn-force-update", "forceAppUpdate");
       setText("btn-reset-settings", "settingsReset");
       setText("btn-toggle-perf-debug", "perfDebugEnable");
 
@@ -1835,119 +1372,18 @@ async function loadProfilePostCount() {
       }
     }
 
-    function buildProfileEditSnapshot() {
-      const snapshot = {};
-      PROFILE_EDIT_TRACKED_FIELD_IDS.forEach((id) => {
-        const el = $(id);
-        snapshot[id] = el ? `${el.value ?? ""}` : "";
-      });
-      snapshot.pendingAvatarFile = pendingAvatarFile
-        ? `${pendingAvatarFile.name}:${pendingAvatarFile.size}`
-        : "";
-      snapshot.pendingBannerFile = pendingBannerFile
-        ? `${pendingBannerFile.name}:${pendingBannerFile.size}`
-        : "";
-      return snapshot;
-    }
-
-    function getProfileEditDraftKey(userId = currentUser?.id) {
-      if (!userId) return "";
-      return `${PROFILE_EDIT_DRAFT_KEY}:${userId}`;
-    }
-
-    function loadProfileEditDraft(userId = currentUser?.id) {
-      const key = getProfileEditDraftKey(userId);
-      if (!key) return null;
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed || parsed.userId !== userId || typeof parsed.fields !== "object") {
-          return null;
-        }
-        return parsed;
-      } catch (error) {
-        console.warn("profile draft load failed", error);
-        return null;
-      }
-    }
-
-    function clearProfileEditDraft(userId = currentUser?.id) {
-      const key = getProfileEditDraftKey(userId);
-      if (!key) return;
-      try {
-        localStorage.removeItem(key);
-      } catch (error) {
-        console.warn("profile draft clear failed", error);
-      }
-    }
-
-    function buildProfileEditDraftPayload() {
-      const fields = {};
-      PROFILE_EDIT_TRACKED_FIELD_IDS.forEach((id) => {
-        const el = $(id);
-        fields[id] = el ? `${el.value ?? ""}` : "";
-      });
-      return {
-        version: 1,
-        userId: currentUser?.id || "",
-        fields,
-        savedAt: Date.now(),
-      };
-    }
-
-    function saveProfileEditDraft() {
-      if (profileDraftSaveTimer) {
-        clearTimeout(profileDraftSaveTimer);
-        profileDraftSaveTimer = null;
-      }
-      if (!currentUser) return;
-      const currentSnapshot = JSON.stringify(buildProfileEditSnapshot());
-      if (!profileEditBaseline || currentSnapshot === profileEditBaseline) {
-        clearProfileEditDraft(currentUser.id);
-        return;
-      }
-      const key = getProfileEditDraftKey(currentUser.id);
-      if (!key) return;
-      const payload = buildProfileEditDraftPayload();
-      try {
-        localStorage.setItem(key, JSON.stringify(payload));
-      } catch (error) {
-        console.warn("profile draft save failed", error);
-      }
-    }
-
     function scheduleProfileEditDraftSave() {
-      if (!currentUser) return;
-      if (profileDraftSaveTimer) {
-        clearTimeout(profileDraftSaveTimer);
-      }
-      profileDraftSaveTimer = setTimeout(saveProfileEditDraft, 280);
+      profileEditState.scheduleDraftSave(280);
     }
 
     function applyProfileEditDraftIfAvailable() {
       if (!currentUser) return false;
-      const draft = loadProfileEditDraft(currentUser.id);
-      if (!draft?.fields) return false;
-      let restored = false;
-      PROFILE_EDIT_TRACKED_FIELD_IDS.forEach((id) => {
-        const el = $(id);
-        if (!el) return;
-        const next = `${draft.fields[id] ?? ""}`;
-        if (`${el.value ?? ""}` === next) return;
-        el.value = next;
-        restored = true;
-      });
-      if (!restored) {
-        clearProfileEditDraft(currentUser.id);
-        return false;
-      }
+      const restored = profileEditState.applyDraftIfAvailable(currentUser.id);
+      if (!restored) return false;
       refreshProfileEditDirtyState();
       const status = $("profile-edit-status");
-      const tr = t[currentLang] || t.ja;
       if (status) {
-        status.textContent =
-          tr.profileDraftRestored || "プロフィール下書きを復元しました。";
+        status.textContent = profileEditState.getDraftRestoredMessage();
       }
       return true;
     }
@@ -1958,53 +1394,43 @@ async function loadProfilePostCount() {
       const dirtyBadge = $("profile-edit-dirty");
       const saveBtn = $("btn-save-profile");
       const resetBtn = $("btn-reset-profile");
+      const isDirty = profileEditState.isDirty();
 
       if (section) {
-        section.classList.toggle("is-dirty", profileEditDirty);
+        section.classList.toggle("is-dirty", isDirty);
       }
       if (dirtyBadge) {
         dirtyBadge.textContent =
           tr.profileUnsaved || "未保存の変更があります。";
-        dirtyBadge.classList.toggle("hidden", !profileEditDirty);
+        dirtyBadge.classList.toggle("hidden", !isDirty);
       }
       if (resetBtn) {
-        resetBtn.disabled = !currentUser || !profileEditDirty;
+        resetBtn.disabled = !currentUser || !isDirty;
       }
       if (saveBtn && !saveBtn.classList.contains("is-loading")) {
-        saveBtn.disabled = !currentUser || !profileEditDirty;
+        saveBtn.disabled = !currentUser || !isDirty;
       }
     }
 
     function refreshProfileEditDirtyState() {
-      if (!currentUser) {
-        profileEditDirty = false;
-        updateProfileEditDirtyUI();
-        return;
-      }
-      const next =
-        JSON.stringify(buildProfileEditSnapshot()) !== profileEditBaseline;
-      profileEditDirty = !!next;
+      profileEditState.refreshDirtyState();
       updateProfileEditDirtyUI();
     }
 
     function captureProfileEditBaseline() {
-      profileEditBaseline = JSON.stringify(buildProfileEditSnapshot());
-      profileEditDirty = false;
+      profileEditState.captureBaseline();
       updateProfileEditDirtyUI();
     }
 
     function handleResetProfileEditor() {
       const tr = t[currentLang] || t.ja;
       if (!currentUser) return;
-      if (!profileEditDirty) {
+      if (!profileEditState.isDirty()) {
         showToast(tr.profileNoChanges || "変更はありません。", "warning");
         return;
       }
-      if (profileDraftSaveTimer) {
-        clearTimeout(profileDraftSaveTimer);
-        profileDraftSaveTimer = null;
-      }
-      clearProfileEditDraft(currentUser.id);
+      profileEditState.cancelDraftSave();
+      profileEditState.clearDraft(currentUser.id);
       populateProfileEditor();
       const status = $("profile-edit-status");
       if (status) status.textContent = "";
@@ -2015,36 +1441,27 @@ async function loadProfilePostCount() {
     }
 
     function confirmDiscardProfileChanges() {
-      if (!profileEditDirty) return true;
+      if (!profileEditState.isDirty()) return true;
       const tr = t[currentLang] || t.ja;
-      return window.confirm(
+      return profileEditState.confirmDiscardChanges(
         tr.profileLeaveConfirm || "未保存の変更があります。ページを移動しますか？"
       );
     }
 
     function setupProfileEditUnloadGuard() {
-      if (profileEditUnloadGuardBound || typeof window === "undefined") return;
-      profileEditUnloadGuardBound = true;
-      window.addEventListener("beforeunload", (event) => {
-        if (!profileEditDirty) return;
-        event.preventDefault();
-        event.returnValue = "";
-      });
+      profileEditState.setupUnloadGuard();
     }
 
     function setupProfileEditShortcuts() {
-      if (profileEditShortcutsBound || typeof window === "undefined") return;
-      profileEditShortcutsBound = true;
-      window.addEventListener("keydown", (event) => {
-        const isSaveKey =
-          (event.metaKey || event.ctrlKey) &&
-          (event.key === "s" || event.key === "S");
-        if (!isSaveKey) return;
-        const activePage =
-          document.querySelector(".page-view.is-active")?.dataset.page || "";
-        if (activePage !== "account" || !currentUser || !profileEditDirty) return;
-        event.preventDefault();
-        handleSaveProfile();
+      profileEditState.setupSaveShortcut({
+        isEnabled: () => {
+          const activePage =
+            document.querySelector(".page-view.is-active")?.dataset.page || "";
+          return activePage === "account" && !!currentUser && profileEditState.isDirty();
+        },
+        onSave: () => {
+          handleSaveProfile();
+        },
       });
     }
 
@@ -2202,10 +1619,7 @@ async function loadProfilePostCount() {
       if (status) status.textContent = "";
 
       if (!currentUser) {
-        if (profileDraftSaveTimer) {
-          clearTimeout(profileDraftSaveTimer);
-          profileDraftSaveTimer = null;
-        }
+        profileEditState.cancelDraftSave();
         if (displayEl) displayEl.value = "";
         if (handleEl) handleEl.value = "";
         if (bioEl) bioEl.value = "";
@@ -2282,7 +1696,7 @@ async function loadProfilePostCount() {
       }
       if (status) status.textContent = "";
       refreshProfileEditDirtyState();
-      if (!profileEditDirty) {
+      if (!profileEditState.isDirty()) {
         showToast(tr.profileNoChanges || "変更はありません。", "warning");
         updateProfileEditDirtyUI();
         return;
@@ -2446,11 +1860,8 @@ async function loadProfilePostCount() {
         if (bannerFileEl) bannerFileEl.value = "";
         pendingAvatarFile = null;
         pendingBannerFile = null;
-        if (profileDraftSaveTimer) {
-          clearTimeout(profileDraftSaveTimer);
-          profileDraftSaveTimer = null;
-        }
-        clearProfileEditDraft(currentUser.id);
+        profileEditState.cancelDraftSave();
+        profileEditState.clearDraft(currentUser.id);
         updateAuthUIState();
         updateProfileSummary();
         populateProfileEditor();
@@ -2538,6 +1949,7 @@ async function loadProfilePostCount() {
         await loadTemplates();
         await loadNotifications();
         await loadFeed();
+        await commentSync.flushQueue({ silent: true });
 
         showToast("ログインしました！", "success");
       } finally {
@@ -2564,6 +1976,7 @@ async function loadProfilePostCount() {
       commentsByPost.clear();
       commentsExpanded.clear();
       commentsLoading.clear();
+      commentSync.clearLoadedPosts();
       commentsEnabled = true;
       likesByPost = new Map();
       likedPostIds = new Set();
@@ -2578,6 +1991,7 @@ async function loadProfilePostCount() {
       exercisePRs = new Map();
       prTrackingEnabled = true;
       clearPostDraft();
+      profileEditState.resetState();
       pendingAvatarFile = null;
       pendingBannerFile = null;
       setFeedState({ isFeedLoading: false, feedError: "" });
@@ -2658,6 +2072,7 @@ async function loadProfilePostCount() {
   await loadExercisePRs();
   await loadTemplates();
   await loadNotifications();
+  await commentSync.flushQueue({ silent: true });
 
   updateProfileSummary();
   updateAuthUIState();
@@ -3706,22 +3121,39 @@ async function loadProfilePostCount() {
       return rows;
     }
 
-    async function loadWorkoutLogs(postIds) {
-      workoutLogsByPost = new Map();
+    async function loadWorkoutLogs(postIds, options = {}) {
+      const append = !!options.append;
+      if (!append) {
+        workoutLogsByPost = new Map();
+        loadedWorkoutLogPostIds = new Set();
+      }
       if (!workoutLogsEnabled) return;
-      if (!postIds.length) return;
+      const targetIds = Array.from(
+        new Set(
+          (Array.isArray(postIds) ? postIds : [])
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+        )
+      );
+      if (!targetIds.length) return;
+      const queryIds = append
+        ? targetIds.filter((postId) => !loadedWorkoutLogPostIds.has(postId))
+        : targetIds;
+      if (!queryIds.length) return;
 
       const { data, error } = await supabase
         .from("workout_sets")
         .select(
           "post_id, exercise, set_index, reps, weight, rest_seconds, exercise_note, pr_type"
         )
-        .in("post_id", postIds);
+        .in("post_id", queryIds);
 
       if (error) {
         console.error("loadWorkoutLogs error:", error);
-        workoutLogsEnabled = false;
-        renderWorkoutRows();
+        if (!append) {
+          workoutLogsEnabled = false;
+          renderWorkoutRows();
+        }
         return;
       }
 
@@ -3749,6 +3181,7 @@ async function loadProfilePostCount() {
         workoutLogsByPost.set(log.post_id, existing);
       });
 
+      queryIds.forEach((postId) => loadedWorkoutLogPostIds.add(postId));
       workoutLogsByPost.forEach((exercises, postId) => {
         exercises.forEach((exercise) => {
           exercise.sets.sort((a, b) => (a.set_index || 0) - (b.set_index || 0));
@@ -4950,9 +4383,12 @@ async function loadProfilePostCount() {
 
 
     async function loadCommentsForPost(postId) {
-      if (!postId || !commentsEnabled) return [];
-      if (commentsByPost.has(postId)) {
-        return commentsByPost.get(postId);
+      if (!postId || !commentsEnabled) return commentsByPost.get(postId) || [];
+      if (commentSync.isPostLoaded(postId)) {
+        return commentsByPost.get(postId) || [];
+      }
+      if (!commentSync.isOnline()) {
+        return commentsByPost.get(postId) || [];
       }
 
       commentsLoading.add(postId);
@@ -4968,8 +4404,11 @@ async function loadProfilePostCount() {
 
       if (error) {
         console.error("loadComments error:", error);
+        if (commentSync.isLikelyTransientNetworkError(error)) {
+          return commentsByPost.get(postId) || [];
+        }
         commentsEnabled = false;
-        return [];
+        return commentsByPost.get(postId) || [];
       }
 
       const profileMap = await loadProfilesForUsers(
@@ -4979,8 +4418,10 @@ async function loadProfilePostCount() {
         ...comment,
         profile: profileMap.get(comment.user_id) || null,
       }));
-      commentsByPost.set(postId, withProfiles);
-      return withProfiles;
+      const merged = commentSync.mergePendingComments(postId, withProfiles);
+      commentsByPost.set(postId, merged);
+      commentSync.markPostLoaded(postId);
+      return merged;
     }
 
     function toggleComments(postId) {
@@ -4990,7 +4431,7 @@ async function loadProfilePostCount() {
         return;
       }
       commentsExpanded.add(postId);
-      if (!commentsByPost.has(postId)) {
+      if (!commentSync.isPostLoaded(postId) && commentsEnabled) {
         loadCommentsForPost(postId).then(() => renderFeed());
       } else {
         renderFeed();
@@ -4999,6 +4440,7 @@ async function loadProfilePostCount() {
 
     async function submitComment(post, inputEl) {
       const postId = post?.id;
+      if (!postId) return;
       if (!currentUser) {
         showToast("ログインしてください。", "warning");
         return;
@@ -5006,6 +4448,37 @@ async function loadProfilePostCount() {
       if (!commentsEnabled) return;
       const body = inputEl.value.trim();
       if (!body) return;
+      const tr = t[currentLang] || t.ja;
+
+      let profile = currentProfile || null;
+      if (!profile && currentUser?.id) {
+        try {
+          profile = await getProfile(currentUser.id);
+        } catch (profileError) {
+          console.error("load comment profile error:", profileError);
+        }
+      }
+
+      const queueComment = () => {
+        commentSync.enqueueOfflineComment({
+          postId,
+          body,
+          targetUserId: post.user_id,
+          profile,
+        });
+        inputEl.value = "";
+        renderFeed();
+        showToast(
+          tr.commentQueued ||
+            "オフラインのため、コメントを保存しました。オンライン時に送信します。",
+          "info"
+        );
+      };
+
+      if (!commentSync.isOnline()) {
+        queueComment();
+        return;
+      }
 
       const { data, error } = await supabase
         .from("comments")
@@ -5018,16 +4491,19 @@ async function loadProfilePostCount() {
         .single();
 
       if (error) {
+        if (commentSync.isLikelyTransientNetworkError(error)) {
+          queueComment();
+          return;
+        }
         console.error("comment insert error:", error);
         commentsEnabled = false;
         showToast("コメントの投稿に失敗しました。", "error");
         return;
       }
 
-      const profile = currentProfile || (await getProfile(currentUser.id));
       const next = commentsByPost.get(postId) || [];
-      next.push({ ...data, profile });
-      commentsByPost.set(postId, next);
+      next.push({ ...data, profile: profile || null });
+      commentsByPost.set(postId, commentSync.sortCommentsByCreatedAt(next));
       inputEl.value = "";
       await createNotification({
         userId: post.user_id,
@@ -5053,6 +4529,58 @@ async function loadProfilePostCount() {
         return;
       }
       await loadFeed();
+    }
+
+    async function clearLocalRuntimeCaches() {
+      localStorage.removeItem("trends_likes");
+      localStorage.removeItem("trends_feed_cache_v1");
+      localStorage.removeItem("trends_likes_offline_queue_v1");
+      commentSync.clearQueue();
+      profileEditState.clearDraft(currentUser?.id);
+      if (typeof caches !== "undefined") {
+        try {
+          const keys = await caches.keys();
+          await Promise.all(
+            keys
+              .filter((key) => key.startsWith("trends-shell-"))
+              .map((key) => caches.delete(key))
+          );
+        } catch (error) {
+          console.warn("cache storage clear failed", error);
+        }
+      }
+    }
+
+    async function getServiceWorkerRegistration() {
+      if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+        return null;
+      }
+      try {
+        const scoped = await navigator.serviceWorker.getRegistration("./sw.js");
+        if (scoped) return scoped;
+      } catch {
+        // ignore
+      }
+      try {
+        return await navigator.serviceWorker.getRegistration();
+      } catch {
+        return null;
+      }
+    }
+
+    async function refreshAppVersion() {
+      const registration = await getServiceWorkerRegistration();
+      if (!registration) return false;
+      try {
+        await registration.update();
+      } catch (error) {
+        console.warn("service worker update check failed", error);
+      }
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        return true;
+      }
+      return false;
     }
 
     // ------------------ Debug ------------------
@@ -5110,11 +4638,44 @@ async function loadProfilePostCount() {
       const clearBtn = $("btn-clear-cache");
       if (clearBtn && clearBtn.dataset.bound !== "true") {
         clearBtn.dataset.bound = "true";
-        clearBtn.addEventListener("click", () => {
-          localStorage.removeItem("trends_likes");
-          localStorage.removeItem("trends_feed_cache_v1");
-          setStatus(t[currentLang].cacheCleared || "Cache cleared.");
-          renderFeed();
+        clearBtn.addEventListener("click", async () => {
+          if (clearBtn.classList.contains("is-loading")) return;
+          clearBtn.classList.add("is-loading");
+          clearBtn.disabled = true;
+          try {
+            await clearLocalRuntimeCaches();
+            setStatus(t[currentLang].cacheCleared || "Cache cleared.");
+            renderFeed();
+          } finally {
+            clearBtn.classList.remove("is-loading");
+            clearBtn.disabled = false;
+          }
+        });
+      }
+
+      const forceUpdateBtn = $("btn-force-update");
+      if (forceUpdateBtn && forceUpdateBtn.dataset.bound !== "true") {
+        forceUpdateBtn.dataset.bound = "true";
+        forceUpdateBtn.addEventListener("click", async () => {
+          if (forceUpdateBtn.classList.contains("is-loading")) return;
+          forceUpdateBtn.classList.add("is-loading");
+          forceUpdateBtn.disabled = true;
+          try {
+            await clearLocalRuntimeCaches();
+            const hasWaitingWorker = await refreshAppVersion();
+            const tr = t[currentLang] || t.ja;
+            setStatus(
+              hasWaitingWorker
+                ? tr.appUpdateReloading || "Updating app and reloading..."
+                : tr.appUpdateReady || "App updated. Reloading…"
+            );
+            setTimeout(() => {
+              window.location.reload();
+            }, 300);
+          } finally {
+            forceUpdateBtn.classList.remove("is-loading");
+            forceUpdateBtn.disabled = false;
+          }
         });
       }
 
@@ -5160,14 +4721,7 @@ async function loadProfilePostCount() {
             tr.settingsResetConfirm || "Reset settings to defaults?"
           );
           if (!ok) return;
-          settings = {
-            ...defaultSettings,
-            notifications: { ...defaultSettings.notifications },
-          };
-          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-          localStorage.removeItem("trends_show_extra_sections");
-          showExtraSections = settings.showExtraSections;
-          applySettings();
+          settingsController.resetToDefaults();
           setStatus(t[currentLang].settingsResetDone || "Settings reset.");
         });
       }

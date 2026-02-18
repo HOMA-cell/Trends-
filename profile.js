@@ -6,10 +6,7 @@ import {
   formatHandle,
   formatDateDisplay,
   formatHeight,
-  formatWeight,
-  formatVolume,
   computeStreak,
-  computeWorkoutStats,
   toDateKey,
   normalizeUrl,
   normalizeHandleUrl,
@@ -50,7 +47,6 @@ export function setProfileContext(next = {}) {
 const getCurrentUser = () => profileContext.getCurrentUser?.();
 const getCurrentLang = () => profileContext.getCurrentLang?.() || "ja";
 const getCurrentProfile = () => profileContext.getCurrentProfile?.();
-const setCurrentProfile = (profile) => profileContext.setCurrentProfile?.(profile);
 const getSettings = () => profileContext.getSettings?.() || {};
 const getAllPosts = () => profileContext.getAllPosts?.() || [];
 const getUserPosts = () => profileContext.getUserPosts?.() || [];

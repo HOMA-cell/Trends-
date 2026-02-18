@@ -258,7 +258,7 @@ export function formatVolume(value, unitOverride) {
 export function computeStreak(dateSet) {
   let streak = 0;
   let cursor = new Date();
-  while (true) {
+  for (;;) {
     const key = toDateKey(cursor);
     if (!key || !dateSet.has(key)) break;
     streak += 1;

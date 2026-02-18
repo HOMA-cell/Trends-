@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <title>Trends | Workout SNS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#e4572e" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link
     rel="icon"
     href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111827'/%3E%3Ctext x='50%25' y='58%25' font-size='18' text-anchor='middle' fill='%23fff' font-family='Arial'%3ET%3C/text%3E%3C/svg%3E"
@@ -71,6 +74,7 @@
                 type="text"
                 placeholder="caption / handle / メモで検索"
               />
+              <button class="btn btn-ghost btn-xs hidden" id="btn-feed-clear">クリア</button>
               <button class="btn btn-ghost btn-xs" id="btn-feed-refresh">更新</button>
             </div>
           </div>
@@ -821,6 +825,7 @@
                 <div class="settings-actions">
                   <button class="btn btn-ghost" id="btn-export-data">データを書き出す</button>
                   <button class="btn btn-ghost" id="btn-clear-cache">キャッシュを削除</button>
+                  <button class="btn btn-ghost" id="btn-force-update">アプリを最新化</button>
                   <button class="btn btn-ghost" id="btn-toggle-perf-debug">描画パフォーマンスをON</button>
                   <button class="btn btn-danger" id="btn-reset-settings">設定をリセット</button>
                 </div>

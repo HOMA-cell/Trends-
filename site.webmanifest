@@ -1,0 +1,17 @@
+{
+  "name": "Trends Workout SNS",
+  "short_name": "Trends",
+  "description": "Workout-focused social app for physique logs and training posts.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4efe6",
+  "theme_color": "#e4572e",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

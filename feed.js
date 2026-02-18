@@ -7,7 +7,6 @@ import {
   formatHandle,
   formatDateDisplay,
   formatWeight,
-  formatVolume,
   toDateKey,
   computeStreak,
 } from "./utils.js";
@@ -77,9 +76,7 @@ const toggleFollowForUser = (...args) => feedContext.toggleFollowForUser?.(...ar
 const loadFollowStats = (...args) => feedContext.loadFollowStats?.(...args);
 const getFollowingIds = () => feedContext.getFollowingIds?.() || new Set();
 const getLikedPostIds = () => feedContext.getLikedPostIds?.() || new Set();
-const setLikedPostIds = (next) => feedContext.setLikedPostIds?.(next);
 const getLikesByPost = () => feedContext.getLikesByPost?.() || new Map();
-const setLikesByPost = (next) => feedContext.setLikesByPost?.(next);
 const getLikesEnabled = () => feedContext.getLikesEnabled?.() ?? true;
 const setLikesEnabled = (value) => feedContext.setLikesEnabled?.(value);
 const loadWorkoutLogs = (...args) => feedContext.loadWorkoutLogs?.(...args);
@@ -102,6 +99,7 @@ let feedError = "";
 let feedPageSize = 8;
 let feedVisibleCount = 8;
 let feedLastLoadedAt = null;
+let feedLoadingGeneration = 0;
 let currentDetailPostId = null;
 let feedRenderToken = 0;
 let feedLoadPromise = null;
@@ -112,6 +110,7 @@ let deferredVideoObserver = null;
 let feedMoreObserver = null;
 let feedAutoLoadingMore = false;
 let feedLastAutoLoadAt = 0;
+let feedMoreLoading = false;
 let feedIsOnline =
   typeof navigator === "undefined" ? true : navigator.onLine !== false;
 let feedNetworkListenersBound = false;
@@ -121,6 +120,9 @@ let feedPullActive = false;
 let feedPullStartY = 0;
 let feedPullDistance = 0;
 let feedPullLastTriggeredAt = 0;
+let likeOfflineQueue = [];
+let likeOfflineQueueLoaded = false;
+let likeOfflineQueueFlushing = false;
 let feedQueryCache = {
   queryKey: "",
   postsRef: null,
@@ -130,12 +132,43 @@ let feedQueryCache = {
 const postSearchHaystackCache = new Map();
 let secondaryRenderScheduled = false;
 const pendingLikePostIds = new Set();
+let feedRenderScheduled = false;
+let feedScheduledRenderToken = 0;
+let feedSearchInputTimer = null;
+let feedLastCommittedSearch = "";
+let feedMoreAnchorTop = null;
+let feedWindowUpdateRaf = 0;
+let feedWindowListenersBound = false;
+let feedChunkRendering = false;
+const feedWindowedCards = new Map();
+let feedKeyboardShortcutsBound = false;
+let feedCardActionDelegationBound = false;
+let feedPageSizeResizeBound = false;
+let feedPageSizeResizeTimer = null;
+const feedImageHydrationQueue = [];
+let feedImageHydrationActive = 0;
+const feedLikesLoadedPostIds = new Set();
+const feedMetaQueuePostIds = new Set();
+let feedMetaHydrationInFlight = false;
+const warmedImageUrlSet = new Set();
+const warmedImageUrlQueue = [];
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
+const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
 const FEED_PULL_THRESHOLD = 70;
 const FEED_PULL_MAX = 128;
 const FEED_PULL_COOLDOWN_MS = 1600;
+const FEED_SEARCH_DEBOUNCE_MS = 220;
+const FEED_WINDOW_MIN_ITEMS = 22;
+const FEED_WINDOW_MARGIN_PX = 820;
+const FEED_MEDIA_OBSERVER_MARGIN = "560px 0px";
+const FEED_MEDIA_VIDEO_PARK_MARGIN_PX = 1500;
+const FEED_IMAGE_HYDRATE_CONCURRENCY = 3;
+const FEED_WARMED_IMAGE_LIMIT = 320;
+const FEED_SEARCH_CACHE_LIMIT = 2400;
+const FEED_META_BATCH_SIZE = 40;
+const FEED_META_PRELOAD_MULTIPLIER = 5;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -159,7 +192,13 @@ const closeBackdrop = (backdrop) => {
     };
 function hydrateDeferredVideo(videoEl) {
       if (!videoEl) return;
-      if (videoEl.dataset.deferredLoaded === "true") return;
+      if (videoEl.dataset.deferredLoaded === "true") {
+        if (videoEl.dataset.parked === "true") {
+          videoEl.preload = "metadata";
+          delete videoEl.dataset.parked;
+        }
+        return;
+      }
       const src = videoEl.dataset.src;
       if (!src) return;
       videoEl.preload = "metadata";
@@ -167,6 +206,69 @@ function hydrateDeferredVideo(videoEl) {
       videoEl.dataset.deferredLoaded = "true";
       delete videoEl.dataset.src;
       videoEl.classList.remove("video-deferred");
+    }
+function hydrateDeferredImage(imgEl) {
+      if (!imgEl) return;
+      if (imgEl.dataset.deferredLoaded === "true") return;
+      const src = imgEl.dataset.src;
+      if (!src) return;
+      imgEl.src = src;
+      imgEl.dataset.deferredLoaded = "true";
+      delete imgEl.dataset.src;
+      delete imgEl.dataset.hydrationQueued;
+      imgEl.classList.remove("image-deferred");
+      rememberWarmedImageUrl(src);
+    }
+function rememberWarmedImageUrl(url) {
+      if (!url) return;
+      if (warmedImageUrlSet.has(url)) return;
+      warmedImageUrlSet.add(url);
+      warmedImageUrlQueue.push(url);
+      while (warmedImageUrlQueue.length > FEED_WARMED_IMAGE_LIMIT) {
+        const oldest = warmedImageUrlQueue.shift();
+        if (!oldest) continue;
+        warmedImageUrlSet.delete(oldest);
+      }
+    }
+function flushImageHydrationQueue() {
+      while (
+        feedImageHydrationActive < FEED_IMAGE_HYDRATE_CONCURRENCY &&
+        feedImageHydrationQueue.length
+      ) {
+        const imgEl = feedImageHydrationQueue.shift();
+        if (!imgEl || !imgEl.isConnected || imgEl.dataset.deferredLoaded === "true") {
+          continue;
+        }
+        feedImageHydrationActive += 1;
+        requestAnimationFrame(() => {
+          try {
+            hydrateDeferredImage(imgEl);
+          } finally {
+            feedImageHydrationActive = Math.max(0, feedImageHydrationActive - 1);
+            flushImageHydrationQueue();
+          }
+        });
+      }
+    }
+function queueImageHydration(imgEl) {
+      if (!imgEl || imgEl.dataset.deferredLoaded === "true") return;
+      if (imgEl.dataset.hydrationQueued === "true") return;
+      imgEl.dataset.hydrationQueued = "true";
+      feedImageHydrationQueue.push(imgEl);
+      flushImageHydrationQueue();
+    }
+function parkDeferredVideo(videoEl) {
+      if (!videoEl) return;
+      if (videoEl.dataset.deferredLoaded !== "true") return;
+      if (!videoEl.paused) {
+        try {
+          videoEl.pause();
+        } catch {
+          // ignore pause errors
+        }
+      }
+      videoEl.preload = "none";
+      videoEl.dataset.parked = "true";
     }
 function ensureDeferredVideoObserver() {
       if (deferredVideoObserver) {
@@ -178,15 +280,41 @@ function ensureDeferredVideoObserver() {
       deferredVideoObserver = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            const videoEl = entry.target;
-            hydrateDeferredVideo(videoEl);
-            deferredVideoObserver?.unobserve(videoEl);
+            const mediaEl = entry.target;
+            if (!mediaEl) return;
+            if (mediaEl.tagName === "VIDEO") {
+              if (entry.isIntersecting) {
+                hydrateDeferredVideo(mediaEl);
+                return;
+              }
+              if (!mediaEl.paused) {
+                try {
+                  mediaEl.pause();
+                } catch {
+                  // ignore pause errors
+                }
+              }
+              if (feedLayout !== "grid") return;
+              const rect = entry.boundingClientRect;
+              const vh = typeof window === "undefined" ? 800 : window.innerHeight || 800;
+              const isFarAway =
+                rect.bottom < -FEED_MEDIA_VIDEO_PARK_MARGIN_PX ||
+                rect.top > vh + FEED_MEDIA_VIDEO_PARK_MARGIN_PX;
+              if (isFarAway) {
+                parkDeferredVideo(mediaEl);
+              }
+              return;
+            }
+            if (mediaEl.tagName === "IMG") {
+              if (!entry.isIntersecting) return;
+              queueImageHydration(mediaEl);
+              deferredVideoObserver?.unobserve(mediaEl);
+            }
           });
         },
         {
           root: null,
-          rootMargin: "320px 0px",
+          rootMargin: FEED_MEDIA_OBSERVER_MARGIN,
           threshold: 0.01,
         }
       );
@@ -200,6 +328,21 @@ function observeDeferredVideo(videoEl) {
         return;
       }
       observer.observe(videoEl);
+    }
+function observeDeferredImage(imgEl) {
+      if (!imgEl) return;
+      const observer = ensureDeferredVideoObserver();
+      if (!observer) {
+        queueImageHydration(imgEl);
+        return;
+      }
+      observer.observe(imgEl);
+    }
+function isEditableTarget(target) {
+      if (!target || typeof target.closest !== "function") return false;
+      return !!target.closest(
+        "input, textarea, select, [contenteditable=''], [contenteditable='true']"
+      );
     }
 function resetDeferredVideoObserver() {
       if (!deferredVideoObserver) return;
@@ -298,6 +441,11 @@ function getPostSearchHaystack(post, workoutLogsMap) {
         logsRef: logs,
         haystack,
       });
+      while (postSearchHaystackCache.size > FEED_SEARCH_CACHE_LIMIT) {
+        const oldestKey = postSearchHaystackCache.keys().next().value;
+        if (oldestKey === undefined) break;
+        postSearchHaystackCache.delete(oldestKey);
+      }
       return haystack;
     }
 function isPerfDebugEnabled() {
@@ -331,10 +479,170 @@ function renderFeedPerfPanel(payload = null) {
         `mode ${payload.mode}`,
         `query ${payload.queryCacheHit ? "hit" : "miss"}`,
       ];
+      if (typeof payload.pageSize === "number") {
+        parts.push(`page ${payload.pageSize}`);
+      }
+      if (typeof payload.detachedCount === "number") {
+        parts.push(`windowed ${payload.detachedCount}`);
+      }
       el.textContent = parts.join(" | ");
     }
 function getOnlineState() {
       return typeof navigator === "undefined" ? true : navigator.onLine !== false;
+    }
+function isLikelyTransientNetworkError(error) {
+      if (!error) return false;
+      if (!getOnlineState()) return true;
+      const status = `${error.status || ""}`.toLowerCase();
+      const code = `${error.code || ""}`.toLowerCase();
+      const message = `${error.message || error.details || error.hint || error}`
+        .toLowerCase()
+        .trim();
+      if (status === "0") return true;
+      if (code.startsWith("08")) return true;
+      return (
+        message.includes("failed to fetch") ||
+        message.includes("network") ||
+        message.includes("connection") ||
+        message.includes("timeout")
+      );
+    }
+function loadLikeOfflineQueue() {
+      if (likeOfflineQueueLoaded) return;
+      likeOfflineQueueLoaded = true;
+      try {
+        const raw = localStorage.getItem(LIKES_OFFLINE_QUEUE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        likeOfflineQueue = Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.warn("load like offline queue failed", error);
+        likeOfflineQueue = [];
+      }
+    }
+function saveLikeOfflineQueue() {
+      try {
+        localStorage.setItem(
+          LIKES_OFFLINE_QUEUE_KEY,
+          JSON.stringify(Array.isArray(likeOfflineQueue) ? likeOfflineQueue : [])
+        );
+      } catch (error) {
+        console.warn("save like offline queue failed", error);
+      }
+    }
+function getLikeOfflineQueueKey(action) {
+      return `${action?.userId || ""}:${action?.postId || ""}`;
+    }
+function upsertLikeOfflineQueueAction(action) {
+      if (!action?.postId || !action?.userId) return;
+      loadLikeOfflineQueue();
+      const key = getLikeOfflineQueueKey(action);
+      const idx = likeOfflineQueue.findIndex(
+        (item) => getLikeOfflineQueueKey(item) === key
+      );
+      if (idx >= 0) {
+        likeOfflineQueue[idx] = { ...likeOfflineQueue[idx], ...action };
+      } else {
+        likeOfflineQueue.push(action);
+      }
+      saveLikeOfflineQueue();
+    }
+async function flushLikeOfflineQueue(options = {}) {
+      loadLikeOfflineQueue();
+      if (!likeOfflineQueue.length) return 0;
+      if (likeOfflineQueueFlushing) return 0;
+      const currentUser = getCurrentUser();
+      if (!currentUser?.id) return 0;
+      if (!getOnlineState()) return 0;
+      const tr = t[getCurrentLang()] || t.ja;
+      const silent = !!options.silent;
+      likeOfflineQueueFlushing = true;
+      let synced = 0;
+      try {
+        for (let idx = 0; idx < likeOfflineQueue.length; ) {
+          const action = likeOfflineQueue[idx];
+          if (!action || action.userId !== currentUser.id || !action.postId) {
+            idx += 1;
+            continue;
+          }
+          try {
+            if (action.desiredLiked) {
+              const { error } = await supabase.from("post_likes").insert({
+                post_id: action.postId,
+                user_id: action.userId,
+              });
+              if (error && error.code !== "23505") {
+                throw error;
+              }
+              if (
+                !error &&
+                action.targetUserId &&
+                action.targetUserId !== action.userId
+              ) {
+                await createNotification({
+                  userId: action.targetUserId,
+                  actorId: action.userId,
+                  type: "like",
+                  postId: action.postId,
+                });
+              }
+            } else {
+              const { error } = await supabase
+                .from("post_likes")
+                .delete()
+                .eq("post_id", action.postId)
+                .eq("user_id", action.userId);
+              if (error) throw error;
+            }
+            likeOfflineQueue.splice(idx, 1);
+            saveLikeOfflineQueue();
+            synced += 1;
+          } catch (error) {
+            if (isLikelyTransientNetworkError(error)) {
+              break;
+            }
+            console.error("flush like queue error:", error);
+            likeOfflineQueue.splice(idx, 1);
+            saveLikeOfflineQueue();
+          }
+        }
+      } finally {
+        likeOfflineQueueFlushing = false;
+      }
+      if (synced > 0) {
+        scheduleRenderFeed();
+        if (!silent) {
+          setFeedNotice(
+            tr.offlineSyncDone || "オフライン操作を同期しました。",
+            "success",
+            1800
+          );
+        }
+      }
+      return synced;
+    }
+function applyQueuedLikeState() {
+      loadLikeOfflineQueue();
+      if (!likeOfflineQueue.length) return;
+      const currentUser = getCurrentUser();
+      if (!currentUser?.id) return;
+      const likedPostIds = getLikedPostIds();
+      const likesByPost = getLikesByPost();
+      likeOfflineQueue.forEach((action) => {
+        if (!action || action.userId !== currentUser.id || !action.postId) return;
+        const currentlyLiked = likedPostIds.has(action.postId);
+        const currentCount = likesByPost.get(action.postId) || 0;
+        if (action.desiredLiked) {
+          if (!currentlyLiked) {
+            likedPostIds.add(action.postId);
+            likesByPost.set(action.postId, currentCount + 1);
+          }
+          return;
+        }
+        if (currentlyLiked) {
+          likedPostIds.delete(action.postId);
+          likesByPost.set(action.postId, Math.max(0, currentCount - 1));
+        }
+      });
     }
 function saveFeedCache(posts = []) {
       try {
@@ -359,6 +667,263 @@ function loadFeedCache() {
         return [];
       }
     }
+function scheduleRenderFeed() {
+      if (feedRenderScheduled) return;
+      feedRenderScheduled = true;
+      const token = ++feedScheduledRenderToken;
+      const run = () => {
+        if (token !== feedScheduledRenderToken) return;
+        feedRenderScheduled = false;
+        renderFeed();
+      };
+      if (
+        typeof window !== "undefined" &&
+        typeof window.requestAnimationFrame === "function"
+      ) {
+        window.requestAnimationFrame(run);
+        return;
+      }
+      setTimeout(run, 0);
+    }
+function getRecommendedFeedPageSize() {
+      const viewportWidth =
+        typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
+      const compact = viewportWidth <= 700;
+      if (feedLayout === "grid") {
+        return compact ? 8 : 12;
+      }
+      return compact ? 6 : 8;
+    }
+function syncFeedPageSize(options = {}) {
+      const nextSize = getRecommendedFeedPageSize();
+      if (feedPageSize === nextSize) return false;
+      feedPageSize = nextSize;
+      if (options.resetVisible) {
+        feedVisibleCount = nextSize;
+      } else {
+        feedVisibleCount = Math.max(feedVisibleCount, nextSize);
+      }
+      return true;
+    }
+function getPostById(postId) {
+      if (!postId) return null;
+      const posts = getAllPosts();
+      if (!Array.isArray(posts) || !posts.length) return null;
+      return posts.find((post) => `${post?.id || ""}` === `${postId}`) || null;
+    }
+function getFeedMetadataPreloadCount() {
+      return Math.max(24, feedPageSize * FEED_META_PRELOAD_MULTIPLIER);
+    }
+function queueFeedMetadataForPosts(postIds = []) {
+      if (!Array.isArray(postIds) || !postIds.length) return;
+      if (!getOnlineState()) return;
+      if (!supabase) return;
+      postIds.forEach((postId) => {
+        const id = `${postId || ""}`.trim();
+        if (!id) return;
+        if (feedLikesLoadedPostIds.has(id)) return;
+        if (feedMetaQueuePostIds.has(id)) return;
+        feedMetaQueuePostIds.add(id);
+      });
+      flushFeedMetadataQueue();
+    }
+async function flushFeedMetadataQueue() {
+      if (feedMetaHydrationInFlight) return;
+      if (!feedMetaQueuePostIds.size) return;
+      if (!getOnlineState()) return;
+      feedMetaHydrationInFlight = true;
+      try {
+        while (feedMetaQueuePostIds.size) {
+          const batch = Array.from(feedMetaQueuePostIds).slice(0, FEED_META_BATCH_SIZE);
+          batch.forEach((postId) => feedMetaQueuePostIds.delete(postId));
+          if (!batch.length) continue;
+          try {
+            await Promise.all([
+              loadWorkoutLogs(batch, { append: true }),
+              loadLikes(batch, { append: true }),
+            ]);
+          } catch (error) {
+            console.error("feed metadata hydration error", error);
+          }
+        }
+      } finally {
+        feedMetaHydrationInFlight = false;
+      }
+      scheduleRenderFeed();
+      scheduleSecondaryRenders();
+    }
+function setupFeedCardActionDelegation() {
+      if (feedCardActionDelegationBound) return;
+      feedCardActionDelegationBound = true;
+      const feedList = $("feed-list");
+      if (!feedList) return;
+      feedList.addEventListener("click", async (event) => {
+        const actionBtn = event.target?.closest?.("button[data-post-action]");
+        if (!actionBtn) return;
+        const card = actionBtn.closest(".post-card[data-post-id]");
+        const postId = card?.getAttribute("data-post-id") || "";
+        if (!postId) return;
+        const action = actionBtn.dataset.postAction || "";
+        if (!action) return;
+        event.preventDefault();
+        if (action === "toggle-comments") {
+          toggleComments(postId);
+          return;
+        }
+        const post = getPostById(postId);
+        if (!post) return;
+        if (action === "toggle-like") {
+          await toggleLikeForPost(post);
+          return;
+        }
+        if (action === "delete-post") {
+          await deletePost(post.id);
+        }
+      });
+    }
+function captureFeedMoreAnchor(moreWrap) {
+      if (!moreWrap || typeof window === "undefined") {
+        feedMoreAnchorTop = null;
+        return;
+      }
+      feedMoreAnchorTop = moreWrap.getBoundingClientRect().top;
+    }
+function restoreFeedMoreAnchor(moreWrap) {
+      if (
+        feedMoreAnchorTop === null ||
+        !moreWrap ||
+        typeof window === "undefined"
+      ) {
+        feedMoreAnchorTop = null;
+        return;
+      }
+      const nextTop = moreWrap.getBoundingClientRect().top;
+      const delta = nextTop - feedMoreAnchorTop;
+      feedMoreAnchorTop = null;
+      if (!Number.isFinite(delta) || Math.abs(delta) < 1) return;
+      window.scrollBy({
+        top: delta,
+        left: 0,
+        behavior: "auto",
+      });
+    }
+function isNearFeedViewport(el) {
+      if (!el || typeof window === "undefined") return true;
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight || 800;
+      return (
+        rect.bottom >= -FEED_WINDOW_MARGIN_PX &&
+        rect.top <= vh + FEED_WINDOW_MARGIN_PX
+      );
+    }
+function restoreWindowedFeedCard(placeholder) {
+      if (!placeholder) return false;
+      const postId = placeholder.getAttribute("data-post-id");
+      if (!postId) return false;
+      const card = feedWindowedCards.get(postId);
+      if (!card) return false;
+      placeholder.replaceWith(card);
+      feedWindowedCards.delete(postId);
+      return true;
+    }
+function restoreAllWindowedFeedCards(container) {
+      if (!container) return;
+      const placeholders = container.querySelectorAll(
+        ".feed-window-placeholder[data-post-id]"
+      );
+      placeholders.forEach((placeholder) => {
+        restoreWindowedFeedCard(placeholder);
+      });
+      feedWindowedCards.clear();
+    }
+function detachFeedCard(card) {
+      if (!card) return false;
+      const postId = card.getAttribute("data-post-id");
+      if (!postId || feedWindowedCards.has(postId)) return false;
+      const rect = card.getBoundingClientRect();
+      const height = Math.max(120, Math.round(rect.height || card.offsetHeight || 220));
+      const placeholder = document.createElement("div");
+      placeholder.className = "feed-window-placeholder";
+      placeholder.setAttribute("data-post-id", postId);
+      placeholder.setAttribute("aria-hidden", "true");
+      placeholder.style.height = `${height}px`;
+      feedWindowedCards.set(postId, card);
+      card.replaceWith(placeholder);
+      return true;
+    }
+function runFeedWindowing() {
+      const container = $("feed-list");
+      if (!container) {
+        feedWindowedCards.clear();
+        return;
+      }
+      if (feedChunkRendering) {
+        return;
+      }
+      if (feedLayout !== "list" || isFeedLoading) {
+        restoreAllWindowedFeedCards(container);
+        return;
+      }
+      const cards = container.querySelectorAll(".post-card[data-post-id]");
+      const placeholders = container.querySelectorAll(
+        ".feed-window-placeholder[data-post-id]"
+      );
+      if (cards.length + placeholders.length < FEED_WINDOW_MIN_ITEMS) {
+        restoreAllWindowedFeedCards(container);
+        return;
+      }
+
+      placeholders.forEach((placeholder) => {
+        if (isNearFeedViewport(placeholder)) {
+          restoreWindowedFeedCard(placeholder);
+        }
+      });
+
+      const activeEl =
+        typeof document !== "undefined" ? document.activeElement : null;
+      const liveCards = container.querySelectorAll(".post-card[data-post-id]");
+      liveCards.forEach((card) => {
+        if (isNearFeedViewport(card)) return;
+        if (activeEl && card.contains(activeEl)) return;
+        detachFeedCard(card);
+      });
+    }
+function scheduleFeedWindowingUpdate(force = false) {
+      if (typeof window === "undefined") return;
+      if (force) {
+        if (feedWindowUpdateRaf) {
+          cancelAnimationFrame(feedWindowUpdateRaf);
+          feedWindowUpdateRaf = 0;
+        }
+        runFeedWindowing();
+        return;
+      }
+      if (feedWindowUpdateRaf) return;
+      feedWindowUpdateRaf = requestAnimationFrame(() => {
+        feedWindowUpdateRaf = 0;
+        runFeedWindowing();
+      });
+    }
+function setupFeedWindowingListeners() {
+      if (feedWindowListenersBound || typeof window === "undefined") return;
+      feedWindowListenersBound = true;
+      window.addEventListener("scroll", () => scheduleFeedWindowingUpdate(), {
+        passive: true,
+      });
+      window.addEventListener("resize", () => scheduleFeedWindowingUpdate(), {
+        passive: true,
+      });
+    }
+function syncFeedWindowing(shouldEnable = false) {
+      const container = $("feed-list");
+      if (!container) return;
+      if (!shouldEnable) {
+        restoreAllWindowedFeedCards(container);
+        return;
+      }
+      setupFeedWindowingListeners();
+      scheduleFeedWindowingUpdate(true);
+    }
 function setFeedNotice(message = "", tone = "", autoClearMs = 0) {
       feedNotice = message || "";
       feedNoticeTone = tone || "";
@@ -370,7 +935,7 @@ function setFeedNotice(message = "", tone = "", autoClearMs = 0) {
         feedNoticeTimer = setTimeout(() => {
           feedNotice = "";
           feedNoticeTone = "";
-          renderFeed();
+          scheduleRenderFeed();
         }, autoClearMs);
       }
     }
@@ -442,6 +1007,7 @@ function scheduleSecondaryRenders() {
       setTimeout(run, 0);
     }
 export function resetFeedPagination() {
+      syncFeedPageSize({ resetVisible: true });
       feedVisibleCount = feedPageSize;
     }
 export function setFeedState(next = {}) {
@@ -466,16 +1032,19 @@ export function setFeedState(next = {}) {
       if (typeof next.feedError === "string") {
         feedError = next.feedError;
       }
+      syncFeedPageSize();
     }
 export function setupFeedControls() {
       feedIsOnline = getOnlineState();
+      setupFeedCardActionDelegation();
+      syncFeedPageSize({ resetVisible: true });
       const filterAll = $("filter-all");
       if (filterAll) {
         filterAll.addEventListener("click", () => {
           currentFilter = "all";
           resetFeedPagination();
           updateFilterButtons();
-          renderFeed();
+          scheduleRenderFeed();
         });
       }
       const filterMine = $("filter-mine");
@@ -495,7 +1064,7 @@ export function setupFeedControls() {
           }
           resetFeedPagination();
           updateFilterButtons();
-          renderFeed();
+          scheduleRenderFeed();
         });
       }
       const filterPublic = $("filter-public");
@@ -504,7 +1073,7 @@ export function setupFeedControls() {
           currentFilter = "public";
           resetFeedPagination();
           updateFilterButtons();
-          renderFeed();
+          scheduleRenderFeed();
         });
       }
       const filterMediaBtn = $("filter-media");
@@ -513,7 +1082,7 @@ export function setupFeedControls() {
           filterMedia = !filterMedia;
           resetFeedPagination();
           updateFilterButtons();
-          renderFeed();
+          scheduleRenderFeed();
         });
       }
       const filterWorkoutBtn = $("filter-workout");
@@ -522,21 +1091,69 @@ export function setupFeedControls() {
           filterWorkout = !filterWorkout;
           resetFeedPagination();
           updateFilterButtons();
-          renderFeed();
+          scheduleRenderFeed();
         });
       }
 
       const searchInput = $("feed-search");
-      let searchTimer = null;
-      if (searchInput) {
+      const clearSearchBtn = $("btn-feed-clear");
+      const syncSearchClearButton = () => {
+        if (!clearSearchBtn || !searchInput) return;
+        const hasValue = !!searchInput.value?.trim();
+        clearSearchBtn.classList.toggle("hidden", !hasValue);
+        clearSearchBtn.disabled = !hasValue;
+        clearSearchBtn.setAttribute("aria-hidden", hasValue ? "false" : "true");
+      };
+      if (searchInput && searchInput.dataset.bound !== "true") {
+        searchInput.dataset.bound = "true";
+        const commitSearch = () => {
+          const nextSearch = searchInput.value?.trim().toLowerCase() || "";
+          if (nextSearch === feedLastCommittedSearch) return;
+          feedLastCommittedSearch = nextSearch;
+          resetFeedPagination();
+          scheduleRenderFeed();
+          syncSearchClearButton();
+        };
+        feedLastCommittedSearch = searchInput.value?.trim().toLowerCase() || "";
+        syncSearchClearButton();
         searchInput.addEventListener("input", () => {
-          if (searchTimer) {
-            clearTimeout(searchTimer);
+          if (feedSearchInputTimer) {
+            clearTimeout(feedSearchInputTimer);
           }
-          searchTimer = setTimeout(() => {
-            resetFeedPagination();
-            renderFeed();
-          }, 180);
+          feedSearchInputTimer = setTimeout(() => {
+            feedSearchInputTimer = null;
+            commitSearch();
+          }, FEED_SEARCH_DEBOUNCE_MS);
+          syncSearchClearButton();
+        });
+        searchInput.addEventListener("keydown", (event) => {
+          if (event.isComposing || event.key !== "Escape") return;
+          if (!searchInput.value) return;
+          event.preventDefault();
+          searchInput.value = "";
+          if (feedSearchInputTimer) {
+            clearTimeout(feedSearchInputTimer);
+            feedSearchInputTimer = null;
+          }
+          commitSearch();
+          syncSearchClearButton();
+        });
+      }
+      if (clearSearchBtn && clearSearchBtn.dataset.bound !== "true") {
+        clearSearchBtn.dataset.bound = "true";
+        clearSearchBtn.addEventListener("click", () => {
+          if (!searchInput) return;
+          if (!searchInput.value?.trim()) return;
+          searchInput.value = "";
+          if (feedSearchInputTimer) {
+            clearTimeout(feedSearchInputTimer);
+            feedSearchInputTimer = null;
+          }
+          feedLastCommittedSearch = "";
+          resetFeedPagination();
+          scheduleRenderFeed();
+          syncSearchClearButton();
+          searchInput.focus();
         });
       }
 
@@ -545,7 +1162,7 @@ export function setupFeedControls() {
         sortSelect.addEventListener("change", () => {
           sortOrder = sortSelect.value || "newest";
           resetFeedPagination();
-          renderFeed();
+          scheduleRenderFeed();
         });
         sortSelect.value = sortOrder;
       }
@@ -570,7 +1187,7 @@ export function setupFeedControls() {
             "warning",
             2600
           );
-          renderFeed();
+          scheduleRenderFeed();
           return false;
         }
         await loadFeed({ softRefresh: true });
@@ -605,7 +1222,51 @@ export function setupFeedControls() {
               feedContext.onFeedLayoutChange(next);
             }
           }
-          renderFeed();
+          syncFeedPageSize({ resetVisible: true });
+          scheduleRenderFeed();
+        });
+      }
+      if (!feedPageSizeResizeBound && typeof window !== "undefined") {
+        feedPageSizeResizeBound = true;
+        window.addEventListener(
+          "resize",
+          () => {
+            if (feedPageSizeResizeTimer) {
+              clearTimeout(feedPageSizeResizeTimer);
+            }
+            feedPageSizeResizeTimer = setTimeout(() => {
+              feedPageSizeResizeTimer = null;
+              if (syncFeedPageSize()) {
+                scheduleRenderFeed();
+              }
+            }, 120);
+          },
+          { passive: true }
+        );
+      }
+      if (!feedKeyboardShortcutsBound && typeof window !== "undefined") {
+        feedKeyboardShortcutsBound = true;
+        window.addEventListener("keydown", (event) => {
+          if (event.defaultPrevented || event.isComposing) return;
+          if (event.metaKey || event.ctrlKey || event.altKey) return;
+          const target = event.target;
+          const activePage =
+            document.querySelector(".page-view.is-active")?.dataset.page || "";
+          if (activePage !== "feed") return;
+          if (event.key === "/" && !isEditableTarget(target)) {
+            const liveSearch = $("feed-search");
+            if (!liveSearch) return;
+            event.preventDefault();
+            liveSearch.focus();
+            liveSearch.select();
+            return;
+          }
+          if (event.key.toLowerCase() === "g" && !isEditableTarget(target)) {
+            const liveLayoutBtn = $("btn-feed-layout");
+            if (!liveLayoutBtn) return;
+            event.preventDefault();
+            liveLayoutBtn.click();
+          }
         });
       }
 
@@ -736,7 +1397,7 @@ export function setupFeedControls() {
 
       if (!feedNetworkListenersBound && typeof window !== "undefined") {
         feedNetworkListenersBound = true;
-        window.addEventListener("online", () => {
+        window.addEventListener("online", async () => {
           feedIsOnline = true;
           const tr = t[getCurrentLang()] || t.ja;
           setFeedNotice(
@@ -744,7 +1405,12 @@ export function setupFeedControls() {
             "success",
             2200
           );
-          renderFeed();
+          scheduleRenderFeed();
+          try {
+            await flushLikeOfflineQueue();
+          } catch (error) {
+            console.error("flush like queue on reconnect failed", error);
+          }
         });
         window.addEventListener("offline", () => {
           feedIsOnline = false;
@@ -754,7 +1420,7 @@ export function setupFeedControls() {
             "warning",
             2600
           );
-          renderFeed();
+          scheduleRenderFeed();
         });
       }
       if (
@@ -775,6 +1441,11 @@ export function setupFeedControls() {
       }
 
       updateFilterButtons();
+      if (getOnlineState()) {
+        flushLikeOfflineQueue({ silent: true }).catch((error) => {
+          console.error("flush like queue on setup failed", error);
+        });
+      }
     }
 export function updateFilterButtons() {
       const buttons = ["filter-all", "filter-mine"];
@@ -793,9 +1464,11 @@ export async function loadFeed(options = {}) {
         return feedLoadPromise;
       }
 
+      const requestGeneration = ++feedLoadingGeneration;
       const softRefresh = !!options.softRefresh && getAllPosts().length > 0;
       const tr = t[getCurrentLang()] || t.ja;
       feedIsOnline = getOnlineState();
+      loadLikeOfflineQueue();
 
       if (!feedIsOnline) {
         isFeedLoading = false;
@@ -846,6 +1519,11 @@ export async function loadFeed(options = {}) {
 
       feedLoadPromise = (async () => {
         try {
+          if (feedIsOnline) {
+            flushLikeOfflineQueue({ silent: true }).catch((error) => {
+              console.error("flush like queue before loading feed failed", error);
+            });
+          }
           let { data, error } = await supabase
             .from("posts")
             .select("*")
@@ -911,9 +1589,25 @@ export async function loadFeed(options = {}) {
             })
           );
 
+          if (requestGeneration !== feedLoadingGeneration) {
+            return;
+          }
+
           const postIds = postsWithProfile.map((post) => post.id).filter(Boolean);
-          await loadWorkoutLogs(postIds);
-          await loadLikes(postIds);
+          const initialMetaIds = postIds.slice(0, getFeedMetadataPreloadCount());
+          feedMetaQueuePostIds.clear();
+          await Promise.all([
+            loadWorkoutLogs(initialMetaIds, { append: false }),
+            loadLikes(initialMetaIds, { append: false }),
+          ]);
+          if (postIds.length > initialMetaIds.length) {
+            queueFeedMetadataForPosts(
+              postIds.slice(
+                initialMetaIds.length,
+                initialMetaIds.length + FEED_META_BATCH_SIZE
+              )
+            );
+          }
 
           setAllPosts(postsWithProfile);
           invalidateFeedQueryCache();
@@ -946,8 +1640,30 @@ export function renderFeed(options = {}) {
     const moreBtn = $("btn-feed-more");
     const layoutBtn = $("btn-feed-layout");
     if (!container) return;
+    feedChunkRendering = false;
+    feedScheduledRenderToken += 1;
+    feedRenderScheduled = false;
     const appendOnly = !!options.appendOnly;
+    if (!appendOnly) {
+      if (feedWindowUpdateRaf) {
+        cancelAnimationFrame(feedWindowUpdateRaf);
+        feedWindowUpdateRaf = 0;
+      }
+      restoreAllWindowedFeedCards(container);
+      feedMoreAnchorTop = null;
+    }
     const renderToken = ++feedRenderToken;
+    const clearFeedMoreLoadingState = () => {
+      feedMoreLoading = false;
+      if (moreBtn) {
+        moreBtn.classList.remove("is-loading");
+        moreBtn.disabled = false;
+      }
+      if (moreWrap) {
+        moreWrap.classList.remove("is-loading");
+      }
+    };
+
     const perfNow = () =>
       typeof performance !== "undefined" && typeof performance.now === "function"
         ? performance.now()
@@ -1114,6 +1830,8 @@ export function renderFeed(options = {}) {
     };
 
     if (isFeedLoading) {
+      feedChunkRendering = false;
+      clearFeedMoreLoadingState();
       updateRetryButton(false);
       if (Array.isArray(allPosts) && allPosts.length > 0) {
         if (status) {
@@ -1134,6 +1852,7 @@ export function renderFeed(options = {}) {
         resetDeferredVideoObserver();
         container.innerHTML = "";
         delete container.dataset.feedSignature;
+        feedWindowedCards.clear();
         if (moreWrap) moreWrap.classList.add("hidden");
         const skeletonCount = 3;
         for (let i = 0; i < skeletonCount; i += 1) {
@@ -1168,6 +1887,17 @@ export function renderFeed(options = {}) {
     updateRetryButton(Boolean(feedError) || (!feedIsOnline && !isFeedLoading));
 
     const visibleSlice = gridCandidates.slice(0, feedVisibleCount);
+    const metaTargetCount = Math.min(
+      gridCandidates.length,
+      feedVisibleCount + feedPageSize * 2
+    );
+    if (metaTargetCount > 0) {
+      const metaTargetIds = gridCandidates
+        .slice(0, metaTargetCount)
+        .map((post) => post.id)
+        .filter(Boolean);
+      queueFeedMetadataForPosts(metaTargetIds);
+    }
     const renderSignature = [
       feedLayout,
       currentFilter,
@@ -1180,7 +1910,9 @@ export function renderFeed(options = {}) {
       gridCandidates[0]?.id || "",
       gridCandidates[gridCandidates.length - 1]?.id || "",
     ].join("|");
-    const existingCount = container.querySelectorAll(".post-card:not(.skeleton)").length;
+    const existingCount = container.querySelectorAll(
+      ".post-card[data-post-id], .feed-window-placeholder[data-post-id]"
+    ).length;
     const canAppend =
       appendOnly &&
       container.dataset.feedSignature === renderSignature &&
@@ -1189,9 +1921,12 @@ export function renderFeed(options = {}) {
     const renderMode = canAppend ? "append" : "full";
 
     if (!gridCandidates.length) {
+      feedChunkRendering = false;
+      clearFeedMoreLoadingState();
       resetDeferredVideoObserver();
       container.innerHTML = "";
       delete container.dataset.feedSignature;
+      syncFeedWindowing(false);
       if (moreWrap) moreWrap.classList.add("hidden");
       const empty = document.createElement("div");
       empty.className = "empty-state";
@@ -1251,6 +1986,7 @@ export function renderFeed(options = {}) {
     }
 
     if (!canAppend) {
+      clearFeedMoreLoadingState();
       resetDeferredVideoObserver();
       container.innerHTML = "";
       if (moreWrap) moreWrap.classList.add("hidden");
@@ -1258,9 +1994,16 @@ export function renderFeed(options = {}) {
     container.dataset.feedSignature = renderSignature;
 
     const localLikedIds = getLikedIds();
+    const shouldAnimateEntry = canAppend;
     const createPostCard = (post) => {
       const card = document.createElement("div");
       card.className = "post-card";
+      if (shouldAnimateEntry) {
+        card.classList.add("post-card-enter");
+        requestAnimationFrame(() => {
+          card.classList.add("is-ready");
+        });
+      }
       if (!post.media_url) {
         card.classList.add("no-media");
       }
@@ -1326,13 +2069,14 @@ export function renderFeed(options = {}) {
 
       const likeBtn = document.createElement("button");
       likeBtn.className = "chip chip-like";
+      likeBtn.dataset.postAction = "toggle-like";
       const likeState = getLikeUiState(post.id, localLikedIds);
       applyLikeButtonState(likeBtn, likeState, tr);
-      likeBtn.addEventListener("click", () => toggleLikeForPost(post));
       actions.appendChild(likeBtn);
 
       const commentBtn = document.createElement("button");
       commentBtn.className = "chip chip-log";
+      commentBtn.dataset.postAction = "toggle-comments";
       const commentCount = commentsByPost.get(post.id)?.length || 0;
       if (commentsExpanded.has(post.id)) {
         commentBtn.textContent = tr.commentsHide || "Hide";
@@ -1341,7 +2085,6 @@ export function renderFeed(options = {}) {
       } else {
         commentBtn.textContent = tr.commentsShow || "View comments";
       }
-      commentBtn.addEventListener("click", () => toggleComments(post.id));
       actions.appendChild(commentBtn);
 
       if (currentUser && post.user_id !== currentUser.id) {
@@ -1358,8 +2101,8 @@ export function renderFeed(options = {}) {
       if (currentUser && post.user_id === currentUser.id) {
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "chip chip-delete";
+        deleteBtn.dataset.postAction = "delete-post";
         deleteBtn.textContent = tr.delete || "Delete";
-        deleteBtn.addEventListener("click", () => deletePost(post.id));
         actions.appendChild(deleteBtn);
       }
 
@@ -1400,13 +2143,22 @@ export function renderFeed(options = {}) {
           const img = document.createElement("img");
           img.loading = "lazy";
           img.decoding = "async";
+          img.fetchPriority = feedLayout === "grid" ? "low" : "auto";
           img.referrerPolicy = "no-referrer";
           img.alt = "post media";
+          img.classList.add("image-deferred");
           img.addEventListener("load", () => {
             clearMediaSkeleton(mediaWrap);
           }, { once: true });
           img.addEventListener("error", renderMediaFallback, { once: true });
-          img.src = post.media_url;
+          if (warmedImageUrlSet.has(post.media_url)) {
+            img.src = post.media_url;
+            img.dataset.deferredLoaded = "true";
+            img.classList.remove("image-deferred");
+          } else {
+            img.dataset.src = post.media_url;
+            observeDeferredImage(img);
+          }
           mediaWrap.appendChild(img);
         }
         card.appendChild(mediaWrap);
@@ -1519,6 +2271,9 @@ export function renderFeed(options = {}) {
             comments.forEach((comment) => {
               const item = document.createElement("div");
               item.className = "comment-item";
+              if (comment.pending) {
+                item.classList.add("is-pending");
+              }
 
               const avatarEl = document.createElement("div");
               avatarEl.className = "avatar";
@@ -1543,9 +2298,11 @@ export function renderFeed(options = {}) {
               const meta = document.createElement("div");
               meta.className = "comment-meta";
               const metaName = commentHandleText;
-              const metaDate = comment.created_at
-                ? formatDateDisplay(comment.created_at)
-                : "";
+              const metaDate = comment.pending
+                ? tr.commentPending || "送信待ち"
+                : comment.created_at
+                  ? formatDateDisplay(comment.created_at)
+                  : "";
               meta.textContent = [metaName, metaDate].filter(Boolean).join(" · ");
 
               bodyWrap.appendChild(bodyText);
@@ -1568,7 +2325,25 @@ export function renderFeed(options = {}) {
           const send = document.createElement("button");
           send.className = "btn btn-primary";
           send.textContent = tr.commentAdd || "Post";
-          send.addEventListener("click", () => submitComment(post, input));
+          send.addEventListener("click", async () => {
+            if (send.classList.contains("is-loading")) return;
+            send.classList.add("is-loading");
+            send.disabled = true;
+            try {
+              await submitComment(post, input);
+            } finally {
+              send.classList.remove("is-loading");
+              send.disabled = false;
+            }
+          });
+          input.addEventListener("keydown", (event) => {
+            if (event.isComposing) return;
+            if (!((event.metaKey || event.ctrlKey) && event.key === "Enter")) {
+              return;
+            }
+            event.preventDefault();
+            send.click();
+          });
 
           form.appendChild(input);
           form.appendChild(send);
@@ -1582,8 +2357,19 @@ export function renderFeed(options = {}) {
     };
 
     let index = canAppend ? existingCount : 0;
-    const batchSize = feedLayout === "grid" ? 6 : 4;
+    const viewportWidth =
+      typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
+    const compactViewport = viewportWidth <= 700;
+    const batchSize = feedLayout === "grid"
+      ? compactViewport
+        ? 4
+        : 8
+      : compactViewport
+        ? 3
+        : 5;
     const finalizeMore = () => {
+      feedChunkRendering = false;
+      clearFeedMoreLoadingState();
       if (moreWrap && moreBtn && moreHint) {
         const remaining = Math.max(0, gridCandidates.length - visibleSlice.length);
         const hasMore = remaining > 0;
@@ -1601,6 +2387,13 @@ export function renderFeed(options = {}) {
         if (!moreBtn.dataset.bound) {
           moreBtn.dataset.bound = "true";
           moreBtn.addEventListener("click", () => {
+            if (feedMoreLoading) return;
+            captureFeedMoreAnchor(moreWrap);
+            feedMoreLoading = true;
+            moreBtn.classList.add("is-loading");
+            moreBtn.disabled = true;
+            moreBtn.textContent = tr.feedMoreLoading || tr.loading || "読み込み中...";
+            moreWrap.classList.add("is-loading");
             feedVisibleCount += feedPageSize;
             renderFeed({ appendOnly: true });
           });
@@ -1610,8 +2403,12 @@ export function renderFeed(options = {}) {
           if (moreWrap.parentElement !== container) {
             container.appendChild(moreWrap);
           }
+          if (appendOnly) {
+            restoreFeedMoreAnchor(moreWrap);
+          }
         } else if (moreWrap.parentElement === container) {
           moreWrap.remove();
+          feedMoreAnchorTop = null;
         }
       }
       renderFeedPerfPanel({
@@ -1620,7 +2417,12 @@ export function renderFeed(options = {}) {
         visibleCount: visibleSlice.length,
         mode: renderMode,
         queryCacheHit,
+        pageSize: feedPageSize,
+        detachedCount: feedWindowedCards.size,
       });
+      const shouldWindow =
+        feedLayout === "list" && visibleSlice.length >= FEED_WINDOW_MIN_ITEMS;
+      syncFeedWindowing(shouldWindow);
     };
 
     const renderChunk = () => {
@@ -1638,6 +2440,7 @@ export function renderFeed(options = {}) {
       }
     };
 
+    feedChunkRendering = true;
     requestAnimationFrame(renderChunk);
     return;
   }
@@ -1663,6 +2466,8 @@ function updateFeedStats(posts = []) {
 export function setupFollowButtons() {
       const feedList = $("#feed-list"); // 投稿一覧のコンテナIDに合わせて
       if (!feedList) return;
+      if (feedList.dataset.followBound === "true") return;
+      feedList.dataset.followBound = "true";
 
       feedList.addEventListener("click", async (e) => {
         const btn = e.target.closest(".btn-follow");
@@ -1686,31 +2491,55 @@ export function setupFollowButtons() {
           // プロフィール側のフォロー数も更新
           await loadFollowStats();
           updateProfileSummary();
-          renderFeed();
+          scheduleRenderFeed();
         } finally {
           btn.classList.remove("is-loading");
           btn.disabled = false;
         }
       });
     }
-export async function loadLikes(postIds) {
+export async function loadLikes(postIds, options = {}) {
       const likesByPost = getLikesByPost();
       const likedPostIds = getLikedPostIds();
-      likesByPost.clear();
-      likedPostIds.clear();
-      setLikesEnabled(true);
-      if (!postIds.length) return;
+      const append = !!options.append;
+      if (!append) {
+        likesByPost.clear();
+        likedPostIds.clear();
+        feedLikesLoadedPostIds.clear();
+        setLikesEnabled(true);
+      }
+      if (!getLikesEnabled()) return;
+      if (!supabase) return;
+      const targetIds = Array.from(
+        new Set(
+          (Array.isArray(postIds) ? postIds : [])
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+        )
+      );
+      if (!targetIds.length) return;
+      const queryIds = append
+        ? targetIds.filter((postId) => !feedLikesLoadedPostIds.has(postId))
+        : targetIds;
+      if (!queryIds.length) return;
+      queryIds.forEach((postId) => {
+        if (!likesByPost.has(postId)) {
+          likesByPost.set(postId, 0);
+        }
+      });
 
       const { data, error } = await supabase
         .from("post_likes")
         .select("post_id, user_id")
-        .in("post_id", postIds);
+        .in("post_id", queryIds);
 
       if (error) {
         console.error("loadLikes error:", error);
-        setLikesEnabled(false);
-        const localLikes = getLikedIds();
-        localLikes.forEach((id) => likedPostIds.add(id));
+        if (!append) {
+          setLikesEnabled(false);
+          const localLikes = getLikedIds();
+          localLikes.forEach((id) => likedPostIds.add(id));
+        }
         return;
       }
 
@@ -1721,6 +2550,8 @@ export async function loadLikes(postIds) {
           likedPostIds.add(like.post_id);
         }
       });
+      queryIds.forEach((postId) => feedLikesLoadedPostIds.add(postId));
+      applyQueuedLikeState();
     }
 function getLikeUiState(postId, localLikedIds = null) {
       const likesEnabled = getLikesEnabled();
@@ -1792,8 +2623,16 @@ export async function toggleLikeForPost(post) {
       }
 
       const wasLiked = likedPostIds.has(post.id);
+      const desiredLiked = !wasLiked;
       const previousCount = likesByPost.get(post.id) || 0;
       let shouldNotify = false;
+      const queuedAction = {
+        postId: post.id,
+        userId: currentUser.id,
+        desiredLiked,
+        targetUserId: post.user_id || null,
+        updatedAt: new Date().toISOString(),
+      };
 
       pendingLikePostIds.add(post.id);
       if (wasLiked) {
@@ -1804,6 +2643,18 @@ export async function toggleLikeForPost(post) {
         likesByPost.set(post.id, previousCount + 1);
       }
       updateLikeButtonsForPost(post.id);
+
+      if (!getOnlineState()) {
+        upsertLikeOfflineQueueAction(queuedAction);
+        showToast(
+          tr.likeQueued ||
+            "オフラインのため、いいねを保存しました。オンライン時に同期します。",
+          "info"
+        );
+        pendingLikePostIds.delete(post.id);
+        updateLikeButtonsForPost(post.id);
+        return;
+      }
 
       try {
         if (wasLiked) {
@@ -1829,6 +2680,15 @@ export async function toggleLikeForPost(post) {
         }
       } catch (error) {
         console.error("like toggle error:", error);
+        if (isLikelyTransientNetworkError(error)) {
+          upsertLikeOfflineQueueAction(queuedAction);
+          showToast(
+            tr.likeQueued ||
+              "オフラインのため、いいねを保存しました。オンライン時に同期します。",
+            "info"
+          );
+          return;
+        }
         if (wasLiked) {
           likedPostIds.add(post.id);
         } else {
@@ -1921,7 +2781,6 @@ export function renderPostDetail() {
 
       const currentLang = getCurrentLang();
       const currentUser = getCurrentUser();
-      const settings = getSettings();
       const workoutLogsByPost = getWorkoutLogsByPost();
       const commentsByPost = getCommentsByPost();
       const commentsLoading = getCommentsLoading();
@@ -2082,6 +2941,9 @@ export function renderPostDetail() {
           comments.forEach((comment) => {
             const row = document.createElement("div");
             row.className = "comment-item";
+            if (comment.pending) {
+              row.classList.add("is-pending");
+            }
             const avatar = document.createElement("div");
             avatar.className = "avatar";
             renderAvatar(
@@ -2099,6 +2961,9 @@ export function renderPostDetail() {
             name.textContent =
               comment.profile?.display_name ||
               formatHandle(comment.profile?.handle || "user");
+            if (comment.pending) {
+              name.textContent = `${name.textContent} · ${tr.commentPending || "送信待ち"}`;
+            }
             const body = document.createElement("div");
             body.className = "comment-body";
             body.textContent = comment.body || "";
@@ -2120,7 +2985,23 @@ export function renderPostDetail() {
           const btn = document.createElement("button");
           btn.className = "btn btn-primary btn-xs";
           btn.textContent = tr.commentSubmit || "送信";
-          btn.addEventListener("click", () => submitComment(post, input));
+          btn.addEventListener("click", async () => {
+            if (btn.classList.contains("is-loading")) return;
+            btn.classList.add("is-loading");
+            btn.disabled = true;
+            try {
+              await submitComment(post, input);
+            } finally {
+              btn.classList.remove("is-loading");
+              btn.disabled = false;
+            }
+          });
+          input.addEventListener("keydown", (event) => {
+            if (event.isComposing) return;
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            btn.click();
+          });
           inputWrap.appendChild(input);
           inputWrap.appendChild(btn);
           commentsEl.appendChild(inputWrap);
