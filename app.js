@@ -99,6 +99,11 @@ import {
     let serviceWorkerScriptUrl = "./sw.js";
     let serviceWorkerBuildVersion = "dev-local";
     let serviceWorkerBuildResolved = false;
+    let appBuildMetaLoaded = false;
+    let appBuildMeta = {
+      version: "dev-local",
+      builtAt: null,
+    };
 
     const POST_DRAFT_KEY = "trends_post_draft_v1";
     const PROFILE_EDIT_DRAFT_KEY = "trends_profile_edit_draft_v1";
@@ -806,27 +811,80 @@ async function loadProfilePostCount() {
       return safe || "dev-local";
     }
 
-    async function resolveServiceWorkerScriptUrl(forceRefresh = false) {
-      if (serviceWorkerBuildResolved && !forceRefresh) {
-        return serviceWorkerScriptUrl;
+    function normalizeBuildMeta(meta = {}) {
+      const version = sanitizeBuildVersion(
+        meta?.version || meta?.build || meta?.commit || meta?.sha || "dev-local"
+      );
+      const builtAtRaw =
+        typeof meta?.built_at === "string"
+          ? meta.built_at
+          : typeof meta?.builtAt === "string"
+          ? meta.builtAt
+          : "";
+      const builtAt = builtAtRaw && !Number.isNaN(Date.parse(builtAtRaw))
+        ? builtAtRaw
+        : null;
+      return { version, builtAt };
+    }
+
+    function renderBuildMeta() {
+      const tr = t[currentLang] || t.ja;
+      const versionLabelEl = $("settings-build-version-label");
+      const builtAtLabelEl = $("settings-build-time-label");
+      const versionValueEl = $("settings-build-version");
+      const builtAtValueEl = $("settings-build-time");
+      if (versionLabelEl) {
+        versionLabelEl.textContent =
+          tr.settingsBuildVersionLabel || "App build";
       }
-      let version = serviceWorkerBuildVersion || "dev-local";
+      if (builtAtLabelEl) {
+        builtAtLabelEl.textContent =
+          tr.settingsBuildBuiltAtLabel || "Built at";
+      }
+      if (versionValueEl) {
+        versionValueEl.textContent =
+          appBuildMeta.version || tr.settingsBuildUnknown || "Unknown";
+      }
+      if (builtAtValueEl) {
+        builtAtValueEl.textContent = appBuildMeta.builtAt
+          ? formatDateTimeDisplay(appBuildMeta.builtAt)
+          : tr.settingsBuildUnknown || "Unknown";
+      }
+    }
+
+    async function loadBuildMeta(forceRefresh = false) {
+      if (appBuildMetaLoaded && !forceRefresh) {
+        renderBuildMeta();
+        return appBuildMeta;
+      }
+      let nextMeta = { ...appBuildMeta };
       try {
         const response = await fetch(`${BUILD_META_URL}?t=${Date.now()}`, {
           cache: "no-store",
         });
         if (response.ok) {
           const meta = await response.json();
-          version = sanitizeBuildVersion(
-            meta?.version || meta?.build || meta?.commit || meta?.sha || version
-          );
+          nextMeta = normalizeBuildMeta(meta);
         }
       } catch {
-        // Keep fallback version when metadata is unavailable.
+        // Keep fallback metadata when file/network is unavailable.
       }
-      serviceWorkerBuildVersion = version;
-      serviceWorkerScriptUrl = `./sw.js?v=${encodeURIComponent(version)}`;
+      appBuildMeta = nextMeta;
+      appBuildMetaLoaded = true;
+      serviceWorkerBuildVersion = appBuildMeta.version || "dev-local";
+      serviceWorkerScriptUrl = `./sw.js?v=${encodeURIComponent(
+        serviceWorkerBuildVersion
+      )}`;
       serviceWorkerBuildResolved = true;
+      renderBuildMeta();
+      return appBuildMeta;
+    }
+
+    async function resolveServiceWorkerScriptUrl(forceRefresh = false) {
+      if (serviceWorkerBuildResolved && !forceRefresh) {
+        return serviceWorkerScriptUrl;
+      }
+      await loadBuildMeta(forceRefresh);
       return serviceWorkerScriptUrl;
     }
 
@@ -892,8 +950,9 @@ async function loadProfilePostCount() {
     }
 
     async function init() {
-      setupServiceWorker();
       loadSettings();
+      loadBuildMeta();
+      setupServiceWorker();
       commentSync.loadQueue();
       commentSync.setupOnlineSync();
       setupLanguageSwitcher();
@@ -1237,6 +1296,8 @@ async function loadProfilePostCount() {
       setText("settings-height-unit-desc", "settingsHeightUnitDesc");
       setText("settings-data-title", "settingsDataTitle");
       setText("settings-data-sub", "settingsDataSub");
+      setText("settings-build-version-label", "settingsBuildVersionLabel");
+      setText("settings-build-time-label", "settingsBuildBuiltAtLabel");
       setText("btn-export-data", "settingsExportData");
       setText("btn-force-update", "forceAppUpdate");
       setText("btn-reset-settings", "settingsReset");
@@ -1390,6 +1451,9 @@ async function loadProfilePostCount() {
       }
       if (typeof setupDebug === "function") {
         setupDebug();
+      }
+      if (typeof renderBuildMeta === "function") {
+        renderBuildMeta();
       }
       if (typeof openPublicProfile === "function" && currentPublicProfileId) {
         openPublicProfile(currentPublicProfileId);

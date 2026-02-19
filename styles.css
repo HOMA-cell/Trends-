@@ -1711,6 +1711,19 @@
       color: var(--text-sub);
       margin-top: 4px;
     }
+    .settings-build-meta {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+    }
+    #settings-build-version {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1px 6px;
+    }
     .notification-list {
       display: flex;
       flex-direction: column;
