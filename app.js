@@ -1,4 +1,8 @@
-import { supabase } from "./supabaseClient.js";
+import {
+  supabase,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+} from "./supabaseClient.js";
 import { t } from "./i18n.js";
 import {
   $,
@@ -1300,6 +1304,7 @@ async function loadProfilePostCount() {
       setText("settings-build-time-label", "settingsBuildBuiltAtLabel");
       setText("btn-export-data", "settingsExportData");
       setText("btn-force-update", "forceAppUpdate");
+      setText("btn-connection-test", "settingsConnectionTest");
       setText("btn-reset-settings", "settingsReset");
       setText("btn-toggle-perf-debug", "perfDebugEnable");
 
@@ -4697,12 +4702,58 @@ async function loadProfilePostCount() {
     // ------------------ Debug ------------------
     function setupDebug() {
       const statusEl = $("settings-data-status");
-      const setStatus = (message) => {
+      const setStatus = (message, durationMs = 2500) => {
         if (!statusEl) return;
         statusEl.textContent = message;
         setTimeout(() => {
           statusEl.textContent = "";
-        }, 2500);
+        }, durationMs);
+      };
+      const runSupabaseConnectionTest = async () => {
+        const timeoutMs = 8000;
+        const authHeaders = { apikey: SUPABASE_ANON_KEY };
+        const restHeaders = {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        };
+        const controller =
+          typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timeoutId =
+          controller && typeof setTimeout === "function"
+            ? setTimeout(() => controller.abort(), timeoutMs)
+            : null;
+        try {
+          const requestOptions = (headers) => ({
+            method: "GET",
+            headers,
+            cache: "no-store",
+            ...(controller ? { signal: controller.signal } : {}),
+          });
+          const [restRes, authRes] = await Promise.all([
+            fetch(`${SUPABASE_URL}/rest/v1/`, requestOptions(restHeaders)),
+            fetch(`${SUPABASE_URL}/auth/v1/health`, requestOptions(authHeaders)),
+          ]);
+          const restReachable =
+            restRes.ok || restRes.status === 401 || restRes.status === 403;
+          const authReachable = authRes.ok;
+          return {
+            ok: restReachable && authReachable,
+            restStatus: restRes.status,
+            authStatus: authRes.status,
+            timedOut: false,
+            error: null,
+          };
+        } catch (error) {
+          return {
+            ok: false,
+            restStatus: 0,
+            authStatus: 0,
+            timedOut: error?.name === "AbortError",
+            error,
+          };
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
+        }
       };
       const isPerfDebugEnabled = () => {
         try {
@@ -4786,6 +4837,64 @@ async function loadProfilePostCount() {
           } finally {
             forceUpdateBtn.classList.remove("is-loading");
             forceUpdateBtn.disabled = false;
+          }
+        });
+      }
+
+      const connectionBtn = $("btn-connection-test");
+      if (connectionBtn && connectionBtn.dataset.bound !== "true") {
+        connectionBtn.dataset.bound = "true";
+        connectionBtn.addEventListener("click", async () => {
+          if (connectionBtn.classList.contains("is-loading")) return;
+          connectionBtn.classList.add("is-loading");
+          connectionBtn.disabled = true;
+          const tr = t[currentLang] || t.ja;
+          try {
+            setStatus(
+              tr.settingsConnectionChecking || "Checking connection...",
+              6000
+            );
+            const result = await runSupabaseConnectionTest();
+            if (result.ok) {
+              setStatus(
+                `${
+                  tr.settingsConnectionOk || "Connection is healthy."
+                } (REST ${result.restStatus}, Auth ${result.authStatus})`,
+                7000
+              );
+              return;
+            }
+            if (result.timedOut) {
+              setStatus(
+                tr.settingsConnectionTimeout ||
+                  "Connection check timed out.",
+                7000
+              );
+              return;
+            }
+            if (result.restStatus || result.authStatus) {
+              setStatus(
+                `${
+                  tr.settingsConnectionFailed || "Connection check failed."
+                } (REST ${result.restStatus || "-"}, Auth ${
+                  result.authStatus || "-"
+                })`,
+                7000
+              );
+              return;
+            }
+            const detail = result.error?.message
+              ? `: ${result.error.message}`
+              : "";
+            setStatus(
+              `${
+                tr.settingsConnectionFailed || "Connection check failed."
+              }${detail}`,
+              7000
+            );
+          } finally {
+            connectionBtn.classList.remove("is-loading");
+            connectionBtn.disabled = false;
           }
         });
       }
