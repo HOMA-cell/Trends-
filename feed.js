@@ -114,6 +114,7 @@ let feedMoreLoading = false;
 let feedIsOnline =
   typeof navigator === "undefined" ? true : navigator.onLine !== false;
 let feedNetworkListenersBound = false;
+let feedNetworkBackoffUntil = 0;
 let feedVisibilityListenerBound = false;
 let feedPullListenersBound = false;
 let feedPullActive = false;
@@ -169,6 +170,7 @@ const FEED_WARMED_IMAGE_LIMIT = 320;
 const FEED_SEARCH_CACHE_LIMIT = 2400;
 const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
+const FEED_NETWORK_BACKOFF_MS = 12000;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -506,6 +508,15 @@ function isLikelyTransientNetworkError(error) {
         message.includes("connection") ||
         message.includes("timeout")
       );
+    }
+function getFeedNetworkBackoffRemainingMs() {
+      return Math.max(0, feedNetworkBackoffUntil - Date.now());
+    }
+function clearFeedNetworkBackoff() {
+      feedNetworkBackoffUntil = 0;
+    }
+function setFeedNetworkBackoff() {
+      feedNetworkBackoffUntil = Date.now() + FEED_NETWORK_BACKOFF_MS;
     }
 function loadLikeOfflineQueue() {
       if (likeOfflineQueueLoaded) return;
@@ -1190,7 +1201,7 @@ export function setupFeedControls() {
           scheduleRenderFeed();
           return false;
         }
-        await loadFeed({ softRefresh: true });
+        await loadFeed({ softRefresh: true, forceNetwork: true });
         return true;
       };
 
@@ -1278,7 +1289,7 @@ export function setupFeedControls() {
           retryBtn.classList.add("is-loading");
           retryBtn.disabled = true;
           try {
-            await loadFeed({ softRefresh: true });
+            await loadFeed({ softRefresh: true, forceNetwork: true });
           } finally {
             retryBtn.classList.remove("is-loading");
             retryBtn.disabled = false;
@@ -1466,6 +1477,7 @@ export async function loadFeed(options = {}) {
 
       const requestGeneration = ++feedLoadingGeneration;
       const softRefresh = !!options.softRefresh && getAllPosts().length > 0;
+      const forceNetwork = !!options.forceNetwork;
       const tr = t[getCurrentLang()] || t.ja;
       feedIsOnline = getOnlineState();
       loadLikeOfflineQueue();
@@ -1509,6 +1521,27 @@ export async function loadFeed(options = {}) {
       feedError = "";
       renderFeed();
 
+      if (!forceNetwork) {
+        const backoffRemainingMs = getFeedNetworkBackoffRemainingMs();
+        if (backoffRemainingMs > 0) {
+          isFeedLoading = false;
+          const hasVisiblePosts = Array.isArray(getAllPosts()) && getAllPosts().length > 0;
+          feedError = hasVisiblePosts
+            ? ""
+            : tr.authNetworkError || "Cannot connect to Supabase.";
+          const waitSeconds = Math.max(1, Math.ceil(backoffRemainingMs / 1000));
+          setFeedNotice(
+            `${tr.feedCachedNotice || "Network issue. Showing last saved feed."} (${waitSeconds}s)`,
+            "warning",
+            2200
+          );
+          renderFeed();
+          return;
+        }
+      } else {
+        clearFeedNetworkBackoff();
+      }
+
       if (!supabase) {
         feedError = "Supabase not initialized.";
         isFeedLoading = false;
@@ -1530,18 +1563,26 @@ export async function loadFeed(options = {}) {
             .order("date", { ascending: false });
 
           if (error) {
-            const fallback = await supabase
-              .from("posts")
-              .select("*")
-              .order("created_at", { ascending: false });
-            if (!fallback.error) {
-              data = fallback.data;
-              error = null;
+            if (!isLikelyTransientNetworkError(error)) {
+              const fallback = await supabase
+                .from("posts")
+                .select("*")
+                .order("created_at", { ascending: false });
+              if (!fallback.error) {
+                data = fallback.data;
+                error = null;
+              }
             }
           }
 
           if (error) {
-            console.error("loadFeed error", error);
+            const isTransientNetwork = isLikelyTransientNetworkError(error);
+            if (isTransientNetwork) {
+              setFeedNetworkBackoff();
+              console.warn("loadFeed network error", error);
+            } else {
+              console.error("loadFeed error", error);
+            }
             const cachedPosts = loadFeedCache();
             if (cachedPosts.length) {
               setAllPosts(cachedPosts);
@@ -1560,12 +1601,16 @@ export async function loadFeed(options = {}) {
               showToast(message, "warning");
               return;
             }
-            feedError = error.message || "Failed to load feed.";
+            feedError = isTransientNetwork
+              ? tr.authNetworkError || "Cannot connect to Supabase."
+              : error.message || "Failed to load feed.";
             isFeedLoading = false;
             setFeedNotice("", "");
             renderFeed();
             return;
           }
+
+          clearFeedNetworkBackoff();
 
           const safeData = Array.isArray(data) ? data : [];
           let profileMap = null;

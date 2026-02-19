@@ -1018,14 +1018,46 @@ async function loadProfilePostCount() {
       return serviceWorkerScriptUrl;
     }
 
+    function isLocalPreviewHost() {
+      if (typeof window === "undefined") return false;
+      const hostname = window.location.hostname || "";
+      return hostname === "localhost" || hostname === "127.0.0.1";
+    }
+
+    async function disableLocalServiceWorkerCaches() {
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(
+            registrations.map((registration) => registration.unregister())
+          );
+        } catch {
+          // ignore unregister failures in local preview
+        }
+      }
+      if (typeof caches === "undefined") return;
+      try {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys
+            .filter((key) => key.startsWith("trends-shell-"))
+            .map((key) => caches.delete(key))
+        );
+      } catch {
+        // ignore cache cleanup failures in local preview
+      }
+    }
+
     function setupServiceWorker() {
       if (serviceWorkerSetupDone) return;
       serviceWorkerSetupDone = true;
       if (typeof window === "undefined" || typeof navigator === "undefined") return;
       if (!("serviceWorker" in navigator)) return;
-      const hostname = window.location.hostname || "";
-      const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
-      if (window.location.protocol !== "https:" && !isLocalhost) return;
+      if (isLocalPreviewHost()) {
+        disableLocalServiceWorkerCaches().catch(() => {});
+        return;
+      }
+      if (window.location.protocol !== "https:") return;
 
       const tr = () => t[currentLang] || t.ja;
       const activateWaitingWorker = (registration) => {
@@ -2152,22 +2184,6 @@ async function loadProfilePostCount() {
         return;
       }
 
-      const shouldForceConnectivityCheck =
-        !supabaseConnectivityState.checkedAt ||
-        Date.now() >= (supabaseConnectivityState.retryAfter || 0);
-      const connectivity = await runSupabaseConnectionTest({
-        force: shouldForceConnectivityCheck,
-      });
-      renderAuthNetworkStatus(connectivity);
-      if (!connectivity.ok) {
-        authRetryBlockedUntil = Math.max(
-          Date.now() + 5000,
-          connectivity.retryAfter || 0
-        );
-        showToast(formatConnectionStatusMessage(connectivity, tr), "error");
-        return;
-      }
-
       setButtonLoading(authBtn, true, "Logging in...");
 
       try {
@@ -2194,13 +2210,21 @@ async function loadProfilePostCount() {
 
         if (error) {
           if (isLikelyFetchError(error)) {
-            const refreshed = await runSupabaseConnectionTest({ force: true });
-            authRetryBlockedUntil = Math.max(
-              Date.now() + 5000,
-              refreshed.retryAfter || 0
+            authRetryBlockedUntil = Date.now() + 5000;
+            supabaseConnectivityState = {
+              ok: false,
+              restStatus: 0,
+              authStatus: 0,
+              timedOut: false,
+              error,
+              checkedAt: Date.now(),
+              retryAfter: Date.now() + SUPABASE_CONNECTIVITY_RETRY_MS,
+            };
+            renderAuthNetworkStatus(supabaseConnectivityState);
+            showToast(
+              `${tr.authNetworkError || "Supabase に接続できません。"} (${getSupabaseHostLabel()})`,
+              "error"
             );
-            renderAuthNetworkStatus(refreshed);
-            showToast(formatConnectionStatusMessage(refreshed, tr), "error");
           } else {
             console.warn("Auth error:", error);
             showToast(
@@ -2331,21 +2355,22 @@ async function loadProfilePostCount() {
     }
 
     async function restoreSession() {
-  const connectivity = await runSupabaseConnectionTest();
-  renderAuthNetworkStatus(connectivity);
-  if (!connectivity.ok) {
-    currentUser = null;
-    currentProfile = null;
-    profilePostCount = null;
-    updateProfileSummary();
-    updateAuthUIState();
-    return;
-  }
-
   const { data, error } = await supabase.auth.getSession();
 
   if (error) {
-    console.warn("restoreSession error:", error);
+    if (isLikelyFetchError(error)) {
+      supabaseConnectivityState = {
+        ok: false,
+        restStatus: 0,
+        authStatus: 0,
+        timedOut: false,
+        error,
+        checkedAt: Date.now(),
+        retryAfter: Date.now() + SUPABASE_CONNECTIVITY_RETRY_MS,
+      };
+    } else {
+      console.warn("restoreSession error:", error);
+    }
     currentUser = null;
     currentProfile = null;
     profilePostCount = null;
@@ -4870,6 +4895,9 @@ async function loadProfilePostCount() {
 
     async function refreshAppVersion() {
       if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+        return false;
+      }
+      if (isLocalPreviewHost()) {
         return false;
       }
       let registration = await getServiceWorkerRegistration();
