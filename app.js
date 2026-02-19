@@ -103,6 +103,7 @@ import {
     let serviceWorkerScriptUrl = "./sw.js";
     let serviceWorkerBuildVersion = "dev-local";
     let serviceWorkerBuildResolved = false;
+    let authRetryBlockedUntil = 0;
     let appBuildMetaLoaded = false;
     let appBuildMeta = {
       version: "dev-local",
@@ -813,6 +814,24 @@ async function loadProfilePostCount() {
       const raw = String(value || "").trim();
       const safe = raw.replace(/[^a-zA-Z0-9._-]/g, "-");
       return safe || "dev-local";
+    }
+
+    function getSupabaseHostLabel() {
+      try {
+        return new URL(SUPABASE_URL).host;
+      } catch {
+        return SUPABASE_URL;
+      }
+    }
+
+    function isLikelyFetchError(error) {
+      const message = String(error?.message || "");
+      const name = String(error?.name || "");
+      return (
+        /failed to fetch/i.test(message) ||
+        /networkerror/i.test(message) ||
+        /fetcherror/i.test(name)
+      );
     }
 
     function normalizeBuildMeta(meta = {}) {
@@ -1992,9 +2011,37 @@ async function loadProfilePostCount() {
       const email = $("auth-email").value.trim();
       const password = $("auth-password").value.trim();
       const authBtn = $("btn-auth");
+      const tr = t[currentLang] || t.ja;
+      const now = Date.now();
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
       if (!email || !password) {
-        showToast("Email と Password を入力してください。", "warning");
+        showToast(
+          tr.authMissingCredentials || "Email と Password を入力してください。",
+          "warning"
+        );
+        return;
+      }
+
+      if (!emailPattern.test(email)) {
+        showToast(
+          tr.authInvalidEmail || "メールアドレスの形式を確認してください。",
+          "warning"
+        );
+        return;
+      }
+
+      if (now < authRetryBlockedUntil) {
+        const seconds = Math.max(
+          1,
+          Math.ceil((authRetryBlockedUntil - now) / 1000)
+        );
+        showToast(
+          `${
+            tr.authRetryLater || "少し待ってから再試行してください。"
+          } (${seconds}s)`,
+          "warning"
+        );
         return;
       }
 
@@ -2023,8 +2070,28 @@ async function loadProfilePostCount() {
         }
 
         if (error) {
-          console.error("Auth error:", error);
-          showToast("ログイン / サインアップに失敗しました。", "error");
+          if (isLikelyFetchError(error)) {
+            authRetryBlockedUntil = Date.now() + 5000;
+            const host = getSupabaseHostLabel();
+            const networkMessage =
+              tr.authNetworkError || "Supabase に接続できません。";
+            showToast(`${networkMessage} (${host})`, "error");
+            const statusEl = $("settings-data-status");
+            if (statusEl) {
+              statusEl.textContent = `${networkMessage} (${host})`;
+              setTimeout(() => {
+                if (statusEl.textContent === `${networkMessage} (${host})`) {
+                  statusEl.textContent = "";
+                }
+              }, 7000);
+            }
+          } else {
+            console.warn("Auth error:", error);
+            showToast(
+              tr.authFailed || "ログイン / サインアップに失敗しました。",
+              "error"
+            );
+          }
           return;
         }
 
@@ -2033,7 +2100,7 @@ async function loadProfilePostCount() {
         }
 
         if (!user) {
-          showToast("ログインに失敗しました。", "error");
+          showToast(tr.authLoginFailed || "ログインに失敗しました。", "error");
           return;
         }
 
@@ -2056,7 +2123,7 @@ async function loadProfilePostCount() {
         await loadFeed();
         await commentSync.flushQueue({ silent: true });
 
-        showToast("ログインしました！", "success");
+        showToast(tr.authLoginSuccess || "ログインしました！", "success");
       } finally {
         setButtonLoading(authBtn, false);
       }
