@@ -1611,7 +1611,6 @@ export async function loadFeed(options = {}) {
             const isTransientNetwork = isLikelyTransientNetworkError(error);
             if (isTransientNetwork) {
               setFeedNetworkBackoff();
-              console.warn("loadFeed network error", error);
             } else {
               console.error("loadFeed error", error);
             }
