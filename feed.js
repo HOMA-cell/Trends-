@@ -115,6 +115,7 @@ let feedIsOnline =
   typeof navigator === "undefined" ? true : navigator.onLine !== false;
 let feedNetworkListenersBound = false;
 let feedNetworkBackoffUntil = 0;
+let feedNetworkBackoffLoaded = false;
 let feedVisibilityListenerBound = false;
 let feedPullListenersBound = false;
 let feedPullActive = false;
@@ -155,6 +156,7 @@ const warmedImageUrlSet = new Set();
 const warmedImageUrlQueue = [];
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
+const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
 const FEED_PULL_THRESHOLD = 70;
@@ -170,7 +172,7 @@ const FEED_WARMED_IMAGE_LIMIT = 320;
 const FEED_SEARCH_CACHE_LIMIT = 2400;
 const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
-const FEED_NETWORK_BACKOFF_MS = 12000;
+const FEED_NETWORK_BACKOFF_MS = 120000;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -512,11 +514,40 @@ function isLikelyTransientNetworkError(error) {
 function getFeedNetworkBackoffRemainingMs() {
       return Math.max(0, feedNetworkBackoffUntil - Date.now());
     }
+function loadFeedNetworkBackoff() {
+      if (feedNetworkBackoffLoaded) return;
+      feedNetworkBackoffLoaded = true;
+      try {
+        const raw = localStorage.getItem(FEED_NETWORK_BACKOFF_KEY);
+        const parsed = Number.parseInt(raw || "0", 10);
+        if (Number.isFinite(parsed) && parsed > Date.now()) {
+          feedNetworkBackoffUntil = parsed;
+        }
+      } catch {
+        // ignore localStorage read failures
+      }
+    }
+function persistFeedNetworkBackoff() {
+      try {
+        if (feedNetworkBackoffUntil > Date.now()) {
+          localStorage.setItem(
+            FEED_NETWORK_BACKOFF_KEY,
+            String(feedNetworkBackoffUntil)
+          );
+        } else {
+          localStorage.removeItem(FEED_NETWORK_BACKOFF_KEY);
+        }
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
 function clearFeedNetworkBackoff() {
       feedNetworkBackoffUntil = 0;
+      persistFeedNetworkBackoff();
     }
 function setFeedNetworkBackoff() {
       feedNetworkBackoffUntil = Date.now() + FEED_NETWORK_BACKOFF_MS;
+      persistFeedNetworkBackoff();
     }
 function loadLikeOfflineQueue() {
       if (likeOfflineQueueLoaded) return;
@@ -1474,6 +1505,7 @@ export async function loadFeed(options = {}) {
       if (feedLoadPromise) {
         return feedLoadPromise;
       }
+      loadFeedNetworkBackoff();
 
       const requestGeneration = ++feedLoadingGeneration;
       const softRefresh = !!options.softRefresh && getAllPosts().length > 0;
