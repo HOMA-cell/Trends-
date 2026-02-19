@@ -104,6 +104,15 @@ import {
     let serviceWorkerBuildVersion = "dev-local";
     let serviceWorkerBuildResolved = false;
     let authRetryBlockedUntil = 0;
+    let supabaseConnectivityState = {
+      ok: null,
+      restStatus: 0,
+      authStatus: 0,
+      timedOut: false,
+      error: null,
+      checkedAt: 0,
+      retryAfter: 0,
+    };
     let appBuildMetaLoaded = false;
     let appBuildMeta = {
       version: "dev-local",
@@ -115,6 +124,8 @@ import {
     const PERF_DEBUG_KEY = "trends_perf_debug";
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const BUILD_META_URL = "./build-meta.json";
+    const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
+    const SUPABASE_CONNECTIVITY_RETRY_MS = 10000;
     const FILE_LIMITS = {
       avatar: 5 * 1024 * 1024,
       banner: 8 * 1024 * 1024,
@@ -832,6 +843,102 @@ async function loadProfilePostCount() {
         /networkerror/i.test(message) ||
         /fetcherror/i.test(name)
       );
+    }
+
+    function formatConnectionStatusMessage(result, tr = t[currentLang] || t.ja) {
+      if (!result || result.ok === null) return "";
+      if (result.ok) {
+        return `${
+          tr.settingsConnectionOk || "Connection is healthy."
+        } (REST ${result.restStatus}, Auth ${result.authStatus})`;
+      }
+      const host = getSupabaseHostLabel();
+      if (result.timedOut) {
+        return `${tr.settingsConnectionTimeout || "Connection check timed out."} (${host})`;
+      }
+      if (result.restStatus || result.authStatus) {
+        return `${
+          tr.settingsConnectionFailed || "Connection check failed."
+        } (REST ${result.restStatus || "-"}, Auth ${result.authStatus || "-"})`;
+      }
+      return `${tr.authNetworkError || "Cannot connect to Supabase."} (${host})`;
+    }
+
+    function renderAuthNetworkStatus(result = supabaseConnectivityState) {
+      const el = $("auth-network-status");
+      if (!el) return;
+      if (!result || result.ok === null) {
+        el.textContent = "";
+        el.classList.remove("feed-status-error", "feed-status-success", "feed-status-warning");
+        return;
+      }
+      const tr = t[currentLang] || t.ja;
+      el.textContent = formatConnectionStatusMessage(result, tr);
+      el.classList.remove("feed-status-error", "feed-status-success", "feed-status-warning");
+      el.classList.add(result.ok ? "feed-status-success" : "feed-status-error");
+    }
+
+    async function runSupabaseConnectionTest(options = {}) {
+      const { force = false, timeoutMs = 8000 } = options;
+      const now = Date.now();
+      if (
+        !force &&
+        supabaseConnectivityState.checkedAt > 0 &&
+        now - supabaseConnectivityState.checkedAt < SUPABASE_CONNECTIVITY_TTL_MS
+      ) {
+        return { ...supabaseConnectivityState };
+      }
+
+      const authHeaders = { apikey: SUPABASE_ANON_KEY };
+      const restHeaders = {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      };
+      const controller =
+        typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId =
+        controller && typeof setTimeout === "function"
+          ? setTimeout(() => controller.abort(), timeoutMs)
+          : null;
+
+      try {
+        const requestOptions = (headers) => ({
+          method: "GET",
+          headers,
+          cache: "no-store",
+          ...(controller ? { signal: controller.signal } : {}),
+        });
+        const [restRes, authRes] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/`, requestOptions(restHeaders)),
+          fetch(`${SUPABASE_URL}/auth/v1/health`, requestOptions(authHeaders)),
+        ]);
+        const restReachable = restRes.status >= 200 && restRes.status < 500;
+        const authReachable = authRes.status >= 200 && authRes.status < 500;
+        const ok = restReachable && authReachable;
+        supabaseConnectivityState = {
+          ok,
+          restStatus: restRes.status,
+          authStatus: authRes.status,
+          timedOut: false,
+          error: null,
+          checkedAt: Date.now(),
+          retryAfter: ok ? 0 : Date.now() + SUPABASE_CONNECTIVITY_RETRY_MS,
+        };
+      } catch (error) {
+        const timedOut = error?.name === "AbortError";
+        supabaseConnectivityState = {
+          ok: false,
+          restStatus: 0,
+          authStatus: 0,
+          timedOut,
+          error,
+          checkedAt: Date.now(),
+          retryAfter: Date.now() + SUPABASE_CONNECTIVITY_RETRY_MS,
+        };
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+      return { ...supabaseConnectivityState };
     }
 
     function normalizeBuildMeta(meta = {}) {
@@ -2045,6 +2152,22 @@ async function loadProfilePostCount() {
         return;
       }
 
+      const shouldForceConnectivityCheck =
+        !supabaseConnectivityState.checkedAt ||
+        Date.now() >= (supabaseConnectivityState.retryAfter || 0);
+      const connectivity = await runSupabaseConnectionTest({
+        force: shouldForceConnectivityCheck,
+      });
+      renderAuthNetworkStatus(connectivity);
+      if (!connectivity.ok) {
+        authRetryBlockedUntil = Math.max(
+          Date.now() + 5000,
+          connectivity.retryAfter || 0
+        );
+        showToast(formatConnectionStatusMessage(connectivity, tr), "error");
+        return;
+      }
+
       setButtonLoading(authBtn, true, "Logging in...");
 
       try {
@@ -2071,20 +2194,13 @@ async function loadProfilePostCount() {
 
         if (error) {
           if (isLikelyFetchError(error)) {
-            authRetryBlockedUntil = Date.now() + 5000;
-            const host = getSupabaseHostLabel();
-            const networkMessage =
-              tr.authNetworkError || "Supabase に接続できません。";
-            showToast(`${networkMessage} (${host})`, "error");
-            const statusEl = $("settings-data-status");
-            if (statusEl) {
-              statusEl.textContent = `${networkMessage} (${host})`;
-              setTimeout(() => {
-                if (statusEl.textContent === `${networkMessage} (${host})`) {
-                  statusEl.textContent = "";
-                }
-              }, 7000);
-            }
+            const refreshed = await runSupabaseConnectionTest({ force: true });
+            authRetryBlockedUntil = Math.max(
+              Date.now() + 5000,
+              refreshed.retryAfter || 0
+            );
+            renderAuthNetworkStatus(refreshed);
+            showToast(formatConnectionStatusMessage(refreshed, tr), "error");
           } else {
             console.warn("Auth error:", error);
             showToast(
@@ -2211,13 +2327,25 @@ async function loadProfilePostCount() {
       } else {
         accountLabel.textContent = "-";
       }
+      renderAuthNetworkStatus();
     }
 
     async function restoreSession() {
+  const connectivity = await runSupabaseConnectionTest();
+  renderAuthNetworkStatus(connectivity);
+  if (!connectivity.ok) {
+    currentUser = null;
+    currentProfile = null;
+    profilePostCount = null;
+    updateProfileSummary();
+    updateAuthUIState();
+    return;
+  }
+
   const { data, error } = await supabase.auth.getSession();
 
   if (error) {
-    console.error("restoreSession error:", error);
+    console.warn("restoreSession error:", error);
     currentUser = null;
     currentProfile = null;
     profilePostCount = null;
@@ -4776,52 +4904,6 @@ async function loadProfilePostCount() {
           statusEl.textContent = "";
         }, durationMs);
       };
-      const runSupabaseConnectionTest = async () => {
-        const timeoutMs = 8000;
-        const authHeaders = { apikey: SUPABASE_ANON_KEY };
-        const restHeaders = {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        };
-        const controller =
-          typeof AbortController !== "undefined" ? new AbortController() : null;
-        const timeoutId =
-          controller && typeof setTimeout === "function"
-            ? setTimeout(() => controller.abort(), timeoutMs)
-            : null;
-        try {
-          const requestOptions = (headers) => ({
-            method: "GET",
-            headers,
-            cache: "no-store",
-            ...(controller ? { signal: controller.signal } : {}),
-          });
-          const [restRes, authRes] = await Promise.all([
-            fetch(`${SUPABASE_URL}/rest/v1/`, requestOptions(restHeaders)),
-            fetch(`${SUPABASE_URL}/auth/v1/health`, requestOptions(authHeaders)),
-          ]);
-          const restReachable =
-            restRes.ok || restRes.status === 401 || restRes.status === 403;
-          const authReachable = authRes.ok;
-          return {
-            ok: restReachable && authReachable,
-            restStatus: restRes.status,
-            authStatus: authRes.status,
-            timedOut: false,
-            error: null,
-          };
-        } catch (error) {
-          return {
-            ok: false,
-            restStatus: 0,
-            authStatus: 0,
-            timedOut: error?.name === "AbortError",
-            error,
-          };
-        } finally {
-          if (timeoutId) clearTimeout(timeoutId);
-        }
-      };
       const isPerfDebugEnabled = () => {
         try {
           return localStorage.getItem(PERF_DEBUG_KEY) === "true";
@@ -4921,44 +5003,10 @@ async function loadProfilePostCount() {
               tr.settingsConnectionChecking || "Checking connection...",
               6000
             );
-            const result = await runSupabaseConnectionTest();
-            if (result.ok) {
-              setStatus(
-                `${
-                  tr.settingsConnectionOk || "Connection is healthy."
-                } (REST ${result.restStatus}, Auth ${result.authStatus})`,
-                7000
-              );
-              return;
-            }
-            if (result.timedOut) {
-              setStatus(
-                tr.settingsConnectionTimeout ||
-                  "Connection check timed out.",
-                7000
-              );
-              return;
-            }
-            if (result.restStatus || result.authStatus) {
-              setStatus(
-                `${
-                  tr.settingsConnectionFailed || "Connection check failed."
-                } (REST ${result.restStatus || "-"}, Auth ${
-                  result.authStatus || "-"
-                })`,
-                7000
-              );
-              return;
-            }
-            const detail = result.error?.message
-              ? `: ${result.error.message}`
-              : "";
-            setStatus(
-              `${
-                tr.settingsConnectionFailed || "Connection check failed."
-              }${detail}`,
-              7000
-            );
+            const result = await runSupabaseConnectionTest({ force: true });
+            renderAuthNetworkStatus(result);
+            const message = formatConnectionStatusMessage(result, tr);
+            setStatus(message, 7000);
           } finally {
             connectionBtn.classList.remove("is-loading");
             connectionBtn.disabled = false;

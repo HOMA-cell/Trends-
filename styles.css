@@ -733,6 +733,9 @@
       gap: 8px;
       flex-wrap: wrap;
     }
+    #auth-network-status {
+      margin-top: 8px;
+    }
     .account-name {
       font-weight: 600;
       font-size: 13px;
