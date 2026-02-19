@@ -1,7 +1,16 @@
-const CACHE_VERSION = "trends-shell-v2-20260217";
-const SHELL_CACHE = CACHE_VERSION;
-const SHELL_CACHE_PREFIX = "trends-shell-";
-const SHELL_ASSET_PATTERN = /\.(?:css|js|html|svg|webmanifest)$/i;
+const SHELL_CACHE_PREFIX = "trends-shell-v3-";
+const buildVersion = (() => {
+  try {
+    const swUrl = new URL(self.location.href);
+    const raw = swUrl.searchParams.get("v") || "dev-local";
+    const safe = String(raw).trim().replace(/[^a-zA-Z0-9._-]/g, "-");
+    return safe || "dev-local";
+  } catch {
+    return "dev-local";
+  }
+})();
+const SHELL_CACHE = `${SHELL_CACHE_PREFIX}${buildVersion}`;
+const SHELL_ASSET_PATTERN = /\.(?:css|js|html|svg|webmanifest|json)$/i;
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -17,6 +26,7 @@ const SHELL_ASSETS = [
   "./profileEditState.js",
   "./icon.svg",
   "./site.webmanifest",
+  "./build-meta.json",
 ];
 
 self.addEventListener("install", (event) => {

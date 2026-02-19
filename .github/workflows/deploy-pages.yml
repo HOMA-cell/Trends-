@@ -48,6 +48,11 @@ jobs:
             --exclude 'package.json' \
             --exclude 'package-lock.json' \
             ./ dist/
+          short_sha="$(echo "$GITHUB_SHA" | cut -c1-12)"
+          built_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          printf '{\n  "version": "%s",\n  "built_at": "%s"\n}\n' \
+            "$short_sha" \
+            "$built_at" > dist/build-meta.json
           touch dist/.nojekyll
 
       - name: Setup Pages

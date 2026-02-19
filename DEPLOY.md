@@ -110,6 +110,8 @@ If needed, click `キャッシュを削除` first, then `アプリを最新化`.
 ## 8) Offline/PWA notes
 
 - This project now includes a service worker (`sw.js`) and manifest (`site.webmanifest`).
+- GitHub Pages deploy writes `build-meta.json` with commit-based version metadata.
+- The app registers the service worker as `sw.js?v=<build-version>` to reduce stale-cache issues.
 - After deploy, first visit online once to cache the app shell.
 - If users report old JS/CSS after an update:
   - First use `アプリを最新化` from Settings.

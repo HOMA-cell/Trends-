@@ -96,11 +96,15 @@ import {
     let serviceWorkerSetupDone = false;
     let serviceWorkerControllerReloaded = false;
     let serviceWorkerVisibilityListenerBound = false;
+    let serviceWorkerScriptUrl = "./sw.js";
+    let serviceWorkerBuildVersion = "dev-local";
+    let serviceWorkerBuildResolved = false;
 
     const POST_DRAFT_KEY = "trends_post_draft_v1";
     const PROFILE_EDIT_DRAFT_KEY = "trends_profile_edit_draft_v1";
     const PERF_DEBUG_KEY = "trends_perf_debug";
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
+    const BUILD_META_URL = "./build-meta.json";
     const FILE_LIMITS = {
       avatar: 5 * 1024 * 1024,
       banner: 8 * 1024 * 1024,
@@ -796,6 +800,36 @@ async function loadProfilePostCount() {
     window.addEventListener("DOMContentLoaded", init);
     window.addEventListener("hashchange", handleHashRoute);
 
+    function sanitizeBuildVersion(value) {
+      const raw = String(value || "").trim();
+      const safe = raw.replace(/[^a-zA-Z0-9._-]/g, "-");
+      return safe || "dev-local";
+    }
+
+    async function resolveServiceWorkerScriptUrl(forceRefresh = false) {
+      if (serviceWorkerBuildResolved && !forceRefresh) {
+        return serviceWorkerScriptUrl;
+      }
+      let version = serviceWorkerBuildVersion || "dev-local";
+      try {
+        const response = await fetch(`${BUILD_META_URL}?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (response.ok) {
+          const meta = await response.json();
+          version = sanitizeBuildVersion(
+            meta?.version || meta?.build || meta?.commit || meta?.sha || version
+          );
+        }
+      } catch {
+        // Keep fallback version when metadata is unavailable.
+      }
+      serviceWorkerBuildVersion = version;
+      serviceWorkerScriptUrl = `./sw.js?v=${encodeURIComponent(version)}`;
+      serviceWorkerBuildResolved = true;
+      return serviceWorkerScriptUrl;
+    }
+
     function setupServiceWorker() {
       if (serviceWorkerSetupDone) return;
       serviceWorkerSetupDone = true;
@@ -814,8 +848,10 @@ async function loadProfilePostCount() {
         return true;
       };
 
-      navigator.serviceWorker
-        .register("./sw.js", { updateViaCache: "none" })
+      resolveServiceWorkerScriptUrl()
+        .then((scriptUrl) =>
+          navigator.serviceWorker.register(scriptUrl, { updateViaCache: "none" })
+        )
         .then((registration) => {
           if (!registration) return;
 
@@ -4556,7 +4592,7 @@ async function loadProfilePostCount() {
         return null;
       }
       try {
-        const scoped = await navigator.serviceWorker.getRegistration("./sw.js");
+        const scoped = await navigator.serviceWorker.getRegistration("./");
         if (scoped) return scoped;
       } catch {
         // ignore
@@ -4569,7 +4605,18 @@ async function loadProfilePostCount() {
     }
 
     async function refreshAppVersion() {
-      const registration = await getServiceWorkerRegistration();
+      if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+        return false;
+      }
+      let registration = await getServiceWorkerRegistration();
+      try {
+        const scriptUrl = await resolveServiceWorkerScriptUrl(true);
+        registration = await navigator.serviceWorker.register(scriptUrl, {
+          updateViaCache: "none",
+        });
+      } catch (error) {
+        console.warn("service worker registration refresh failed", error);
+      }
       if (!registration) return false;
       try {
         await registration.update();
