@@ -162,6 +162,18 @@ export const t = {
         settingsConnectionOk: "接続は正常です。",
         settingsConnectionTimeout: "接続確認がタイムアウトしました。",
         settingsConnectionFailed: "接続確認に失敗しました。",
+        settingsSupabaseTitle: "Supabase 接続先",
+        settingsSupabaseUrlLabel: "Project URL",
+        settingsSupabaseKeyLabel: "Anon key",
+        settingsSupabaseSave: "保存して再読み込み",
+        settingsSupabaseReset: "デフォルトに戻す",
+        settingsSupabaseSaved: "Supabase 接続先を保存しました。再読み込みします。",
+        settingsSupabaseResetDone: "Supabase 接続先をデフォルトに戻しました。再読み込みします。",
+        settingsSupabaseInvalidUrl:
+          "Supabase URL が不正です。https://<project-ref>.supabase.co を入力してください。",
+        settingsSupabaseMissingKey: "Anon key を入力してください。",
+        settingsSupabaseSourceLocal: "現在: ローカル設定の接続先を使用中",
+        settingsSupabaseSourceDefault: "現在: コード内デフォルト接続先を使用中",
         settingsBuildVersionLabel: "アプリ版",
         settingsBuildBuiltAtLabel: "ビルド日時",
         settingsBuildUnknown: "不明",
@@ -551,6 +563,22 @@ export const t = {
         settingsConnectionOk: "Connection is healthy.",
         settingsConnectionTimeout: "Connection check timed out.",
         settingsConnectionFailed: "Connection check failed.",
+        settingsSupabaseTitle: "Supabase endpoint",
+        settingsSupabaseUrlLabel: "Project URL",
+        settingsSupabaseKeyLabel: "Anon key",
+        settingsSupabaseSave: "Save and reload",
+        settingsSupabaseReset: "Use default config",
+        settingsSupabaseSaved:
+          "Saved Supabase endpoint. Reloading the app now.",
+        settingsSupabaseResetDone:
+          "Reverted Supabase endpoint to default. Reloading the app now.",
+        settingsSupabaseInvalidUrl:
+          "Invalid Supabase URL. Use https://<project-ref>.supabase.co",
+        settingsSupabaseMissingKey: "Please enter the anon key.",
+        settingsSupabaseSourceLocal:
+          "Current source: local override from this browser",
+        settingsSupabaseSourceDefault:
+          "Current source: built-in default from app code",
         settingsBuildVersionLabel: "App build",
         settingsBuildBuiltAtLabel: "Built at",
         settingsBuildUnknown: "Unknown",

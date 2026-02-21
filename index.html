@@ -831,6 +831,36 @@
                   <button class="btn btn-ghost" id="btn-toggle-perf-debug">描画パフォーマンスをON</button>
                   <button class="btn btn-danger" id="btn-reset-settings">設定をリセット</button>
                 </div>
+                <div class="settings-supabase-config">
+                  <div class="settings-note" id="settings-supabase-title">Supabase 接続先</div>
+                  <div class="field">
+                    <label id="settings-supabase-url-label">Project URL</label>
+                    <input
+                      id="settings-supabase-url"
+                      type="text"
+                      placeholder="https://your-project.supabase.co"
+                      autocapitalize="off"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </div>
+                  <div class="field">
+                    <label id="settings-supabase-key-label">Anon key</label>
+                    <input
+                      id="settings-supabase-key"
+                      type="password"
+                      placeholder="eyJ..."
+                      autocapitalize="off"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </div>
+                  <div class="settings-actions">
+                    <button class="btn btn-ghost" id="btn-supabase-save">保存して再読み込み</button>
+                    <button class="btn btn-ghost" id="btn-supabase-reset">デフォルトに戻す</button>
+                  </div>
+                  <div class="settings-note" id="settings-supabase-source"></div>
+                </div>
                 <div class="settings-build-meta" id="settings-build-meta">
                   <div class="settings-note">
                     <span id="settings-build-version-label">アプリ版</span>:

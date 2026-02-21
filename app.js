@@ -2,6 +2,9 @@ import {
   supabase,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
+  SUPABASE_CONFIG_SOURCE,
+  saveStoredSupabaseConfig,
+  clearStoredSupabaseConfig,
 } from "./supabaseClient.js";
 import { t } from "./i18n.js";
 import {
@@ -835,6 +838,30 @@ async function loadProfilePostCount() {
       }
     }
 
+    function normalizeSupabaseUrlInput(raw) {
+      const value = String(raw || "").trim();
+      if (!value) return "";
+      const withProtocol = /^https?:\/\//i.test(value)
+        ? value
+        : `https://${value}`;
+      try {
+        const parsed = new URL(withProtocol);
+        if (!/^https:$/i.test(parsed.protocol)) return "";
+        return parsed.origin.replace(/\/$/, "");
+      } catch {
+        return "";
+      }
+    }
+
+    function looksLikeSupabaseHost(url) {
+      try {
+        const host = new URL(url).hostname.toLowerCase();
+        return host.endsWith(".supabase.co");
+      } catch {
+        return false;
+      }
+    }
+
     function isLikelyFetchError(error) {
       const message = String(error?.message || "");
       const name = String(error?.name || "");
@@ -1458,6 +1485,23 @@ async function loadProfilePostCount() {
       setText("settings-height-unit-desc", "settingsHeightUnitDesc");
       setText("settings-data-title", "settingsDataTitle");
       setText("settings-data-sub", "settingsDataSub");
+      setText("settings-supabase-title", "settingsSupabaseTitle");
+      setText("settings-supabase-url-label", "settingsSupabaseUrlLabel");
+      setText("settings-supabase-key-label", "settingsSupabaseKeyLabel");
+      setText("btn-supabase-save", "settingsSupabaseSave");
+      setText("btn-supabase-reset", "settingsSupabaseReset");
+      setPlaceholder("settings-supabase-url", "settingsSupabaseUrlLabel");
+      setPlaceholder("settings-supabase-key", "settingsSupabaseKeyLabel");
+      const supabaseSourceEl = $("settings-supabase-source");
+      if (supabaseSourceEl) {
+        const sourceText =
+          SUPABASE_CONFIG_SOURCE === "local"
+            ? tr.settingsSupabaseSourceLocal ||
+              "Current source: local override from this browser"
+            : tr.settingsSupabaseSourceDefault ||
+              "Current source: built-in default from app code";
+        supabaseSourceEl.textContent = `${sourceText} (${getSupabaseHostLabel()})`;
+      }
       setText("settings-build-version-label", "settingsBuildVersionLabel");
       setText("settings-build-time-label", "settingsBuildBuiltAtLabel");
       setText("btn-export-data", "settingsExportData");
@@ -4932,6 +4976,26 @@ async function loadProfilePostCount() {
           statusEl.textContent = "";
         }, durationMs);
       };
+      const renderSupabaseSourceStatus = () => {
+        const sourceEl = $("settings-supabase-source");
+        if (!sourceEl) return;
+        const tr = t[currentLang] || t.ja;
+        const sourceText =
+          SUPABASE_CONFIG_SOURCE === "local"
+            ? tr.settingsSupabaseSourceLocal ||
+              "Current source: local override from this browser"
+            : tr.settingsSupabaseSourceDefault ||
+              "Current source: built-in default from app code";
+        sourceEl.textContent = `${sourceText} (${getSupabaseHostLabel()})`;
+      };
+      const fillSupabaseConfigInputs = () => {
+        const urlInput = $("settings-supabase-url");
+        const keyInput = $("settings-supabase-key");
+        if (urlInput) urlInput.value = SUPABASE_URL || "";
+        if (keyInput) keyInput.value = SUPABASE_ANON_KEY || "";
+      };
+      fillSupabaseConfigInputs();
+      renderSupabaseSourceStatus();
       const isPerfDebugEnabled = () => {
         try {
           return localStorage.getItem(PERF_DEBUG_KEY) === "true";
@@ -5039,6 +5103,68 @@ async function loadProfilePostCount() {
             connectionBtn.classList.remove("is-loading");
             connectionBtn.disabled = false;
           }
+        });
+      }
+
+      const supabaseSaveBtn = $("btn-supabase-save");
+      if (supabaseSaveBtn && supabaseSaveBtn.dataset.bound !== "true") {
+        supabaseSaveBtn.dataset.bound = "true";
+        supabaseSaveBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          const urlInput = $("settings-supabase-url");
+          const keyInput = $("settings-supabase-key");
+          const nextUrl = normalizeSupabaseUrlInput(urlInput?.value || "");
+          const nextKey = String(keyInput?.value || "").trim();
+          if (!nextUrl || !looksLikeSupabaseHost(nextUrl)) {
+            setStatus(
+              tr.settingsSupabaseInvalidUrl ||
+                "Invalid Supabase URL. Use https://<project-ref>.supabase.co",
+              5000
+            );
+            return;
+          }
+          if (!nextKey) {
+            setStatus(
+              tr.settingsSupabaseMissingKey || "Please enter the anon key.",
+              4200
+            );
+            return;
+          }
+          try {
+            saveStoredSupabaseConfig({ url: nextUrl, anonKey: nextKey });
+          } catch {
+            setStatus(
+              tr.settingsSupabaseInvalidUrl ||
+                "Invalid Supabase URL. Use https://<project-ref>.supabase.co",
+              5000
+            );
+            return;
+          }
+          setStatus(
+            tr.settingsSupabaseSaved ||
+              "Saved Supabase endpoint. Reloading the app now.",
+            2600
+          );
+          setTimeout(() => {
+            window.location.reload();
+          }, 320);
+        });
+      }
+
+      const supabaseResetBtn = $("btn-supabase-reset");
+      if (supabaseResetBtn && supabaseResetBtn.dataset.bound !== "true") {
+        supabaseResetBtn.dataset.bound = "true";
+        supabaseResetBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          clearStoredSupabaseConfig();
+          setStatus(
+            tr.settingsSupabaseResetDone ||
+              "Reverted Supabase endpoint to default. Reloading the app now.",
+            2600
+          );
+          setTimeout(() => {
+            window.location.reload();
+          }, 320);
         });
       }
 
