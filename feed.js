@@ -511,6 +511,26 @@ function isLikelyTransientNetworkError(error) {
         message.includes("timeout")
       );
     }
+function isSupabaseConnectivityIssue(message, tr = {}) {
+      const text = String(message || "").toLowerCase().trim();
+      if (!text) return false;
+      const localized = String(tr.authNetworkError || "")
+        .toLowerCase()
+        .trim();
+      const markers = [
+        localized,
+        "supabase",
+        "failed to fetch",
+        "network",
+        "connection",
+        "connect",
+        "err_name_not_resolved",
+        "could not resolve",
+        "dns",
+        "接続",
+      ].filter(Boolean);
+      return markers.some((marker) => text.includes(marker));
+    }
 function getFeedNetworkBackoffRemainingMs() {
       return Math.max(0, feedNetworkBackoffUntil - Date.now());
     }
@@ -2012,17 +2032,33 @@ export function renderFeed(options = {}) {
       title.textContent =
         tr.feedEmptyTitle || tr.emptyFeed || "表示する投稿がありません。";
 
+      const hasConnectionIssue = isSupabaseConnectivityIssue(feedError, tr);
       const desc = document.createElement("div");
       desc.className = "empty-desc";
-      desc.textContent =
-        tr.feedEmptyDesc || "最初の投稿をしてみましょう。";
+      desc.textContent = hasConnectionIssue
+        ? tr.feedEmptyConnectionHint ||
+          "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。"
+        : tr.feedEmptyDesc || "最初の投稿をしてみましょう。";
 
       const actions = document.createElement("div");
       actions.className = "empty-actions";
 
       const primary = document.createElement("button");
       primary.className = "btn btn-primary";
-      if (currentUser) {
+      if (hasConnectionIssue) {
+        primary.textContent =
+          tr.feedEmptyCtaFixConnection || "接続設定を開く";
+        primary.addEventListener("click", () => {
+          setActivePage("settings");
+          const targetInput = document.getElementById("settings-supabase-url");
+          if (targetInput) {
+            setTimeout(() => {
+              targetInput.focus();
+              targetInput.select();
+            }, 120);
+          }
+        });
+      } else if (currentUser) {
         primary.textContent = tr.feedEmptyCtaPost || tr.newPost || "新規投稿";
         primary.addEventListener("click", () => {
           if (typeof openPostModal === "function") {
@@ -2039,11 +2075,26 @@ export function renderFeed(options = {}) {
 
       const secondary = document.createElement("button");
       secondary.className = "btn btn-ghost";
-      secondary.textContent =
-        tr.feedEmptyCtaProfile || "プロフィールを整える";
-      secondary.addEventListener("click", () => {
-        setActivePage("account");
-      });
+      if (hasConnectionIssue) {
+        secondary.textContent = tr.feedRetry || "Retry";
+        secondary.addEventListener("click", async () => {
+          if (secondary.classList.contains("is-loading")) return;
+          secondary.classList.add("is-loading");
+          secondary.disabled = true;
+          try {
+            await loadFeed({ softRefresh: true, forceNetwork: true });
+          } finally {
+            secondary.classList.remove("is-loading");
+            secondary.disabled = false;
+          }
+        });
+      } else {
+        secondary.textContent =
+          tr.feedEmptyCtaProfile || "プロフィールを整える";
+        secondary.addEventListener("click", () => {
+          setActivePage("account");
+        });
+      }
 
       actions.appendChild(primary);
       actions.appendChild(secondary);
