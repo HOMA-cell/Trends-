@@ -193,6 +193,8 @@ export const t = {
         settingsSupabaseInvalidUrl:
           "Supabase URL が不正です。https://<project-ref>.supabase.co を入力してください。",
         settingsSupabaseMissingKey: "Anon key を入力してください。",
+        settingsSupabaseInvalidKey:
+          "Anon key の形式が不正です。Supabase 設定画面の anon key をそのまま貼り付けてください。",
         settingsSupabaseSourceLocal: "現在: ローカル設定の接続先を使用中",
         settingsSupabaseSourceDefault: "現在: コード内デフォルト接続先を使用中",
         settingsBuildVersionLabel: "アプリ版",
@@ -621,6 +623,8 @@ export const t = {
         settingsSupabaseInvalidUrl:
           "Invalid Supabase URL. Use https://<project-ref>.supabase.co",
         settingsSupabaseMissingKey: "Please enter the anon key.",
+        settingsSupabaseInvalidKey:
+          "Anon key format looks invalid. Paste the full anon key from Supabase settings.",
         settingsSupabaseSourceLocal:
           "Current source: local override from this browser",
         settingsSupabaseSourceDefault:

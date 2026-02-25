@@ -871,6 +871,21 @@ async function loadProfilePostCount() {
       }
     }
 
+    function looksLikeSupabaseAnonKey(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return false;
+      const parts = raw.split(".");
+      return parts.length === 3 && raw.length >= 80;
+    }
+
+    function getKeyFingerprint(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      const head = raw.slice(0, 6);
+      const tail = raw.slice(-4);
+      return `${head}...${tail} (${raw.length})`;
+    }
+
     function isLikelyFetchError(error) {
       const message = String(error?.message || "");
       const name = String(error?.name || "");
@@ -5321,6 +5336,7 @@ async function loadProfilePostCount() {
           supabase: {
             host: getSupabaseHostLabel(),
             source: SUPABASE_CONFIG_SOURCE,
+            anon_key_fingerprint: getKeyFingerprint(SUPABASE_ANON_KEY),
             connectivity: {
               ok: supabaseConnectivityState.ok,
               rest_status: supabaseConnectivityState.restStatus || 0,
@@ -5393,6 +5409,14 @@ async function loadProfilePostCount() {
           setStatus(
             tr.settingsSupabaseMissingKey || "Please enter the anon key.",
             4200
+          );
+          return null;
+        }
+        if (!looksLikeSupabaseAnonKey(nextKey)) {
+          setStatus(
+            tr.settingsSupabaseInvalidKey ||
+              "Anon key format looks invalid. Paste the full anon key from Supabase settings.",
+            5200
           );
           return null;
         }
