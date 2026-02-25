@@ -830,12 +830,16 @@ async function loadProfilePostCount() {
       return safe || "dev-local";
     }
 
-    function getSupabaseHostLabel() {
+    function getSupabaseHostLabelFromUrl(url) {
       try {
-        return new URL(SUPABASE_URL).host;
+        return new URL(String(url || "")).host;
       } catch {
-        return SUPABASE_URL;
+        return String(url || "");
       }
+    }
+
+    function getSupabaseHostLabel() {
+      return getSupabaseHostLabelFromUrl(SUPABASE_URL);
     }
 
     function normalizeSupabaseUrlInput(raw) {
@@ -872,14 +876,18 @@ async function loadProfilePostCount() {
       );
     }
 
-    function formatConnectionStatusMessage(result, tr = t[currentLang] || t.ja) {
+    function formatConnectionStatusMessage(
+      result,
+      tr = t[currentLang] || t.ja,
+      hostOverride = ""
+    ) {
       if (!result || result.ok === null) return "";
       if (result.ok) {
         return `${
           tr.settingsConnectionOk || "Connection is healthy."
         } (REST ${result.restStatus}, Auth ${result.authStatus})`;
       }
-      const host = getSupabaseHostLabel();
+      const host = hostOverride || getSupabaseHostLabel();
       if (result.timedOut) {
         return `${tr.settingsConnectionTimeout || "Connection check timed out."} (${host})`;
       }
@@ -905,21 +913,12 @@ async function loadProfilePostCount() {
       el.classList.add(result.ok ? "feed-status-success" : "feed-status-error");
     }
 
-    async function runSupabaseConnectionTest(options = {}) {
-      const { force = false, timeoutMs = 8000 } = options;
-      const now = Date.now();
-      if (
-        !force &&
-        supabaseConnectivityState.checkedAt > 0 &&
-        now - supabaseConnectivityState.checkedAt < SUPABASE_CONNECTIVITY_TTL_MS
-      ) {
-        return { ...supabaseConnectivityState };
-      }
-
-      const authHeaders = { apikey: SUPABASE_ANON_KEY };
+    async function runSupabaseConnectionProbe(options = {}) {
+      const { url = SUPABASE_URL, anonKey = SUPABASE_ANON_KEY, timeoutMs = 8000 } = options;
+      const authHeaders = { apikey: anonKey };
       const restHeaders = {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
       };
       const controller =
         typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -936,13 +935,13 @@ async function loadProfilePostCount() {
           ...(controller ? { signal: controller.signal } : {}),
         });
         const [restRes, authRes] = await Promise.all([
-          fetch(`${SUPABASE_URL}/rest/v1/`, requestOptions(restHeaders)),
-          fetch(`${SUPABASE_URL}/auth/v1/health`, requestOptions(authHeaders)),
+          fetch(`${url}/rest/v1/`, requestOptions(restHeaders)),
+          fetch(`${url}/auth/v1/health`, requestOptions(authHeaders)),
         ]);
         const restReachable = restRes.status >= 200 && restRes.status < 500;
         const authReachable = authRes.status >= 200 && authRes.status < 500;
         const ok = restReachable && authReachable;
-        supabaseConnectivityState = {
+        return {
           ok,
           restStatus: restRes.status,
           authStatus: authRes.status,
@@ -953,7 +952,7 @@ async function loadProfilePostCount() {
         };
       } catch (error) {
         const timedOut = error?.name === "AbortError";
-        supabaseConnectivityState = {
+        return {
           ok: false,
           restStatus: 0,
           authStatus: 0,
@@ -965,6 +964,20 @@ async function loadProfilePostCount() {
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
       }
+    }
+
+    async function runSupabaseConnectionTest(options = {}) {
+      const { force = false, timeoutMs = 8000 } = options;
+      const now = Date.now();
+      if (
+        !force &&
+        supabaseConnectivityState.checkedAt > 0 &&
+        now - supabaseConnectivityState.checkedAt < SUPABASE_CONNECTIVITY_TTL_MS
+      ) {
+        return { ...supabaseConnectivityState };
+      }
+
+      supabaseConnectivityState = await runSupabaseConnectionProbe({ timeoutMs });
       return { ...supabaseConnectivityState };
     }
 
@@ -1488,6 +1501,7 @@ async function loadProfilePostCount() {
       setText("settings-supabase-title", "settingsSupabaseTitle");
       setText("settings-supabase-url-label", "settingsSupabaseUrlLabel");
       setText("settings-supabase-key-label", "settingsSupabaseKeyLabel");
+      setText("btn-supabase-test", "settingsSupabaseTest");
       setText("btn-supabase-save", "settingsSupabaseSave");
       setText("btn-supabase-reset", "settingsSupabaseReset");
       setPlaceholder("settings-supabase-url", "settingsSupabaseUrlLabel");
@@ -4994,6 +5008,60 @@ async function loadProfilePostCount() {
         if (urlInput) urlInput.value = SUPABASE_URL || "";
         if (keyInput) keyInput.value = SUPABASE_ANON_KEY || "";
       };
+      const setInlineButtonLoading = (button, loading) => {
+        if (!button) return;
+        button.classList.toggle("is-loading", !!loading);
+        button.disabled = !!loading;
+      };
+      const readDraftSupabaseConfig = () => {
+        const tr = t[currentLang] || t.ja;
+        const urlInput = $("settings-supabase-url");
+        const keyInput = $("settings-supabase-key");
+        const nextUrl = normalizeSupabaseUrlInput(urlInput?.value || "");
+        const nextKey = String(keyInput?.value || "").trim();
+        if (!nextUrl || !looksLikeSupabaseHost(nextUrl)) {
+          setStatus(
+            tr.settingsSupabaseInvalidUrl ||
+              "Invalid Supabase URL. Use https://<project-ref>.supabase.co",
+            5000
+          );
+          return null;
+        }
+        if (!nextKey) {
+          setStatus(
+            tr.settingsSupabaseMissingKey || "Please enter the anon key.",
+            4200
+          );
+          return null;
+        }
+        return { url: nextUrl, anonKey: nextKey };
+      };
+      const testDraftSupabaseConfig = async (config) => {
+        const tr = t[currentLang] || t.ja;
+        setStatus(
+          tr.settingsSupabaseTesting || "Checking this URL/key...",
+          6000
+        );
+        const result = await runSupabaseConnectionProbe({
+          url: config.url,
+          anonKey: config.anonKey,
+          timeoutMs: 8000,
+        });
+        const hostLabel = getSupabaseHostLabelFromUrl(config.url);
+        if (result.ok) {
+          const okMessage =
+            tr.settingsSupabaseTestOk ||
+            "This URL/key can reach Supabase.";
+          setStatus(`${okMessage} (${hostLabel})`, 6500);
+          return { ok: true, result };
+        }
+        const failedMessage =
+          tr.settingsSupabaseTestFailed ||
+          "This URL/key could not reach Supabase.";
+        const detail = formatConnectionStatusMessage(result, tr, hostLabel);
+        setStatus(`${failedMessage} ${detail}`, 8000);
+        return { ok: false, result };
+      };
       fillSupabaseConfigInputs();
       renderSupabaseSourceStatus();
       const isPerfDebugEnabled = () => {
@@ -5106,48 +5174,50 @@ async function loadProfilePostCount() {
         });
       }
 
+      const supabaseTestBtn = $("btn-supabase-test");
+      if (supabaseTestBtn && supabaseTestBtn.dataset.bound !== "true") {
+        supabaseTestBtn.dataset.bound = "true";
+        supabaseTestBtn.addEventListener("click", async () => {
+          const config = readDraftSupabaseConfig();
+          if (!config) return;
+          setInlineButtonLoading(supabaseTestBtn, true);
+          try {
+            await testDraftSupabaseConfig(config);
+          } finally {
+            setInlineButtonLoading(supabaseTestBtn, false);
+          }
+        });
+      }
+
       const supabaseSaveBtn = $("btn-supabase-save");
       if (supabaseSaveBtn && supabaseSaveBtn.dataset.bound !== "true") {
         supabaseSaveBtn.dataset.bound = "true";
-        supabaseSaveBtn.addEventListener("click", () => {
+        supabaseSaveBtn.addEventListener("click", async () => {
           const tr = t[currentLang] || t.ja;
-          const urlInput = $("settings-supabase-url");
-          const keyInput = $("settings-supabase-key");
-          const nextUrl = normalizeSupabaseUrlInput(urlInput?.value || "");
-          const nextKey = String(keyInput?.value || "").trim();
-          if (!nextUrl || !looksLikeSupabaseHost(nextUrl)) {
-            setStatus(
-              tr.settingsSupabaseInvalidUrl ||
-                "Invalid Supabase URL. Use https://<project-ref>.supabase.co",
-              5000
-            );
-            return;
-          }
-          if (!nextKey) {
-            setStatus(
-              tr.settingsSupabaseMissingKey || "Please enter the anon key.",
-              4200
-            );
-            return;
-          }
+          const config = readDraftSupabaseConfig();
+          if (!config) return;
+          setInlineButtonLoading(supabaseSaveBtn, true);
           try {
-            saveStoredSupabaseConfig({ url: nextUrl, anonKey: nextKey });
+            const tested = await testDraftSupabaseConfig(config);
+            if (!tested.ok) return;
+            saveStoredSupabaseConfig(config);
+            setStatus(
+              tr.settingsSupabaseSaved ||
+                "Saved Supabase endpoint. Reloading the app now.",
+              2600
+            );
+            setTimeout(() => {
+              window.location.reload();
+            }, 320);
           } catch {
             setStatus(
               tr.settingsSupabaseInvalidUrl ||
                 "Invalid Supabase URL. Use https://<project-ref>.supabase.co",
               5000
             );
-            return;
+          } finally {
+            setInlineButtonLoading(supabaseSaveBtn, false);
           }
-          setStatus(
-            tr.settingsSupabaseSaved ||
-              "Saved Supabase endpoint. Reloading the app now.",
-            2600
-          );
-          setTimeout(() => {
-            window.location.reload();
-          }, 320);
         });
       }
 

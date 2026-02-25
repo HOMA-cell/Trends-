@@ -168,8 +168,12 @@ export const t = {
         settingsSupabaseTitle: "Supabase 接続先",
         settingsSupabaseUrlLabel: "Project URL",
         settingsSupabaseKeyLabel: "Anon key",
+        settingsSupabaseTest: "この設定で接続テスト",
+        settingsSupabaseTesting: "入力値で接続を確認中...",
         settingsSupabaseSave: "保存して再読み込み",
         settingsSupabaseReset: "デフォルトに戻す",
+        settingsSupabaseTestOk: "入力値で接続に成功しました。",
+        settingsSupabaseTestFailed: "入力値で接続に失敗しました。",
         settingsSupabaseSaved: "Supabase 接続先を保存しました。再読み込みします。",
         settingsSupabaseResetDone: "Supabase 接続先をデフォルトに戻しました。再読み込みします。",
         settingsSupabaseInvalidUrl:
@@ -572,8 +576,12 @@ export const t = {
         settingsSupabaseTitle: "Supabase endpoint",
         settingsSupabaseUrlLabel: "Project URL",
         settingsSupabaseKeyLabel: "Anon key",
+        settingsSupabaseTest: "Test this config",
+        settingsSupabaseTesting: "Checking this URL/key...",
         settingsSupabaseSave: "Save and reload",
         settingsSupabaseReset: "Use default config",
+        settingsSupabaseTestOk: "This URL/key can reach Supabase.",
+        settingsSupabaseTestFailed: "This URL/key could not reach Supabase.",
         settingsSupabaseSaved:
           "Saved Supabase endpoint. Reloading the app now.",
         settingsSupabaseResetDone:
