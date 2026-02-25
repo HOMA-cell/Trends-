@@ -159,6 +159,7 @@ const warmedImageUrlQueue = [];
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
+const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
 const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
 const FEED_PULL_THRESHOLD = 70;
@@ -176,6 +177,7 @@ const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
 const FEED_NETWORK_BACKOFF_MS = 120000;
 const FEED_DEMO_AUTO_RETRY_COOLDOWN_MS = 12000;
+let feedUiStateLoaded = false;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -635,6 +637,47 @@ function clearFeedNetworkBackoff() {
 function setFeedNetworkBackoff() {
       feedNetworkBackoffUntil = Date.now() + FEED_NETWORK_BACKOFF_MS;
       persistFeedNetworkBackoff();
+    }
+function loadFeedUiState() {
+      if (feedUiStateLoaded) return;
+      feedUiStateLoaded = true;
+      try {
+        const raw = localStorage.getItem(FEED_UI_STATE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const nextFilter = String(parsed?.currentFilter || "");
+        const nextSort = String(parsed?.sortOrder || "");
+        const nextSearch = String(parsed?.search || "").trim().toLowerCase();
+        if (["all", "mine"].includes(nextFilter)) {
+          currentFilter = nextFilter;
+        }
+        if (["newest", "oldest"].includes(nextSort)) {
+          sortOrder = nextSort;
+        }
+        if (typeof parsed?.filterMedia === "boolean") {
+          filterMedia = parsed.filterMedia;
+        }
+        if (typeof parsed?.filterWorkout === "boolean") {
+          filterWorkout = parsed.filterWorkout;
+        }
+        feedLastCommittedSearch = nextSearch.slice(0, 120);
+      } catch {
+        // ignore persisted feed UI parse failures
+      }
+    }
+function persistFeedUiState() {
+      try {
+        const payload = {
+          currentFilter: currentFilter === "mine" ? "mine" : "all",
+          sortOrder: sortOrder === "oldest" ? "oldest" : "newest",
+          filterMedia: !!filterMedia,
+          filterWorkout: !!filterWorkout,
+          search: String(feedLastCommittedSearch || "").slice(0, 120),
+        };
+        localStorage.setItem(FEED_UI_STATE_KEY, JSON.stringify(payload));
+      } catch {
+        // ignore persisted feed UI write failures
+      }
     }
 function loadLikeOfflineQueue() {
       if (likeOfflineQueueLoaded) return;
@@ -1140,20 +1183,25 @@ export function resetFeedPagination() {
       feedVisibleCount = feedPageSize;
     }
 export function setFeedState(next = {}) {
+      let shouldPersistUi = false;
       if (typeof next.currentFilter === "string") {
         currentFilter = next.currentFilter;
+        shouldPersistUi = true;
       }
       if (typeof next.feedLayout === "string") {
         feedLayout = next.feedLayout;
       }
       if (typeof next.filterMedia === "boolean") {
         filterMedia = next.filterMedia;
+        shouldPersistUi = true;
       }
       if (typeof next.filterWorkout === "boolean") {
         filterWorkout = next.filterWorkout;
+        shouldPersistUi = true;
       }
       if (typeof next.sortOrder === "string") {
         sortOrder = next.sortOrder;
+        shouldPersistUi = true;
       }
       if (typeof next.isFeedLoading === "boolean") {
         isFeedLoading = next.isFeedLoading;
@@ -1162,8 +1210,12 @@ export function setFeedState(next = {}) {
         feedError = next.feedError;
       }
       syncFeedPageSize();
+      if (shouldPersistUi) {
+        persistFeedUiState();
+      }
     }
 export function setupFeedControls() {
+      loadFeedUiState();
       feedIsOnline = getOnlineState();
       setupFeedCardActionDelegation();
       syncFeedPageSize({ resetVisible: true });
@@ -1171,6 +1223,7 @@ export function setupFeedControls() {
       if (filterAll) {
         filterAll.addEventListener("click", () => {
           currentFilter = "all";
+          persistFeedUiState();
           resetFeedPagination();
           updateFilterButtons();
           scheduleRenderFeed();
@@ -1191,6 +1244,7 @@ export function setupFeedControls() {
           } else {
             currentFilter = "mine";
           }
+          persistFeedUiState();
           resetFeedPagination();
           updateFilterButtons();
           scheduleRenderFeed();
@@ -1200,6 +1254,7 @@ export function setupFeedControls() {
       if (filterPublic) {
         filterPublic.addEventListener("click", () => {
           currentFilter = "public";
+          persistFeedUiState();
           resetFeedPagination();
           updateFilterButtons();
           scheduleRenderFeed();
@@ -1209,6 +1264,7 @@ export function setupFeedControls() {
       if (filterMediaBtn) {
         filterMediaBtn.addEventListener("click", () => {
           filterMedia = !filterMedia;
+          persistFeedUiState();
           resetFeedPagination();
           updateFilterButtons();
           scheduleRenderFeed();
@@ -1218,6 +1274,7 @@ export function setupFeedControls() {
       if (filterWorkoutBtn) {
         filterWorkoutBtn.addEventListener("click", () => {
           filterWorkout = !filterWorkout;
+          persistFeedUiState();
           resetFeedPagination();
           updateFilterButtons();
           scheduleRenderFeed();
@@ -1235,10 +1292,14 @@ export function setupFeedControls() {
       };
       if (searchInput && searchInput.dataset.bound !== "true") {
         searchInput.dataset.bound = "true";
+        if (feedLastCommittedSearch) {
+          searchInput.value = feedLastCommittedSearch;
+        }
         const commitSearch = () => {
           const nextSearch = searchInput.value?.trim().toLowerCase() || "";
           if (nextSearch === feedLastCommittedSearch) return;
           feedLastCommittedSearch = nextSearch;
+          persistFeedUiState();
           resetFeedPagination();
           scheduleRenderFeed();
           syncSearchClearButton();
@@ -1279,6 +1340,7 @@ export function setupFeedControls() {
             feedSearchInputTimer = null;
           }
           feedLastCommittedSearch = "";
+          persistFeedUiState();
           resetFeedPagination();
           scheduleRenderFeed();
           syncSearchClearButton();
@@ -1290,6 +1352,7 @@ export function setupFeedControls() {
       if (sortSelect) {
         sortSelect.addEventListener("change", () => {
           sortOrder = sortSelect.value || "newest";
+          persistFeedUiState();
           resetFeedPagination();
           scheduleRenderFeed();
         });
@@ -1880,11 +1943,16 @@ export function renderFeed(options = {}) {
     }
     const searchValue = $("feed-search")?.value?.trim().toLowerCase() || "";
     const allowedFilters = ["all", "mine"];
+    let normalizedFilter = currentFilter;
     if (!allowedFilters.includes(currentFilter)) {
-      currentFilter = "all";
+      normalizedFilter = "all";
     }
-    if (currentFilter === "mine" && !currentUser) {
-      currentFilter = "all";
+    if (normalizedFilter === "mine" && !currentUser) {
+      normalizedFilter = "all";
+    }
+    if (normalizedFilter !== currentFilter) {
+      currentFilter = normalizedFilter;
+      persistFeedUiState();
     }
     updateFilterButtons();
 

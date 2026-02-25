@@ -112,7 +112,7 @@
           </div>
 
           <div class="feed-status-row">
-            <div id="feed-status" class="template-status"></div>
+            <div id="feed-status" class="template-status" role="status" aria-live="polite"></div>
             <button class="btn btn-ghost btn-xs hidden" id="btn-feed-retry">再試行</button>
           </div>
           <div id="feed-perf" class="template-status feed-perf hidden"></div>
@@ -151,7 +151,7 @@
           <div class="account-buttons" style="margin-top: 8px;">
             <button class="btn btn-ghost" id="btn-toggle-sections">追加パネルを表示</button>
           </div>
-          <div class="template-status" id="auth-network-status"></div>
+          <div class="template-status" id="auth-network-status" role="status" aria-live="polite"></div>
         </section>
       
         <section class="card profile-card" id="profile-section" data-collapsible="profile-details" data-default-open="false">
@@ -828,6 +828,7 @@
                   <button class="btn btn-ghost" id="btn-clear-cache">キャッシュを削除</button>
                   <button class="btn btn-ghost" id="btn-force-update">アプリを最新化</button>
                   <button class="btn btn-ghost" id="btn-connection-test">接続テスト</button>
+                  <button class="btn btn-ghost" id="btn-copy-diagnostics">診断情報をコピー</button>
                   <button class="btn btn-ghost" id="btn-toggle-perf-debug">描画パフォーマンスをON</button>
                   <button class="btn btn-danger" id="btn-reset-settings">設定をリセット</button>
                 </div>
@@ -872,7 +873,7 @@
                     <span id="settings-build-time">-</span>
                   </div>
                 </div>
-                <div class="settings-note" id="settings-data-status"></div>
+                <div class="settings-note" id="settings-data-status" role="status" aria-live="polite"></div>
               </div>
             </section>
 

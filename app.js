@@ -1609,6 +1609,7 @@ async function loadProfilePostCount() {
       setText("btn-export-data", "settingsExportData");
       setText("btn-force-update", "forceAppUpdate");
       setText("btn-connection-test", "settingsConnectionTest");
+      setText("btn-copy-diagnostics", "settingsCopyDiagnostics");
       setText("btn-reset-settings", "settingsReset");
       setText("btn-toggle-perf-debug", "perfDebugEnable");
 
@@ -5129,6 +5130,80 @@ async function loadProfilePostCount() {
         button.classList.toggle("is-loading", !!loading);
         button.disabled = !!loading;
       };
+      const toIsoMaybe = (value) => {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num) || num <= 0) return null;
+        try {
+          return new Date(num).toISOString();
+        } catch {
+          return null;
+        }
+      };
+      const buildDiagnosticsPayload = () => {
+        const connectivityError =
+          supabaseConnectivityState?.error?.message ||
+          String(supabaseConnectivityState?.error || "");
+        return {
+          generated_at: new Date().toISOString(),
+          app: {
+            build_version: appBuildMeta.version || "dev-local",
+            build_time: appBuildMeta.builtAt || null,
+            location: typeof window !== "undefined" ? window.location.href : "",
+            lang: currentLang,
+          },
+          supabase: {
+            host: getSupabaseHostLabel(),
+            source: SUPABASE_CONFIG_SOURCE,
+            connectivity: {
+              ok: supabaseConnectivityState.ok,
+              rest_status: supabaseConnectivityState.restStatus || 0,
+              auth_status: supabaseConnectivityState.authStatus || 0,
+              timed_out: !!supabaseConnectivityState.timedOut,
+              checked_at: toIsoMaybe(supabaseConnectivityState.checkedAt),
+              retry_after: toIsoMaybe(supabaseConnectivityState.retryAfter),
+              error: connectivityError || null,
+            },
+          },
+          runtime: {
+            online:
+              typeof navigator === "undefined" ? true : navigator.onLine !== false,
+            user_agent:
+              typeof navigator === "undefined" ? "" : navigator.userAgent,
+            current_user_id: currentUser?.id || null,
+            current_profile_id: currentProfile?.id || null,
+            posts_count: Array.isArray(allPosts) ? allPosts.length : 0,
+          },
+          settings,
+        };
+      };
+      const copyDiagnosticsToClipboard = async () => {
+        const payload = buildDiagnosticsPayload();
+        const text = JSON.stringify(payload, null, 2);
+        if (
+          typeof navigator !== "undefined" &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === "function"
+        ) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        textarea.style.pointerEvents = "none";
+        document.body.appendChild(textarea);
+        textarea.select();
+        let ok = false;
+        try {
+          ok = document.execCommand("copy");
+        } catch {
+          ok = false;
+        }
+        textarea.remove();
+        return ok;
+      };
       const readDraftSupabaseConfig = () => {
         const tr = t[currentLang] || t.ja;
         const urlInput = $("settings-supabase-url");
@@ -5286,6 +5361,38 @@ async function loadProfilePostCount() {
           } finally {
             connectionBtn.classList.remove("is-loading");
             connectionBtn.disabled = false;
+          }
+        });
+      }
+
+      const copyDiagnosticsBtn = $("btn-copy-diagnostics");
+      if (copyDiagnosticsBtn && copyDiagnosticsBtn.dataset.bound !== "true") {
+        copyDiagnosticsBtn.dataset.bound = "true";
+        copyDiagnosticsBtn.addEventListener("click", async () => {
+          const tr = t[currentLang] || t.ja;
+          setInlineButtonLoading(copyDiagnosticsBtn, true);
+          try {
+            const copied = await copyDiagnosticsToClipboard();
+            if (copied) {
+              setStatus(
+                tr.settingsDiagnosticsCopied || "Diagnostics copied.",
+                2600
+              );
+            } else {
+              setStatus(
+                tr.settingsDiagnosticsCopyFailed ||
+                  "Failed to copy diagnostics.",
+                4000
+              );
+            }
+          } catch {
+            setStatus(
+              tr.settingsDiagnosticsCopyFailed ||
+                "Failed to copy diagnostics.",
+              4000
+            );
+          } finally {
+            setInlineButtonLoading(copyDiagnosticsBtn, false);
           }
         });
       }
