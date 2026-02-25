@@ -198,6 +198,10 @@ export const t = {
           "接続先が見つかりません。Project URL が正しいか確認してください。",
         settingsConnectionHintNetwork:
           "通信に失敗しました。ネットワークと接続先を確認してください。",
+        settingsConnectionSummaryNone: "まだ接続チェックを実行していません。",
+        settingsConnectionSummaryCheckedAt: "最終確認",
+        settingsSupabaseSourceLocalShort: "ローカル",
+        settingsSupabaseSourceDefaultShort: "デフォルト",
         settingsCopyDiagnostics: "診断情報をコピー",
         settingsDownloadDiagnostics: "診断JSONを書き出す",
         settingsClearDiagnostics: "診断ログをクリア",
@@ -650,6 +654,10 @@ export const t = {
           "Supabase endpoint not found. Verify your project URL.",
         settingsConnectionHintNetwork:
           "Network request failed. Check your connection and endpoint.",
+        settingsConnectionSummaryNone: "No connection check yet.",
+        settingsConnectionSummaryCheckedAt: "Last checked",
+        settingsSupabaseSourceLocalShort: "local override",
+        settingsSupabaseSourceDefaultShort: "default",
         settingsCopyDiagnostics: "Copy diagnostics",
         settingsDownloadDiagnostics: "Download diagnostics JSON",
         settingsClearDiagnostics: "Clear diagnostics log",

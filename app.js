@@ -1052,6 +1052,37 @@ async function loadProfilePostCount() {
       }
     }
 
+    function renderConnectivitySummary(result = supabaseConnectivityState) {
+      const el = $("settings-connection-diagnostic");
+      if (!el) return;
+      const tr = t[currentLang] || t.ja;
+      if (!result || result.ok === null) {
+        el.textContent =
+          tr.settingsConnectionSummaryNone || "No connection check yet.";
+        return;
+      }
+      const checkedAtText =
+        Number(result.checkedAt || 0) > 0
+          ? formatDateTimeDisplay(new Date(result.checkedAt).toISOString())
+          : "";
+      const checkedLabel = checkedAtText
+        ? `${tr.settingsConnectionSummaryCheckedAt || "Checked"}: ${checkedAtText}`
+        : "";
+      const sourceLabel =
+        SUPABASE_CONFIG_SOURCE === "local"
+          ? tr.settingsSupabaseSourceLocalShort || "local"
+          : tr.settingsSupabaseSourceDefaultShort || "default";
+      const parts = [
+        formatConnectionStatusMessage(result, tr),
+        `host: ${getSupabaseHostLabel()}`,
+        `source: ${sourceLabel}`,
+      ];
+      if (checkedLabel) {
+        parts.push(checkedLabel);
+      }
+      el.textContent = parts.join(" | ");
+    }
+
     function normalizeConnectivityState(next = {}, fallback = {}) {
       return {
         ok:
@@ -1128,6 +1159,8 @@ async function loadProfilePostCount() {
         supabaseConnectivityState
       );
       persistSupabaseConnectivityState();
+      renderAuthNetworkStatus(supabaseConnectivityState);
+      renderConnectivitySummary(supabaseConnectivityState);
       return { ...supabaseConnectivityState };
     }
 
@@ -5529,6 +5562,7 @@ async function loadProfilePostCount() {
       };
       fillSupabaseConfigInputs();
       renderSupabaseSourceStatus();
+      renderConnectivitySummary();
       const isPerfDebugEnabled = () => {
         try {
           return localStorage.getItem(PERF_DEBUG_KEY) === "true";
