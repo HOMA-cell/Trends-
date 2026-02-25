@@ -96,6 +96,7 @@ let sortOrder = "newest";
 let feedLayout = "list";
 let isFeedLoading = false;
 let feedError = "";
+let feedDemoMode = false;
 let feedPageSize = 8;
 let feedVisibleCount = 8;
 let feedLastLoadedAt = null;
@@ -1620,6 +1621,7 @@ export async function loadFeed(options = {}) {
       if (!softRefresh && !getAllPosts().length) {
         const cachedPosts = loadFeedCache();
         if (cachedPosts.length) {
+          feedDemoMode = false;
           setAllPosts(cachedPosts);
           invalidateFeedQueryCache();
           postSearchHaystackCache.clear();
@@ -1700,6 +1702,7 @@ export async function loadFeed(options = {}) {
             }
             const cachedPosts = loadFeedCache();
             if (cachedPosts.length) {
+              feedDemoMode = false;
               setAllPosts(cachedPosts);
               invalidateFeedQueryCache();
               postSearchHaystackCache.clear();
@@ -1725,6 +1728,7 @@ export async function loadFeed(options = {}) {
             return;
           }
 
+          feedDemoMode = false;
           clearFeedNetworkBackoff();
 
           const safeData = Array.isArray(data) ? data : [];
@@ -2033,6 +2037,11 @@ export function renderFeed(options = {}) {
       if (feedError) {
         status.textContent = feedError;
         status.classList.add("feed-status-error");
+      } else if (feedDemoMode) {
+        status.textContent =
+          tr.feedDemoModeNotice ||
+          "デモ表示中です。接続後に「再試行」で実データへ切り替えてください。";
+        status.classList.add("feed-status-warning");
       } else if (feedNotice) {
         status.textContent = feedNotice;
         if (feedNoticeTone === "success") {
@@ -2044,7 +2053,11 @@ export function renderFeed(options = {}) {
         }
       }
     }
-    updateRetryButton(Boolean(feedError) || (!feedIsOnline && !isFeedLoading));
+    updateRetryButton(
+      Boolean(feedError) ||
+        (!feedIsOnline && !isFeedLoading) ||
+        feedDemoMode
+    );
 
     const visibleSlice = gridCandidates.slice(0, feedVisibleCount);
     const metaTargetCount = Math.min(
@@ -2166,6 +2179,7 @@ export function renderFeed(options = {}) {
         demo.textContent = tr.feedEmptyCtaDemo || "デモ投稿を表示";
         demo.addEventListener("click", () => {
           const demoPosts = createDemoFeedPosts();
+          feedDemoMode = true;
           setAllPosts(demoPosts);
           invalidateFeedQueryCache();
           postSearchHaystackCache.clear();
@@ -2173,11 +2187,7 @@ export function renderFeed(options = {}) {
           resetFeedPagination();
           updateFeedStats(demoPosts);
           feedError = "";
-          setFeedNotice(
-            tr.feedDemoLoaded || "デモ投稿を表示しました。",
-            "success",
-            2200
-          );
+          setFeedNotice("", "");
           renderFeed();
         });
         actions.appendChild(demo);

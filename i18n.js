@@ -50,6 +50,8 @@ export const t = {
         feedEmptyConnectionHint:
           "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。",
         feedDemoLoaded: "デモ投稿を表示しました。",
+        feedDemoModeNotice:
+          "デモ表示中です。接続後に「再試行」で実データへ切り替えてください。",
         feedJustNow: "たった今",
         feedMinutesAgo: "{count}分前",
         feedHoursAgo: "{count}時間前",
@@ -460,6 +462,8 @@ export const t = {
         feedEmptyConnectionHint:
           "Supabase connection failed. Check Project URL and anon key in Settings.",
         feedDemoLoaded: "Loaded demo posts.",
+        feedDemoModeNotice:
+          "Demo mode is active. After fixing connection, press Retry to switch to live data.",
         feedJustNow: "Just now",
         feedMinutesAgo: "{count}m ago",
         feedHoursAgo: "{count}h ago",
