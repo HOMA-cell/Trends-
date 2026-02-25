@@ -97,6 +97,7 @@ let feedLayout = "list";
 let isFeedLoading = false;
 let feedError = "";
 let feedDemoMode = false;
+let feedDemoLastAutoRetryAt = 0;
 let feedPageSize = 8;
 let feedVisibleCount = 8;
 let feedLastLoadedAt = null;
@@ -174,6 +175,7 @@ const FEED_SEARCH_CACHE_LIMIT = 2400;
 const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
 const FEED_NETWORK_BACKOFF_MS = 120000;
+const FEED_DEMO_AUTO_RETRY_COOLDOWN_MS = 12000;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -1321,6 +1323,23 @@ export function setupFeedControls() {
         return true;
       };
 
+      const maybeAutoRecoverFromDemoMode = async () => {
+        if (!feedDemoMode) return false;
+        if (!getOnlineState()) return false;
+        if (isFeedLoading || feedLoadPromise) return false;
+        const now = Date.now();
+        if (now - feedDemoLastAutoRetryAt < FEED_DEMO_AUTO_RETRY_COOLDOWN_MS) {
+          return false;
+        }
+        feedDemoLastAutoRetryAt = now;
+        try {
+          await loadFeed({ softRefresh: true, forceNetwork: true });
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
       const refreshBtn = $("btn-feed-refresh");
       if (refreshBtn && refreshBtn.dataset.bound !== "true") {
         refreshBtn.dataset.bound = "true";
@@ -1538,6 +1557,7 @@ export function setupFeedControls() {
           } catch (error) {
             console.error("flush like queue on reconnect failed", error);
           }
+          maybeAutoRecoverFromDemoMode().catch(() => {});
         });
         window.addEventListener("offline", () => {
           feedIsOnline = false;
@@ -1560,6 +1580,10 @@ export function setupFeedControls() {
           if (document.visibilityState !== "visible") return;
           if (isFeedLoading || feedLoadPromise) return;
           if (!getOnlineState()) return;
+          if (feedDemoMode) {
+            maybeAutoRecoverFromDemoMode().catch(() => {});
+            return;
+          }
           const staleMs = 2 * 60 * 1000;
           const now = Date.now();
           if (!feedLastLoadedAt || now - feedLastLoadedAt < staleMs) return;
