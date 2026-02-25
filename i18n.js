@@ -46,8 +46,10 @@ export const t = {
         feedEmptyCtaLogin: "ログインして始める",
         feedEmptyCtaProfile: "プロフィールを整える",
         feedEmptyCtaFixConnection: "接続設定を開く",
+        feedEmptyCtaDemo: "デモ投稿を表示",
         feedEmptyConnectionHint:
           "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。",
+        feedDemoLoaded: "デモ投稿を表示しました。",
         feedJustNow: "たった今",
         feedMinutesAgo: "{count}分前",
         feedHoursAgo: "{count}時間前",
@@ -454,8 +456,10 @@ export const t = {
         feedEmptyCtaLogin: "Log in to start",
         feedEmptyCtaProfile: "Edit profile",
         feedEmptyCtaFixConnection: "Open connection settings",
+        feedEmptyCtaDemo: "Show demo posts",
         feedEmptyConnectionHint:
           "Supabase connection failed. Check Project URL and anon key in Settings.",
+        feedDemoLoaded: "Loaded demo posts.",
         feedJustNow: "Just now",
         feedMinutesAgo: "{count}m ago",
         feedHoursAgo: "{count}h ago",

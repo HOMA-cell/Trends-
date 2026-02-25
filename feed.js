@@ -531,6 +531,70 @@ function isSupabaseConnectivityIssue(message, tr = {}) {
       ].filter(Boolean);
       return markers.some((marker) => text.includes(marker));
     }
+function createDemoFeedPosts() {
+      const now = Date.now();
+      const toIsoHoursAgo = (hoursAgo = 0) =>
+        new Date(now - hoursAgo * 60 * 60 * 1000).toISOString();
+      return [
+        {
+          id: "demo-post-1",
+          user_id: "demo-user-1",
+          date: toIsoHoursAgo(2),
+          created_at: toIsoHoursAgo(2),
+          visibility: "public",
+          caption:
+            "肩の日。OHP 5x5 + lateral raise。フォーム優先で追い込みました。",
+          log: "OHP 5x5 / Lateral raise 4x15 / Face pull 3x20",
+          weight: 72.4,
+          media_url: "",
+          profile: {
+            id: "demo-user-1",
+            handle: "hiro_demo",
+            display_name: "Hiro",
+            bio: "Strength + physique",
+            avatar_url: "",
+          },
+        },
+        {
+          id: "demo-post-2",
+          user_id: "demo-user-2",
+          date: toIsoHoursAgo(19),
+          created_at: toIsoHoursAgo(19),
+          visibility: "public",
+          caption:
+            "脚トレ。スクワットの深さを調整して膝の違和感なし。次回は+2.5kg。",
+          log: "Back squat 5x5 / Leg press 4x12 / RDL 4x8",
+          weight: 61.2,
+          media_url: "",
+          profile: {
+            id: "demo-user-2",
+            handle: "mika_lifts",
+            display_name: "Mika",
+            bio: "Hypertrophy focus",
+            avatar_url: "",
+          },
+        },
+        {
+          id: "demo-post-3",
+          user_id: "demo-user-3",
+          date: toIsoHoursAgo(31),
+          created_at: toIsoHoursAgo(31),
+          visibility: "public",
+          caption:
+            "背中の日。懸垂の可動域を意識。体重は維持しつつ出力を上げる週。",
+          log: "Pull-up 6x6 / Row 4x10 / Lat pull 4x12",
+          weight: 79.8,
+          media_url: "",
+          profile: {
+            id: "demo-user-3",
+            handle: "ken_train",
+            display_name: "Ken",
+            bio: "Powerbuilding",
+            avatar_url: "",
+          },
+        },
+      ];
+    }
 function getFeedNetworkBackoffRemainingMs() {
       return Math.max(0, feedNetworkBackoffUntil - Date.now());
     }
@@ -2094,6 +2158,29 @@ export function renderFeed(options = {}) {
         secondary.addEventListener("click", () => {
           setActivePage("account");
         });
+      }
+
+      if (hasConnectionIssue) {
+        const demo = document.createElement("button");
+        demo.className = "btn btn-ghost";
+        demo.textContent = tr.feedEmptyCtaDemo || "デモ投稿を表示";
+        demo.addEventListener("click", () => {
+          const demoPosts = createDemoFeedPosts();
+          setAllPosts(demoPosts);
+          invalidateFeedQueryCache();
+          postSearchHaystackCache.clear();
+          feedLastLoadedAt = Date.now();
+          resetFeedPagination();
+          updateFeedStats(demoPosts);
+          feedError = "";
+          setFeedNotice(
+            tr.feedDemoLoaded || "デモ投稿を表示しました。",
+            "success",
+            2200
+          );
+          renderFeed();
+        });
+        actions.appendChild(demo);
       }
 
       actions.appendChild(primary);
