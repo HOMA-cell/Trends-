@@ -121,6 +121,8 @@ import {
       version: "dev-local",
       builtAt: null,
     };
+    let runtimeIssues = [];
+    let runtimeIssueCaptureBound = false;
 
     const POST_DRAFT_KEY = "trends_post_draft_v1";
     const PROFILE_EDIT_DRAFT_KEY = "trends_profile_edit_draft_v1";
@@ -128,6 +130,8 @@ import {
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const BUILD_META_URL = "./build-meta.json";
     const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
+    const RUNTIME_ISSUES_KEY = "trends_runtime_issues_v1";
+    const RUNTIME_ISSUES_LIMIT = 20;
     const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
     const SUPABASE_CONNECTIVITY_RETRY_MS = 120000;
     const FILE_LIMITS = {
@@ -993,6 +997,101 @@ async function loadProfilePostCount() {
       return { ...supabaseConnectivityState };
     }
 
+    function persistRuntimeIssues() {
+      try {
+        localStorage.setItem(RUNTIME_ISSUES_KEY, JSON.stringify(runtimeIssues));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+
+    function loadRuntimeIssues() {
+      try {
+        const raw = localStorage.getItem(RUNTIME_ISSUES_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        runtimeIssues = parsed
+          .filter((entry) => entry && typeof entry === "object")
+          .slice(0, RUNTIME_ISSUES_LIMIT);
+      } catch {
+        runtimeIssues = [];
+      }
+    }
+
+    function pushRuntimeIssue(entry = {}) {
+      const next = {
+        ts: new Date().toISOString(),
+        type: String(entry.type || "runtime"),
+        message: String(entry.message || "").slice(0, 500),
+        source: String(entry.source || "").slice(0, 500),
+        stack: String(entry.stack || "").slice(0, 4000),
+        count: 1,
+      };
+      if (!next.message && !next.source) return;
+      const prev = runtimeIssues[0];
+      if (
+        prev &&
+        prev.type === next.type &&
+        prev.message === next.message &&
+        prev.source === next.source &&
+        prev.stack === next.stack
+      ) {
+        runtimeIssues[0] = {
+          ...prev,
+          ts: next.ts,
+          count: Number(prev.count || 1) + 1,
+        };
+        persistRuntimeIssues();
+        return;
+      }
+      runtimeIssues = [next, ...runtimeIssues].slice(0, RUNTIME_ISSUES_LIMIT);
+      persistRuntimeIssues();
+    }
+
+    function clearRuntimeIssues() {
+      runtimeIssues = [];
+      try {
+        localStorage.removeItem(RUNTIME_ISSUES_KEY);
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+
+    function setupRuntimeIssueCapture() {
+      if (runtimeIssueCaptureBound) return;
+      runtimeIssueCaptureBound = true;
+      if (typeof window === "undefined") return;
+      loadRuntimeIssues();
+      window.addEventListener("error", (event) => {
+        const message = event?.message || "Unhandled error";
+        const source =
+          event?.filename && event?.lineno
+            ? `${event.filename}:${event.lineno}:${event.colno || 0}`
+            : event?.filename || "";
+        const stack = event?.error?.stack || "";
+        pushRuntimeIssue({
+          type: "window.error",
+          message,
+          source,
+          stack,
+        });
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        const reason = event?.reason;
+        const message =
+          reason?.message ||
+          (typeof reason === "string" ? reason : "Unhandled rejection");
+        const stack = reason?.stack || "";
+        pushRuntimeIssue({
+          type: "unhandledrejection",
+          message,
+          source: "",
+          stack,
+        });
+      });
+    }
+
     async function runSupabaseConnectionProbe(options = {}) {
       const { url = SUPABASE_URL, anonKey = SUPABASE_ANON_KEY, timeoutMs = 8000 } = options;
       const authHeaders = { apikey: anonKey };
@@ -1239,6 +1338,7 @@ async function loadProfilePostCount() {
     }
 
     async function init() {
+      setupRuntimeIssueCapture();
       loadSupabaseConnectivityState();
       loadSettings();
       loadBuildMeta();
@@ -1610,6 +1710,7 @@ async function loadProfilePostCount() {
       setText("btn-force-update", "forceAppUpdate");
       setText("btn-connection-test", "settingsConnectionTest");
       setText("btn-copy-diagnostics", "settingsCopyDiagnostics");
+      setText("btn-clear-diagnostics", "settingsClearDiagnostics");
       setText("btn-reset-settings", "settingsReset");
       setText("btn-toggle-perf-debug", "perfDebugEnable");
 
@@ -5172,7 +5273,11 @@ async function loadProfilePostCount() {
             current_user_id: currentUser?.id || null,
             current_profile_id: currentProfile?.id || null,
             posts_count: Array.isArray(allPosts) ? allPosts.length : 0,
+            runtime_issues_count: Array.isArray(runtimeIssues)
+              ? runtimeIssues.length
+              : 0,
           },
+          runtime_issues: Array.isArray(runtimeIssues) ? runtimeIssues : [],
           settings,
         };
       };
@@ -5394,6 +5499,19 @@ async function loadProfilePostCount() {
           } finally {
             setInlineButtonLoading(copyDiagnosticsBtn, false);
           }
+        });
+      }
+
+      const clearDiagnosticsBtn = $("btn-clear-diagnostics");
+      if (clearDiagnosticsBtn && clearDiagnosticsBtn.dataset.bound !== "true") {
+        clearDiagnosticsBtn.dataset.bound = "true";
+        clearDiagnosticsBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          clearRuntimeIssues();
+          setStatus(
+            tr.settingsDiagnosticsCleared || "Runtime diagnostics were cleared.",
+            2600
+          );
         });
       }
 

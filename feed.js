@@ -1,4 +1,8 @@
-import { supabase } from "./supabaseClient.js";
+import {
+  supabase,
+  SUPABASE_CONFIG_SOURCE,
+  clearStoredSupabaseConfig,
+} from "./supabaseClient.js";
 import { t } from "./i18n.js";
 import {
   $,
@@ -2283,6 +2287,18 @@ export function renderFeed(options = {}) {
           renderFeed();
         });
         actions.appendChild(demo);
+        if (SUPABASE_CONFIG_SOURCE === "local") {
+          const resetConnection = document.createElement("button");
+          resetConnection.className = "btn btn-ghost";
+          resetConnection.textContent =
+            tr.feedEmptyCtaResetConnection ||
+            "デフォルト接続に戻して再読み込み";
+          resetConnection.addEventListener("click", () => {
+            clearStoredSupabaseConfig();
+            window.location.reload();
+          });
+          actions.appendChild(resetConnection);
+        }
       }
 
       actions.appendChild(primary);
