@@ -2206,11 +2206,16 @@ export function renderFeed(options = {}) {
         tr.feedEmptyTitle || tr.emptyFeed || "表示する投稿がありません。";
 
       const hasConnectionIssue = isSupabaseConnectivityIssue(feedError, tr);
+      const hasLocalConnectionOverrideIssue =
+        hasConnectionIssue && SUPABASE_CONFIG_SOURCE === "local";
       const desc = document.createElement("div");
       desc.className = "empty-desc";
       desc.textContent = hasConnectionIssue
-        ? tr.feedEmptyConnectionHint ||
-          "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。"
+        ? hasLocalConnectionOverrideIssue
+          ? tr.feedEmptyConnectionHintLocal ||
+            "ローカル保存した接続先で失敗しています。デフォルト接続に戻すと復旧できる可能性があります。"
+          : tr.feedEmptyConnectionHint ||
+            "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。"
         : tr.feedEmptyDesc || "最初の投稿をしてみましょう。";
 
       const actions = document.createElement("div");
@@ -2287,7 +2292,7 @@ export function renderFeed(options = {}) {
           renderFeed();
         });
         actions.appendChild(demo);
-        if (SUPABASE_CONFIG_SOURCE === "local") {
+        if (hasLocalConnectionOverrideIssue) {
           const resetConnection = document.createElement("button");
           resetConnection.className = "btn btn-ghost";
           resetConnection.textContent =

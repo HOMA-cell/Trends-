@@ -1710,6 +1710,7 @@ async function loadProfilePostCount() {
       setText("btn-force-update", "forceAppUpdate");
       setText("btn-connection-test", "settingsConnectionTest");
       setText("btn-copy-diagnostics", "settingsCopyDiagnostics");
+      setText("btn-download-diagnostics", "settingsDownloadDiagnostics");
       setText("btn-clear-diagnostics", "settingsClearDiagnostics");
       setText("btn-reset-settings", "settingsReset");
       setText("btn-toggle-perf-debug", "perfDebugEnable");
@@ -5499,6 +5500,41 @@ async function loadProfilePostCount() {
           } finally {
             setInlineButtonLoading(copyDiagnosticsBtn, false);
           }
+        });
+      }
+
+      const downloadDiagnosticsBtn = $("btn-download-diagnostics");
+      if (
+        downloadDiagnosticsBtn &&
+        downloadDiagnosticsBtn.dataset.bound !== "true"
+      ) {
+        downloadDiagnosticsBtn.dataset.bound = "true";
+        downloadDiagnosticsBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          const payload = buildDiagnosticsPayload();
+          const stamp = new Date();
+          const y = stamp.getFullYear();
+          const m = String(stamp.getMonth() + 1).padStart(2, "0");
+          const d = String(stamp.getDate()).padStart(2, "0");
+          const hh = String(stamp.getHours()).padStart(2, "0");
+          const mm = String(stamp.getMinutes()).padStart(2, "0");
+          const fileName = `trends-diagnostics-${y}${m}${d}-${hh}${mm}.json`;
+          const blob = new Blob([JSON.stringify(payload, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          setStatus(
+            tr.settingsDiagnosticsDownloaded ||
+              "Downloaded diagnostics JSON.",
+            2600
+          );
         });
       }
 

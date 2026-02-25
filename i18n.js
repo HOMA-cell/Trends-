@@ -50,6 +50,8 @@ export const t = {
         feedEmptyCtaResetConnection: "デフォルト接続に戻す",
         feedEmptyConnectionHint:
           "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。",
+        feedEmptyConnectionHintLocal:
+          "ローカル保存した接続先で失敗しています。デフォルト接続に戻すと復旧できる可能性があります。",
         feedDemoLoaded: "デモ投稿を表示しました。",
         feedDemoModeNotice:
           "デモ表示中です。接続後に「再試行」で実データへ切り替えてください。",
@@ -171,10 +173,12 @@ export const t = {
         settingsConnectionTimeout: "接続確認がタイムアウトしました。",
         settingsConnectionFailed: "接続確認に失敗しました。",
         settingsCopyDiagnostics: "診断情報をコピー",
+        settingsDownloadDiagnostics: "診断JSONを書き出す",
         settingsClearDiagnostics: "診断ログをクリア",
         settingsDiagnosticsCopied: "診断情報をコピーしました。",
         settingsDiagnosticsCopyFailed: "診断情報のコピーに失敗しました。",
         settingsDiagnosticsCleared: "診断ログをクリアしました。",
+        settingsDiagnosticsDownloaded: "診断JSONを書き出しました。",
         settingsSupabaseTitle: "Supabase 接続先",
         settingsSupabaseUrlLabel: "Project URL",
         settingsSupabaseKeyLabel: "Anon key",
@@ -468,6 +472,8 @@ export const t = {
         feedEmptyCtaResetConnection: "Reset to default endpoint",
         feedEmptyConnectionHint:
           "Supabase connection failed. Check Project URL and anon key in Settings.",
+        feedEmptyConnectionHintLocal:
+          "Your browser-local endpoint override is failing. Resetting to default endpoint may recover quickly.",
         feedDemoLoaded: "Loaded demo posts.",
         feedDemoModeNotice:
           "Demo mode is active. After fixing connection, press Retry to switch to live data.",
@@ -589,10 +595,12 @@ export const t = {
         settingsConnectionTimeout: "Connection check timed out.",
         settingsConnectionFailed: "Connection check failed.",
         settingsCopyDiagnostics: "Copy diagnostics",
+        settingsDownloadDiagnostics: "Download diagnostics JSON",
         settingsClearDiagnostics: "Clear diagnostics log",
         settingsDiagnosticsCopied: "Diagnostics copied.",
         settingsDiagnosticsCopyFailed: "Failed to copy diagnostics.",
         settingsDiagnosticsCleared: "Cleared runtime diagnostics log.",
+        settingsDiagnosticsDownloaded: "Downloaded diagnostics JSON.",
         settingsSupabaseTitle: "Supabase endpoint",
         settingsSupabaseUrlLabel: "Project URL",
         settingsSupabaseKeyLabel: "Anon key",
