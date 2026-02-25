@@ -127,8 +127,9 @@ import {
     const PERF_DEBUG_KEY = "trends_perf_debug";
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const BUILD_META_URL = "./build-meta.json";
+    const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
     const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
-    const SUPABASE_CONNECTIVITY_RETRY_MS = 10000;
+    const SUPABASE_CONNECTIVITY_RETRY_MS = 120000;
     const FILE_LIMITS = {
       avatar: 5 * 1024 * 1024,
       banner: 8 * 1024 * 1024,
@@ -913,6 +914,85 @@ async function loadProfilePostCount() {
       el.classList.add(result.ok ? "feed-status-success" : "feed-status-error");
     }
 
+    function normalizeConnectivityState(next = {}, fallback = {}) {
+      return {
+        ok:
+          typeof next.ok === "boolean"
+            ? next.ok
+            : typeof fallback.ok === "boolean"
+            ? fallback.ok
+            : null,
+        restStatus:
+          Number.isFinite(next.restStatus) && next.restStatus >= 0
+            ? next.restStatus
+            : Number.isFinite(fallback.restStatus)
+            ? fallback.restStatus
+            : 0,
+        authStatus:
+          Number.isFinite(next.authStatus) && next.authStatus >= 0
+            ? next.authStatus
+            : Number.isFinite(fallback.authStatus)
+            ? fallback.authStatus
+            : 0,
+        timedOut:
+          typeof next.timedOut === "boolean"
+            ? next.timedOut
+            : !!fallback.timedOut,
+        error: next.error || fallback.error || null,
+        checkedAt:
+          Number.isFinite(next.checkedAt) && next.checkedAt > 0
+            ? next.checkedAt
+            : Number.isFinite(fallback.checkedAt)
+            ? fallback.checkedAt
+            : 0,
+        retryAfter:
+          Number.isFinite(next.retryAfter) && next.retryAfter >= 0
+            ? next.retryAfter
+            : Number.isFinite(fallback.retryAfter)
+            ? fallback.retryAfter
+            : 0,
+      };
+    }
+
+    function persistSupabaseConnectivityState() {
+      try {
+        const payload = {
+          ok: supabaseConnectivityState.ok,
+          restStatus: supabaseConnectivityState.restStatus || 0,
+          authStatus: supabaseConnectivityState.authStatus || 0,
+          timedOut: !!supabaseConnectivityState.timedOut,
+          checkedAt: supabaseConnectivityState.checkedAt || 0,
+          retryAfter: supabaseConnectivityState.retryAfter || 0,
+        };
+        localStorage.setItem(
+          SUPABASE_CONNECTIVITY_CACHE_KEY,
+          JSON.stringify(payload)
+        );
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+
+    function loadSupabaseConnectivityState() {
+      try {
+        const raw = localStorage.getItem(SUPABASE_CONNECTIVITY_CACHE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        supabaseConnectivityState = normalizeConnectivityState(parsed);
+      } catch {
+        // ignore localStorage parse/read failures
+      }
+    }
+
+    function setSupabaseConnectivityState(next = {}) {
+      supabaseConnectivityState = normalizeConnectivityState(
+        next,
+        supabaseConnectivityState
+      );
+      persistSupabaseConnectivityState();
+      return { ...supabaseConnectivityState };
+    }
+
     async function runSupabaseConnectionProbe(options = {}) {
       const { url = SUPABASE_URL, anonKey = SUPABASE_ANON_KEY, timeoutMs = 8000 } = options;
       const authHeaders = { apikey: anonKey };
@@ -969,16 +1049,23 @@ async function loadProfilePostCount() {
     async function runSupabaseConnectionTest(options = {}) {
       const { force = false, timeoutMs = 8000 } = options;
       const now = Date.now();
-      if (
-        !force &&
-        supabaseConnectivityState.checkedAt > 0 &&
-        now - supabaseConnectivityState.checkedAt < SUPABASE_CONNECTIVITY_TTL_MS
-      ) {
-        return { ...supabaseConnectivityState };
+      if (!force) {
+        if (
+          supabaseConnectivityState.ok === false &&
+          now < (supabaseConnectivityState.retryAfter || 0)
+        ) {
+          return { ...supabaseConnectivityState };
+        }
+        if (
+          supabaseConnectivityState.checkedAt > 0 &&
+          now - supabaseConnectivityState.checkedAt < SUPABASE_CONNECTIVITY_TTL_MS
+        ) {
+          return { ...supabaseConnectivityState };
+        }
       }
 
-      supabaseConnectivityState = await runSupabaseConnectionProbe({ timeoutMs });
-      return { ...supabaseConnectivityState };
+      const next = await runSupabaseConnectionProbe({ timeoutMs });
+      return setSupabaseConnectivityState(next);
     }
 
     function normalizeBuildMeta(meta = {}) {
@@ -1152,6 +1239,7 @@ async function loadProfilePostCount() {
     }
 
     async function init() {
+      loadSupabaseConnectivityState();
       loadSettings();
       loadBuildMeta();
       setupServiceWorker();
@@ -2269,7 +2357,7 @@ async function loadProfilePostCount() {
         if (error) {
           if (isLikelyFetchError(error)) {
             authRetryBlockedUntil = Date.now() + 5000;
-            supabaseConnectivityState = {
+            setSupabaseConnectivityState({
               ok: false,
               restStatus: 0,
               authStatus: 0,
@@ -2277,7 +2365,7 @@ async function loadProfilePostCount() {
               error,
               checkedAt: Date.now(),
               retryAfter: Date.now() + SUPABASE_CONNECTIVITY_RETRY_MS,
-            };
+            });
             renderAuthNetworkStatus(supabaseConnectivityState);
             showToast(
               `${tr.authNetworkError || "Supabase に接続できません。"} (${getSupabaseHostLabel()})`,
@@ -2304,6 +2392,13 @@ async function loadProfilePostCount() {
 
         // ログイン成功
         currentUser = user;
+        setSupabaseConnectivityState({
+          ok: true,
+          timedOut: false,
+          error: null,
+          checkedAt: Date.now(),
+          retryAfter: 0,
+        });
 
         // プロフィールを自動作成＆取得
         await ensureProfileForUser(currentUser);
@@ -2413,54 +2508,75 @@ async function loadProfilePostCount() {
     }
 
     async function restoreSession() {
-  const { data, error } = await supabase.auth.getSession();
+      const now = Date.now();
+      if (
+        supabaseConnectivityState.ok === false &&
+        now < (supabaseConnectivityState.retryAfter || 0)
+      ) {
+        currentUser = null;
+        currentProfile = null;
+        profilePostCount = null;
+        updateProfileSummary();
+        updateAuthUIState();
+        return;
+      }
 
-  if (error) {
-    if (isLikelyFetchError(error)) {
-      supabaseConnectivityState = {
-        ok: false,
-        restStatus: 0,
-        authStatus: 0,
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        if (isLikelyFetchError(error)) {
+          setSupabaseConnectivityState({
+            ok: false,
+            restStatus: 0,
+            authStatus: 0,
+            timedOut: false,
+            error,
+            checkedAt: Date.now(),
+            retryAfter: Date.now() + SUPABASE_CONNECTIVITY_RETRY_MS,
+          });
+        } else {
+          console.warn("restoreSession error:", error);
+        }
+        currentUser = null;
+        currentProfile = null;
+        profilePostCount = null;
+        updateProfileSummary();
+        updateAuthUIState();
+        return;
+      }
+
+      const session = data?.session;
+      currentUser = session?.user || null;
+
+      if (!currentUser) {
+        currentProfile = null;
+        profilePostCount = null;
+        updateProfileSummary();
+        updateAuthUIState();
+        return;
+      }
+
+      setSupabaseConnectivityState({
+        ok: true,
         timedOut: false,
-        error,
+        error: null,
         checkedAt: Date.now(),
-        retryAfter: Date.now() + SUPABASE_CONNECTIVITY_RETRY_MS,
-      };
-    } else {
-      console.warn("restoreSession error:", error);
+        retryAfter: 0,
+      });
+
+      // ユーザーのプロフィールと投稿数を読み込み
+      await ensureProfileForUser(currentUser);
+      await loadProfilePostCount();
+      await loadFollowStats();
+      await loadExercisePRs();
+      await loadTemplates();
+      await loadNotifications();
+      await commentSync.flushQueue({ silent: true });
+
+      updateProfileSummary();
+      updateAuthUIState();
+      populateProfileEditor();
     }
-    currentUser = null;
-    currentProfile = null;
-    profilePostCount = null;
-    updateProfileSummary();
-    updateAuthUIState();
-    return;
-  }
-
-  const session = data?.session;
-  currentUser = session?.user || null;
-
-  if (!currentUser) {
-    currentProfile = null;
-    profilePostCount = null;
-    updateProfileSummary();
-    updateAuthUIState();
-    return;
-  }
-
-  // ユーザーのプロフィールと投稿数を読み込み
-  await ensureProfileForUser(currentUser);
-  await loadProfilePostCount();
-  await loadFollowStats();
-  await loadExercisePRs();
-  await loadTemplates();
-  await loadNotifications();
-  await commentSync.flushQueue({ silent: true });
-
-  updateProfileSummary();
-  updateAuthUIState();
-  populateProfileEditor();
-}
 
 
 
