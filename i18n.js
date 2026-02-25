@@ -52,6 +52,22 @@ export const t = {
           "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。",
         feedEmptyConnectionHintLocal:
           "ローカル保存した接続先で失敗しています。デフォルト接続に戻すと復旧できる可能性があります。",
+        feedEmptyConnectionHintDns:
+          "Supabase のホスト名を解決できません。Project URL を確認してください。",
+        feedEmptyConnectionHintTimeout:
+          "接続確認がタイムアウトしました。通信状態を確認して再試行してください。",
+        feedEmptyConnectionHintAuth:
+          "認証に失敗しています。Anon key が正しいか確認してください。",
+        feedConnectionErrorDns:
+          "Supabase ホストを解決できません。Project URL を確認してください。",
+        feedConnectionErrorTimeout:
+          "Supabase 接続がタイムアウトしました。",
+        feedConnectionErrorAuth:
+          "Supabase 認証に失敗しました。Anon key を確認してください。",
+        feedConnectionErrorNotFound:
+          "Supabase の接続先が見つかりません。Project URL を確認してください。",
+        feedConnectionErrorNetwork:
+          "Supabase への接続に失敗しました。",
         feedDemoLoaded: "デモ投稿を表示しました。",
         feedDemoModeNotice:
           "デモ表示中です。接続後に「再試行」で実データへ切り替えてください。",
@@ -172,6 +188,16 @@ export const t = {
         settingsConnectionOk: "接続は正常です。",
         settingsConnectionTimeout: "接続確認がタイムアウトしました。",
         settingsConnectionFailed: "接続確認に失敗しました。",
+        settingsConnectionHintDns:
+          "Project URL のホスト名を解決できません。URL が正しいか確認してください。",
+        settingsConnectionHintTimeout:
+          "タイムアウトしました。ネットワーク状態を確認して再試行してください。",
+        settingsConnectionHintAuth:
+          "認証に失敗しました。Anon key が正しいか確認してください。",
+        settingsConnectionHintNotFound:
+          "接続先が見つかりません。Project URL が正しいか確認してください。",
+        settingsConnectionHintNetwork:
+          "通信に失敗しました。ネットワークと接続先を確認してください。",
         settingsCopyDiagnostics: "診断情報をコピー",
         settingsDownloadDiagnostics: "診断JSONを書き出す",
         settingsClearDiagnostics: "診断ログをクリア",
@@ -480,6 +506,20 @@ export const t = {
           "Supabase connection failed. Check Project URL and anon key in Settings.",
         feedEmptyConnectionHintLocal:
           "Your browser-local endpoint override is failing. Resetting to default endpoint may recover quickly.",
+        feedEmptyConnectionHintDns:
+          "Supabase hostname could not be resolved. Verify your Project URL.",
+        feedEmptyConnectionHintTimeout:
+          "Connection timed out. Check your network and retry.",
+        feedEmptyConnectionHintAuth:
+          "Authentication failed. Verify your anon key.",
+        feedConnectionErrorDns:
+          "Could not resolve Supabase hostname. Verify your Project URL.",
+        feedConnectionErrorTimeout: "Supabase connection timed out.",
+        feedConnectionErrorAuth:
+          "Supabase authentication failed. Verify your anon key.",
+        feedConnectionErrorNotFound:
+          "Supabase endpoint was not found. Verify your Project URL.",
+        feedConnectionErrorNetwork: "Failed to connect to Supabase.",
         feedDemoLoaded: "Loaded demo posts.",
         feedDemoModeNotice:
           "Demo mode is active. After fixing connection, press Retry to switch to live data.",
@@ -600,6 +640,16 @@ export const t = {
         settingsConnectionOk: "Connection is healthy.",
         settingsConnectionTimeout: "Connection check timed out.",
         settingsConnectionFailed: "Connection check failed.",
+        settingsConnectionHintDns:
+          "Project URL host could not be resolved. Re-check your project URL.",
+        settingsConnectionHintTimeout:
+          "Connection timed out. Check your network and retry.",
+        settingsConnectionHintAuth:
+          "Authentication failed. Verify your anon key.",
+        settingsConnectionHintNotFound:
+          "Supabase endpoint not found. Verify your project URL.",
+        settingsConnectionHintNetwork:
+          "Network request failed. Check your connection and endpoint.",
         settingsCopyDiagnostics: "Copy diagnostics",
         settingsDownloadDiagnostics: "Download diagnostics JSON",
         settingsClearDiagnostics: "Clear diagnostics log",

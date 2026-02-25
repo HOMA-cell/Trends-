@@ -902,6 +902,8 @@ async function loadProfilePostCount() {
       hostOverride = ""
     ) {
       if (!result || result.ok === null) return "";
+      const issueCode = getConnectivityIssueCode(result);
+      const issueHint = getConnectivityIssueHint(issueCode, tr);
       if (result.ok) {
         return `${
           tr.settingsConnectionOk || "Connection is healthy."
@@ -909,14 +911,84 @@ async function loadProfilePostCount() {
       }
       const host = hostOverride || getSupabaseHostLabel();
       if (result.timedOut) {
-        return `${tr.settingsConnectionTimeout || "Connection check timed out."} (${host})`;
+        const base = `${
+          tr.settingsConnectionTimeout || "Connection check timed out."
+        } (${host})`;
+        return issueHint ? `${base} ${issueHint}` : base;
       }
       if (result.restStatus || result.authStatus) {
-        return `${
+        const base = `${
           tr.settingsConnectionFailed || "Connection check failed."
         } (REST ${result.restStatus || "-"}, Auth ${result.authStatus || "-"})`;
+        return issueHint ? `${base} ${issueHint}` : base;
       }
-      return `${tr.authNetworkError || "Cannot connect to Supabase."} (${host})`;
+      const base = `${tr.authNetworkError || "Cannot connect to Supabase."} (${host})`;
+      return issueHint ? `${base} ${issueHint}` : base;
+    }
+
+    function getConnectivityIssueCode(result = supabaseConnectivityState) {
+      if (!result || result.ok !== false) return "";
+      if (result.timedOut) return "timeout";
+      const restStatus = Number(result.restStatus || 0);
+      const authStatus = Number(result.authStatus || 0);
+      if ([401, 403].includes(restStatus) || [401, 403].includes(authStatus)) {
+        return "auth";
+      }
+      if (restStatus === 404 || authStatus === 404) {
+        return "notfound";
+      }
+      const errorText = `${result?.error?.message || result?.error?.details || result?.error?.hint || result?.error || ""}`
+        .toLowerCase()
+        .trim();
+      if (
+        errorText.includes("err_name_not_resolved") ||
+        errorText.includes("name not resolved") ||
+        errorText.includes("could not resolve") ||
+        errorText.includes("enotfound") ||
+        errorText.includes("dns")
+      ) {
+        return "dns";
+      }
+      if (
+        errorText.includes("invalid api key") ||
+        errorText.includes("jwt") ||
+        errorText.includes("apikey")
+      ) {
+        return "auth";
+      }
+      return "network";
+    }
+
+    function getConnectivityIssueHint(code = "", tr = t[currentLang] || t.ja) {
+      switch (code) {
+        case "dns":
+          return (
+            tr.settingsConnectionHintDns ||
+            "Project URL host could not be resolved. Re-check your project URL."
+          );
+        case "timeout":
+          return (
+            tr.settingsConnectionHintTimeout ||
+            "Connection timed out. Retry after checking your network."
+          );
+        case "auth":
+          return (
+            tr.settingsConnectionHintAuth ||
+            "Auth failed. Verify your anon key."
+          );
+        case "notfound":
+          return (
+            tr.settingsConnectionHintNotFound ||
+            "Supabase endpoint was not found. Verify your project URL."
+          );
+        case "network":
+          return (
+            tr.settingsConnectionHintNetwork ||
+            "Network request failed. Check your connection and endpoint."
+          );
+        default:
+          return "";
+      }
     }
 
     function isLocalSupabaseOverrideFailure(result = supabaseConnectivityState) {
@@ -5325,6 +5397,11 @@ async function loadProfilePostCount() {
         const connectivityError =
           supabaseConnectivityState?.error?.message ||
           String(supabaseConnectivityState?.error || "");
+        const issueCode = getConnectivityIssueCode(supabaseConnectivityState);
+        const issueHint = getConnectivityIssueHint(
+          issueCode,
+          t[currentLang] || t.ja
+        );
         return {
           generated_at: new Date().toISOString(),
           app: {
@@ -5341,6 +5418,8 @@ async function loadProfilePostCount() {
               ok: supabaseConnectivityState.ok,
               rest_status: supabaseConnectivityState.restStatus || 0,
               auth_status: supabaseConnectivityState.authStatus || 0,
+              issue_code: issueCode || null,
+              issue_hint: issueHint || null,
               timed_out: !!supabaseConnectivityState.timedOut,
               checked_at: toIsoMaybe(supabaseConnectivityState.checkedAt),
               retry_after: toIsoMaybe(supabaseConnectivityState.retryAfter),

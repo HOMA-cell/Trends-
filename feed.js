@@ -100,6 +100,7 @@ let sortOrder = "newest";
 let feedLayout = "list";
 let isFeedLoading = false;
 let feedError = "";
+let feedErrorCode = "";
 let feedDemoMode = false;
 let feedDemoLastAutoRetryAt = 0;
 let feedPageSize = 8;
@@ -519,6 +520,64 @@ function isLikelyTransientNetworkError(error) {
         message.includes("connection") ||
         message.includes("timeout")
       );
+    }
+function classifyFeedConnectionIssue(error = null, fallbackMessage = "") {
+      const status = Number(error?.status || 0);
+      const codeText = `${error?.code || ""}`.toLowerCase().trim();
+      const nameText = `${error?.name || ""}`.toLowerCase().trim();
+      const messageText = `${error?.message || error?.details || error?.hint || fallbackMessage || ""}`
+        .toLowerCase()
+        .trim();
+      if (nameText === "aborterror" || messageText.includes("timeout")) {
+        return "timeout";
+      }
+      if ([401, 403].includes(status)) {
+        return "auth";
+      }
+      if (status === 404) {
+        return "notfound";
+      }
+      if (
+        codeText.includes("err_name_not_resolved") ||
+        messageText.includes("err_name_not_resolved") ||
+        messageText.includes("name not resolved") ||
+        messageText.includes("could not resolve") ||
+        messageText.includes("enotfound") ||
+        messageText.includes("dns")
+      ) {
+        return "dns";
+      }
+      if (
+        messageText.includes("invalid api key") ||
+        messageText.includes("apikey") ||
+        messageText.includes("jwt")
+      ) {
+        return "auth";
+      }
+      return "network";
+    }
+function formatFeedConnectionError(code, tr = {}) {
+      switch (code) {
+        case "dns":
+          return (
+            tr.feedConnectionErrorDns ||
+            "Could not resolve Supabase hostname. Verify your Project URL."
+          );
+        case "timeout":
+          return tr.feedConnectionErrorTimeout || "Supabase connection timed out.";
+        case "auth":
+          return (
+            tr.feedConnectionErrorAuth ||
+            "Supabase authentication failed. Verify your anon key."
+          );
+        case "notfound":
+          return (
+            tr.feedConnectionErrorNotFound ||
+            "Supabase endpoint was not found. Verify your Project URL."
+          );
+        default:
+          return tr.feedConnectionErrorNetwork || "Failed to connect to Supabase.";
+      }
     }
 function isSupabaseConnectivityIssue(message, tr = {}) {
       const text = String(message || "").toLowerCase().trim();
@@ -1212,6 +1271,12 @@ export function setFeedState(next = {}) {
       }
       if (typeof next.feedError === "string") {
         feedError = next.feedError;
+        if (!feedError) {
+          feedErrorCode = "";
+        }
+      }
+      if (typeof next.feedErrorCode === "string") {
+        feedErrorCode = next.feedErrorCode;
       }
       syncFeedPageSize();
       if (shouldPersistUi) {
@@ -1728,6 +1793,7 @@ export async function loadFeed(options = {}) {
         isFeedLoading = true;
       }
       feedError = "";
+      feedErrorCode = "";
       renderFeed();
 
       if (!forceNetwork) {
@@ -1737,7 +1803,8 @@ export async function loadFeed(options = {}) {
           const hasVisiblePosts = Array.isArray(getAllPosts()) && getAllPosts().length > 0;
           feedError = hasVisiblePosts
             ? ""
-            : tr.authNetworkError || "Cannot connect to Supabase.";
+            : formatFeedConnectionError("network", tr);
+          feedErrorCode = hasVisiblePosts ? "" : "network";
           const waitSeconds = Math.max(1, Math.ceil(backoffRemainingMs / 1000));
           setFeedNotice(
             `${tr.feedCachedNotice || "Network issue. Showing last saved feed."} (${waitSeconds}s)`,
@@ -1752,7 +1819,8 @@ export async function loadFeed(options = {}) {
       }
 
       if (!supabase) {
-        feedError = "Supabase not initialized.";
+        feedErrorCode = "network";
+        feedError = formatFeedConnectionError(feedErrorCode, tr);
         isFeedLoading = false;
         setFeedNotice("", "");
         renderFeed();
@@ -1786,6 +1854,7 @@ export async function loadFeed(options = {}) {
 
           if (error) {
             const isTransientNetwork = isLikelyTransientNetworkError(error);
+            const issueCode = classifyFeedConnectionIssue(error);
             if (isTransientNetwork) {
               setFeedNetworkBackoff();
             } else {
@@ -1810,9 +1879,10 @@ export async function loadFeed(options = {}) {
               showToast(message, "warning");
               return;
             }
+            feedErrorCode = issueCode;
             feedError = isTransientNetwork
-              ? tr.authNetworkError || "Cannot connect to Supabase."
-              : error.message || "Failed to load feed.";
+              ? formatFeedConnectionError(issueCode, tr)
+              : error.message || formatFeedConnectionError(issueCode, tr);
             isFeedLoading = false;
             setFeedNotice("", "");
             renderFeed();
@@ -1820,6 +1890,7 @@ export async function loadFeed(options = {}) {
           }
 
           feedDemoMode = false;
+          feedErrorCode = "";
           clearFeedNetworkBackoff();
 
           const safeData = Array.isArray(data) ? data : [];
@@ -2214,6 +2285,15 @@ export function renderFeed(options = {}) {
         ? hasLocalConnectionOverrideIssue
           ? tr.feedEmptyConnectionHintLocal ||
             "ローカル保存した接続先で失敗しています。デフォルト接続に戻すと復旧できる可能性があります。"
+          : feedErrorCode === "dns"
+          ? tr.feedEmptyConnectionHintDns ||
+            "Supabase のホスト名を解決できません。Project URL を確認してください。"
+          : feedErrorCode === "timeout"
+          ? tr.feedEmptyConnectionHintTimeout ||
+            "接続確認がタイムアウトしました。通信状態を確認して再試行してください。"
+          : feedErrorCode === "auth"
+          ? tr.feedEmptyConnectionHintAuth ||
+            "認証に失敗しています。Anon key が正しいか確認してください。"
           : tr.feedEmptyConnectionHint ||
             "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。"
         : tr.feedEmptyDesc || "最初の投稿をしてみましょう。";
