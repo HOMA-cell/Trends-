@@ -904,18 +904,65 @@ async function loadProfilePostCount() {
       return `${tr.authNetworkError || "Cannot connect to Supabase."} (${host})`;
     }
 
+    function isLocalSupabaseOverrideFailure(result = supabaseConnectivityState) {
+      return SUPABASE_CONFIG_SOURCE === "local" && result?.ok === false;
+    }
+
+    function openSupabaseSettings() {
+      if (typeof setActivePage === "function") {
+        setActivePage("settings");
+      } else {
+        const tab = document.querySelector("[data-page-target='settings']");
+        if (tab instanceof HTMLElement) {
+          tab.click();
+        }
+      }
+      const targetInput = document.getElementById("settings-supabase-url");
+      if (targetInput) {
+        setTimeout(() => {
+          targetInput.focus();
+          targetInput.select();
+        }, 120);
+      }
+    }
+
+    function resetSupabaseConfigToDefaultAndReload() {
+      clearStoredSupabaseConfig();
+      window.location.reload();
+    }
+
     function renderAuthNetworkStatus(result = supabaseConnectivityState) {
       const el = $("auth-network-status");
+      const actions = $("auth-network-actions");
+      const resetBtn = $("btn-auth-reset-connection");
       if (!el) return;
       if (!result || result.ok === null) {
         el.textContent = "";
         el.classList.remove("feed-status-error", "feed-status-success", "feed-status-warning");
+        if (actions) actions.classList.add("hidden");
+        if (resetBtn) resetBtn.classList.add("hidden");
         return;
       }
       const tr = t[currentLang] || t.ja;
-      el.textContent = formatConnectionStatusMessage(result, tr);
+      const localOverrideFailure = isLocalSupabaseOverrideFailure(result);
+      const baseMessage = formatConnectionStatusMessage(result, tr);
+      el.textContent = localOverrideFailure
+        ? `${baseMessage} ${tr.authLocalOverrideHint || ""}`.trim()
+        : baseMessage;
       el.classList.remove("feed-status-error", "feed-status-success", "feed-status-warning");
-      el.classList.add(result.ok ? "feed-status-success" : "feed-status-error");
+      if (result.ok) {
+        el.classList.add("feed-status-success");
+      } else if (localOverrideFailure) {
+        el.classList.add("feed-status-warning");
+      } else {
+        el.classList.add("feed-status-error");
+      }
+      if (actions) {
+        actions.classList.toggle("hidden", result.ok);
+      }
+      if (resetBtn) {
+        resetBtn.classList.toggle("hidden", !localOverrideFailure);
+      }
     }
 
     function normalizeConnectivityState(next = {}, fallback = {}) {
@@ -1607,6 +1654,8 @@ async function loadProfilePostCount() {
       setText("account-title", "account");
       setText("btn-auth", "loginSignup");
       setText("btn-logout", "logout");
+      setText("btn-auth-open-settings", "authOpenConnectionSettings");
+      setText("btn-auth-reset-connection", "authResetConnection");
 
       setText("settings-title", "settingsTitle");
       setText("settings-sub", "settingsSub");
@@ -1876,11 +1925,27 @@ async function loadProfilePostCount() {
     function setupAuthUI() {
       const authBtn = $("btn-auth");
       const logoutBtn = $("btn-logout");
-      if (authBtn) {
+      const openSettingsBtn = $("btn-auth-open-settings");
+      const resetConnectionBtn = $("btn-auth-reset-connection");
+      if (authBtn && authBtn.dataset.bound !== "true") {
+        authBtn.dataset.bound = "true";
         authBtn.addEventListener("click", handleAuthSubmit);
       }
-      if (logoutBtn) {
+      if (logoutBtn && logoutBtn.dataset.bound !== "true") {
+        logoutBtn.dataset.bound = "true";
         logoutBtn.addEventListener("click", handleLogout);
+      }
+      if (openSettingsBtn && openSettingsBtn.dataset.bound !== "true") {
+        openSettingsBtn.dataset.bound = "true";
+        openSettingsBtn.addEventListener("click", () => {
+          openSupabaseSettings();
+        });
+      }
+      if (resetConnectionBtn && resetConnectionBtn.dataset.bound !== "true") {
+        resetConnectionBtn.dataset.bound = "true";
+        resetConnectionBtn.addEventListener("click", () => {
+          resetSupabaseConfigToDefaultAndReload();
+        });
       }
     }
 
@@ -5603,15 +5668,12 @@ async function loadProfilePostCount() {
         supabaseResetBtn.dataset.bound = "true";
         supabaseResetBtn.addEventListener("click", () => {
           const tr = t[currentLang] || t.ja;
-          clearStoredSupabaseConfig();
           setStatus(
             tr.settingsSupabaseResetDone ||
               "Reverted Supabase endpoint to default. Reloading the app now.",
             2600
           );
-          setTimeout(() => {
-            window.location.reload();
-          }, 320);
+          setTimeout(resetSupabaseConfigToDefaultAndReload, 320);
         });
       }
 

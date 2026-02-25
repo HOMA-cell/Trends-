@@ -218,6 +218,10 @@ export const t = {
         authInvalidEmail: "メールアドレスの形式を確認してください。",
         authRetryLater: "少し待ってから再試行してください。",
         authNetworkError: "Supabase に接続できません。",
+        authOpenConnectionSettings: "接続設定を開く",
+        authResetConnection: "デフォルト接続に戻す",
+        authLocalOverrideHint:
+          "ローカル接続先が無効です。デフォルト接続に戻すと復旧しやすいです。",
         authFailed: "ログイン / サインアップに失敗しました。",
         authLoginFailed: "ログインに失敗しました。",
         authLoginSuccess: "ログインしました！",
@@ -644,6 +648,10 @@ export const t = {
         authInvalidEmail: "Please check your email format.",
         authRetryLater: "Please wait a moment before trying again.",
         authNetworkError: "Cannot connect to Supabase.",
+        authOpenConnectionSettings: "Open connection settings",
+        authResetConnection: "Reset to default endpoint",
+        authLocalOverrideHint:
+          "Your local endpoint override appears invalid. Resetting to default usually restores access.",
         authFailed: "Log in / sign up failed.",
         authLoginFailed: "Login failed.",
         authLoginSuccess: "Logged in.",
