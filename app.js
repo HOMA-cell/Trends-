@@ -129,6 +129,7 @@ import {
     const PERF_DEBUG_KEY = "trends_perf_debug";
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const BUILD_META_URL = "./build-meta.json";
+    const DEFAULT_LIVE_SITE_URL = "https://homa-cell.github.io/Trends-/";
     const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
     const RUNTIME_ISSUES_KEY = "trends_runtime_issues_v1";
     const RUNTIME_ISSUES_LIMIT = 20;
@@ -845,6 +846,31 @@ async function loadProfilePostCount() {
 
     function getSupabaseHostLabel() {
       return getSupabaseHostLabelFromUrl(SUPABASE_URL);
+    }
+
+    function normalizeSiteBaseUrl(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      try {
+        const parsed = new URL(raw);
+        return `${parsed.origin}${parsed.pathname.replace(/\/?$/, "/")}`;
+      } catch {
+        return "";
+      }
+    }
+
+    function getLiveSiteUrl() {
+      if (typeof window !== "undefined") {
+        const { origin, hostname, pathname } = window.location;
+        if (hostname === "homa-cell.github.io" && pathname.startsWith("/Trends-/")) {
+          return normalizeSiteBaseUrl(`${origin}/Trends-/`) || DEFAULT_LIVE_SITE_URL;
+        }
+      }
+      return DEFAULT_LIVE_SITE_URL;
+    }
+
+    function getLiveBuildMetaUrl() {
+      return `${getLiveSiteUrl()}build-meta.json`;
     }
 
     function normalizeSupabaseUrlInput(raw) {
@@ -1878,6 +1904,8 @@ async function loadProfilePostCount() {
       setText("btn-export-data", "settingsExportData");
       setText("btn-force-update", "forceAppUpdate");
       setText("btn-connection-test", "settingsConnectionTest");
+      setText("btn-live-check", "settingsLiveCheck");
+      setText("btn-open-live-site", "settingsOpenLiveSite");
       setText("btn-copy-diagnostics", "settingsCopyDiagnostics");
       setText("btn-download-diagnostics", "settingsDownloadDiagnostics");
       setText("btn-clear-diagnostics", "settingsClearDiagnostics");
@@ -5394,6 +5422,11 @@ async function loadProfilePostCount() {
           statusEl.textContent = "";
         }, durationMs);
       };
+      const liveStatusEl = $("settings-live-status");
+      const setLiveStatus = (message = "") => {
+        if (!liveStatusEl) return;
+        liveStatusEl.textContent = message;
+      };
       const renderSupabaseSourceStatus = () => {
         const sourceEl = $("settings-supabase-source");
         if (!sourceEl) return;
@@ -5534,6 +5567,47 @@ async function loadProfilePostCount() {
         }
         return { url: nextUrl, anonKey: nextKey };
       };
+      const checkLiveDeployStatus = async () => {
+        const tr = t[currentLang] || t.ja;
+        const localVersion = appBuildMeta.version || "dev-local";
+        const localBuiltAt = appBuildMeta.builtAt
+          ? formatDateTimeDisplay(appBuildMeta.builtAt)
+          : tr.settingsBuildUnknown || "Unknown";
+        const checkingMessage =
+          tr.settingsLiveChecking || "Checking live deployment...";
+        setStatus(checkingMessage, 5200);
+        setLiveStatus(checkingMessage);
+        try {
+          const liveUrl = getLiveBuildMetaUrl();
+          const response = await fetch(`${liveUrl}?t=${Date.now()}`, {
+            cache: "no-store",
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const liveMetaRaw = await response.json();
+          const liveMeta = normalizeBuildMeta(liveMetaRaw);
+          const liveVersion = liveMeta.version || "unknown";
+          const liveBuiltAt = liveMeta.builtAt
+            ? formatDateTimeDisplay(liveMeta.builtAt)
+            : tr.settingsBuildUnknown || "Unknown";
+          const sameVersion = liveVersion === localVersion;
+          const message = sameVersion
+            ? `${tr.settingsLiveUpToDate || "Live site is up to date."} (${liveVersion})`
+            : `${tr.settingsLiveOutdated || "Live site version differs from this app."} local=${localVersion}, live=${liveVersion}`;
+          const detail = `${message} | local built: ${localBuiltAt} | live built: ${liveBuiltAt}`;
+          setLiveStatus(detail);
+          setStatus(message, 7000);
+          return;
+        } catch (error) {
+          const detail = String(error?.message || error || "").slice(0, 180);
+          const message =
+            tr.settingsLiveUnavailable || "Could not check live deployment.";
+          const full = detail ? `${message} (${detail})` : message;
+          setLiveStatus(full);
+          setStatus(full, 7000);
+        }
+      };
       const testDraftSupabaseConfig = async (config) => {
         const tr = t[currentLang] || t.ja;
         setStatus(
@@ -5563,6 +5637,10 @@ async function loadProfilePostCount() {
       fillSupabaseConfigInputs();
       renderSupabaseSourceStatus();
       renderConnectivitySummary();
+      setLiveStatus(
+        (t[currentLang] || t.ja).settingsLiveStatusHint ||
+          "Use \"Check live deployment\" to compare local and live versions."
+      );
       const isPerfDebugEnabled = () => {
         try {
           return localStorage.getItem(PERF_DEBUG_KEY) === "true";
@@ -5670,6 +5748,34 @@ async function loadProfilePostCount() {
             connectionBtn.classList.remove("is-loading");
             connectionBtn.disabled = false;
           }
+        });
+      }
+
+      const liveCheckBtn = $("btn-live-check");
+      if (liveCheckBtn && liveCheckBtn.dataset.bound !== "true") {
+        liveCheckBtn.dataset.bound = "true";
+        liveCheckBtn.addEventListener("click", async () => {
+          if (liveCheckBtn.classList.contains("is-loading")) return;
+          setInlineButtonLoading(liveCheckBtn, true);
+          try {
+            await checkLiveDeployStatus();
+          } finally {
+            setInlineButtonLoading(liveCheckBtn, false);
+          }
+        });
+      }
+
+      const openLiveSiteBtn = $("btn-open-live-site");
+      if (openLiveSiteBtn && openLiveSiteBtn.dataset.bound !== "true") {
+        openLiveSiteBtn.dataset.bound = "true";
+        openLiveSiteBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          const url = getLiveSiteUrl();
+          window.open(url, "_blank", "noopener,noreferrer");
+          setStatus(
+            tr.settingsLiveOpenDone || "Opened live site in a new tab.",
+            2600
+          );
         });
       }
 
