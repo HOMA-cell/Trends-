@@ -3009,6 +3009,9 @@ async function loadProfilePostCount() {
       let miniHeaderScrollRaf = 0;
       let miniHeaderLastVisible = null;
       let miniHeaderLastProgress = -1;
+      const isFeedPageActive = () =>
+        (document.querySelector(".page-view.is-active")?.dataset.page || "feed") ===
+        "feed";
       const applyScrollUi = () => {
         miniHeaderScrollRaf = 0;
         const isVisible = window.scrollY > 120;
@@ -3017,6 +3020,15 @@ async function loadProfilePostCount() {
           miniHeaderLastVisible = isVisible;
         }
         if (progressBar) {
+          const allowProgress =
+            isFeedPageActive() && (window.innerWidth || 1024) > 700;
+          if (!allowProgress) {
+            if (miniHeaderLastProgress !== 0) {
+              progressBar.style.width = "0%";
+              miniHeaderLastProgress = 0;
+            }
+            return;
+          }
           const doc = document.documentElement;
           const total = doc.scrollHeight - doc.clientHeight;
           const percent = Math.min(

@@ -1374,6 +1374,9 @@
       .profile-editor {
         grid-template-columns: 1fr;
       }
+      .mini-progress {
+        display: none;
+      }
       .profile-edit-toolbar {
         position: static;
         top: auto;
