@@ -73,7 +73,6 @@ const submitComment = (...args) => feedContext.submitComment?.(...args);
 const toggleComments = (...args) => feedContext.toggleComments?.(...args);
 const createNotification = (...args) => feedContext.createNotification?.(...args);
 const deletePost = (...args) => feedContext.deletePost?.(...args);
-const getProfile = (...args) => feedContext.getProfile?.(...args);
 const getProfilesForUsers = (...args) =>
   feedContext.getProfilesForUsers?.(...args) || new Map();
 const toggleFollowForUser = (...args) => feedContext.toggleFollowForUser?.(...args);
@@ -152,6 +151,7 @@ let feedWindowListenersBound = false;
 let feedChunkRendering = false;
 let feedWindowLastRunAt = 0;
 let feedWindowLastRunY = 0;
+let feedWindowingEnabled = false;
 const feedWindowedCards = new Map();
 let feedKeyboardShortcutsBound = false;
 let feedCardActionDelegationBound = false;
@@ -182,6 +182,9 @@ const FEED_WINDOW_SCAN_LIMIT_DESKTOP = 120;
 const FEED_WINDOW_SCAN_LIMIT_MOBILE = 64;
 const FEED_WINDOW_MUTATION_BUDGET_DESKTOP = 20;
 const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 10;
+const FEED_CACHE_POST_LIMIT = 240;
+const FEED_CACHE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+const FEED_NETWORK_POST_LIMIT = 260;
 const FEED_MEDIA_OBSERVER_MARGIN = "560px 0px";
 const FEED_MEDIA_VIDEO_PARK_MARGIN_PX = 1500;
 const FEED_IMAGE_HYDRATE_CONCURRENCY = 3;
@@ -888,11 +891,15 @@ function applyQueuedLikeState() {
         }
       });
     }
+function clampFeedPostsForCache(posts = []) {
+      if (!Array.isArray(posts) || !posts.length) return [];
+      return posts.slice(0, FEED_CACHE_POST_LIMIT);
+    }
 function saveFeedCache(posts = []) {
       try {
         const payload = {
           saved_at: Date.now(),
-          posts: Array.isArray(posts) ? posts : [],
+          posts: clampFeedPostsForCache(posts),
         };
         localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(payload));
       } catch (error) {
@@ -905,7 +912,12 @@ function loadFeedCache() {
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed?.posts)) return [];
-        return parsed.posts;
+        const savedAt = Number(parsed?.saved_at || 0);
+        if (savedAt > 0 && Date.now() - savedAt > FEED_CACHE_MAX_AGE_MS) {
+          localStorage.removeItem(FEED_CACHE_KEY);
+          return [];
+        }
+        return clampFeedPostsForCache(parsed.posts);
       } catch (error) {
         console.warn("loadFeedCache failed", error);
         return [];
@@ -1203,6 +1215,7 @@ function runFeedWindowing() {
     }
 function scheduleFeedWindowingUpdate(force = false) {
       if (typeof window === "undefined") return;
+      if (!force && !feedWindowingEnabled) return;
       if (force) {
         if (feedWindowUpdateRaf) {
           cancelAnimationFrame(feedWindowUpdateRaf);
@@ -1244,7 +1257,14 @@ function setupFeedWindowingListeners() {
 function syncFeedWindowing(shouldEnable = false) {
       const container = $("feed-list");
       if (!container) return;
+      feedWindowingEnabled = !!shouldEnable;
       if (!shouldEnable) {
+        if (feedWindowUpdateRaf) {
+          cancelAnimationFrame(feedWindowUpdateRaf);
+          feedWindowUpdateRaf = 0;
+        }
+        feedWindowLastRunAt = 0;
+        feedWindowLastRunY = 0;
         restoreAllWindowedFeedCards(container);
         return;
       }
@@ -1929,14 +1949,16 @@ export async function loadFeed(options = {}) {
           let { data, error } = await supabase
             .from("posts")
             .select("*")
-            .order("date", { ascending: false });
+            .order("date", { ascending: false })
+            .limit(FEED_NETWORK_POST_LIMIT);
 
           if (error) {
             if (!isLikelyTransientNetworkError(error)) {
               const fallback = await supabase
                 .from("posts")
                 .select("*")
-                .order("created_at", { ascending: false });
+                .order("created_at", { ascending: false })
+                .limit(FEED_NETWORK_POST_LIMIT);
               if (!fallback.error) {
                 data = fallback.data;
                 error = null;
@@ -1994,18 +2016,13 @@ export async function loadFeed(options = {}) {
           } catch (profileBatchError) {
             console.error("loadFeed profile batch error", profileBatchError);
           }
-          const postsWithProfile = await Promise.all(
-            safeData.map(async (post) => {
-              if (profileMap && typeof profileMap.get === "function") {
-                return {
-                  ...post,
-                  profile: profileMap.get(post.user_id) || null,
-                };
-              }
-              const profile = await getProfile(post.user_id);
-              return { ...post, profile };
-            })
-          );
+          const postsWithProfile = safeData.map((post) => ({
+            ...post,
+            profile:
+              profileMap && typeof profileMap.get === "function"
+                ? profileMap.get(post.user_id) || null
+                : null,
+          }));
 
           if (requestGeneration !== feedLoadingGeneration) {
             return;
