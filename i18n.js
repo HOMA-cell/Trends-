@@ -193,6 +193,12 @@ export const t = {
         settingsLiveStatusHint:
           "「ライブ版を確認」でローカルと公開版のビルド差分を確認できます。",
         settingsLiveOpenDone: "ライブサイトを新しいタブで開きました。",
+        settingsLiveCrossOriginHint:
+          "ローカル表示中のため、GitHub main の最新コミットで確認しました。",
+        settingsLiveRepoMatch:
+          "現在のビルドIDは GitHub main の最新コミットと一致しています。",
+        settingsLiveRepoMismatch:
+          "現在のビルドIDは GitHub main の最新コミットと一致していません。",
         settingsConnectionChecking: "接続を確認中...",
         settingsConnectionOk: "接続は正常です。",
         settingsConnectionTimeout: "接続確認がタイムアウトしました。",
@@ -658,6 +664,12 @@ export const t = {
         settingsLiveStatusHint:
           "Use \"Check live deployment\" to compare local and live builds.",
         settingsLiveOpenDone: "Opened live site in a new tab.",
+        settingsLiveCrossOriginHint:
+          "Running outside the live host, so checked latest GitHub main commit.",
+        settingsLiveRepoMatch:
+          "Current build ID matches the latest GitHub main commit.",
+        settingsLiveRepoMismatch:
+          "Current build ID differs from latest GitHub main commit.",
         settingsConnectionChecking: "Checking connection...",
         settingsConnectionOk: "Connection is healthy.",
         settingsConnectionTimeout: "Connection check timed out.",

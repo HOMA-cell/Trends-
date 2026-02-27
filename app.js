@@ -130,6 +130,8 @@ import {
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const BUILD_META_URL = "./build-meta.json";
     const DEFAULT_LIVE_SITE_URL = "https://homa-cell.github.io/Trends-/";
+    const GITHUB_MAIN_COMMIT_API_URL =
+      "https://api.github.com/repos/HOMA-cell/Trends-/commits/main";
     const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
     const RUNTIME_ISSUES_KEY = "trends_runtime_issues_v1";
     const RUNTIME_ISSUES_LIMIT = 20;
@@ -871,6 +873,29 @@ async function loadProfilePostCount() {
 
     function getLiveBuildMetaUrl() {
       return `${getLiveSiteUrl()}build-meta.json`;
+    }
+
+    function isLikelyCommitVersion(value) {
+      const raw = String(value || "").trim();
+      return /^[a-f0-9]{7,40}$/i.test(raw);
+    }
+
+    async function fetchGitHubMainCommitShortSha() {
+      const response = await fetch(`${GITHUB_MAIN_COMMIT_API_URL}?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/vnd.github+json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`GitHub API HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      const sha = String(payload?.sha || "").trim();
+      if (!sha) {
+        throw new Error("GitHub API missing sha");
+      }
+      return sha.slice(0, 12);
     }
 
     function normalizeSupabaseUrlInput(raw) {
@@ -5578,6 +5603,36 @@ async function loadProfilePostCount() {
         setStatus(checkingMessage, 5200);
         setLiveStatus(checkingMessage);
         try {
+          const localOrigin =
+            typeof window !== "undefined" ? window.location.origin : "";
+          let liveOrigin = "";
+          try {
+            liveOrigin = new URL(getLiveSiteUrl()).origin;
+          } catch {
+            liveOrigin = "";
+          }
+          const canDirectCompare =
+            !!localOrigin && !!liveOrigin && localOrigin === liveOrigin;
+          if (!canDirectCompare) {
+            const remoteSha = await fetchGitHubMainCommitShortSha();
+            const hasComparableLocal = isLikelyCommitVersion(localVersion);
+            const isMatch =
+              hasComparableLocal &&
+              localVersion.toLowerCase() === remoteSha.toLowerCase();
+            const summary = isMatch
+              ? tr.settingsLiveRepoMatch ||
+                "Current build ID matches the latest GitHub main commit."
+              : tr.settingsLiveRepoMismatch ||
+                "Current build ID differs from latest GitHub main commit.";
+            const modeHint =
+              tr.settingsLiveCrossOriginHint ||
+              "Running outside the live host, so checked latest GitHub main commit.";
+            setStatus(summary, 7000);
+            setLiveStatus(
+              `${modeHint} ${summary} (local=${localVersion}, main=${remoteSha}, local built: ${localBuiltAt})`
+            );
+            return;
+          }
           const liveUrl = getLiveBuildMetaUrl();
           const response = await fetch(`${liveUrl}?t=${Date.now()}`, {
             cache: "no-store",
