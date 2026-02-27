@@ -146,6 +146,7 @@ let feedScheduledRenderToken = 0;
 let feedSearchInputTimer = null;
 let feedLastCommittedSearch = "";
 let feedMoreAnchorTop = null;
+let feedMoreLastTrigger = "manual";
 let feedWindowUpdateRaf = 0;
 let feedWindowListenersBound = false;
 let feedChunkRendering = false;
@@ -1040,6 +1041,25 @@ function restoreFeedMoreAnchor(moreWrap) {
         top: delta,
         left: 0,
         behavior: "auto",
+      });
+    }
+function smoothScrollToPostCard(container, postId) {
+      if (!container || !postId || typeof window === "undefined") return;
+      const cards = Array.from(
+        container.querySelectorAll(".post-card[data-post-id]")
+      );
+      const target = cards.find(
+        (card) => card.getAttribute("data-post-id") === postId
+      );
+      if (!target) return;
+      const targetTop = target.getBoundingClientRect().top + window.scrollY - 56;
+      const currentTop = window.scrollY || 0;
+      if (!Number.isFinite(targetTop) || Math.abs(targetTop - currentTop) < 12) {
+        return;
+      }
+      window.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: "smooth",
       });
     }
 function isNearFeedViewport(el) {
@@ -1977,6 +1997,7 @@ export function renderFeed(options = {}) {
       }
       restoreAllWindowedFeedCards(container);
       feedMoreAnchorTop = null;
+      feedMoreLastTrigger = "manual";
     }
     const renderToken = ++feedRenderToken;
     const clearFeedMoreLoadingState = () => {
@@ -2258,6 +2279,10 @@ export function renderFeed(options = {}) {
       container.dataset.feedSignature === renderSignature &&
       existingCount > 0 &&
       existingCount < visibleSlice.length;
+    const appendedStartPostId =
+      canAppend && appendOnly
+        ? visibleSlice[existingCount]?.id || ""
+        : "";
     const renderMode = canAppend ? "append" : "full";
 
     if (!gridCandidates.length) {
@@ -2803,9 +2828,15 @@ export function renderFeed(options = {}) {
         moreBtn.textContent = tr.feedMore || "もっと見る";
         if (!moreBtn.dataset.bound) {
           moreBtn.dataset.bound = "true";
-          moreBtn.addEventListener("click", () => {
+          moreBtn.addEventListener("click", (event) => {
             if (feedMoreLoading) return;
-            captureFeedMoreAnchor(moreWrap);
+            const triggeredByUser = !!event?.isTrusted;
+            feedMoreLastTrigger = triggeredByUser ? "manual" : "auto";
+            if (feedMoreLastTrigger === "auto") {
+              captureFeedMoreAnchor(moreWrap);
+            } else {
+              feedMoreAnchorTop = null;
+            }
             feedMoreLoading = true;
             moreBtn.classList.add("is-loading");
             moreBtn.disabled = true;
@@ -2821,7 +2852,12 @@ export function renderFeed(options = {}) {
             container.appendChild(moreWrap);
           }
           if (appendOnly) {
-            restoreFeedMoreAnchor(moreWrap);
+            if (feedMoreLastTrigger === "auto") {
+              restoreFeedMoreAnchor(moreWrap);
+            } else {
+              smoothScrollToPostCard(container, appendedStartPostId);
+            }
+            feedMoreLastTrigger = "manual";
           }
         } else if (moreWrap.parentElement === container) {
           moreWrap.remove();
