@@ -178,6 +178,10 @@ const FEED_WINDOW_MIN_ITEMS = 22;
 const FEED_WINDOW_MARGIN_PX = 820;
 const FEED_WINDOW_RUN_INTERVAL_MS = 90;
 const FEED_WINDOW_MIN_SCROLL_DELTA_PX = 22;
+const FEED_WINDOW_SCAN_LIMIT_DESKTOP = 120;
+const FEED_WINDOW_SCAN_LIMIT_MOBILE = 64;
+const FEED_WINDOW_MUTATION_BUDGET_DESKTOP = 20;
+const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 10;
 const FEED_MEDIA_OBSERVER_MARGIN = "560px 0px";
 const FEED_MEDIA_VIDEO_PARK_MARGIN_PX = 1500;
 const FEED_IMAGE_HYDRATE_CONCURRENCY = 3;
@@ -1056,13 +1060,38 @@ function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
         behavior: resolveFeedScrollBehavior(preferredBehavior),
       });
     }
-function isNearFeedViewport(el) {
+function getFeedWindowRuntimeSettings() {
+      if (typeof window === "undefined") {
+        return {
+          marginPx: FEED_WINDOW_MARGIN_PX,
+          runIntervalMs: FEED_WINDOW_RUN_INTERVAL_MS,
+          minScrollDeltaPx: FEED_WINDOW_MIN_SCROLL_DELTA_PX,
+          scanLimit: FEED_WINDOW_SCAN_LIMIT_DESKTOP,
+          mutationBudget: FEED_WINDOW_MUTATION_BUDGET_DESKTOP,
+        };
+      }
+      const width = window.innerWidth || 1024;
+      const mobile = width <= 700;
+      const compact = width <= 980;
+      return {
+        marginPx: mobile ? 520 : compact ? 660 : FEED_WINDOW_MARGIN_PX,
+        runIntervalMs: mobile ? 130 : FEED_WINDOW_RUN_INTERVAL_MS,
+        minScrollDeltaPx: mobile ? 46 : FEED_WINDOW_MIN_SCROLL_DELTA_PX,
+        scanLimit: mobile
+          ? FEED_WINDOW_SCAN_LIMIT_MOBILE
+          : FEED_WINDOW_SCAN_LIMIT_DESKTOP,
+        mutationBudget: mobile
+          ? FEED_WINDOW_MUTATION_BUDGET_MOBILE
+          : FEED_WINDOW_MUTATION_BUDGET_DESKTOP,
+      };
+    }
+function isNearFeedViewport(el, marginPx = FEED_WINDOW_MARGIN_PX) {
       if (!el || typeof window === "undefined") return true;
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || 800;
       return (
-        rect.bottom >= -FEED_WINDOW_MARGIN_PX &&
-        rect.top <= vh + FEED_WINDOW_MARGIN_PX
+        rect.bottom >= -marginPx &&
+        rect.top <= vh + marginPx
       );
     }
 function restoreWindowedFeedCard(placeholder) {
@@ -1123,6 +1152,7 @@ function runFeedWindowing() {
         restoreAllWindowedFeedCards(container);
         return;
       }
+      const runtime = getFeedWindowRuntimeSettings();
       const cards = container.querySelectorAll(".post-card[data-post-id]");
       const placeholders = container.querySelectorAll(
         ".feed-window-placeholder[data-post-id]"
@@ -1132,20 +1162,41 @@ function runFeedWindowing() {
         return;
       }
 
-      placeholders.forEach((placeholder) => {
-        if (isNearFeedViewport(placeholder)) {
-          restoreWindowedFeedCard(placeholder);
+      let mutationCount = 0;
+      let scanCount = 0;
+      for (const placeholder of placeholders) {
+        if (
+          scanCount >= runtime.scanLimit ||
+          mutationCount >= runtime.mutationBudget
+        ) {
+          break;
         }
-      });
+        scanCount += 1;
+        if (isNearFeedViewport(placeholder, runtime.marginPx)) {
+          if (restoreWindowedFeedCard(placeholder)) {
+            mutationCount += 1;
+          }
+        }
+      }
 
       const activeEl =
         typeof document !== "undefined" ? document.activeElement : null;
       const liveCards = container.querySelectorAll(".post-card[data-post-id]");
-      liveCards.forEach((card) => {
-        if (isNearFeedViewport(card)) return;
-        if (activeEl && card.contains(activeEl)) return;
-        detachFeedCard(card);
-      });
+      scanCount = 0;
+      for (const card of liveCards) {
+        if (
+          scanCount >= runtime.scanLimit ||
+          mutationCount >= runtime.mutationBudget
+        ) {
+          break;
+        }
+        scanCount += 1;
+        if (isNearFeedViewport(card, runtime.marginPx)) continue;
+        if (activeEl && card.contains(activeEl)) continue;
+        if (detachFeedCard(card)) {
+          mutationCount += 1;
+        }
+      }
       feedWindowLastRunAt = Date.now();
       feedWindowLastRunY =
         typeof window === "undefined" ? 0 : window.scrollY || window.pageYOffset || 0;
@@ -1164,12 +1215,13 @@ function scheduleFeedWindowingUpdate(force = false) {
       }
       const scrollY = window.scrollY || window.pageYOffset || 0;
       const now = Date.now();
+      const runtime = getFeedWindowRuntimeSettings();
       const sinceLastRun = now - feedWindowLastRunAt;
       const moved = Math.abs(scrollY - feedWindowLastRunY);
       if (
         feedWindowLastRunAt > 0 &&
-        sinceLastRun < FEED_WINDOW_RUN_INTERVAL_MS &&
-        moved < FEED_WINDOW_MIN_SCROLL_DELTA_PX
+        sinceLastRun < runtime.runIntervalMs &&
+        moved < runtime.minScrollDeltaPx
       ) {
         return;
       }
