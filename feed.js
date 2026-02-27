@@ -1036,7 +1036,15 @@ function getPostById(postId) {
       return posts.find((post) => `${post?.id || ""}` === `${postId}`) || null;
     }
 function getFeedMetadataPreloadCount() {
-      return Math.max(24, feedPageSize * FEED_META_PRELOAD_MULTIPLIER);
+      const multiplier = isCompactViewport() || isSaveDataEnabled()
+        ? Math.max(2, FEED_META_PRELOAD_MULTIPLIER - 2)
+        : FEED_META_PRELOAD_MULTIPLIER;
+      return Math.max(18, feedPageSize * multiplier);
+    }
+function getFeedMetadataBatchSize() {
+      if (isSaveDataEnabled()) return Math.max(10, Math.floor(FEED_META_BATCH_SIZE / 4));
+      if (isCompactViewport()) return Math.max(14, Math.floor(FEED_META_BATCH_SIZE / 2));
+      return FEED_META_BATCH_SIZE;
     }
 function queueFeedMetadataForPosts(postIds = []) {
       if (!Array.isArray(postIds) || !postIds.length) return;
@@ -1058,7 +1066,7 @@ async function flushFeedMetadataQueue() {
       feedMetaHydrationInFlight = true;
       try {
         while (feedMetaQueuePostIds.size) {
-          const batch = Array.from(feedMetaQueuePostIds).slice(0, FEED_META_BATCH_SIZE);
+          const batch = Array.from(feedMetaQueuePostIds).slice(0, getFeedMetadataBatchSize());
           batch.forEach((postId) => feedMetaQueuePostIds.delete(postId));
           if (!batch.length) continue;
           try {
@@ -2107,7 +2115,7 @@ export async function loadFeed(options = {}) {
             queueFeedMetadataForPosts(
               postIds.slice(
                 initialMetaIds.length,
-                initialMetaIds.length + FEED_META_BATCH_SIZE
+                initialMetaIds.length + getFeedMetadataBatchSize()
               )
             );
           }
