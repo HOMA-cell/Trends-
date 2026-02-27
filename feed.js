@@ -185,7 +185,7 @@ const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 10;
 const FEED_CACHE_POST_LIMIT = 240;
 const FEED_CACHE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 const FEED_NETWORK_POST_LIMIT = 260;
-const FEED_MEDIA_OBSERVER_MARGIN = "560px 0px";
+const FEED_MEDIA_OBSERVER_MARGIN = "420px 0px";
 const FEED_MEDIA_VIDEO_PARK_MARGIN_PX = 1500;
 const FEED_IMAGE_HYDRATE_CONCURRENCY = 3;
 const FEED_WARMED_IMAGE_LIMIT = 320;
@@ -257,8 +257,9 @@ function rememberWarmedImageUrl(url) {
       }
     }
 function flushImageHydrationQueue() {
+      const concurrency = getFeedImageHydrationConcurrency();
       while (
-        feedImageHydrationActive < FEED_IMAGE_HYDRATE_CONCURRENCY &&
+        feedImageHydrationActive < concurrency &&
         feedImageHydrationQueue.length
       ) {
         const imgEl = feedImageHydrationQueue.shift();
@@ -282,6 +283,36 @@ function queueImageHydration(imgEl) {
       imgEl.dataset.hydrationQueued = "true";
       feedImageHydrationQueue.push(imgEl);
       flushImageHydrationQueue();
+    }
+function prefersReducedMotion() {
+      if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+        return false;
+      }
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+function isSaveDataEnabled() {
+      if (typeof navigator === "undefined") return false;
+      return !!navigator.connection?.saveData;
+    }
+function isCompactViewport() {
+      if (typeof window === "undefined") return false;
+      return (window.innerWidth || 1024) <= 700;
+    }
+function getFeedImageHydrationConcurrency() {
+      if (isSaveDataEnabled()) return 1;
+      if (isCompactViewport()) return 1;
+      return FEED_IMAGE_HYDRATE_CONCURRENCY;
+    }
+function getFeedMediaObserverMargin() {
+      if (isSaveDataEnabled()) return "180px 0px";
+      if (isCompactViewport()) return "260px 0px";
+      return FEED_MEDIA_OBSERVER_MARGIN;
+    }
+function shouldUseFeedEntryAnimation() {
+      if (prefersReducedMotion()) return false;
+      if (isCompactViewport()) return false;
+      if (isSaveDataEnabled()) return false;
+      return true;
     }
 function parkDeferredVideo(videoEl) {
       if (!videoEl) return;
@@ -340,7 +371,7 @@ function ensureDeferredVideoObserver() {
         },
         {
           root: null,
-          rootMargin: FEED_MEDIA_OBSERVER_MARGIN,
+          rootMargin: getFeedMediaObserverMargin(),
           threshold: 0.01,
         }
       );
@@ -2521,7 +2552,7 @@ export function renderFeed(options = {}) {
     container.dataset.feedSignature = renderSignature;
 
     const localLikedIds = getLikedIds();
-    const shouldAnimateEntry = canAppend;
+    const shouldAnimateEntry = canAppend && shouldUseFeedEntryAnimation();
     const createPostCard = (post) => {
       const card = document.createElement("div");
       card.className = "post-card";
@@ -2892,7 +2923,7 @@ export function renderFeed(options = {}) {
         ? 4
         : 8
       : compactViewport
-        ? 3
+        ? 2
         : 5;
     const finalizeMore = () => {
       feedChunkRendering = false;

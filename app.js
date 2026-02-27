@@ -423,16 +423,16 @@ async function ensureProfileForUser(user) {
     }
 
     // 自分をフォローしている人
-    const { data: followers, error: err2 } = await supabase
+    const { count: followerCount, error: err2 } = await supabase
       .from("follows")
-      .select("id")
+      .select("*", { count: "exact", head: true })
       .eq("following_id", currentUser.id);
 
     if (err2) {
       console.error("loadFollowStats followers error:", err2);
       currentFollowersCount = null;
     } else {
-      currentFollowersCount = followers.length;
+      currentFollowersCount = followerCount ?? 0;
     }
   }
 
@@ -443,9 +443,9 @@ async function loadProfilePostCount() {
     return;
   }
 
-  const { data, error } = await supabase
+  const { count, error } = await supabase
     .from("posts")
-    .select("id")
+    .select("*", { count: "exact", head: true })
     .eq("user_id", currentUser.id);
 
   if (error) {
@@ -454,7 +454,7 @@ async function loadProfilePostCount() {
     return;
   }
 
-  profilePostCount = data.length;
+  profilePostCount = count ?? 0;
 }
 
 
