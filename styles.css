@@ -2163,6 +2163,21 @@
       color: var(--text-sub);
       margin-bottom: 6px;
     }
+    .post-composer-mode {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .post-composer-hint {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+    .modal-panel:not(.post-composer-advanced) .post-advanced-section {
+      display: none;
+    }
     .media-preview {
       border: 1px dashed var(--border);
       border-radius: var(--radius-md);

@@ -60,6 +60,7 @@ import {
     let currentMediaPreviewUrl = null;
     let draftSaveTimer = null;
     let draftSaveBlockedUntil = 0;
+    let postComposerAdvanced = false;
     let pendingAvatarFile = null;
     let pendingBannerFile = null;
     let profilePostCount = null;
@@ -125,6 +126,7 @@ import {
     let runtimeIssueCaptureBound = false;
 
     const POST_DRAFT_KEY = "trends_post_draft_v1";
+    const POST_COMPOSER_ADVANCED_KEY = "trends_post_composer_advanced_v1";
     const PROFILE_EDIT_DRAFT_KEY = "trends_profile_edit_draft_v1";
     const PERF_DEBUG_KEY = "trends_perf_debug";
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
@@ -1800,6 +1802,8 @@ async function loadProfilePostCount() {
       setText("btn-clear-draft", "draftClear");
       setText("draft-hint", "draftHint");
       setText("btn-remove-media", "mediaRemove");
+      setText("btn-post-toggle-advanced", "postShowAdvanced");
+      setText("post-composer-hint", "postSimpleHint");
       setText("login-required", "pleaseLogin");
 
       // Feed
@@ -2067,6 +2071,9 @@ async function loadProfilePostCount() {
       }
       if (typeof renderOnboardingChecklist === "function") {
         renderOnboardingChecklist();
+      }
+      if (typeof renderPostComposerMode === "function") {
+        renderPostComposerMode();
       }
       if (typeof updateCollapsibleLabels === "function") {
         updateCollapsibleLabels();
@@ -3144,7 +3151,12 @@ async function loadProfilePostCount() {
     function hasPostInputs() {
       const caption = $("post-caption")?.value?.trim() || "";
       const weight = $("post-weight")?.value || "";
-      const hasExercises = workoutExercises.some(
+      const hasExercises = hasWorkoutInputs();
+      return Boolean(caption || weight || hasExercises || currentMediaFile);
+    }
+
+    function hasWorkoutInputs() {
+      return workoutExercises.some(
         (exercise) =>
           (exercise.name && exercise.name.trim().length > 0) ||
           (exercise.note && exercise.note.trim().length > 0) ||
@@ -3152,7 +3164,72 @@ async function loadProfilePostCount() {
             (setItem) => String(setItem.reps || "").trim() || String(setItem.weight || "").trim()
           )
       );
-      return Boolean(caption || weight || hasExercises || currentMediaFile);
+    }
+
+    function hasAdvancedPostInputs() {
+      const weight = String($("post-weight")?.value || "").trim();
+      const templateId = String($("post-template")?.value || "").trim();
+      const visibility = String($("post-visibility")?.value || "public").trim();
+      const defaultVisibility = String(settings.defaultVisibility || "public").trim();
+      const date = String($("post-date")?.value || "").trim();
+      const today = new Date().toISOString().slice(0, 10);
+      return Boolean(
+        weight ||
+          templateId ||
+          hasWorkoutInputs() ||
+          (visibility && visibility !== defaultVisibility) ||
+          (date && date !== today)
+      );
+    }
+
+    function persistPostComposerMode() {
+      try {
+        localStorage.setItem(
+          POST_COMPOSER_ADVANCED_KEY,
+          postComposerAdvanced ? "true" : "false"
+        );
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+
+    function loadPostComposerModePreference() {
+      try {
+        const raw = localStorage.getItem(POST_COMPOSER_ADVANCED_KEY);
+        postComposerAdvanced = raw === "true";
+      } catch {
+        postComposerAdvanced = false;
+      }
+    }
+
+    function renderPostComposerMode() {
+      const panel = document.querySelector("#post-modal-backdrop .modal-panel");
+      if (panel) {
+        panel.classList.toggle("post-composer-advanced", postComposerAdvanced);
+      }
+      const tr = t[currentLang] || t.ja;
+      const toggleBtn = $("btn-post-toggle-advanced");
+      if (toggleBtn) {
+        toggleBtn.textContent = postComposerAdvanced
+          ? tr.postShowSimple || "項目を減らす"
+          : tr.postShowAdvanced || "項目を増やす";
+      }
+      const hint = $("post-composer-hint");
+      if (hint) {
+        hint.textContent = postComposerAdvanced
+          ? tr.postAdvancedHint ||
+            "詳細投稿: 体重・ワークアウト・公開範囲まで編集できます。"
+          : tr.postSimpleHint ||
+            "クイック投稿: キャプション・メディア中心";
+      }
+    }
+
+    function setPostComposerMode(advanced, options = {}) {
+      postComposerAdvanced = !!advanced;
+      if (options.persist !== false) {
+        persistPostComposerMode();
+      }
+      renderPostComposerMode();
     }
 
     function savePostDraft() {
@@ -3251,6 +3328,17 @@ async function loadProfilePostCount() {
     }
     
     function setupPostForm() {
+      loadPostComposerModePreference();
+      renderPostComposerMode();
+
+      const toggleComposerBtn = $("btn-post-toggle-advanced");
+      if (toggleComposerBtn && toggleComposerBtn.dataset.bound !== "true") {
+        toggleComposerBtn.dataset.bound = "true";
+        toggleComposerBtn.addEventListener("click", () => {
+          setPostComposerMode(!postComposerAdvanced);
+        });
+      }
+
       const mediaInput = $("post-media");
       const removeMediaBtn = $("btn-remove-media");
       if (mediaInput) {
@@ -3346,6 +3434,7 @@ async function loadProfilePostCount() {
           showToast("投稿するにはログインが必要です。", "warning");
           return;
         }
+        renderPostComposerMode();
         setDraftStatus("");
         const draft = loadPostDraft();
         const tr = t[currentLang] || t.ja;
@@ -3360,6 +3449,9 @@ async function loadProfilePostCount() {
             applyPostDraft(draft);
             setDraftStatus(tr.draftRestored || "下書きを復元しました", true);
           }
+        }
+        if (hasAdvancedPostInputs()) {
+          setPostComposerMode(true, { persist: false });
         }
         openBackdrop(backdrop);
       };

@@ -948,7 +948,11 @@
           <button class="modal-close-btn" id="btn-post-close">×</button>
         </div>
       </div>
-      <div class="modal-section">
+      <div class="post-composer-mode">
+        <span class="post-composer-hint" id="post-composer-hint">クイック投稿: キャプション・メディア中心</span>
+        <button class="btn btn-ghost btn-xs" type="button" id="btn-post-toggle-advanced">項目を増やす</button>
+      </div>
+      <div class="modal-section post-advanced-section">
         <div class="modal-section-title" id="post-section-basic">基本</div>
         <div class="grid-2">
           <div class="field">
@@ -975,7 +979,7 @@
           </div>
         </div>
       </div>
-      <div class="modal-section">
+      <div class="modal-section post-advanced-section">
         <div class="modal-section-title" id="post-section-workout">ワークアウト</div>
         <div class="field">
           <label id="label-log">ワークアウトログ</label>
@@ -998,14 +1002,14 @@
           <textarea id="post-caption" placeholder="bench 100"></textarea>
         </div>
       </div>
-      <div class="modal-section">
+      <div class="modal-section post-advanced-section">
         <div class="modal-section-title" id="post-section-template">テンプレート</div>
         <div class="field">
           <label id="label-template">テンプレート</label>
           <select id="post-template"></select>
         </div>
       </div>
-      <div class="modal-section">
+      <div class="modal-section post-advanced-section">
         <div class="modal-section-title" id="post-section-visibility">公開範囲</div>
         <div class="grid-2">
           <div class="field">

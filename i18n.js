@@ -14,6 +14,11 @@ export const t = {
         postSectionCaption: "キャプション",
         postSectionTemplate: "テンプレート",
         postSectionVisibility: "公開範囲",
+        postShowAdvanced: "項目を増やす",
+        postShowSimple: "項目を減らす",
+        postSimpleHint: "クイック投稿: キャプション・メディア中心",
+        postAdvancedHint:
+          "詳細投稿: 体重・ワークアウト・公開範囲まで編集できます。",
         public: "Public",
         private: "自分のみ",
         submit: "投稿",
@@ -487,6 +492,11 @@ export const t = {
         postSectionCaption: "Caption",
         postSectionTemplate: "Template",
         postSectionVisibility: "Visibility",
+        postShowAdvanced: "Show more fields",
+        postShowSimple: "Show fewer fields",
+        postSimpleHint: "Quick post: caption and media focused.",
+        postAdvancedHint:
+          "Detailed post: edit bodyweight, workout, template, and visibility.",
         public: "Public",
         private: "Private",
         submit: "Post",
