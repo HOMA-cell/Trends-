@@ -1024,7 +1024,16 @@ function captureFeedMoreAnchor(moreWrap) {
       }
       feedMoreAnchorTop = moreWrap.getBoundingClientRect().top;
     }
-function restoreFeedMoreAnchor(moreWrap) {
+function resolveFeedScrollBehavior(preferredBehavior = "auto") {
+      if (preferredBehavior !== "smooth") return "auto";
+      if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+        return "smooth";
+      }
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
+    }
+function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
       if (
         feedMoreAnchorTop === null ||
         !moreWrap ||
@@ -1040,26 +1049,7 @@ function restoreFeedMoreAnchor(moreWrap) {
       window.scrollBy({
         top: delta,
         left: 0,
-        behavior: "auto",
-      });
-    }
-function smoothScrollToPostCard(container, postId) {
-      if (!container || !postId || typeof window === "undefined") return;
-      const cards = Array.from(
-        container.querySelectorAll(".post-card[data-post-id]")
-      );
-      const target = cards.find(
-        (card) => card.getAttribute("data-post-id") === postId
-      );
-      if (!target) return;
-      const targetTop = target.getBoundingClientRect().top + window.scrollY - 56;
-      const currentTop = window.scrollY || 0;
-      if (!Number.isFinite(targetTop) || Math.abs(targetTop - currentTop) < 12) {
-        return;
-      }
-      window.scrollTo({
-        top: Math.max(0, targetTop),
-        behavior: "smooth",
+        behavior: resolveFeedScrollBehavior(preferredBehavior),
       });
     }
 function isNearFeedViewport(el) {
@@ -2279,10 +2269,6 @@ export function renderFeed(options = {}) {
       container.dataset.feedSignature === renderSignature &&
       existingCount > 0 &&
       existingCount < visibleSlice.length;
-    const appendedStartPostId =
-      canAppend && appendOnly
-        ? visibleSlice[existingCount]?.id || ""
-        : "";
     const renderMode = canAppend ? "append" : "full";
 
     if (!gridCandidates.length) {
@@ -2832,11 +2818,7 @@ export function renderFeed(options = {}) {
             if (feedMoreLoading) return;
             const triggeredByUser = !!event?.isTrusted;
             feedMoreLastTrigger = triggeredByUser ? "manual" : "auto";
-            if (feedMoreLastTrigger === "auto") {
-              captureFeedMoreAnchor(moreWrap);
-            } else {
-              feedMoreAnchorTop = null;
-            }
+            captureFeedMoreAnchor(moreWrap);
             feedMoreLoading = true;
             moreBtn.classList.add("is-loading");
             moreBtn.disabled = true;
@@ -2852,11 +2834,9 @@ export function renderFeed(options = {}) {
             container.appendChild(moreWrap);
           }
           if (appendOnly) {
-            if (feedMoreLastTrigger === "auto") {
-              restoreFeedMoreAnchor(moreWrap);
-            } else {
-              smoothScrollToPostCard(container, appendedStartPostId);
-            }
+            const restoreBehavior =
+              feedMoreLastTrigger === "manual" ? "smooth" : "auto";
+            restoreFeedMoreAnchor(moreWrap, restoreBehavior);
             feedMoreLastTrigger = "manual";
           }
         } else if (moreWrap.parentElement === container) {
