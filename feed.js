@@ -150,6 +150,8 @@ let feedMoreLastTrigger = "manual";
 let feedWindowUpdateRaf = 0;
 let feedWindowListenersBound = false;
 let feedChunkRendering = false;
+let feedWindowLastRunAt = 0;
+let feedWindowLastRunY = 0;
 const feedWindowedCards = new Map();
 let feedKeyboardShortcutsBound = false;
 let feedCardActionDelegationBound = false;
@@ -174,6 +176,8 @@ const FEED_PULL_COOLDOWN_MS = 1600;
 const FEED_SEARCH_DEBOUNCE_MS = 220;
 const FEED_WINDOW_MIN_ITEMS = 22;
 const FEED_WINDOW_MARGIN_PX = 820;
+const FEED_WINDOW_RUN_INTERVAL_MS = 90;
+const FEED_WINDOW_MIN_SCROLL_DELTA_PX = 22;
 const FEED_MEDIA_OBSERVER_MARGIN = "560px 0px";
 const FEED_MEDIA_VIDEO_PARK_MARGIN_PX = 1500;
 const FEED_IMAGE_HYDRATE_CONCURRENCY = 3;
@@ -1102,6 +1106,16 @@ function runFeedWindowing() {
         feedWindowedCards.clear();
         return;
       }
+      const activePage =
+        typeof document === "undefined"
+          ? "feed"
+          : document.querySelector(".page-view.is-active")?.dataset.page || "";
+      if (activePage !== "feed") {
+        if (feedWindowedCards.size) {
+          restoreAllWindowedFeedCards(container);
+        }
+        return;
+      }
       if (feedChunkRendering) {
         return;
       }
@@ -1132,6 +1146,9 @@ function runFeedWindowing() {
         if (activeEl && card.contains(activeEl)) return;
         detachFeedCard(card);
       });
+      feedWindowLastRunAt = Date.now();
+      feedWindowLastRunY =
+        typeof window === "undefined" ? 0 : window.scrollY || window.pageYOffset || 0;
     }
 function scheduleFeedWindowingUpdate(force = false) {
       if (typeof window === "undefined") return;
@@ -1140,7 +1157,20 @@ function scheduleFeedWindowingUpdate(force = false) {
           cancelAnimationFrame(feedWindowUpdateRaf);
           feedWindowUpdateRaf = 0;
         }
+        feedWindowLastRunAt = 0;
+        feedWindowLastRunY = window.scrollY || window.pageYOffset || 0;
         runFeedWindowing();
+        return;
+      }
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      const now = Date.now();
+      const sinceLastRun = now - feedWindowLastRunAt;
+      const moved = Math.abs(scrollY - feedWindowLastRunY);
+      if (
+        feedWindowLastRunAt > 0 &&
+        sinceLastRun < FEED_WINDOW_RUN_INTERVAL_MS &&
+        moved < FEED_WINDOW_MIN_SCROLL_DELTA_PX
+      ) {
         return;
       }
       if (feedWindowUpdateRaf) return;

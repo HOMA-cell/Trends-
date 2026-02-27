@@ -231,6 +231,14 @@
       .layout {
         grid-template-columns: 1fr;
       }
+      header,
+      .mini-header,
+      .card {
+        backdrop-filter: none;
+      }
+      .mini-header {
+        background: #fff;
+      }
     }
 
     .card {
@@ -479,7 +487,6 @@
       transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.2s ease;
       content-visibility: auto;
       contain-intrinsic-size: 320px;
-      will-change: transform, opacity;
     }
     .post-card:hover {
       transform: translateY(-1px);

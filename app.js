@@ -3006,18 +3006,35 @@ async function loadProfilePostCount() {
       const progressBar = $("mini-progress-bar");
       if (!miniHeader) return;
 
-      const onScroll = () => {
+      let miniHeaderScrollRaf = 0;
+      let miniHeaderLastVisible = null;
+      let miniHeaderLastProgress = -1;
+      const applyScrollUi = () => {
+        miniHeaderScrollRaf = 0;
         const isVisible = window.scrollY > 120;
-        miniHeader.classList.toggle("is-visible", isVisible);
+        if (miniHeaderLastVisible !== isVisible) {
+          miniHeader.classList.toggle("is-visible", isVisible);
+          miniHeaderLastVisible = isVisible;
+        }
         if (progressBar) {
           const doc = document.documentElement;
           const total = doc.scrollHeight - doc.clientHeight;
-          const percent = total > 0 ? (window.scrollY / total) * 100 : 0;
-          progressBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+          const percent = Math.min(
+            100,
+            Math.max(0, total > 0 ? (window.scrollY / total) * 100 : 0)
+          );
+          if (Math.abs(percent - miniHeaderLastProgress) >= 0.35) {
+            progressBar.style.width = `${percent}%`;
+            miniHeaderLastProgress = percent;
+          }
         }
       };
+      const onScroll = () => {
+        if (miniHeaderScrollRaf) return;
+        miniHeaderScrollRaf = requestAnimationFrame(applyScrollUi);
+      };
       window.addEventListener("scroll", onScroll, { passive: true });
-      onScroll();
+      applyScrollUi();
 
       if (miniPost && miniPost.dataset.bound !== "true") {
         miniPost.dataset.bound = "true";
