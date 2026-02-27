@@ -183,6 +183,7 @@ const FEED_WINDOW_SCAN_LIMIT_MOBILE = 64;
 const FEED_WINDOW_MUTATION_BUDGET_DESKTOP = 20;
 const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 10;
 const FEED_CACHE_POST_LIMIT = 240;
+const FEED_CACHE_TEXT_LIMIT = 600;
 const FEED_CACHE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 const FEED_NETWORK_POST_LIMIT = 260;
 const FEED_MEDIA_OBSERVER_MARGIN = "420px 0px";
@@ -924,7 +925,43 @@ function applyQueuedLikeState() {
     }
 function clampFeedPostsForCache(posts = []) {
       if (!Array.isArray(posts) || !posts.length) return [];
-      return posts.slice(0, FEED_CACHE_POST_LIMIT);
+      return posts.slice(0, FEED_CACHE_POST_LIMIT).map((post) => {
+        if (!post || typeof post !== "object") return null;
+        const note = String(post.note || "");
+        const caption = String(post.caption || "");
+        const safeProfile =
+          post.profile && typeof post.profile === "object"
+            ? {
+                id: post.profile.id || post.user_id || null,
+                handle: post.profile.handle || post.profile.username || "",
+                display_name: post.profile.display_name || "",
+                avatar_url: post.profile.avatar_url || "",
+                accent_color: post.profile.accent_color || "",
+              }
+            : null;
+        return {
+          id: post.id || null,
+          user_id: post.user_id || null,
+          created_at: post.created_at || null,
+          date: post.date || post.created_at || null,
+          visibility: post.visibility || "public",
+          media_url: post.media_url || "",
+          media_type: post.media_type || "",
+          bodyweight:
+            post.bodyweight === null || post.bodyweight === undefined
+              ? null
+              : post.bodyweight,
+          note:
+            note.length > FEED_CACHE_TEXT_LIMIT
+              ? `${note.slice(0, FEED_CACHE_TEXT_LIMIT)}…`
+              : note,
+          caption:
+            caption.length > FEED_CACHE_TEXT_LIMIT
+              ? `${caption.slice(0, FEED_CACHE_TEXT_LIMIT)}…`
+              : caption,
+          profile: safeProfile,
+        };
+      }).filter(Boolean);
     }
 function saveFeedCache(posts = []) {
       try {
