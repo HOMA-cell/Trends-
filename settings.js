@@ -379,11 +379,33 @@ export function createSettingsController(options) {
   function applySettings() {
     const current = getSettings();
     const prev = applyPrev || {};
+    const isFirstApply = !applyPrev;
     const prevWeightUnit = prev.weightUnit || current.weightUnit;
     const prevHeightUnit = prev.heightUnit || current.heightUnit;
     const weightUnitChanged = prevWeightUnit !== current.weightUnit;
     const heightUnitChanged = prevHeightUnit !== current.heightUnit;
-    const languageChanged = !applyPrev || current.language !== getCurrentLang();
+    const languageChanged = isFirstApply || current.language !== getCurrentLang();
+    const dateFormatChanged = isFirstApply || prev.dateFormat !== current.dateFormat;
+    const compactModeChanged = isFirstApply || prev.compactMode !== current.compactMode;
+    const showFeedStatsChanged =
+      isFirstApply || prev.showFeedStats !== current.showFeedStats;
+    const defaultFilterChanged =
+      isFirstApply || prev.defaultFilter !== current.defaultFilter;
+    const feedLayoutChanged = isFirstApply || prev.feedLayout !== current.feedLayout;
+    const feedAutoLoadChanged =
+      isFirstApply || prev.feedAutoLoadMore !== current.feedAutoLoadMore;
+    const showBodyweightChanged =
+      isFirstApply || prev.showBodyweight !== current.showBodyweight;
+    const showEmailChanged = isFirstApply || prev.showEmail !== current.showEmail;
+    const showProfileStatsChanged =
+      isFirstApply || prev.showProfileStats !== current.showProfileStats;
+    const showExtraSectionsChanged =
+      isFirstApply || prev.showExtraSections !== current.showExtraSections;
+    const notificationsChanged =
+      isFirstApply ||
+      !!prev.notifications?.like !== !!current.notifications?.like ||
+      !!prev.notifications?.comment !== !!current.notifications?.comment ||
+      !!prev.notifications?.follow !== !!current.notifications?.follow;
 
     document.body.classList.toggle("compact-mode", current.compactMode);
 
@@ -407,8 +429,10 @@ export function createSettingsController(options) {
       publicMeta.classList.toggle("hidden", !current.showProfileStats);
     }
 
-    setShowExtraSections(!!current.showExtraSections);
-    updateExtraSectionsVisibility();
+    if (showExtraSectionsChanged || languageChanged) {
+      setShowExtraSections(!!current.showExtraSections);
+      updateExtraSectionsVisibility();
+    }
 
     if (current.defaultFilter) {
       setFeedState({ currentFilter: current.defaultFilter });
@@ -494,17 +518,60 @@ export function createSettingsController(options) {
     updateSettingsSummary();
     updatePresetActive(detectPresetFromSettings());
 
-    renderFeed();
-    updateProfileSummary();
-    renderWorkoutHistory();
-    renderTrainingSummary();
-    renderPrList();
-    renderInsights();
-    renderOnboardingChecklist();
-    renderNotifications();
+    const shouldRenderFeed =
+      compactModeChanged ||
+      showFeedStatsChanged ||
+      defaultFilterChanged ||
+      feedLayoutChanged ||
+      feedAutoLoadChanged ||
+      showBodyweightChanged ||
+      languageChanged ||
+      dateFormatChanged ||
+      weightUnitChanged;
+    if (shouldRenderFeed) {
+      renderFeed();
+    }
+
+    const shouldRenderProfileSummary =
+      compactModeChanged ||
+      showProfileStatsChanged ||
+      showEmailChanged ||
+      showBodyweightChanged ||
+      languageChanged ||
+      dateFormatChanged ||
+      weightUnitChanged ||
+      heightUnitChanged;
+    if (shouldRenderProfileSummary) {
+      updateProfileSummary();
+    }
+
+    const shouldRenderTrainingPanels =
+      compactModeChanged ||
+      showExtraSectionsChanged ||
+      languageChanged ||
+      dateFormatChanged ||
+      weightUnitChanged;
+    if (shouldRenderTrainingPanels) {
+      renderWorkoutHistory();
+      renderTrainingSummary();
+      renderPrList();
+      renderInsights();
+      renderOnboardingChecklist();
+    }
+
+    if (notificationsChanged || languageChanged) {
+      renderNotifications();
+    }
 
     const currentPublicProfileId = getCurrentPublicProfileId();
-    if (currentPublicProfileId) {
+    const shouldRefreshPublicProfile =
+      isFirstApply ||
+      languageChanged ||
+      dateFormatChanged ||
+      weightUnitChanged ||
+      heightUnitChanged ||
+      showProfileStatsChanged;
+    if (currentPublicProfileId && shouldRefreshPublicProfile) {
       openPublicProfile(currentPublicProfileId);
     }
 
