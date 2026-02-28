@@ -2970,6 +2970,9 @@ async function loadProfilePostCount() {
           const target = tab.getAttribute("data-page-target");
           tab.classList.toggle("is-active", target === page);
         });
+        if (document?.body) {
+          document.body.dataset.page = page;
+        }
         collapseProfileEditGroupsOnMobile(page);
         if (page === "account") {
           applyProfileEditCompactMode();

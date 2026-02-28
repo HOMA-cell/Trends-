@@ -1417,7 +1417,9 @@ function runFeedWindowing() {
       const activePage =
         typeof document === "undefined"
           ? "feed"
-          : document.querySelector(".page-view.is-active")?.dataset.page || "";
+          : document.body?.dataset?.page ||
+            document.querySelector(".page-view.is-active")?.dataset.page ||
+            "";
       if (activePage !== "feed") {
         if (feedWindowedCards.size) {
           restoreAllWindowedFeedCards(container);
@@ -3668,6 +3670,7 @@ export function renderPostDetail() {
             const video = document.createElement("video");
             video.controls = true;
             video.playsInline = true;
+            video.preload = "metadata";
             video.addEventListener(
               "loadeddata",
               () => {
@@ -3680,6 +3683,8 @@ export function renderPostDetail() {
             wrap.appendChild(video);
           } else {
             const img = document.createElement("img");
+            img.loading = "lazy";
+            img.decoding = "async";
             img.referrerPolicy = "no-referrer";
             img.alt = "media";
             img.addEventListener(
