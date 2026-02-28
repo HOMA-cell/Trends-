@@ -139,6 +139,8 @@ let feedQueryCache = {
 };
 const postSearchHaystackCache = new Map();
 let secondaryRenderScheduled = false;
+let secondaryRenderLastRunAt = 0;
+let secondaryRenderCooldownTimer = null;
 const pendingLikePostIds = new Set();
 let feedRenderScheduled = false;
 let feedScheduledRenderToken = 0;
@@ -162,6 +164,7 @@ let feedImageHydrationActive = 0;
 const feedProfileCache = new Map();
 const feedProfileQueueUserIds = new Set();
 let feedProfileHydrationInFlight = false;
+let feedProfileHydrationTimer = null;
 const feedLikesLoadedPostIds = new Set();
 const feedMetaQueuePostIds = new Set();
 let feedMetaHydrationInFlight = false;
@@ -207,6 +210,8 @@ const FEED_NETWORK_BACKOFF_MS = 120000;
 const FEED_DEMO_AUTO_RETRY_COOLDOWN_MS = 12000;
 const FEED_PROFILE_BATCH_SIZE = 120;
 const FEED_PROFILE_CACHE_LIMIT = 1400;
+const FEED_PROFILE_HYDRATION_DELAY_MS = 90;
+const FEED_SECONDARY_RENDER_COOLDOWN_MS = 1100;
 let feedUiStateLoaded = false;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
@@ -1173,14 +1178,40 @@ function queueFeedProfileHydration(userIds = []) {
         if (feedProfileQueueUserIds.has(id)) return;
         feedProfileQueueUserIds.add(id);
       });
-      flushFeedProfileHydrationQueue();
+      if (!feedProfileQueueUserIds.size) return;
+      if (feedProfileHydrationInFlight) return;
+      if (feedProfileHydrationTimer) return;
+      feedProfileHydrationTimer = setTimeout(() => {
+        feedProfileHydrationTimer = null;
+        flushFeedProfileHydrationQueue();
+      }, FEED_PROFILE_HYDRATION_DELAY_MS);
     }
 async function flushFeedProfileHydrationQueue() {
+      if (feedProfileHydrationTimer) {
+        clearTimeout(feedProfileHydrationTimer);
+        feedProfileHydrationTimer = null;
+      }
       if (feedProfileHydrationInFlight) return;
       if (!feedProfileQueueUserIds.size) return;
       if (!getOnlineState()) return;
+      const posts = getAllPosts();
+      if (!Array.isArray(posts) || !posts.length) return;
+      const pendingByUserId = new Map();
+      posts.forEach((post, index) => {
+        if (!post || post.profile) return;
+        const userId = `${post.user_id || ""}`.trim();
+        if (!userId) return;
+        const list = pendingByUserId.get(userId) || [];
+        list.push(index);
+        pendingByUserId.set(userId, list);
+      });
+      if (!pendingByUserId.size) {
+        feedProfileQueueUserIds.clear();
+        return;
+      }
       feedProfileHydrationInFlight = true;
       let changed = false;
+      let nextPosts = posts;
       try {
         while (feedProfileQueueUserIds.size) {
           const batch = Array.from(feedProfileQueueUserIds).slice(
@@ -1191,28 +1222,28 @@ async function flushFeedProfileHydrationQueue() {
           if (!batch.length) continue;
 
           const profileMap = await loadFeedProfilesForUsers(batch);
-          const batchSet = new Set(batch);
-          const posts = getAllPosts();
-          if (!Array.isArray(posts) || !posts.length) continue;
-
-          let batchChanged = false;
-          const nextPosts = posts.map((post) => {
-            const userId = `${post?.user_id || ""}`.trim();
-            if (!userId || !batchSet.has(userId)) return post;
-            if (post.profile) return post;
-            if (!profileMap.has(userId)) return post;
-            batchChanged = true;
-            return {
-              ...post,
-              profile: profileMap.get(userId) || null,
-            };
+          batch.forEach((userId) => {
+            if (!profileMap.has(userId)) return;
+            const postIndexes = pendingByUserId.get(userId);
+            if (!postIndexes?.length) return;
+            if (!changed) {
+              nextPosts = nextPosts.slice();
+            }
+            const profile = profileMap.get(userId) || null;
+            postIndexes.forEach((postIndex) => {
+              const post = nextPosts[postIndex];
+              if (!post || post.profile) return;
+              nextPosts[postIndex] = {
+                ...post,
+                profile,
+              };
+              changed = true;
+            });
+            pendingByUserId.delete(userId);
           });
-
-          if (batchChanged) {
-            changed = true;
-            setAllPosts(nextPosts);
-            invalidateFeedQueryCache();
-            postSearchHaystackCache.clear();
+          if (!pendingByUserId.size) {
+            feedProfileQueueUserIds.clear();
+            break;
           }
         }
       } catch (error) {
@@ -1222,8 +1253,19 @@ async function flushFeedProfileHydrationQueue() {
       }
 
       if (changed) {
+        setAllPosts(nextPosts);
+        invalidateFeedQueryCache();
+        postSearchHaystackCache.clear();
         scheduleRenderFeed();
         scheduleSecondaryRenders();
+      }
+      if (feedProfileQueueUserIds.size) {
+        if (!feedProfileHydrationTimer) {
+          feedProfileHydrationTimer = setTimeout(() => {
+            feedProfileHydrationTimer = null;
+            flushFeedProfileHydrationQueue();
+          }, FEED_PROFILE_HYDRATION_DELAY_MS);
+        }
       }
     }
 function getFeedMetadataPreloadCount() {
@@ -1601,11 +1643,26 @@ function resetFeedPullIndicator(immediate = false) {
         indicator.classList.remove("is-visible");
       }, 180);
     }
-function scheduleSecondaryRenders() {
+function scheduleSecondaryRenders(options = {}) {
+      const force = !!options.force;
+      const now = Date.now();
+      if (!force && secondaryRenderLastRunAt > 0) {
+        const elapsed = now - secondaryRenderLastRunAt;
+        if (elapsed < FEED_SECONDARY_RENDER_COOLDOWN_MS) {
+          if (!secondaryRenderCooldownTimer) {
+            secondaryRenderCooldownTimer = setTimeout(() => {
+              secondaryRenderCooldownTimer = null;
+              scheduleSecondaryRenders({ force: true });
+            }, FEED_SECONDARY_RENDER_COOLDOWN_MS - elapsed);
+          }
+          return;
+        }
+      }
       if (secondaryRenderScheduled) return;
       secondaryRenderScheduled = true;
       const run = () => {
         secondaryRenderScheduled = false;
+        secondaryRenderLastRunAt = Date.now();
         updateProfileSummary();
         renderWorkoutHistory();
         renderTrainingSummary();
