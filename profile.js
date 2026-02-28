@@ -70,6 +70,48 @@ const toggleFollowForUser = (...args) => profileContext.toggleFollowForUser?.(..
 const loadFollowStats = (...args) => profileContext.loadFollowStats?.(...args);
 const followCountCache = new Map();
 const FOLLOW_COUNT_CACHE_TTL_MS = 60 * 1000;
+const publicProfilePostsCache = {
+  postsRef: null,
+  viewerId: "",
+  byUser: new Map(),
+};
+let publicProfileGallerySignature = "";
+function getPublicProfilePostCollections(userId, allPosts, currentUser) {
+  if (!Array.isArray(allPosts) || !allPosts.length) {
+    return { userPosts: [], mediaPosts: [] };
+  }
+  const targetUserId = `${userId || ""}`.trim();
+  const viewerId = `${currentUser?.id || ""}`.trim();
+  if (!targetUserId) {
+    return { userPosts: [], mediaPosts: [] };
+  }
+  if (
+    publicProfilePostsCache.postsRef !== allPosts ||
+    publicProfilePostsCache.viewerId !== viewerId
+  ) {
+    publicProfilePostsCache.postsRef = allPosts;
+    publicProfilePostsCache.viewerId = viewerId;
+    publicProfilePostsCache.byUser = new Map();
+  }
+  const cached = publicProfilePostsCache.byUser.get(targetUserId);
+  if (cached) {
+    return cached;
+  }
+  const allowPrivate = !!viewerId && viewerId === targetUserId;
+  const userPosts = [];
+  const mediaPosts = [];
+  allPosts.forEach((post) => {
+    if (!post || post.user_id !== targetUserId) return;
+    if (post.visibility === "private" && !allowPrivate) return;
+    userPosts.push(post);
+    if (post.media_url) {
+      mediaPosts.push(post);
+    }
+  });
+  const payload = { userPosts, mediaPosts };
+  publicProfilePostsCache.byUser.set(targetUserId, payload);
+  return payload;
+}
 function getCachedFollowCounts(userId) {
   const id = `${userId || ""}`.trim();
   if (!id) return null;
@@ -552,6 +594,7 @@ export async function openPublicProfile(userId, options = {}) {
   if (!userId) return;
   const forceCounts = !!options.forceCounts;
   const prevPublicId = getCurrentPublicProfileId();
+  const isSamePublicProfile = prevPublicId === userId;
   setCurrentPublicProfileId(userId);
   if (prevPublicId !== userId) {
     setPublicPostsVisibleCount(getPublicPostsPageSize());
@@ -620,14 +663,11 @@ export async function openPublicProfile(userId, options = {}) {
 
   const currentUser = getCurrentUser();
   const allPosts = getAllPosts();
-  const userPosts = Array.isArray(allPosts)
-    ? allPosts.filter(
-        (post) =>
-          post.user_id === userId &&
-          (post.visibility !== "private" ||
-            (currentUser && currentUser.id === userId))
-      )
-    : [];
+  const { userPosts, mediaPosts } = getPublicProfilePostCollections(
+    userId,
+    allPosts,
+    currentUser
+  );
 
   renderProfileStatsGrid(statsGridEl, userPosts, tr);
   renderProfileQuickStats(quickStatsEl, userPosts, tr);
@@ -708,12 +748,21 @@ export async function openPublicProfile(userId, options = {}) {
     }
   }
 
-  const mediaPosts = userPosts.filter((post) => post.media_url);
-  setCurrentGalleryPosts(mediaPosts);
-  setGalleryPage(1);
+  const gallerySignature = `${userId}|${mediaPosts.length}|${
+    mediaPosts[0]?.id || ""
+  }|${mediaPosts[mediaPosts.length - 1]?.id || ""}`;
+  if (!isSamePublicProfile || publicProfileGallerySignature !== gallerySignature) {
+    setCurrentGalleryPosts(mediaPosts);
+    setGalleryPage(1);
+    publicProfileGallerySignature = gallerySignature;
+  }
   renderGalleryPage();
 
-  setActivePage("public-profile");
+  if (
+    (document?.body?.dataset?.page || "") !== "public-profile"
+  ) {
+    setActivePage("public-profile");
+  }
   if (window.location.hash !== `#profile=${userId}`) {
     window.location.hash = `profile=${userId}`;
   }
