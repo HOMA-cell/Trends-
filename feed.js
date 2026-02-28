@@ -147,6 +147,7 @@ let feedScheduledRenderToken = 0;
 let feedSearchInputTimer = null;
 let feedLastCommittedSearch = "";
 let feedMoreAnchorTop = null;
+let feedMoreAnchorScrollY = null;
 let feedMoreLastTrigger = "manual";
 let feedWindowUpdateRaf = 0;
 let feedWindowListenersBound = false;
@@ -186,12 +187,12 @@ const FEED_PULL_COOLDOWN_MS = 1600;
 const FEED_SEARCH_DEBOUNCE_MS = 220;
 const FEED_WINDOW_MIN_ITEMS = 22;
 const FEED_WINDOW_MARGIN_PX = 820;
-const FEED_WINDOW_RUN_INTERVAL_MS = 90;
-const FEED_WINDOW_MIN_SCROLL_DELTA_PX = 22;
+const FEED_WINDOW_RUN_INTERVAL_MS = 110;
+const FEED_WINDOW_MIN_SCROLL_DELTA_PX = 28;
 const FEED_WINDOW_SCAN_LIMIT_DESKTOP = 120;
-const FEED_WINDOW_SCAN_LIMIT_MOBILE = 64;
+const FEED_WINDOW_SCAN_LIMIT_MOBILE = 44;
 const FEED_WINDOW_MUTATION_BUDGET_DESKTOP = 20;
-const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 10;
+const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 6;
 const FEED_CACHE_POST_LIMIT = 240;
 const FEED_CACHE_TEXT_LIMIT = 600;
 const FEED_CACHE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
@@ -1352,9 +1353,11 @@ function setupFeedCardActionDelegation() {
 function captureFeedMoreAnchor(moreWrap) {
       if (!moreWrap || typeof window === "undefined") {
         feedMoreAnchorTop = null;
+        feedMoreAnchorScrollY = null;
         return;
       }
       feedMoreAnchorTop = moreWrap.getBoundingClientRect().top;
+      feedMoreAnchorScrollY = window.scrollY || window.pageYOffset || 0;
     }
 function resolveFeedScrollBehavior(preferredBehavior = "auto") {
       if (preferredBehavior !== "smooth") return "auto";
@@ -1368,21 +1371,35 @@ function resolveFeedScrollBehavior(preferredBehavior = "auto") {
 function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
       if (
         feedMoreAnchorTop === null ||
+        feedMoreAnchorScrollY === null ||
         !moreWrap ||
         typeof window === "undefined"
       ) {
         feedMoreAnchorTop = null;
+        feedMoreAnchorScrollY = null;
         return;
       }
       const nextTop = moreWrap.getBoundingClientRect().top;
       const delta = nextTop - feedMoreAnchorTop;
+      const previousScrollY = feedMoreAnchorScrollY;
       feedMoreAnchorTop = null;
+      feedMoreAnchorScrollY = null;
       if (!Number.isFinite(delta) || Math.abs(delta) < 1) return;
-      window.scrollBy({
-        top: delta,
+      const compactViewport = (window.innerWidth || 1024) <= 700;
+      const behavior =
+        compactViewport || Math.abs(delta) > 720
+          ? "auto"
+          : resolveFeedScrollBehavior(preferredBehavior);
+      window.scrollTo({
+        top: previousScrollY + delta,
         left: 0,
-        behavior: resolveFeedScrollBehavior(preferredBehavior),
+        behavior,
       });
+    }
+function getFeedWindowMinItems() {
+      if (typeof window === "undefined") return FEED_WINDOW_MIN_ITEMS;
+      const width = window.innerWidth || 1024;
+      return width <= 700 ? Math.max(30, FEED_WINDOW_MIN_ITEMS) : FEED_WINDOW_MIN_ITEMS;
     }
 function getFeedWindowRuntimeSettings() {
       if (typeof window === "undefined") {
@@ -1398,9 +1415,9 @@ function getFeedWindowRuntimeSettings() {
       const mobile = width <= 700;
       const compact = width <= 980;
       return {
-        marginPx: mobile ? 520 : compact ? 660 : FEED_WINDOW_MARGIN_PX,
-        runIntervalMs: mobile ? 130 : FEED_WINDOW_RUN_INTERVAL_MS,
-        minScrollDeltaPx: mobile ? 46 : FEED_WINDOW_MIN_SCROLL_DELTA_PX,
+        marginPx: mobile ? 440 : compact ? 640 : FEED_WINDOW_MARGIN_PX,
+        runIntervalMs: mobile ? 180 : FEED_WINDOW_RUN_INTERVAL_MS,
+        minScrollDeltaPx: mobile ? 70 : FEED_WINDOW_MIN_SCROLL_DELTA_PX,
         scanLimit: mobile
           ? FEED_WINDOW_SCAN_LIMIT_MOBILE
           : FEED_WINDOW_SCAN_LIMIT_DESKTOP,
@@ -1483,7 +1500,7 @@ function runFeedWindowing() {
       const placeholders = container.querySelectorAll(
         ".feed-window-placeholder[data-post-id]"
       );
-      if (cards.length + placeholders.length < FEED_WINDOW_MIN_ITEMS) {
+      if (cards.length + placeholders.length < getFeedWindowMinItems()) {
         restoreAllWindowedFeedCards(container);
         return;
       }
@@ -2437,6 +2454,7 @@ export function renderFeed(options = {}) {
       }
       restoreAllWindowedFeedCards(container);
       feedMoreAnchorTop = null;
+      feedMoreAnchorScrollY = null;
       feedMoreLastTrigger = "manual";
     }
     const renderToken = ++feedRenderToken;
@@ -3297,6 +3315,7 @@ export function renderFeed(options = {}) {
         } else if (moreWrap.parentElement === container) {
           moreWrap.remove();
           feedMoreAnchorTop = null;
+          feedMoreAnchorScrollY = null;
         }
       }
       renderFeedPerfPanel({
@@ -3309,7 +3328,7 @@ export function renderFeed(options = {}) {
         detachedCount: feedWindowedCards.size,
       });
       const shouldWindow =
-        feedLayout === "list" && visibleSlice.length >= FEED_WINDOW_MIN_ITEMS;
+        feedLayout === "list" && visibleSlice.length >= getFeedWindowMinItems();
       syncFeedWindowing(shouldWindow);
     };
 

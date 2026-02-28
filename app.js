@@ -54,6 +54,13 @@ import {
     let currentUser = null;
     let currentProfile = null;
     let allPosts = [];
+    let userPostsCache = {
+      postsRef: null,
+      userId: "",
+      posts: [],
+      postIds: new Set(),
+      sortedByDateDesc: [],
+    };
     let showExtraSections = false;
     let currentLang = "ja";
     let currentMediaFile = null;
@@ -1742,8 +1749,58 @@ async function loadProfilePostCount() {
 
 
     function getUserPosts() {
-      if (!currentUser || !Array.isArray(allPosts)) return [];
-      return allPosts.filter((post) => post.user_id === currentUser.id);
+      const userId = `${currentUser?.id || ""}`.trim();
+      if (!userId || !Array.isArray(allPosts) || !allPosts.length) {
+        userPostsCache = {
+          postsRef: null,
+          userId: "",
+          posts: [],
+          postIds: new Set(),
+          sortedByDateDesc: [],
+        };
+        return [];
+      }
+      if (userPostsCache.postsRef === allPosts && userPostsCache.userId === userId) {
+        return userPostsCache.posts;
+      }
+      const posts = [];
+      const postIds = new Set();
+      allPosts.forEach((post) => {
+        if (!post || post.user_id !== userId) return;
+        posts.push(post);
+        if (post.id) postIds.add(post.id);
+      });
+      userPostsCache = {
+        postsRef: allPosts,
+        userId,
+        posts,
+        postIds,
+        sortedByDateDesc: [],
+      };
+      return posts;
+    }
+
+    function getUserPostIds() {
+      getUserPosts();
+      return userPostsCache.postIds;
+    }
+
+    function getUserPostsSortedByDateDesc() {
+      const posts = getUserPosts();
+      if (!posts.length) return [];
+      if (
+        userPostsCache.sortedByDateDesc.length &&
+        userPostsCache.sortedByDateDesc.length === posts.length
+      ) {
+        return userPostsCache.sortedByDateDesc;
+      }
+      const sorted = posts.slice().sort((a, b) => {
+        const aDate = new Date(a.date || a.created_at || 0).getTime();
+        const bDate = new Date(b.date || b.created_at || 0).getTime();
+        return bDate - aDate;
+      });
+      userPostsCache.sortedByDateDesc = sorted;
+      return sorted;
     }
 
 
@@ -4543,11 +4600,7 @@ async function loadProfilePostCount() {
         return;
       }
 
-      const userPosts = getUserPosts().sort((a, b) => {
-        const aDate = new Date(a.date || a.created_at || 0).getTime();
-        const bDate = new Date(b.date || b.created_at || 0).getTime();
-        return bDate - aDate;
-      });
+      const userPosts = getUserPostsSortedByDateDesc();
 
       const historyItems = userPosts
         .filter((post) => workoutLogsByPost.has(post.id))
@@ -4996,8 +5049,9 @@ async function loadProfilePostCount() {
       }
 
       const userPosts = getUserPosts();
+      const userPostIds = getUserPostIds();
       const hasWorkout = Array.from(workoutLogsByPost.keys()).some((postId) =>
-        userPosts.find((post) => post.id === postId)
+        userPostIds.has(postId)
       );
       const hasMedia = userPosts.some((post) => post.media_url);
 
