@@ -196,6 +196,9 @@ const FEED_MEDIA_VIDEO_PARK_MARGIN_PX = 1500;
 const FEED_IMAGE_HYDRATE_CONCURRENCY = 3;
 const FEED_WARMED_IMAGE_LIMIT = 320;
 const FEED_SEARCH_CACHE_LIMIT = 2400;
+const FEED_SEARCH_CACHE_LIMIT_MOBILE = 1200;
+const FEED_SEARCH_TEXT_LIMIT = 280;
+const FEED_SEARCH_LOG_LIMIT = 8;
 const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
 const FEED_NETWORK_BACKOFF_MS = 120000;
@@ -480,6 +483,16 @@ function invalidateFeedQueryCache() {
         gridCandidates: [],
       };
     }
+function toSearchChunk(value, limit = FEED_SEARCH_TEXT_LIMIT) {
+      if (value === null || value === undefined) return "";
+      const text = String(value).trim();
+      if (!text) return "";
+      if (text.length <= limit) return text;
+      return text.slice(0, limit);
+    }
+function getFeedSearchCacheLimit() {
+      return isCompactViewport() ? FEED_SEARCH_CACHE_LIMIT_MOBILE : FEED_SEARCH_CACHE_LIMIT;
+    }
 function getPostSearchHaystack(post, workoutLogsMap) {
       if (!post) return "";
       const logs = workoutLogsMap.get(post.id) || [];
@@ -488,14 +501,17 @@ function getPostSearchHaystack(post, workoutLogsMap) {
         return cached.haystack;
       }
       const logText = logs
-        .map((exercise) => `${exercise.exercise || ""} ${exercise.note || ""}`)
+        .slice(0, FEED_SEARCH_LOG_LIMIT)
+        .map((exercise) =>
+          `${toSearchChunk(exercise.exercise)} ${toSearchChunk(exercise.note)}`
+        )
         .join(" ");
       const haystack = [
-        post.note,
-        post.caption,
+        toSearchChunk(post.note),
+        toSearchChunk(post.caption),
         post.bodyweight,
-        post.profile?.handle,
-        post.profile?.display_name,
+        toSearchChunk(post.profile?.handle),
+        toSearchChunk(post.profile?.display_name),
         logText,
       ]
         .filter(Boolean)
@@ -506,7 +522,8 @@ function getPostSearchHaystack(post, workoutLogsMap) {
         logsRef: logs,
         haystack,
       });
-      while (postSearchHaystackCache.size > FEED_SEARCH_CACHE_LIMIT) {
+      const cacheLimit = getFeedSearchCacheLimit();
+      while (postSearchHaystackCache.size > cacheLimit) {
         const oldestKey = postSearchHaystackCache.keys().next().value;
         if (oldestKey === undefined) break;
         postSearchHaystackCache.delete(oldestKey);
