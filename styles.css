@@ -18,6 +18,11 @@
     html {
       scroll-behavior: smooth;
     }
+    @media (max-width: 700px) {
+      html {
+        scroll-behavior: auto;
+      }
+    }
     @media (prefers-reduced-motion: reduce) {
       html {
         scroll-behavior: auto;
@@ -248,6 +253,16 @@
       box-shadow: var(--shadow);
       backdrop-filter: blur(6px);
     }
+    @media (max-width: 900px) {
+      header,
+      .mini-header,
+      .card {
+        backdrop-filter: none;
+      }
+      .mini-header {
+        background: #fff;
+      }
+    }
     .card-header {
       display: flex;
       align-items: center;
@@ -454,14 +469,6 @@
         width: 100%;
         justify-content: flex-end;
       }
-      .post-card {
-        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
-        transition: opacity 0.16s ease;
-      }
-      .post-card:hover {
-        transform: none;
-        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
-      }
       .skeleton {
         animation: none;
       }
@@ -512,6 +519,20 @@
     .post-card.post-card-enter.is-ready {
       opacity: 1;
       transform: translateY(0);
+    }
+    @media (max-width: 700px) {
+      .post-card {
+        box-shadow: 0 3px 7px rgba(15, 23, 42, 0.04);
+        transition: opacity 0.14s ease;
+        contain-intrinsic-size: 280px;
+      }
+      .post-card:hover {
+        transform: none;
+        box-shadow: 0 3px 7px rgba(15, 23, 42, 0.04);
+      }
+      .post-card.post-card-enter {
+        transform: none;
+      }
     }
     .skeleton {
       background: linear-gradient(110deg, #f0ebe2 8%, #f8f4ed 18%, #f0ebe2 33%);

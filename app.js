@@ -3074,14 +3074,15 @@ async function loadProfilePostCount() {
         "feed";
       const applyScrollUi = () => {
         miniHeaderScrollRaf = 0;
-        const isVisible = window.scrollY > 120;
+        const feedPageActive = isFeedPageActive();
+        const isVisible = feedPageActive && window.scrollY > 120;
         if (miniHeaderLastVisible !== isVisible) {
           miniHeader.classList.toggle("is-visible", isVisible);
           miniHeaderLastVisible = isVisible;
         }
         if (progressBar) {
           const allowProgress =
-            isFeedPageActive() && (window.innerWidth || 1024) > 700;
+            feedPageActive && (window.innerWidth || 1024) > 700;
           if (!allowProgress) {
             if (miniHeaderLastProgress !== 0) {
               progressBar.style.width = "0%";
@@ -3095,7 +3096,7 @@ async function loadProfilePostCount() {
             100,
             Math.max(0, total > 0 ? (window.scrollY / total) * 100 : 0)
           );
-          if (Math.abs(percent - miniHeaderLastProgress) >= 0.35) {
+          if (Math.abs(percent - miniHeaderLastProgress) >= 1.2) {
             progressBar.style.width = `${percent}%`;
             miniHeaderLastProgress = percent;
           }

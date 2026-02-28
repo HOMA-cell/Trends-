@@ -1390,11 +1390,19 @@ function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
         compactViewport || Math.abs(delta) > 720
           ? "auto"
           : resolveFeedScrollBehavior(preferredBehavior);
-      window.scrollTo({
-        top: previousScrollY + delta,
-        left: 0,
-        behavior,
-      });
+      const targetTop = previousScrollY + delta;
+      const applyScroll = () => {
+        window.scrollTo({
+          top: targetTop,
+          left: 0,
+          behavior,
+        });
+      };
+      if (typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(applyScroll);
+        return;
+      }
+      applyScroll();
     }
 function getFeedWindowMinItems() {
       if (typeof window === "undefined") return FEED_WINDOW_MIN_ITEMS;
