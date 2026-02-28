@@ -68,6 +68,42 @@ const getFollowCounts = (...args) => profileContext.getFollowCounts?.(...args);
 const setActivePage = (page) => profileContext.setActivePage?.(page);
 const toggleFollowForUser = (...args) => profileContext.toggleFollowForUser?.(...args);
 const loadFollowStats = (...args) => profileContext.loadFollowStats?.(...args);
+const followCountCache = new Map();
+const FOLLOW_COUNT_CACHE_TTL_MS = 60 * 1000;
+function getCachedFollowCounts(userId) {
+  const id = `${userId || ""}`.trim();
+  if (!id) return null;
+  const cached = followCountCache.get(id);
+  if (!cached) return null;
+  if (Date.now() - cached.cachedAt > FOLLOW_COUNT_CACHE_TTL_MS) {
+    followCountCache.delete(id);
+    return null;
+  }
+  return cached.value;
+}
+function setCachedFollowCounts(userId, counts) {
+  const id = `${userId || ""}`.trim();
+  if (!id || !counts) return;
+  followCountCache.set(id, {
+    cachedAt: Date.now(),
+    value: {
+      following: Number(counts.following || 0),
+      followers: Number(counts.followers || 0),
+    },
+  });
+}
+async function loadFollowCountsCached(userId, options = {}) {
+  const force = !!options.force;
+  const id = `${userId || ""}`.trim();
+  if (!id) return { following: 0, followers: 0 };
+  if (!force) {
+    const cached = getCachedFollowCounts(id);
+    if (cached) return cached;
+  }
+  const counts = await getFollowCounts(id);
+  setCachedFollowCounts(id, counts);
+  return counts;
+}
 const toggleSectionVisibility = (titleId, containerEl) => {
   const titleEl = titleId ? $(titleId) : null;
   const hasContent = !!containerEl && containerEl.children.length > 0;
@@ -501,7 +537,7 @@ export function setupProfileLinks() {
       try {
         await toggleFollowForUser(currentPublicProfileId);
         await loadFollowStats();
-        await openPublicProfile(currentPublicProfileId);
+        await openPublicProfile(currentPublicProfileId, { forceCounts: true });
       } finally {
         followBtn.classList.remove("is-loading");
         followBtn.disabled = false;
@@ -510,10 +546,11 @@ export function setupProfileLinks() {
   }
 }
 
-export async function openPublicProfile(userId) {
+export async function openPublicProfile(userId, options = {}) {
   const currentLang = profileContext.getCurrentLang?.() || "ja";
   const tr = t[currentLang] || t.ja;
   if (!userId) return;
+  const forceCounts = !!options.forceCounts;
   const prevPublicId = getCurrentPublicProfileId();
   setCurrentPublicProfileId(userId);
   if (prevPublicId !== userId) {
@@ -599,7 +636,7 @@ export async function openPublicProfile(userId) {
     postsEl.textContent = `${tr.profilePosts || "Posts"}: ${userPosts.length}`;
   }
 
-  const counts = await getFollowCounts(userId);
+  const counts = await loadFollowCountsCached(userId, { force: forceCounts });
   if (followingEl) {
     followingEl.textContent = `${tr.profileFollowing || "Following"}: ${counts.following}`;
   }
