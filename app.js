@@ -4121,17 +4121,39 @@ async function loadProfilePostCount() {
         return;
       }
 
+      const exerciseLookupByPost = new Map();
+      const touchedPostIds = new Set();
       (data || []).forEach((log) => {
-        const existing = workoutLogsByPost.get(log.post_id) || [];
-        let exercise = existing.find((ex) => ex.exercise === log.exercise);
+        const postId = `${log?.post_id || ""}`.trim();
+        if (!postId) return;
+        touchedPostIds.add(postId);
+
+        const existing = workoutLogsByPost.get(postId) || [];
+        if (!workoutLogsByPost.has(postId)) {
+          workoutLogsByPost.set(postId, existing);
+        }
+
+        let exerciseLookup = exerciseLookupByPost.get(postId);
+        if (!exerciseLookup) {
+          exerciseLookup = new Map();
+          existing.forEach((exercise) => {
+            if (!exercise?.exercise) return;
+            exerciseLookup.set(exercise.exercise, exercise);
+          });
+          exerciseLookupByPost.set(postId, exerciseLookup);
+        }
+
+        const exerciseName = log.exercise || "";
+        let exercise = exerciseLookup.get(exerciseName);
         if (!exercise) {
           exercise = {
-            exercise: log.exercise,
+            exercise: exerciseName,
             rest_seconds: log.rest_seconds,
             note: log.exercise_note || "",
             sets: [],
           };
           existing.push(exercise);
+          exerciseLookup.set(exerciseName, exercise);
         }
         if (!exercise.note && log.exercise_note) {
           exercise.note = log.exercise_note;
@@ -4142,11 +4164,11 @@ async function loadProfilePostCount() {
           weight: log.weight,
           pr_type: log.pr_type,
         });
-        workoutLogsByPost.set(log.post_id, existing);
       });
 
       queryIds.forEach((postId) => loadedWorkoutLogPostIds.add(postId));
-      workoutLogsByPost.forEach((exercises, postId) => {
+      touchedPostIds.forEach((postId) => {
+        const exercises = workoutLogsByPost.get(postId) || [];
         exercises.forEach((exercise) => {
           exercise.sets.sort((a, b) => (a.set_index || 0) - (b.set_index || 0));
         });
