@@ -434,12 +434,12 @@ export function createSettingsController(options) {
       updateExtraSectionsVisibility();
     }
 
-    if (current.defaultFilter) {
+    if (current.defaultFilter && defaultFilterChanged) {
       setFeedState({ currentFilter: current.defaultFilter });
       updateFilterButtons();
     }
 
-    if (current.feedLayout) {
+    if (current.feedLayout && feedLayoutChanged) {
       setFeedState({ feedLayout: current.feedLayout });
     }
 
