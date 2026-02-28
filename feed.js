@@ -160,6 +160,8 @@ let feedPageSizeResizeTimer = null;
 const feedImageHydrationQueue = [];
 let feedImageHydrationActive = 0;
 const feedProfileCache = new Map();
+const feedProfileQueueUserIds = new Set();
+let feedProfileHydrationInFlight = false;
 const feedLikesLoadedPostIds = new Set();
 const feedMetaQueuePostIds = new Set();
 let feedMetaHydrationInFlight = false;
@@ -1082,6 +1084,14 @@ function rememberFeedProfile(userId, profile) {
         feedProfileCache.delete(oldest);
       }
     }
+function getFeedProfileBatchSize() {
+      if (isSaveDataEnabled()) return Math.max(24, Math.floor(FEED_PROFILE_BATCH_SIZE / 3));
+      if (isCompactViewport()) return Math.max(40, Math.floor(FEED_PROFILE_BATCH_SIZE / 2));
+      return FEED_PROFILE_BATCH_SIZE;
+    }
+function getFeedProfilePreloadPostCount() {
+      return Math.max(20, feedPageSize * 3);
+    }
 async function loadFeedProfilesForUsers(userIds = []) {
       const ids = Array.from(
         new Set(
@@ -1153,6 +1163,68 @@ async function loadFeedProfilesForUsers(userIds = []) {
       });
 
       return result;
+    }
+function queueFeedProfileHydration(userIds = []) {
+      if (!Array.isArray(userIds) || !userIds.length) return;
+      userIds.forEach((userId) => {
+        const id = `${userId || ""}`.trim();
+        if (!id) return;
+        if (feedProfileCache.has(id)) return;
+        if (feedProfileQueueUserIds.has(id)) return;
+        feedProfileQueueUserIds.add(id);
+      });
+      flushFeedProfileHydrationQueue();
+    }
+async function flushFeedProfileHydrationQueue() {
+      if (feedProfileHydrationInFlight) return;
+      if (!feedProfileQueueUserIds.size) return;
+      if (!getOnlineState()) return;
+      feedProfileHydrationInFlight = true;
+      let changed = false;
+      try {
+        while (feedProfileQueueUserIds.size) {
+          const batch = Array.from(feedProfileQueueUserIds).slice(
+            0,
+            getFeedProfileBatchSize()
+          );
+          batch.forEach((id) => feedProfileQueueUserIds.delete(id));
+          if (!batch.length) continue;
+
+          const profileMap = await loadFeedProfilesForUsers(batch);
+          const batchSet = new Set(batch);
+          const posts = getAllPosts();
+          if (!Array.isArray(posts) || !posts.length) continue;
+
+          let batchChanged = false;
+          const nextPosts = posts.map((post) => {
+            const userId = `${post?.user_id || ""}`.trim();
+            if (!userId || !batchSet.has(userId)) return post;
+            if (post.profile) return post;
+            if (!profileMap.has(userId)) return post;
+            batchChanged = true;
+            return {
+              ...post,
+              profile: profileMap.get(userId) || null,
+            };
+          });
+
+          if (batchChanged) {
+            changed = true;
+            setAllPosts(nextPosts);
+            invalidateFeedQueryCache();
+            postSearchHaystackCache.clear();
+          }
+        }
+      } catch (error) {
+        console.error("flushFeedProfileHydrationQueue error", error);
+      } finally {
+        feedProfileHydrationInFlight = false;
+      }
+
+      if (changed) {
+        scheduleRenderFeed();
+        scheduleSecondaryRenders();
+      }
     }
 function getFeedMetadataPreloadCount() {
       const multiplier = isCompactViewport() || isSaveDataEnabled()
@@ -2203,10 +2275,22 @@ export async function loadFeed(options = {}) {
           clearFeedNetworkBackoff();
 
           const safeData = Array.isArray(data) ? data : [];
+          const initialProfilePostCount = Math.min(
+            safeData.length,
+            getFeedProfilePreloadPostCount()
+          );
+          const initialProfileUserIds = Array.from(
+            new Set(
+              safeData
+                .slice(0, initialProfilePostCount)
+                .map((post) => `${post?.user_id || ""}`.trim())
+                .filter(Boolean)
+            )
+          );
           let profileMap = null;
           try {
             profileMap = await loadFeedProfilesForUsers(
-              safeData.map((post) => post.user_id)
+              initialProfileUserIds
             );
           } catch (profileBatchError) {
             console.error("loadFeed profile batch error", profileBatchError);
@@ -2222,6 +2306,16 @@ export async function loadFeed(options = {}) {
           if (requestGeneration !== feedLoadingGeneration) {
             return;
           }
+          feedProfileQueueUserIds.clear();
+          queueFeedProfileHydration(
+            safeData
+              .map((post) => `${post?.user_id || ""}`.trim())
+              .filter(
+                (userId) =>
+                  userId &&
+                  (!profileMap || typeof profileMap.get !== "function" || !profileMap.has(userId))
+              )
+          );
 
           const postIds = postsWithProfile.map((post) => post.id).filter(Boolean);
           const initialMetaIds = postIds.slice(0, getFeedMetadataPreloadCount());
@@ -2532,6 +2626,11 @@ export function renderFeed(options = {}) {
     );
 
     const visibleSlice = gridCandidates.slice(0, feedVisibleCount);
+    queueFeedProfileHydration(
+      visibleSlice
+        .filter((post) => post && !post.profile)
+        .map((post) => post.user_id)
+    );
     const metaTargetCount = Math.min(
       gridCandidates.length,
       feedVisibleCount + feedPageSize * 2
