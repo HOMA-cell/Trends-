@@ -159,6 +159,7 @@ let feedPageSizeResizeBound = false;
 let feedPageSizeResizeTimer = null;
 const feedImageHydrationQueue = [];
 let feedImageHydrationActive = 0;
+const feedProfileCache = new Map();
 const feedLikesLoadedPostIds = new Set();
 const feedMetaQueuePostIds = new Set();
 let feedMetaHydrationInFlight = false;
@@ -168,6 +169,10 @@ const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
+const FEED_POST_SELECT_FIELDS =
+  "id,user_id,date,created_at,visibility,note,caption,bodyweight,media_url,media_type";
+const FEED_PROFILE_SELECT_FIELDS =
+  "id,handle,display_name,avatar_url,accent_color";
 const PERF_DEBUG_KEY = "trends_perf_debug";
 const MODAL_ANIM_MS = 200;
 const FEED_PULL_THRESHOLD = 70;
@@ -195,6 +200,8 @@ const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
 const FEED_NETWORK_BACKOFF_MS = 120000;
 const FEED_DEMO_AUTO_RETRY_COOLDOWN_MS = 12000;
+const FEED_PROFILE_BATCH_SIZE = 120;
+const FEED_PROFILE_CACHE_LIMIT = 1400;
 let feedUiStateLoaded = false;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
@@ -1034,6 +1041,101 @@ function getPostById(postId) {
       const posts = getAllPosts();
       if (!Array.isArray(posts) || !posts.length) return null;
       return posts.find((post) => `${post?.id || ""}` === `${postId}`) || null;
+    }
+function compactFeedProfile(profile) {
+      if (!profile || typeof profile !== "object") return null;
+      return {
+        id: profile.id || null,
+        handle: profile.handle || profile.username || "",
+        display_name: profile.display_name || "",
+        avatar_url: profile.avatar_url || "",
+        accent_color: profile.accent_color || "",
+      };
+    }
+function rememberFeedProfile(userId, profile) {
+      const id = `${userId || ""}`.trim();
+      if (!id) return;
+      if (feedProfileCache.has(id)) {
+        feedProfileCache.delete(id);
+      }
+      feedProfileCache.set(id, profile || null);
+      while (feedProfileCache.size > FEED_PROFILE_CACHE_LIMIT) {
+        const oldest = feedProfileCache.keys().next().value;
+        if (oldest === undefined) break;
+        feedProfileCache.delete(oldest);
+      }
+    }
+async function loadFeedProfilesForUsers(userIds = []) {
+      const ids = Array.from(
+        new Set(
+          (Array.isArray(userIds) ? userIds : [])
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+        )
+      );
+      const result = new Map();
+      if (!ids.length) return result;
+
+      const missingIds = [];
+      ids.forEach((id) => {
+        if (feedProfileCache.has(id)) {
+          result.set(id, feedProfileCache.get(id));
+          return;
+        }
+        missingIds.push(id);
+      });
+
+      if (!missingIds.length) {
+        return result;
+      }
+
+      if (!supabase) {
+        missingIds.forEach((id) => result.set(id, null));
+        return result;
+      }
+
+      const fetchedIds = new Set();
+      for (let i = 0; i < missingIds.length; i += FEED_PROFILE_BATCH_SIZE) {
+        const batchIds = missingIds.slice(i, i + FEED_PROFILE_BATCH_SIZE);
+        try {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select(FEED_PROFILE_SELECT_FIELDS)
+            .in("id", batchIds);
+          if (error) {
+            throw error;
+          }
+          (data || []).forEach((profile) => {
+            if (!profile?.id) return;
+            const compact = compactFeedProfile(profile);
+            rememberFeedProfile(profile.id, compact);
+            result.set(profile.id, compact);
+            fetchedIds.add(profile.id);
+          });
+        } catch (error) {
+          console.error("loadFeedProfilesForUsers error", error);
+          try {
+            const fallbackMap = await getProfilesForUsers(batchIds);
+            batchIds.forEach((id) => {
+              const compact = compactFeedProfile(fallbackMap?.get?.(id) || null);
+              rememberFeedProfile(id, compact);
+              result.set(id, compact);
+              if (compact) fetchedIds.add(id);
+            });
+          } catch (fallbackError) {
+            console.error("loadFeedProfilesForUsers fallback error", fallbackError);
+          }
+        }
+      }
+
+      missingIds.forEach((id) => {
+        if (result.has(id)) return;
+        const value = fetchedIds.has(id) ? result.get(id) || null : null;
+        rememberFeedProfile(id, value);
+        result.set(id, value);
+      });
+
+      return result;
     }
 function getFeedMetadataPreloadCount() {
       const multiplier = isCompactViewport() || isSaveDataEnabled()
@@ -2024,7 +2126,7 @@ export async function loadFeed(options = {}) {
           }
           let { data, error } = await supabase
             .from("posts")
-            .select("*")
+            .select(FEED_POST_SELECT_FIELDS)
             .order("date", { ascending: false })
             .limit(FEED_NETWORK_POST_LIMIT);
 
@@ -2032,7 +2134,7 @@ export async function loadFeed(options = {}) {
             if (!isLikelyTransientNetworkError(error)) {
               const fallback = await supabase
                 .from("posts")
-                .select("*")
+                .select(FEED_POST_SELECT_FIELDS)
                 .order("created_at", { ascending: false })
                 .limit(FEED_NETWORK_POST_LIMIT);
               if (!fallback.error) {
@@ -2086,7 +2188,7 @@ export async function loadFeed(options = {}) {
           const safeData = Array.isArray(data) ? data : [];
           let profileMap = null;
           try {
-            profileMap = await getProfilesForUsers(
+            profileMap = await loadFeedProfilesForUsers(
               safeData.map((post) => post.user_id)
             );
           } catch (profileBatchError) {
