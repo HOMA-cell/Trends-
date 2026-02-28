@@ -1044,10 +1044,13 @@ function getRecommendedFeedPageSize() {
       const viewportWidth =
         typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
       const compact = viewportWidth <= 700;
+      const medium = viewportWidth <= 980;
       if (feedLayout === "grid") {
-        return compact ? 8 : 12;
+        if (compact) return 6;
+        return medium ? 8 : 10;
       }
-      return compact ? 6 : 8;
+      if (compact) return 5;
+      return medium ? 6 : 8;
     }
 function syncFeedPageSize(options = {}) {
       const nextSize = getRecommendedFeedPageSize();
@@ -2643,7 +2646,7 @@ export function renderFeed(options = {}) {
         delete container.dataset.feedSignature;
         feedWindowedCards.clear();
         if (moreWrap) moreWrap.classList.add("hidden");
-        const skeletonCount = 3;
+        const skeletonCount = isCompactViewport() ? 2 : 3;
         for (let i = 0; i < skeletonCount; i += 1) {
           const skeleton = document.createElement("div");
           skeleton.className = "post-card skeleton feed-skeleton";
