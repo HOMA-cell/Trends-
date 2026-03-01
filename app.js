@@ -3034,6 +3034,12 @@ async function loadProfilePostCount() {
         if (page === "account") {
           applyProfileEditCompactMode();
           updateProfileEditAdvancedToggleLabel();
+          updateProfileSummary();
+          renderWorkoutHistory();
+          renderTrainingSummary();
+          renderPrList();
+          renderInsights();
+          renderOnboardingChecklist();
         }
         queueCollapsibleHeightRefresh();
         if (options.restoreScroll !== false) {

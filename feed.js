@@ -1409,6 +1409,11 @@ function getFeedWindowMinItems() {
       const width = window.innerWidth || 1024;
       return width <= 700 ? Math.max(30, FEED_WINDOW_MIN_ITEMS) : FEED_WINDOW_MIN_ITEMS;
     }
+function isFeedWindowingAllowed() {
+      if (typeof window === "undefined") return true;
+      const width = window.innerWidth || 1024;
+      return width > 700;
+    }
 function getFeedWindowRuntimeSettings() {
       if (typeof window === "undefined") {
         return {
@@ -1482,6 +1487,12 @@ function runFeedWindowing() {
       const container = $("feed-list");
       if (!container) {
         feedWindowedCards.clear();
+        return;
+      }
+      if (!isFeedWindowingAllowed()) {
+        if (feedWindowedCards.size) {
+          restoreAllWindowedFeedCards(container);
+        }
         return;
       }
       const activePage =
@@ -1596,7 +1607,8 @@ function setupFeedWindowingListeners() {
 function syncFeedWindowing(shouldEnable = false) {
       const container = $("feed-list");
       if (!container) return;
-      feedWindowingEnabled = !!shouldEnable;
+      const allowWindowing = isFeedWindowingAllowed();
+      feedWindowingEnabled = !!shouldEnable && allowWindowing;
       if (!shouldEnable) {
         if (feedWindowUpdateRaf) {
           cancelAnimationFrame(feedWindowUpdateRaf);
@@ -1607,8 +1619,20 @@ function syncFeedWindowing(shouldEnable = false) {
         restoreAllWindowedFeedCards(container);
         return;
       }
+      if (!allowWindowing) {
+        restoreAllWindowedFeedCards(container);
+        return;
+      }
       setupFeedWindowingListeners();
       scheduleFeedWindowingUpdate(true);
+    }
+function isAccountPageActive() {
+      if (typeof document === "undefined") return false;
+      const activePage =
+        document.body?.dataset?.page ||
+        document.querySelector(".page-view.is-active")?.dataset.page ||
+        "";
+      return activePage === "account";
     }
 function setFeedNotice(message = "", tone = "", autoClearMs = 0) {
       feedNotice = message || "";
@@ -1673,6 +1697,9 @@ function resetFeedPullIndicator(immediate = false) {
     }
 function scheduleSecondaryRenders(options = {}) {
       const force = !!options.force;
+      if (!force && !isAccountPageActive()) {
+        return;
+      }
       const now = Date.now();
       if (!force && secondaryRenderLastRunAt > 0) {
         const elapsed = now - secondaryRenderLastRunAt;
@@ -3336,7 +3363,9 @@ export function renderFeed(options = {}) {
         detachedCount: feedWindowedCards.size,
       });
       const shouldWindow =
-        feedLayout === "list" && visibleSlice.length >= getFeedWindowMinItems();
+        isFeedWindowingAllowed() &&
+        feedLayout === "list" &&
+        visibleSlice.length >= getFeedWindowMinItems();
       syncFeedWindowing(shouldWindow);
     };
 
