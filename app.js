@@ -3045,6 +3045,11 @@ async function loadProfilePostCount() {
         if (options.restoreScroll !== false) {
           restoreScroll(page, options.scrollBehavior || "auto");
         }
+        if (page === "feed" && prevPage !== "feed") {
+          requestAnimationFrame(() => {
+            renderFeed({ forcePageRender: true });
+          });
+        }
         return true;
       };
       setActivePage = setPage;

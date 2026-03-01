@@ -144,6 +144,7 @@ let secondaryRenderCooldownTimer = null;
 const pendingLikePostIds = new Set();
 let feedRenderScheduled = false;
 let feedScheduledRenderToken = 0;
+let feedRenderPendingWhileHidden = false;
 let feedSearchInputTimer = null;
 let feedLastCommittedSearch = "";
 let feedMoreAnchorTop = null;
@@ -1023,14 +1024,32 @@ function loadFeedCache() {
         return [];
       }
     }
+function getActivePage() {
+      if (typeof document === "undefined") return "feed";
+      return (
+        document.body?.dataset?.page ||
+        document.querySelector(".page-view.is-active")?.dataset.page ||
+        "feed"
+      );
+    }
+function isFeedPageActive() {
+      return getActivePage() === "feed";
+    }
 function scheduleRenderFeed() {
+      if (!isFeedPageActive()) {
+        if (!feedRenderPendingWhileHidden) {
+          feedRenderPendingWhileHidden = true;
+        }
+        return;
+      }
       if (feedRenderScheduled) return;
       feedRenderScheduled = true;
       const token = ++feedScheduledRenderToken;
       const run = () => {
         if (token !== feedScheduledRenderToken) return;
         feedRenderScheduled = false;
-        renderFeed();
+        feedRenderPendingWhileHidden = false;
+        renderFeed({ forcePageRender: true });
       };
       if (
         typeof window !== "undefined" &&
@@ -1627,12 +1646,7 @@ function syncFeedWindowing(shouldEnable = false) {
       scheduleFeedWindowingUpdate(true);
     }
 function isAccountPageActive() {
-      if (typeof document === "undefined") return false;
-      const activePage =
-        document.body?.dataset?.page ||
-        document.querySelector(".page-view.is-active")?.dataset.page ||
-        "";
-      return activePage === "account";
+      return getActivePage() === "account";
     }
 function setFeedNotice(message = "", tone = "", autoClearMs = 0) {
       feedNotice = message || "";
@@ -2478,6 +2492,16 @@ export function renderFeed(options = {}) {
     const moreBtn = $("btn-feed-more");
     const layoutBtn = $("btn-feed-layout");
     if (!container) return;
+    const forcePageRender = !!options.forcePageRender;
+    if (!forcePageRender && !isFeedPageActive()) {
+      if (!feedRenderPendingWhileHidden) {
+        feedRenderPendingWhileHidden = true;
+      }
+      return;
+    }
+    if (feedRenderPendingWhileHidden) {
+      feedRenderPendingWhileHidden = false;
+    }
     feedChunkRendering = false;
     feedScheduledRenderToken += 1;
     feedRenderScheduled = false;
