@@ -33,6 +33,7 @@ import {
   updateFilterButtons,
   loadFeed,
   renderFeed,
+  refreshFeedPostComments,
 } from "./feed.js";
 import {
   setProfileContext,
@@ -5444,7 +5445,7 @@ async function loadProfilePostCount() {
       }
 
       commentsLoading.add(postId);
-      renderFeed();
+      refreshFeedPostComments(postId);
 
       const { data, error } = await supabase
         .from("comments")
@@ -5453,6 +5454,7 @@ async function loadProfilePostCount() {
         .order("created_at", { ascending: true });
 
       commentsLoading.delete(postId);
+      refreshFeedPostComments(postId);
 
       if (error) {
         console.error("loadComments error:", error);
@@ -5460,6 +5462,7 @@ async function loadProfilePostCount() {
           return commentsByPost.get(postId) || [];
         }
         commentsEnabled = false;
+        refreshFeedPostComments(postId);
         return commentsByPost.get(postId) || [];
       }
 
@@ -5473,20 +5476,22 @@ async function loadProfilePostCount() {
       const merged = commentSync.mergePendingComments(postId, withProfiles);
       commentsByPost.set(postId, merged);
       commentSync.markPostLoaded(postId);
+      refreshFeedPostComments(postId);
       return merged;
     }
 
     function toggleComments(postId) {
       if (commentsExpanded.has(postId)) {
         commentsExpanded.delete(postId);
-        renderFeed();
+        refreshFeedPostComments(postId);
         return;
       }
       commentsExpanded.add(postId);
+      refreshFeedPostComments(postId);
       if (!commentSync.isPostLoaded(postId) && commentsEnabled) {
-        loadCommentsForPost(postId).then(() => renderFeed());
-      } else {
-        renderFeed();
+        loadCommentsForPost(postId).finally(() => {
+          refreshFeedPostComments(postId);
+        });
       }
     }
 
@@ -5519,7 +5524,7 @@ async function loadProfilePostCount() {
           profile,
         });
         inputEl.value = "";
-        renderFeed();
+        refreshFeedPostComments(postId);
         showToast(
           tr.commentQueued ||
             "オフラインのため、コメントを保存しました。オンライン時に送信します。",
@@ -5549,6 +5554,7 @@ async function loadProfilePostCount() {
         }
         console.error("comment insert error:", error);
         commentsEnabled = false;
+        refreshFeedPostComments(postId);
         showToast("コメントの投稿に失敗しました。", "error");
         return;
       }
@@ -5557,13 +5563,13 @@ async function loadProfilePostCount() {
       next.push({ ...data, profile: profile || null });
       commentsByPost.set(postId, commentSync.sortCommentsByCreatedAt(next));
       inputEl.value = "";
+      refreshFeedPostComments(postId);
       await createNotification({
         userId: post.user_id,
         actorId: currentUser.id,
         type: "comment",
         postId: postId,
       });
-      renderFeed();
     }
 
   // カード描画

@@ -1356,6 +1356,9 @@ function setupFeedCardActionDelegation() {
         event.preventDefault();
         if (action === "toggle-comments") {
           toggleComments(postId);
+          if (!refreshFeedPostComments(postId)) {
+            scheduleRenderFeed();
+          }
           return;
         }
         const post = getPostById(postId);
@@ -3037,14 +3040,7 @@ export function renderFeed(options = {}) {
       const commentBtn = document.createElement("button");
       commentBtn.className = "chip chip-log";
       commentBtn.dataset.postAction = "toggle-comments";
-      const commentCount = commentsByPost.get(post.id)?.length || 0;
-      if (commentsExpanded.has(post.id)) {
-        commentBtn.textContent = tr.commentsHide || "Hide";
-      } else if (commentCount) {
-        commentBtn.textContent = `${tr.comments || "Comments"} (${commentCount})`;
-      } else {
-        commentBtn.textContent = tr.commentsShow || "View comments";
-      }
+      updateCommentButtonState(commentBtn, post.id, tr, commentsByPost, commentsExpanded);
       actions.appendChild(commentBtn);
 
       if (currentUser && post.user_id !== currentUser.id) {
@@ -3206,111 +3202,17 @@ export function renderFeed(options = {}) {
       }
 
       if (commentsExpanded.has(post.id)) {
-        const commentSection = document.createElement("div");
-        commentSection.className = "comment-section";
-
-        if (!commentsEnabled) {
-          const unavailable = document.createElement("div");
-          unavailable.className = "empty";
-          unavailable.textContent =
-            tr.commentUnavailable || "Comments are not available.";
-          commentSection.appendChild(unavailable);
-        } else if (commentsLoading.has(post.id)) {
-          const loading = document.createElement("div");
-          loading.className = "empty";
-          loading.textContent = tr.commentLoading || "Loading...";
-          commentSection.appendChild(loading);
-        } else {
-          const comments = commentsByPost.get(post.id) || [];
-          if (!comments.length) {
-            const empty = document.createElement("div");
-            empty.className = "empty";
-            empty.textContent = tr.commentEmpty || "No comments yet.";
-            commentSection.appendChild(empty);
-          } else {
-            comments.forEach((comment) => {
-              const item = document.createElement("div");
-              item.className = "comment-item";
-              if (comment.pending) {
-                item.classList.add("is-pending");
-              }
-
-              const avatarEl = document.createElement("div");
-              avatarEl.className = "avatar";
-              const commentHandle =
-                comment.profile?.handle ||
-                comment.profile?.username ||
-                "user";
-              const commentHandleText = formatHandle(commentHandle) || "@user";
-              const commentDisplay = comment.profile?.display_name || "";
-              const commentInitial = (commentDisplay || commentHandleText || "U")
-                .replace("@", "")
-                .charAt(0)
-                .toUpperCase();
-              renderAvatar(avatarEl, comment.profile, commentInitial);
-
-              const bodyWrap = document.createElement("div");
-              bodyWrap.className = "comment-body";
-
-              const bodyText = document.createElement("div");
-              bodyText.textContent = comment.body;
-
-              const meta = document.createElement("div");
-              meta.className = "comment-meta";
-              const metaName = commentHandleText;
-              const metaDate = comment.pending
-                ? tr.commentPending || "送信待ち"
-                : comment.created_at
-                  ? formatDateDisplay(comment.created_at)
-                  : "";
-              meta.textContent = [metaName, metaDate].filter(Boolean).join(" · ");
-
-              bodyWrap.appendChild(bodyText);
-              bodyWrap.appendChild(meta);
-
-              item.appendChild(avatarEl);
-              item.appendChild(bodyWrap);
-              commentSection.appendChild(item);
-            });
-          }
+        const commentSection = buildFeedCommentSection(
+          post,
+          tr,
+          currentUser,
+          commentsByPost,
+          commentsLoading,
+          commentsEnabled
+        );
+        if (commentSection) {
+          card.appendChild(commentSection);
         }
-
-        if (currentUser && commentsEnabled) {
-          const form = document.createElement("div");
-          form.className = "comment-form";
-
-          const input = document.createElement("textarea");
-          input.placeholder = tr.commentPlaceholder || "Add a comment";
-
-          const send = document.createElement("button");
-          send.className = "btn btn-primary";
-          send.textContent = tr.commentAdd || "Post";
-          send.addEventListener("click", async () => {
-            if (send.classList.contains("is-loading")) return;
-            send.classList.add("is-loading");
-            send.disabled = true;
-            try {
-              await submitComment(post, input);
-            } finally {
-              send.classList.remove("is-loading");
-              send.disabled = false;
-            }
-          });
-          input.addEventListener("keydown", (event) => {
-            if (event.isComposing) return;
-            if (!((event.metaKey || event.ctrlKey) && event.key === "Enter")) {
-              return;
-            }
-            event.preventDefault();
-            send.click();
-          });
-
-          form.appendChild(input);
-          form.appendChild(send);
-          commentSection.appendChild(form);
-        }
-
-        card.appendChild(commentSection);
       }
 
       return card;
@@ -3553,6 +3455,179 @@ function updateLikeButtonsForPost(postId) {
         const likeBtn = card.querySelector(".chip-like");
         applyLikeButtonState(likeBtn, likeState, tr);
       });
+    }
+function updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commentsExpanded) {
+      if (!commentBtn || !postId) return;
+      const commentCount = commentsByPost.get(postId)?.length || 0;
+      if (commentsExpanded.has(postId)) {
+        commentBtn.textContent = tr.commentsHide || "Hide";
+      } else if (commentCount) {
+        commentBtn.textContent = `${tr.comments || "Comments"} (${commentCount})`;
+      } else {
+        commentBtn.textContent = tr.commentsShow || "View comments";
+      }
+    }
+function buildFeedCommentSection(
+      post,
+      tr,
+      currentUser,
+      commentsByPost,
+      commentsLoading,
+      commentsEnabled
+    ) {
+      if (!post) return null;
+      const commentSection = document.createElement("div");
+      commentSection.className = "comment-section";
+
+      if (!commentsEnabled) {
+        const unavailable = document.createElement("div");
+        unavailable.className = "empty";
+        unavailable.textContent =
+          tr.commentUnavailable || "Comments are not available.";
+        commentSection.appendChild(unavailable);
+      } else if (commentsLoading.has(post.id)) {
+        const loading = document.createElement("div");
+        loading.className = "empty";
+        loading.textContent = tr.commentLoading || "Loading...";
+        commentSection.appendChild(loading);
+      } else {
+        const comments = commentsByPost.get(post.id) || [];
+        if (!comments.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = tr.commentEmpty || "No comments yet.";
+          commentSection.appendChild(empty);
+        } else {
+          comments.forEach((comment) => {
+            const item = document.createElement("div");
+            item.className = "comment-item";
+            if (comment.pending) {
+              item.classList.add("is-pending");
+            }
+
+            const avatarEl = document.createElement("div");
+            avatarEl.className = "avatar";
+            const commentHandle =
+              comment.profile?.handle ||
+              comment.profile?.username ||
+              "user";
+            const commentHandleText = formatHandle(commentHandle) || "@user";
+            const commentDisplay = comment.profile?.display_name || "";
+            const commentInitial = (commentDisplay || commentHandleText || "U")
+              .replace("@", "")
+              .charAt(0)
+              .toUpperCase();
+            renderAvatar(avatarEl, comment.profile, commentInitial);
+
+            const bodyWrap = document.createElement("div");
+            bodyWrap.className = "comment-body";
+
+            const bodyText = document.createElement("div");
+            bodyText.textContent = comment.body;
+
+            const meta = document.createElement("div");
+            meta.className = "comment-meta";
+            const metaName = commentHandleText;
+            const metaDate = comment.pending
+              ? tr.commentPending || "送信待ち"
+              : comment.created_at
+                ? formatDateDisplay(comment.created_at)
+                : "";
+            meta.textContent = [metaName, metaDate].filter(Boolean).join(" · ");
+
+            bodyWrap.appendChild(bodyText);
+            bodyWrap.appendChild(meta);
+
+            item.appendChild(avatarEl);
+            item.appendChild(bodyWrap);
+            commentSection.appendChild(item);
+          });
+        }
+      }
+
+      if (currentUser && commentsEnabled) {
+        const form = document.createElement("div");
+        form.className = "comment-form";
+
+        const input = document.createElement("textarea");
+        input.placeholder = tr.commentPlaceholder || "Add a comment";
+
+        const send = document.createElement("button");
+        send.className = "btn btn-primary";
+        send.textContent = tr.commentAdd || "Post";
+        send.addEventListener("click", async () => {
+          if (send.classList.contains("is-loading")) return;
+          send.classList.add("is-loading");
+          send.disabled = true;
+          try {
+            await submitComment(post, input);
+          } finally {
+            send.classList.remove("is-loading");
+            send.disabled = false;
+          }
+        });
+        input.addEventListener("keydown", (event) => {
+          if (event.isComposing) return;
+          if (!((event.metaKey || event.ctrlKey) && event.key === "Enter")) {
+            return;
+          }
+          event.preventDefault();
+          send.click();
+        });
+
+        form.appendChild(input);
+        form.appendChild(send);
+        commentSection.appendChild(form);
+      }
+
+      return commentSection;
+    }
+function findFeedCardByPostId(postId) {
+      if (!postId) return null;
+      const cards = document.querySelectorAll(".post-card[data-post-id]");
+      for (const card of cards) {
+        if (`${card.getAttribute("data-post-id") || ""}` === `${postId}`) {
+          return card;
+        }
+      }
+      return null;
+    }
+export function refreshFeedPostComments(postId) {
+      if (!postId) return false;
+      const card = findFeedCardByPostId(postId);
+      if (!card) return false;
+      const post = getPostById(postId);
+      if (!post) return false;
+
+      const tr = t[getCurrentLang()] || t.ja;
+      const currentUser = getCurrentUser();
+      const commentsByPost = getCommentsByPost();
+      const commentsExpanded = getCommentsExpanded();
+      const commentsLoading = getCommentsLoading();
+      const commentsEnabled = isCommentsEnabled();
+
+      const commentBtn = card.querySelector("button[data-post-action=\"toggle-comments\"]");
+      updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commentsExpanded);
+
+      const prevSection = card.querySelector(".comment-section");
+      if (prevSection) {
+        prevSection.remove();
+      }
+      if (!commentsExpanded.has(postId)) {
+        return true;
+      }
+      const commentSection = buildFeedCommentSection(
+        post,
+        tr,
+        currentUser,
+        commentsByPost,
+        commentsLoading,
+        commentsEnabled
+      );
+      if (commentSection) {
+        card.appendChild(commentSection);
+      }
+      return true;
     }
 export function getLikedIds() {
       try {
