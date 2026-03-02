@@ -3357,11 +3357,16 @@ export function setupFollowButtons() {
         btn.disabled = true;
         try {
           await toggleFollowForUser(targetUserId);
-
-          // プロフィール側のフォロー数も更新
-          await loadFollowStats();
-          updateProfileSummary();
-          scheduleRenderFeed();
+          refreshFeedFollowButtonsForUser(targetUserId);
+          loadFollowStats()
+            .then(() => {
+              updateProfileSummary();
+            })
+            .catch((error) => {
+              console.error("loadFollowStats after follow toggle failed", error);
+            });
+        } catch (error) {
+          console.error("follow toggle failed", error);
         } finally {
           btn.classList.remove("is-loading");
           btn.disabled = false;
@@ -3455,6 +3460,23 @@ function updateLikeButtonsForPost(postId) {
         const likeBtn = card.querySelector(".chip-like");
         applyLikeButtonState(likeBtn, likeState, tr);
       });
+    }
+function refreshFeedFollowButtonsForUser(targetUserId) {
+      const userId = `${targetUserId || ""}`.trim();
+      if (!userId) return 0;
+      const tr = t[getCurrentLang()] || t.ja;
+      const followingIds = getFollowingIds();
+      const isFollowing = followingIds.has(userId);
+      let updatedCount = 0;
+      const buttons = document.querySelectorAll(".btn-follow[data-user-id]");
+      buttons.forEach((btn) => {
+        if (`${btn.getAttribute("data-user-id") || ""}` !== userId) return;
+        btn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
+        btn.classList.toggle("is-following", isFollowing);
+        btn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
+        updatedCount += 1;
+      });
+      return updatedCount;
     }
 function updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commentsExpanded) {
       if (!commentBtn || !postId) return;
