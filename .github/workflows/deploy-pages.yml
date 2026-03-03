@@ -22,6 +22,51 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Ensure GitHub Pages is enabled
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const apiVersion = "2022-11-28";
+            const pagesUrl = `https://github.com/${owner}/${repo}/settings/pages`;
+
+            try {
+              const site = await github.request("GET /repos/{owner}/{repo}/pages", {
+                owner,
+                repo,
+                headers: { "X-GitHub-Api-Version": apiVersion },
+              });
+              const buildType = site?.data?.build_type || "unknown";
+              core.info(`Pages site found (build_type=${buildType}).`);
+              if (buildType !== "workflow") {
+                core.warning(
+                  `Pages build_type is '${buildType}'. If deploy fails, set Source to GitHub Actions at ${pagesUrl}`
+                );
+              }
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+              core.warning("Pages site not found. Attempting to create with build_type=workflow.");
+              try {
+                await github.request("POST /repos/{owner}/{repo}/pages", {
+                  owner,
+                  repo,
+                  build_type: "workflow",
+                  headers: { "X-GitHub-Api-Version": apiVersion },
+                });
+                core.info("Pages site created.");
+              } catch (createError) {
+                const status = createError.status || "unknown";
+                const detail = createError.message || String(createError);
+                core.setFailed(
+                  `Pages is not enabled and auto-enable failed (status=${status}). ` +
+                  `Open ${pagesUrl} and set Source to GitHub Actions. Details: ${detail}`
+                );
+              }
+            }
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

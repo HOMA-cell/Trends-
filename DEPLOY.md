@@ -57,6 +57,15 @@ After push:
 2. Confirm the latest UI/feature is visible.
 3. If not visible yet, wait 30-90 seconds and reload once.
 
+If Actions shows:
+- `Get Pages site failed` or
+- `Pages is not enabled`
+
+Fix once in GitHub:
+1. Open `https://github.com/HOMA-cell/Trends-/settings/pages`
+2. `Build and deployment` -> `Source` -> `GitHub Actions`
+3. Go to `Actions` and click `Re-run jobs`
+
 Alternative:
 - Open your Netlify URL if you are using Netlify.
 - Confirm the latest UI/feature is visible.
