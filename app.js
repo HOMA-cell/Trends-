@@ -1924,8 +1924,13 @@ async function loadProfilePostCount() {
       setText("btn-feed-retry", "feedRetry");
       setText("btn-feed-options", "feedOptions");
       setText("btn-feed-layout", "feedLayoutGrid");
+      setText("filter-foryou", "foryou");
       setText("filter-all", "all");
+      setText("filter-following", "following");
       setText("filter-mine", "mine");
+      setText("filter-saved", "saved");
+      setText("feed-trending-title", "feedTrendingTitle");
+      setText("feed-suggested-title", "feedSuggestedTitle");
       setText("filter-public", "publicOnly");
       setText("filter-media", "filterMedia");
       setText("filter-workout", "filterWorkout");
@@ -1980,8 +1985,11 @@ async function loadProfilePostCount() {
       setText("settings-feed-auto-load-desc", "settingsFeedAutoLoadDesc");
       setText("settings-default-filter-title", "settingsDefaultFilterTitle");
       setText("settings-default-filter-desc", "settingsDefaultFilterDesc");
+      setText("settings-default-filter-foryou", "foryou");
       setText("settings-default-filter-all", "all");
+      setText("settings-default-filter-following", "following");
       setText("settings-default-filter-mine", "mine");
+      setText("settings-default-filter-saved", "saved");
       setText("settings-feed-layout-title", "settingsFeedLayoutTitle");
       setText("settings-feed-layout-desc", "settingsFeedLayoutDesc");
       setText("settings-feed-layout-list", "feedLayoutList");

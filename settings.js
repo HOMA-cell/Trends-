@@ -6,7 +6,7 @@ export const defaultSettings = {
   showExtraSections: false,
   showFeedStats: true,
   feedAutoLoadMore: true,
-  defaultFilter: "all",
+  defaultFilter: "foryou",
   feedLayout: "list",
   defaultVisibility: "public",
   showEmail: true,
@@ -119,8 +119,8 @@ function normalizeSettings(settings) {
   if (typeof merged.liteEffects !== "boolean") {
     merged.liteEffects = false;
   }
-  if (!["all", "mine"].includes(merged.defaultFilter)) {
-    merged.defaultFilter = "all";
+  if (!["foryou", "all", "following", "mine", "saved"].includes(merged.defaultFilter)) {
+    merged.defaultFilter = "foryou";
   }
   if (!["list", "grid"].includes(merged.feedLayout)) {
     merged.feedLayout = "list";
@@ -655,10 +655,21 @@ export function createSettingsController(options) {
       },
       {
         label: currentTr.settingsSummaryFilter || "Default feed",
-        value:
-          current.defaultFilter === "mine"
-            ? currentTr.mine || "Mine"
-            : currentTr.all || "All",
+        value: (() => {
+          if (current.defaultFilter === "foryou") {
+            return currentTr.foryou || "For You";
+          }
+          if (current.defaultFilter === "following") {
+            return currentTr.following || "Following";
+          }
+          if (current.defaultFilter === "mine") {
+            return currentTr.mine || "Mine";
+          }
+          if (current.defaultFilter === "saved") {
+            return currentTr.saved || "Saved";
+          }
+          return currentTr.all || "All";
+        })(),
       },
       {
         label: currentTr.settingsSummaryRender || "Rendering",

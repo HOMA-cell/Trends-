@@ -88,8 +88,11 @@
           <!-- すべて / 自分 -->
           <div class="feed-filters">
             <div class="chips">
-              <button class="chip chip-active" id="filter-all">すべて</button>
+              <button class="chip chip-active" id="filter-foryou">おすすめ</button>
+              <button class="chip" id="filter-all">すべて</button>
+              <button class="chip" id="filter-following">フォロー中</button>
               <button class="chip" id="filter-mine">自分</button>
+              <button class="chip" id="filter-saved">保存済み</button>
             </div>
             <div class="feed-actions">
               <div class="feed-sort">
@@ -99,6 +102,17 @@
                 </select>
               </div>
               <button class="btn btn-ghost btn-xs" id="btn-feed-layout">グリッド</button>
+            </div>
+          </div>
+
+          <div class="feed-discovery" id="feed-discovery">
+            <div class="feed-discovery-item">
+              <div class="feed-discovery-title" id="feed-trending-title">トレンドタグ</div>
+              <div class="chips chips-scroll" id="feed-trending-tags"></div>
+            </div>
+            <div class="feed-discovery-item">
+              <div class="feed-discovery-title" id="feed-suggested-title">おすすめユーザー</div>
+              <div class="chips chips-scroll" id="feed-suggested-users"></div>
             </div>
           </div>
 
@@ -624,8 +638,11 @@
                     </div>
                     <div class="settings-control">
                       <select class="settings-select" id="settings-default-filter">
+                        <option value="foryou" id="settings-default-filter-foryou">おすすめ</option>
                         <option value="all" id="settings-default-filter-all">すべて</option>
+                        <option value="following" id="settings-default-filter-following">フォロー中</option>
                         <option value="mine" id="settings-default-filter-mine">自分</option>
+                        <option value="saved" id="settings-default-filter-saved">保存済み</option>
                       </select>
                     </div>
                   </div>

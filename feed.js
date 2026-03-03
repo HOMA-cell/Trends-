@@ -92,7 +92,7 @@ const renderOnboardingChecklist = () => feedContext.renderOnboardingChecklist?.(
 const setActivePage = (page) => feedContext.setActivePage?.(page);
 const openPostModal = () => feedContext.openPostModal?.();
 
-let currentFilter = "all";
+let currentFilter = "foryou";
 let filterMedia = false;
 let filterWorkout = false;
 let sortOrder = "newest";
@@ -180,9 +180,11 @@ let feedMetaHydrationInFlight = false;
 const warmedImageUrlSet = new Set();
 const warmedImageUrlQueue = [];
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
+const FEED_SAVED_POSTS_KEY = "trends_saved_posts_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
+const FEED_FILTERS = ["foryou", "all", "following", "mine", "saved", "public"];
 const FEED_POST_SELECT_FIELDS =
   "id,user_id,date,created_at,visibility,note,caption,bodyweight,media_url,media_type";
 const FEED_PROFILE_SELECT_FIELDS =
@@ -224,6 +226,9 @@ const FEED_PROFILE_BATCH_SIZE = 120;
 const FEED_PROFILE_CACHE_LIMIT = 1400;
 const FEED_PROFILE_HYDRATION_DELAY_MS = 90;
 const FEED_SECONDARY_RENDER_COOLDOWN_MS = 1100;
+const FEED_DISCOVERY_POST_SCAN_LIMIT = 180;
+const FEED_DISCOVERY_TAG_LIMIT = 8;
+const FEED_DISCOVERY_USER_LIMIT = 8;
 let feedUiStateLoaded = false;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
@@ -808,6 +813,165 @@ function setFeedNetworkBackoff() {
       feedNetworkBackoffUntil = Date.now() + FEED_NETWORK_BACKOFF_MS;
       persistFeedNetworkBackoff();
     }
+function isAllowedFeedFilter(filter) {
+      return FEED_FILTERS.includes(`${filter || ""}`);
+    }
+function getSavedPostIdsSet() {
+      try {
+        const raw = localStorage.getItem(FEED_SAVED_POSTS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return new Set();
+        return new Set(
+          parsed
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+            .slice(0, 1200)
+        );
+      } catch {
+        return new Set();
+      }
+    }
+function setSavedPostIdsSet(savedSet) {
+      try {
+        const next = Array.from(savedSet || [])
+          .map((id) => `${id || ""}`.trim())
+          .filter(Boolean)
+          .slice(0, 1200);
+        localStorage.setItem(FEED_SAVED_POSTS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function toggleSavedPostId(postId) {
+      const id = `${postId || ""}`.trim();
+      if (!id) return false;
+      const savedSet = getSavedPostIdsSet();
+      let isSaved = false;
+      if (savedSet.has(id)) {
+        savedSet.delete(id);
+      } else {
+        savedSet.add(id);
+        isSaved = true;
+      }
+      setSavedPostIdsSet(savedSet);
+      return isSaved;
+    }
+function getPostTimestamp(post) {
+      return new Date(post?.date || post?.created_at || 0).getTime() || 0;
+    }
+function getForYouScore(post, options = {}) {
+      const nowMs = options.nowMs || Date.now();
+      const currentUserId = `${options.currentUserId || ""}`;
+      const followingIds = options.followingIds || new Set();
+      const likesByPost = options.likesByPost || new Map();
+      const commentsByPost = options.commentsByPost || new Map();
+      const workoutLogsByPost = options.workoutLogsByPost || new Map();
+
+      const ageMs = Math.max(0, nowMs - getPostTimestamp(post));
+      const recency = Math.exp(-ageMs / (36 * 60 * 60 * 1000));
+      const likeCount = Math.max(0, Number(likesByPost.get(post.id) || 0));
+      const commentCount = Math.max(
+        0,
+        Number((commentsByPost.get(post.id) || []).length || 0)
+      );
+      const workoutCount = Math.max(
+        0,
+        Number((workoutLogsByPost.get(post.id) || []).length || 0)
+      );
+      const hasMedia = !!post?.media_url;
+      const isFollowing = followingIds.has(`${post?.user_id || ""}`);
+      const isOwn = !!currentUserId && `${post?.user_id || ""}` === currentUserId;
+
+      let score = 0;
+      score += recency * 4.6;
+      score += Math.min(24, likeCount) * 0.24;
+      score += Math.min(12, commentCount) * 0.35;
+      score += Math.min(10, workoutCount) * 0.16;
+      score += hasMedia ? 0.8 : 0;
+      score += isFollowing ? 0.55 : 0;
+      score += isOwn ? -0.25 : 0;
+      return score;
+    }
+function rankForYouPosts(posts = [], options = {}) {
+      const source = Array.isArray(posts) ? posts : [];
+      if (!source.length) return [];
+      const nowMs = Date.now();
+      const sortOrderValue = options.sortOrder === "oldest" ? "oldest" : "newest";
+      return source
+        .slice()
+        .sort((a, b) => {
+          const scoreDiff =
+            getForYouScore(b, { ...options, nowMs }) -
+            getForYouScore(a, { ...options, nowMs });
+          if (Math.abs(scoreDiff) > 0.001) {
+            return scoreDiff;
+          }
+          const aTime = getPostTimestamp(a);
+          const bTime = getPostTimestamp(b);
+          if (sortOrderValue === "oldest") {
+            return aTime - bTime;
+          }
+          return bTime - aTime;
+        });
+    }
+function parseHashtagsFromText(text) {
+      const raw = `${text || ""}`;
+      if (!raw) return [];
+      const tokens = raw.match(/#[^\s#]{2,32}/g) || [];
+      return tokens
+        .map((token) =>
+          token
+            .replace(/^#+/, "")
+            .replace(/[.,!?;:)\]'"`]+$/g, "")
+            .toLowerCase()
+        )
+        .filter(Boolean);
+    }
+function buildTrendingHashtags(posts = []) {
+      const counts = new Map();
+      const source = Array.isArray(posts) ? posts.slice(0, FEED_DISCOVERY_POST_SCAN_LIMIT) : [];
+      source.forEach((post, index) => {
+        const text = `${post?.note || ""} ${post?.caption || ""}`.trim();
+        const tags = parseHashtagsFromText(text);
+        if (!tags.length) return;
+        const freshnessBoost = 1 + (source.length - index) / Math.max(1, source.length);
+        tags.forEach((tag) => {
+          counts.set(tag, (counts.get(tag) || 0) + freshnessBoost);
+        });
+      });
+      return Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, FEED_DISCOVERY_TAG_LIMIT)
+        .map(([tag]) => tag);
+    }
+function buildSuggestedUsers(posts = [], options = {}) {
+      const currentUserId = `${options.currentUserId || ""}`;
+      const followingIds = options.followingIds || new Set();
+      const source = Array.isArray(posts) ? posts.slice(0, FEED_DISCOVERY_POST_SCAN_LIMIT) : [];
+      const bucket = new Map();
+      source.forEach((post, index) => {
+        const userId = `${post?.user_id || ""}`.trim();
+        if (!userId) return;
+        if (userId === currentUserId) return;
+        if (followingIds.has(userId)) return;
+        const item = bucket.get(userId) || {
+          userId,
+          score: 0,
+          postCount: 0,
+          profile: post?.profile || null,
+        };
+        item.postCount += 1;
+        if (!item.profile && post?.profile) {
+          item.profile = post.profile;
+        }
+        const recencyBonus = 1 + (source.length - index) / Math.max(1, source.length);
+        item.score += recencyBonus + (post?.media_url ? 0.55 : 0);
+        bucket.set(userId, item);
+      });
+      return Array.from(bucket.values())
+        .sort((a, b) => b.score - a.score)
+        .slice(0, FEED_DISCOVERY_USER_LIMIT);
+    }
 function loadFeedUiState() {
       if (feedUiStateLoaded) return;
       feedUiStateLoaded = true;
@@ -818,7 +982,7 @@ function loadFeedUiState() {
         const nextFilter = String(parsed?.currentFilter || "");
         const nextSort = String(parsed?.sortOrder || "");
         const nextSearch = String(parsed?.search || "").trim().toLowerCase();
-        if (["all", "mine"].includes(nextFilter)) {
+        if (isAllowedFeedFilter(nextFilter)) {
           currentFilter = nextFilter;
         }
         if (["newest", "oldest"].includes(nextSort)) {
@@ -838,7 +1002,7 @@ function loadFeedUiState() {
 function persistFeedUiState() {
       try {
         const payload = {
-          currentFilter: currentFilter === "mine" ? "mine" : "all",
+          currentFilter: isAllowedFeedFilter(currentFilter) ? currentFilter : "all",
           sortOrder: sortOrder === "oldest" ? "oldest" : "newest",
           filterMedia: !!filterMedia,
           filterWorkout: !!filterWorkout,
@@ -1477,6 +1641,42 @@ function setupFeedCardActionDelegation() {
           await toggleLikeForPost(post);
           return;
         }
+        if (action === "toggle-save") {
+          const isSaved = toggleSavedPostId(post.id);
+          const tr = t[getCurrentLang()] || t.ja;
+          showToast(
+            isSaved
+              ? tr.saved || "Saved"
+              : tr.unsave || "Removed from saved",
+            "success"
+          );
+          scheduleRenderFeed();
+          return;
+        }
+        if (action === "share-post") {
+          const tr = t[getCurrentLang()] || t.ja;
+          const origin =
+            typeof window !== "undefined" ? window.location.origin : "";
+          const path =
+            typeof window !== "undefined" ? window.location.pathname : "";
+          const shareUrl = `${origin}${path}#post=${post.id}`;
+          try {
+            if (
+              typeof navigator !== "undefined" &&
+              navigator.clipboard &&
+              typeof navigator.clipboard.writeText === "function"
+            ) {
+              await navigator.clipboard.writeText(shareUrl);
+              showToast(tr.feedLinkCopied || "Link copied.", "success");
+            } else {
+              showToast(shareUrl, "info");
+            }
+          } catch (error) {
+            console.error("share post failed", error);
+            showToast(shareUrl, "info");
+          }
+          return;
+        }
         if (action === "delete-post") {
           await deletePost(post.id);
         }
@@ -1899,7 +2099,9 @@ export function resetFeedPagination() {
 export function setFeedState(next = {}) {
       let shouldPersistUi = false;
       if (typeof next.currentFilter === "string") {
-        currentFilter = next.currentFilter;
+        currentFilter = isAllowedFeedFilter(next.currentFilter)
+          ? next.currentFilter
+          : "all";
         shouldPersistUi = true;
       }
       if (typeof next.feedLayout === "string") {
@@ -1939,45 +2141,65 @@ export function setupFeedControls() {
       feedIsOnline = getOnlineState();
       setupFeedCardActionDelegation();
       syncFeedPageSize({ resetVisible: true });
+      const applyFilter = (nextFilter) => {
+        currentFilter = isAllowedFeedFilter(nextFilter) ? nextFilter : "all";
+        persistFeedUiState();
+        resetFeedPagination();
+        updateFilterButtons();
+        scheduleRenderFeed();
+      };
+      const requireLoginForFilter = (nextFilter, fallbackKey, fallbackText) => {
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+          applyFilter(nextFilter);
+          return;
+        }
+        const tr = t[getCurrentLang()] || t.ja;
+        showToast(tr[fallbackKey] || fallbackText, "warning");
+        applyFilter("all");
+      };
+      const filterForYou = $("filter-foryou");
+      if (filterForYou) {
+        filterForYou.addEventListener("click", () => {
+          applyFilter("foryou");
+        });
+      }
       const filterAll = $("filter-all");
       if (filterAll) {
         filterAll.addEventListener("click", () => {
-          currentFilter = "all";
-          persistFeedUiState();
-          resetFeedPagination();
-          updateFilterButtons();
-          scheduleRenderFeed();
+          applyFilter("all");
+        });
+      }
+      const filterFollowing = $("filter-following");
+      if (filterFollowing) {
+        filterFollowing.addEventListener("click", () => {
+          requireLoginForFilter(
+            "following",
+            "followingFilterLogin",
+            "Log in to see posts from users you follow."
+          );
         });
       }
       const filterMine = $("filter-mine");
       if (filterMine) {
         filterMine.addEventListener("click", () => {
-          const currentUser = getCurrentUser();
-          const currentLang = getCurrentLang();
-          if (!currentUser) {
-            const tr = t[currentLang] || t.ja;
-            showToast(
-              tr.mineFilterLogin || "Log in to see only your posts.",
-              "warning"
-            );
-            currentFilter = "all";
-          } else {
-            currentFilter = "mine";
-          }
-          persistFeedUiState();
-          resetFeedPagination();
-          updateFilterButtons();
-          scheduleRenderFeed();
+          requireLoginForFilter(
+            "mine",
+            "mineFilterLogin",
+            "Log in to see only your posts."
+          );
+        });
+      }
+      const filterSaved = $("filter-saved");
+      if (filterSaved) {
+        filterSaved.addEventListener("click", () => {
+          applyFilter("saved");
         });
       }
       const filterPublic = $("filter-public");
       if (filterPublic) {
         filterPublic.addEventListener("click", () => {
-          currentFilter = "public";
-          persistFeedUiState();
-          resetFeedPagination();
-          updateFilterButtons();
-          scheduleRenderFeed();
+          applyFilter("public");
         });
       }
       const filterMediaBtn = $("filter-media");
@@ -1998,6 +2220,69 @@ export function setupFeedControls() {
           resetFeedPagination();
           updateFilterButtons();
           scheduleRenderFeed();
+        });
+      }
+      const trendingTagsWrap = $("feed-trending-tags");
+      if (trendingTagsWrap && trendingTagsWrap.dataset.bound !== "true") {
+        trendingTagsWrap.dataset.bound = "true";
+        trendingTagsWrap.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-trending-tag]");
+          if (!btn) return;
+          const tag = `${btn.getAttribute("data-trending-tag") || ""}`.trim();
+          if (!tag) return;
+          const searchInput = $("feed-search");
+          if (searchInput) {
+            searchInput.value = `#${tag}`;
+          }
+          const clearBtn = $("btn-feed-clear");
+          if (clearBtn) {
+            clearBtn.classList.remove("hidden");
+            clearBtn.disabled = false;
+          }
+          feedLastCommittedSearch = `#${tag}`.toLowerCase();
+          persistFeedUiState();
+          resetFeedPagination();
+          scheduleRenderFeed();
+        });
+      }
+      const suggestedUsersWrap = $("feed-suggested-users");
+      if (suggestedUsersWrap && suggestedUsersWrap.dataset.bound !== "true") {
+        suggestedUsersWrap.dataset.bound = "true";
+        suggestedUsersWrap.addEventListener("click", async (event) => {
+          const profileBtn = event.target.closest("button[data-suggest-profile]");
+          if (profileBtn) {
+            setActivePage("account");
+            return;
+          }
+          const followBtn = event.target.closest("button[data-suggest-follow]");
+          if (!followBtn) return;
+          if (followBtn.classList.contains("is-loading")) return;
+          const currentUser = getCurrentUser();
+          if (!currentUser) {
+            const tr = t[getCurrentLang()] || t.ja;
+            showToast(
+              tr.followingFilterLogin ||
+                "Log in to follow users and personalize your feed.",
+              "warning"
+            );
+            return;
+          }
+          const targetUserId = `${followBtn.getAttribute("data-user-id") || ""}`.trim();
+          if (!targetUserId || targetUserId === currentUser.id) return;
+          followBtn.classList.add("is-loading");
+          followBtn.disabled = true;
+          try {
+            await toggleFollowForUser(targetUserId);
+            refreshFeedFollowButtonsForUser(targetUserId);
+            await loadFollowStats();
+            updateProfileSummary();
+            scheduleRenderFeed();
+          } catch (error) {
+            console.error("suggested follow toggle failed", error);
+          } finally {
+            followBtn.classList.remove("is-loading");
+            followBtn.disabled = false;
+          }
         });
       }
 
@@ -2397,7 +2682,14 @@ export function setupFeedControls() {
       }
     }
 export function updateFilterButtons() {
-      const buttons = ["filter-all", "filter-mine"];
+      const buttons = [
+        "filter-foryou",
+        "filter-all",
+        "filter-following",
+        "filter-mine",
+        "filter-saved",
+        "filter-public",
+      ];
       buttons.forEach((id) => {
         const el = $(id);
         if (!el) return;
@@ -2714,12 +3006,16 @@ export function renderFeed(options = {}) {
       pullIndicator.textContent = tr.feedPullHint || "下に引いて更新";
     }
     const searchValue = $("feed-search")?.value?.trim().toLowerCase() || "";
-    const allowedFilters = ["all", "mine"];
+    const savedPostIds = getSavedPostIdsSet();
+    const allowedFilters = FEED_FILTERS;
     let normalizedFilter = currentFilter;
     if (!allowedFilters.includes(currentFilter)) {
       normalizedFilter = "all";
     }
-    if (normalizedFilter === "mine" && !currentUser) {
+    if (
+      (normalizedFilter === "mine" || normalizedFilter === "following") &&
+      !currentUser
+    ) {
       normalizedFilter = "all";
     }
     if (normalizedFilter !== currentFilter) {
@@ -2764,8 +3060,18 @@ export function renderFeed(options = {}) {
     };
 
     const matchesFilter = (post) => {
+      if (currentFilter === "foryou") {
+        return true;
+      }
       if (currentFilter === "mine") {
         return currentUser && post.user_id === currentUser.id;
+      }
+      if (currentFilter === "following") {
+        if (!currentUser) return false;
+        return post.user_id === currentUser.id || followingIds.has(post.user_id);
+      }
+      if (currentFilter === "saved") {
+        return savedPostIds.has(`${post?.id || ""}`);
       }
       if (currentFilter === "public") {
         return post.visibility !== "private";
@@ -2778,6 +3084,15 @@ export function renderFeed(options = {}) {
       const haystack = getPostSearchHaystack(post, workoutLogsByPost);
       return haystack.includes(searchValue);
     };
+    renderFeedDiscoverySections({
+      allPosts,
+      currentFilter,
+      currentUser,
+      followingIds,
+      savedPostIds,
+      searchValue,
+      tr,
+    });
 
     const firstPostId = Array.isArray(allPosts) && allPosts.length ? allPosts[0]?.id || "" : "";
     const lastPostId = Array.isArray(allPosts) && allPosts.length
@@ -2794,6 +3109,8 @@ export function renderFeed(options = {}) {
       Array.isArray(allPosts) ? allPosts.length : 0,
       firstPostId,
       lastPostId,
+      Array.from(followingIds).sort().slice(0, 120).join(","),
+      Array.from(savedPostIds).sort().slice(0, 120).join(","),
     ].join("|");
     const baseQueryKey = [
       currentUser?.id || "",
@@ -2804,6 +3121,8 @@ export function renderFeed(options = {}) {
       Array.isArray(allPosts) ? allPosts.length : 0,
       firstPostId,
       lastPostId,
+      Array.from(followingIds).sort().slice(0, 120).join(","),
+      Array.from(savedPostIds).sort().slice(0, 120).join(","),
     ].join("|");
     let gridCandidates = [];
     const canUseQueryCache =
@@ -2836,14 +3155,25 @@ export function renderFeed(options = {}) {
               return true;
             })
           : [];
-        sortedBasePosts = visiblePosts.slice().sort((a, b) => {
-          const aTime = new Date(a.date || a.created_at || 0).getTime();
-          const bTime = new Date(b.date || b.created_at || 0).getTime();
-          if (sortOrder === "oldest") {
-            return aTime - bTime;
-          }
-          return bTime - aTime;
-        });
+        if (currentFilter === "foryou") {
+          sortedBasePosts = rankForYouPosts(visiblePosts, {
+            currentUserId: currentUser?.id || "",
+            followingIds,
+            likesByPost: getLikesByPost(),
+            commentsByPost,
+            workoutLogsByPost,
+            sortOrder,
+          });
+        } else {
+          sortedBasePosts = visiblePosts.slice().sort((a, b) => {
+            const aTime = new Date(a.date || a.created_at || 0).getTime();
+            const bTime = new Date(b.date || b.created_at || 0).getTime();
+            if (sortOrder === "oldest") {
+              return aTime - bTime;
+            }
+            return bTime - aTime;
+          });
+        }
         feedBaseCandidatesCache = {
           baseKey: baseQueryKey,
           postsRef: allPosts,
@@ -3004,8 +3334,13 @@ export function renderFeed(options = {}) {
 
       const title = document.createElement("div");
       title.className = "empty-title";
-      title.textContent =
-        tr.feedEmptyTitle || tr.emptyFeed || "表示する投稿がありません。";
+      const isSavedEmpty = currentFilter === "saved";
+      const isFollowingEmpty = currentFilter === "following";
+      title.textContent = isSavedEmpty
+        ? tr.feedSavedEmptyTitle || "保存した投稿がありません。"
+        : isFollowingEmpty
+        ? tr.feedFollowingEmptyTitle || "フォロー中ユーザーの投稿がありません。"
+        : tr.feedEmptyTitle || tr.emptyFeed || "表示する投稿がありません。";
 
       const hasConnectionIssue = isSupabaseConnectivityIssue(feedError, tr);
       const hasLocalConnectionOverrideIssue =
@@ -3027,6 +3362,11 @@ export function renderFeed(options = {}) {
             "認証に失敗しています。Anon key が正しいか確認してください。"
           : tr.feedEmptyConnectionHint ||
             "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。"
+        : isSavedEmpty
+        ? tr.feedSavedEmptyDesc || "カード右上の保存ボタンで後で見返せます。"
+        : isFollowingEmpty
+        ? tr.feedFollowingEmptyDesc ||
+          "おすすめユーザーをフォローしてフィードを充実させましょう。"
         : tr.feedEmptyDesc || "最初の投稿をしてみましょう。";
 
       const actions = document.createElement("div");
@@ -3046,6 +3386,14 @@ export function renderFeed(options = {}) {
               targetInput.select();
             }, 120);
           }
+        });
+      } else if (isSavedEmpty) {
+        primary.textContent = tr.feedSavedEmptyCta || tr.all || "すべて";
+        primary.addEventListener("click", () => {
+          currentFilter = "all";
+          persistFeedUiState();
+          updateFilterButtons();
+          renderFeed();
         });
       } else if (currentUser) {
         primary.textContent = tr.feedEmptyCtaPost || tr.newPost || "新規投稿";
@@ -3227,6 +3575,21 @@ export function renderFeed(options = {}) {
       commentBtn.dataset.postAction = "toggle-comments";
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost, commentsExpanded);
       actions.appendChild(commentBtn);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "chip chip-log chip-save";
+      saveBtn.dataset.postAction = "toggle-save";
+      const isSaved = savedPostIds.has(`${post.id || ""}`);
+      saveBtn.textContent = isSaved ? tr.saved || "Saved" : tr.save || "Save";
+      saveBtn.classList.toggle("chip-active", isSaved);
+      saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
+      actions.appendChild(saveBtn);
+
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "chip chip-log";
+      shareBtn.dataset.postAction = "share-post";
+      shareBtn.textContent = tr.share || "Share";
+      actions.appendChild(shareBtn);
 
       if (currentUser && post.user_id !== currentUser.id) {
         const followBtn = document.createElement("button");
@@ -3551,6 +3914,97 @@ export function renderFeed(options = {}) {
     return;
   }
 
+function renderFeedDiscoverySections(payload = {}) {
+  const discoveryRoot = $("feed-discovery");
+  const trendingWrap = $("feed-trending-tags");
+  const suggestedWrap = $("feed-suggested-users");
+  if (!discoveryRoot && !trendingWrap && !suggestedWrap) return;
+
+  const currentFilterValue = `${payload.currentFilter || ""}`;
+  const shouldShow = ["foryou", "all", "following"].includes(currentFilterValue);
+  if (discoveryRoot) {
+    discoveryRoot.classList.toggle("hidden", !shouldShow);
+  }
+  if (!shouldShow) {
+    if (trendingWrap) trendingWrap.innerHTML = "";
+    if (suggestedWrap) suggestedWrap.innerHTML = "";
+    return;
+  }
+
+  const tr = payload.tr || t[getCurrentLang()] || t.ja;
+  const allPosts = Array.isArray(payload.allPosts) ? payload.allPosts : [];
+  const currentUser = payload.currentUser || null;
+  const currentUserId = `${currentUser?.id || ""}`;
+  const followingIds =
+    payload.followingIds instanceof Set ? payload.followingIds : new Set();
+  const canViewPost = (post) => {
+    if (!post) return false;
+    if (post.visibility === "private") {
+      return !!currentUserId && `${post.user_id || ""}` === currentUserId;
+    }
+    return true;
+  };
+  const visiblePosts = allPosts.filter((post) => canViewPost(post));
+
+  if (trendingWrap) {
+    const tags = buildTrendingHashtags(visiblePosts);
+    trendingWrap.innerHTML = "";
+    if (!tags.length) {
+      const emptyChip = document.createElement("span");
+      emptyChip.className = "chip chip-muted";
+      emptyChip.textContent = tr.feedNoTrending || "まだタグがありません";
+      trendingWrap.appendChild(emptyChip);
+    } else {
+      tags.forEach((tag) => {
+        const chip = document.createElement("button");
+        chip.className = "chip chip-trending";
+        chip.setAttribute("data-trending-tag", tag);
+        chip.textContent = `#${tag}`;
+        const active =
+          payload.searchValue &&
+          (payload.searchValue.includes(`#${tag}`) ||
+            payload.searchValue.includes(tag));
+        chip.classList.toggle("chip-active", !!active);
+        trendingWrap.appendChild(chip);
+      });
+    }
+  }
+
+  if (suggestedWrap) {
+    const suggestedUsers = buildSuggestedUsers(visiblePosts, {
+      currentUserId,
+      followingIds,
+    });
+    suggestedWrap.innerHTML = "";
+    if (!suggestedUsers.length) {
+      const emptyChip = document.createElement("span");
+      emptyChip.className = "chip chip-muted";
+      emptyChip.textContent =
+        tr.feedNoSuggestions || "おすすめユーザーはまだありません";
+      suggestedWrap.appendChild(emptyChip);
+      return;
+    }
+    suggestedUsers.forEach((entry) => {
+      const row = document.createElement("div");
+      row.className = "feed-suggested-row";
+      const profileBtn = document.createElement("button");
+      profileBtn.className = "chip chip-suggest-profile";
+      profileBtn.setAttribute("data-suggest-profile", entry.userId);
+      const handle = formatHandle(entry.profile?.handle || "user");
+      const displayName = entry.profile?.display_name || handle;
+      profileBtn.textContent = `${displayName}`;
+      row.appendChild(profileBtn);
+
+      const followBtn = document.createElement("button");
+      followBtn.className = "chip chip-suggest-follow";
+      followBtn.setAttribute("data-suggest-follow", entry.userId);
+      followBtn.setAttribute("data-user-id", entry.userId);
+      followBtn.textContent = tr.follow || "Follow";
+      row.appendChild(followBtn);
+      suggestedWrap.appendChild(row);
+    });
+  }
+}
 function updateFeedStats(posts = []) {
   const statTodayEl = $("stat-today");
   const statStreakEl = $("stat-streak");
@@ -3710,6 +4164,22 @@ function refreshFeedFollowButtonsForUser(targetUserId) {
         btn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
         btn.classList.toggle("is-following", isFollowing);
         btn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
+        updatedCount += 1;
+      });
+      const suggestButtons = document.querySelectorAll(
+        ".chip-suggest-follow[data-user-id]"
+      );
+      suggestButtons.forEach((btn) => {
+        if (`${btn.getAttribute("data-user-id") || ""}` !== userId) return;
+        if (isFollowing) {
+          btn.textContent = tr.unfollow || "Following";
+          btn.classList.add("is-following");
+          btn.setAttribute("aria-pressed", "true");
+        } else {
+          btn.textContent = tr.follow || "Follow";
+          btn.classList.remove("is-following");
+          btn.setAttribute("aria-pressed", "false");
+        }
         updatedCount += 1;
       });
       return updatedCount;

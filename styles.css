@@ -485,6 +485,59 @@
       gap: 6px;
       align-items: center;
     }
+    .chips-scroll {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      padding-bottom: 2px;
+    }
+    .chip-muted {
+      background: #f8f7f4;
+      color: #7d7d76;
+      border-style: dashed;
+      cursor: default;
+    }
+    .chip-save {
+      min-width: 56px;
+    }
+    .feed-discovery {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .feed-discovery-item {
+      padding: 8px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: #fffcf8;
+      min-height: 48px;
+    }
+    .feed-discovery-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text-sub);
+      margin-bottom: 6px;
+    }
+    .feed-suggested-row {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      margin-right: 6px;
+    }
+    .chip-suggest-profile {
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chip-suggest-follow.is-following {
+      background: var(--primary-soft);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
     .feed-actions .select-sm {
       padding: 6px 10px;
       border-radius: 999px;
@@ -509,6 +562,9 @@
       .feed-actions {
         width: 100%;
         justify-content: flex-end;
+      }
+      .feed-discovery {
+        grid-template-columns: 1fr;
       }
       .skeleton {
         animation: none;
