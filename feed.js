@@ -320,7 +320,12 @@ function prefersReducedMotion() {
       }
       return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     }
+function isLiteEffectsEnabled() {
+      const settings = getSettings();
+      return !!settings?.liteEffects;
+    }
 function isSaveDataEnabled() {
+      if (isLiteEffectsEnabled()) return true;
       if (typeof navigator === "undefined") return false;
       return !!navigator.connection?.saveData;
     }
@@ -329,16 +334,19 @@ function isCompactViewport() {
       return (window.innerWidth || 1024) <= 700;
     }
 function getFeedImageHydrationConcurrency() {
+      if (isLiteEffectsEnabled()) return 1;
       if (isSaveDataEnabled()) return 1;
       if (isCompactViewport()) return 1;
       return FEED_IMAGE_HYDRATE_CONCURRENCY;
     }
 function getFeedMediaObserverMargin() {
+      if (isLiteEffectsEnabled()) return "120px 0px";
       if (isSaveDataEnabled()) return "180px 0px";
       if (isCompactViewport()) return "260px 0px";
       return FEED_MEDIA_OBSERVER_MARGIN;
     }
 function shouldUseFeedEntryAnimation() {
+      if (isLiteEffectsEnabled()) return false;
       if (prefersReducedMotion()) return false;
       if (isCompactViewport()) return false;
       if (isSaveDataEnabled()) return false;
@@ -517,6 +525,12 @@ function toSearchChunk(value, limit = FEED_SEARCH_TEXT_LIMIT) {
     }
 function getFeedSearchCacheLimit() {
       return isCompactViewport() ? FEED_SEARCH_CACHE_LIMIT_MOBILE : FEED_SEARCH_CACHE_LIMIT;
+    }
+function getFeedSearchDebounceMs() {
+      if (isLiteEffectsEnabled()) return Math.max(120, FEED_SEARCH_DEBOUNCE_MS + 90);
+      if (isSaveDataEnabled()) return Math.max(120, FEED_SEARCH_DEBOUNCE_MS + 60);
+      if (isCompactViewport()) return FEED_SEARCH_DEBOUNCE_MS + 30;
+      return FEED_SEARCH_DEBOUNCE_MS;
     }
 function getPostSearchHaystack(post, workoutLogsMap) {
       if (!post) return "";
@@ -1068,6 +1082,19 @@ function scheduleRenderFeed() {
         renderFeed({ forcePageRender: true });
       };
       if (
+        isLiteEffectsEnabled() &&
+        typeof window !== "undefined" &&
+        typeof window.requestIdleCallback === "function"
+      ) {
+        window.requestIdleCallback(
+          () => {
+            run();
+          },
+          { timeout: 42 }
+        );
+        return;
+      }
+      if (
         typeof window !== "undefined" &&
         typeof window.requestAnimationFrame === "function"
       ) {
@@ -1081,12 +1108,13 @@ function getRecommendedFeedPageSize() {
         typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
       const compact = viewportWidth <= 700;
       const medium = viewportWidth <= 980;
+      const lite = isLiteEffectsEnabled();
       if (feedLayout === "grid") {
-        if (compact) return 6;
-        return medium ? 8 : 10;
+        if (compact) return lite ? 4 : 6;
+        return medium ? (lite ? 6 : 8) : lite ? 8 : 10;
       }
-      if (compact) return 5;
-      return medium ? 6 : 8;
+      if (compact) return lite ? 4 : 5;
+      return medium ? (lite ? 5 : 6) : lite ? 7 : 8;
     }
 function syncFeedPageSize(options = {}) {
       const nextSize = getRecommendedFeedPageSize();
@@ -1106,22 +1134,23 @@ function getFeedChunkProfileKey(layout = "list", compactViewport = false) {
       return isSaveDataEnabled() ? `${mode}:save` : mode;
     }
 function getFeedChunkBounds(layout = "list", compactViewport = false) {
+      const lowPower = isSaveDataEnabled() || isLiteEffectsEnabled();
       if (layout === "grid") {
         if (compactViewport) {
-          return isSaveDataEnabled()
+          return lowPower
             ? { min: 1, max: 3, defaultSize: 2 }
             : { min: 2, max: 6, defaultSize: 4 };
         }
-        return isSaveDataEnabled()
+        return lowPower
           ? { min: 2, max: 6, defaultSize: 4 }
           : { min: 4, max: 10, defaultSize: 8 };
       }
       if (compactViewport) {
-        return isSaveDataEnabled()
+        return lowPower
           ? { min: 1, max: 2, defaultSize: 1 }
           : { min: 1, max: 4, defaultSize: 2 };
       }
-      return isSaveDataEnabled()
+      return lowPower
         ? { min: 2, max: 4, defaultSize: 3 }
         : { min: 3, max: 7, defaultSize: 5 };
     }
@@ -1145,9 +1174,12 @@ function tuneAdaptiveFeedChunkSize(
       const key = getFeedChunkProfileKey(layout, compactViewport);
       const bounds = getFeedChunkBounds(layout, compactViewport);
       const current = getAdaptiveFeedChunkSize(layout, compactViewport);
-      const targetMs = compactViewport
+      let targetMs = compactViewport
         ? FEED_CHUNK_TARGET_MS_MOBILE
         : FEED_CHUNK_TARGET_MS_DESKTOP;
+      if (isLiteEffectsEnabled()) {
+        targetMs = Math.max(4, targetMs - 2);
+      }
       let next = current;
       if (chunkDurationMs > FEED_CHUNK_HARD_MAX_MS) {
         next = current - 1;
@@ -1486,8 +1518,9 @@ function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
       feedMoreAnchorScrollY = null;
       if (!Number.isFinite(delta) || Math.abs(delta) < 1) return;
       const compactViewport = (window.innerWidth || 1024) <= 700;
+      const liteEffects = isLiteEffectsEnabled();
       const behavior =
-        compactViewport || Math.abs(delta) > 720
+        compactViewport || liteEffects || Math.abs(delta) > 720
           ? "auto"
           : resolveFeedScrollBehavior(preferredBehavior);
       const currentY = window.scrollY || window.pageYOffset || previousScrollY;
@@ -1538,15 +1571,34 @@ function getFeedWindowRuntimeSettings() {
       const width = window.innerWidth || 1024;
       const mobile = width <= 700;
       const compact = width <= 980;
+      const lowPower = isLiteEffectsEnabled() || isSaveDataEnabled();
       return {
-        marginPx: mobile ? 440 : compact ? 640 : FEED_WINDOW_MARGIN_PX,
-        runIntervalMs: mobile ? 180 : FEED_WINDOW_RUN_INTERVAL_MS,
-        minScrollDeltaPx: mobile ? 70 : FEED_WINDOW_MIN_SCROLL_DELTA_PX,
+        marginPx: mobile
+          ? lowPower ? 380 : 440
+          : compact
+          ? lowPower ? 560 : 640
+          : lowPower
+          ? 760
+          : FEED_WINDOW_MARGIN_PX,
+        runIntervalMs: mobile
+          ? lowPower ? 240 : 180
+          : lowPower
+          ? 150
+          : FEED_WINDOW_RUN_INTERVAL_MS,
+        minScrollDeltaPx: mobile
+          ? lowPower ? 88 : 70
+          : lowPower
+          ? 36
+          : FEED_WINDOW_MIN_SCROLL_DELTA_PX,
         scanLimit: mobile
           ? FEED_WINDOW_SCAN_LIMIT_MOBILE
           : FEED_WINDOW_SCAN_LIMIT_DESKTOP,
         mutationBudget: mobile
-          ? FEED_WINDOW_MUTATION_BUDGET_MOBILE
+          ? lowPower
+            ? Math.max(3, FEED_WINDOW_MUTATION_BUDGET_MOBILE - 2)
+            : FEED_WINDOW_MUTATION_BUDGET_MOBILE
+          : lowPower
+          ? Math.max(10, FEED_WINDOW_MUTATION_BUDGET_DESKTOP - 4)
           : FEED_WINDOW_MUTATION_BUDGET_DESKTOP,
       };
     }
@@ -1981,11 +2033,26 @@ export function setupFeedControls() {
           feedSearchInputTimer = setTimeout(() => {
             feedSearchInputTimer = null;
             commitSearch();
-          }, FEED_SEARCH_DEBOUNCE_MS);
+          }, getFeedSearchDebounceMs());
           syncSearchClearButton();
         });
+        searchInput.addEventListener("blur", () => {
+          if (!feedSearchInputTimer) return;
+          clearTimeout(feedSearchInputTimer);
+          feedSearchInputTimer = null;
+          commitSearch();
+        });
         searchInput.addEventListener("keydown", (event) => {
-          if (event.isComposing || event.key !== "Escape") return;
+          if (event.isComposing) return;
+          if (event.key === "Enter") {
+            if (feedSearchInputTimer) {
+              clearTimeout(feedSearchInputTimer);
+              feedSearchInputTimer = null;
+            }
+            commitSearch();
+            return;
+          }
+          if (event.key !== "Escape") return;
           if (!searchInput.value) return;
           event.preventDefault();
           searchInput.value = "";
@@ -3280,41 +3347,69 @@ export function renderFeed(options = {}) {
         logTitle.className = "post-weight";
         logTitle.textContent = tr.workoutLogTitle || "Workout log";
         logWrap.appendChild(logTitle);
-        const getPrLabel = (type) => {
-          if (!type) return "";
-          if (type === "weight") return tr.prWeight || "Weight PR";
-          if (type === "reps") return tr.prReps || "Rep PR";
-          return tr.prLabel || "PR";
-        };
-        const visibleLogs = logs.slice(0, 2);
-        visibleLogs.forEach((exercise) => {
-          const row = document.createElement("div");
-          row.className = "post-sub";
-          const setsText = (exercise.sets || [])
-            .map((set) => {
-              const weightText = set.weight ? `@${formatWeight(set.weight)}` : "";
-              const prLabel = getPrLabel(set.pr_type);
-              const prSuffix = prLabel ? ` (${prLabel})` : "";
-              return `${set.set_index || ""} ${set.reps}reps ${weightText}${prSuffix}`.trim();
-            })
-            .join(", ");
-          row.textContent = `${exercise.exercise}: ${setsText}`;
-          logWrap.appendChild(row);
-          if (exercise.note) {
-            const note = document.createElement("div");
-            note.className = "post-sub";
-            note.textContent = `${tr.workoutNoteLabel || "Note"}: ${exercise.note}`;
-            logWrap.appendChild(note);
-          }
-        });
-        if (logs.length > 2) {
-          const more = document.createElement("div");
-          more.className = "post-sub";
-          more.textContent = (tr.workoutMore || "ほか{count}件").replace(
-            "{count}",
-            `${logs.length - 2}`
+        const liteWorkoutPreview =
+          isLiteEffectsEnabled() || isCompactViewport();
+        if (liteWorkoutPreview) {
+          const exerciseCount = logs.length;
+          const setCount = logs.reduce(
+            (sum, item) => sum + ((item?.sets || []).length || 0),
+            0
           );
-          logWrap.appendChild(more);
+          const compactRow = document.createElement("div");
+          compactRow.className = "post-sub";
+          compactRow.textContent = `${exerciseCount}${
+            tr.workoutExerciseCountLabel || "種目"
+          } · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
+          logWrap.appendChild(compactRow);
+
+          const topNames = logs
+            .slice(0, 2)
+            .map((item) => String(item?.exercise || "").trim())
+            .filter(Boolean)
+            .join(" / ");
+          if (topNames) {
+            const namesRow = document.createElement("div");
+            namesRow.className = "post-sub";
+            namesRow.textContent = topNames;
+            logWrap.appendChild(namesRow);
+          }
+        } else {
+          const getPrLabel = (type) => {
+            if (!type) return "";
+            if (type === "weight") return tr.prWeight || "Weight PR";
+            if (type === "reps") return tr.prReps || "Rep PR";
+            return tr.prLabel || "PR";
+          };
+          const visibleLogs = logs.slice(0, 2);
+          visibleLogs.forEach((exercise) => {
+            const row = document.createElement("div");
+            row.className = "post-sub";
+            const setsText = (exercise.sets || [])
+              .map((set) => {
+                const weightText = set.weight ? `@${formatWeight(set.weight)}` : "";
+                const prLabel = getPrLabel(set.pr_type);
+                const prSuffix = prLabel ? ` (${prLabel})` : "";
+                return `${set.set_index || ""} ${set.reps}reps ${weightText}${prSuffix}`.trim();
+              })
+              .join(", ");
+            row.textContent = `${exercise.exercise}: ${setsText}`;
+            logWrap.appendChild(row);
+            if (exercise.note) {
+              const note = document.createElement("div");
+              note.className = "post-sub";
+              note.textContent = `${tr.workoutNoteLabel || "Note"}: ${exercise.note}`;
+              logWrap.appendChild(note);
+            }
+          });
+          if (logs.length > 2) {
+            const more = document.createElement("div");
+            more.className = "post-sub";
+            more.textContent = (tr.workoutMore || "ほか{count}件").replace(
+              "{count}",
+              `${logs.length - 2}`
+            );
+            logWrap.appendChild(more);
+          }
         }
         card.appendChild(logWrap);
       }

@@ -84,6 +84,15 @@
     body.lite-effects .skeleton {
       animation-duration: 2.2s;
     }
+    body.lite-effects .feed-more {
+      transition: none;
+    }
+    body.lite-effects .feed-more::after {
+      transition: none;
+    }
+    body.lite-effects .mini-progress-bar {
+      transition: none;
+    }
     .page {
       max-width: 1100px;
       margin: 0 auto;
