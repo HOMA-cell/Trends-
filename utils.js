@@ -6,6 +6,9 @@ let utilsContext = {
   CM_TO_IN: 0.3937007874,
 };
 
+const dateTimeFormatterCache = new Map();
+const numberFormatterCache = new Map();
+
 export function setUtilsContext(next = {}) {
   utilsContext = { ...utilsContext, ...next };
 }
@@ -28,6 +31,26 @@ function getKgToLb() {
 
 function getCmToIn() {
   return utilsContext.CM_TO_IN ?? 0.3937007874;
+}
+
+function getDateTimeFormatter(locale, options = {}) {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  if (dateTimeFormatterCache.has(key)) {
+    return dateTimeFormatterCache.get(key);
+  }
+  const formatter = new Intl.DateTimeFormat(locale, options);
+  dateTimeFormatterCache.set(key, formatter);
+  return formatter;
+}
+
+function getNumberFormatter(locale, options = {}) {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  if (numberFormatterCache.has(key)) {
+    return numberFormatterCache.get(key);
+  }
+  const formatter = new Intl.NumberFormat(locale, options);
+  numberFormatterCache.set(key, formatter);
+  return formatter;
 }
 
 export function $(id) {
@@ -157,7 +180,7 @@ export function formatDateDisplay(value) {
   if (format === "mdy") {
     return `${month}/${day}/${year}`;
   }
-  return new Intl.DateTimeFormat(locale, {
+  return getDateTimeFormatter(locale, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -169,7 +192,7 @@ export function formatDateTimeDisplay(value) {
   if (!date) return "-";
   const currentLang = getCurrentLang();
   const locale = currentLang === "ja" ? "ja-JP" : "en-US";
-  const time = new Intl.DateTimeFormat(locale, {
+  const time = getDateTimeFormatter(locale, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
@@ -179,7 +202,7 @@ export function formatDateTimeDisplay(value) {
 export function formatNumber(value, decimals = 0) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "";
-  return new Intl.NumberFormat("en-US", {
+  return getNumberFormatter("en-US", {
     maximumFractionDigits: decimals,
     minimumFractionDigits: 0,
     useGrouping: false,
@@ -225,7 +248,7 @@ export function formatWeight(value, unitOverride) {
   const KG_TO_LB = getKgToLb();
   const converted = unit === "lb" ? num * KG_TO_LB : num;
   const locale = currentLang === "ja" ? "ja-JP" : "en-US";
-  const formatted = new Intl.NumberFormat(locale, {
+  const formatted = getNumberFormatter(locale, {
     maximumFractionDigits: 1,
   }).format(converted);
   return `${formatted} ${unit}`;
@@ -240,7 +263,7 @@ export function formatHeight(value, unitOverride) {
   const CM_TO_IN = getCmToIn();
   const converted = unit === "in" ? num * CM_TO_IN : num;
   const locale = currentLang === "ja" ? "ja-JP" : "en-US";
-  const formatted = new Intl.NumberFormat(locale, {
+  const formatted = getNumberFormatter(locale, {
     maximumFractionDigits: unit === "in" ? 1 : 0,
   }).format(converted);
   return `${formatted} ${unit}`;
@@ -252,7 +275,9 @@ export function formatVolume(value, unitOverride) {
   const converted = settings.weightUnit === "lb" ? safe * getKgToLb() : safe;
   const rounded = Math.round(converted);
   const unit = unitOverride || (settings.weightUnit === "lb" ? "lb" : "kg");
-  return `${rounded.toLocaleString()} ${unit}`;
+  const locale = getCurrentLang() === "ja" ? "ja-JP" : "en-US";
+  const formatted = getNumberFormatter(locale).format(rounded);
+  return `${formatted} ${unit}`;
 }
 
 export function computeStreak(dateSet) {
