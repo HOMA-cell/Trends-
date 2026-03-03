@@ -1951,6 +1951,23 @@
       gap: 8px;
       margin-top: 8px;
     }
+    .notification-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .notification-unread-count {
+      border-radius: 999px;
+      border: 1px solid #f3b6a4;
+      background: #fff3ee;
+      color: #c14b22;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      white-space: nowrap;
+    }
     .notification-item {
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
@@ -1973,6 +1990,9 @@
       gap: 6px;
       flex-wrap: wrap;
       margin-top: 4px;
+    }
+    .chip-repost {
+      min-width: 66px;
     }
     .log-builder {
       border: 1px solid var(--border);

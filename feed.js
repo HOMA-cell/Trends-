@@ -90,7 +90,7 @@ const renderPrList = () => feedContext.renderPrList?.();
 const renderInsights = () => feedContext.renderInsights?.();
 const renderOnboardingChecklist = () => feedContext.renderOnboardingChecklist?.();
 const setActivePage = (page) => feedContext.setActivePage?.(page);
-const openPostModal = () => feedContext.openPostModal?.();
+const openPostModal = (...args) => feedContext.openPostModal?.(...args);
 
 let currentFilter = "foryou";
 let filterMedia = false;
@@ -183,6 +183,7 @@ const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const FEED_SAVED_POSTS_KEY = "trends_saved_posts_v1";
 const FEED_HIDDEN_POSTS_KEY = "trends_hidden_posts_v1";
 const FEED_SEEN_POSTS_KEY = "trends_seen_posts_v1";
+const FEED_REPOST_STATE_KEY = "trends_repost_state_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
@@ -902,6 +903,79 @@ function clearHiddenPostIds() {
         // ignore localStorage write failures
       }
     }
+function getRepostState() {
+      try {
+        const raw = localStorage.getItem(FEED_REPOST_STATE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        const byUser = parsed?.byUser && typeof parsed.byUser === "object"
+          ? parsed.byUser
+          : {};
+        return { byUser };
+      } catch {
+        return { byUser: {} };
+      }
+    }
+function setRepostState(state) {
+      try {
+        const byUser =
+          state?.byUser && typeof state.byUser === "object"
+            ? state.byUser
+            : {};
+        localStorage.setItem(
+          FEED_REPOST_STATE_KEY,
+          JSON.stringify({ byUser })
+        );
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function getRepostedPostIdsForUser(userId, repostState = null) {
+      const id = `${userId || ""}`.trim();
+      if (!id) return new Set();
+      const source = repostState || getRepostState();
+      const list = Array.isArray(source?.byUser?.[id]) ? source.byUser[id] : [];
+      return new Set(
+        list
+          .map((item) => `${item || ""}`.trim())
+          .filter(Boolean)
+          .slice(-FEED_SEEN_POSTS_LIMIT)
+      );
+    }
+function buildRepostCountMap(repostState = null) {
+      const source = repostState || getRepostState();
+      const map = new Map();
+      const byUser =
+        source?.byUser && typeof source.byUser === "object" ? source.byUser : {};
+      Object.values(byUser).forEach((list) => {
+        if (!Array.isArray(list)) return;
+        list.forEach((postId) => {
+          const id = `${postId || ""}`.trim();
+          if (!id) return;
+          map.set(id, (map.get(id) || 0) + 1);
+        });
+      });
+      return map;
+    }
+function toggleRepostForUser(postId, userId) {
+      const pid = `${postId || ""}`.trim();
+      const uid = `${userId || ""}`.trim();
+      if (!pid || !uid) {
+        return { isReposted: false, count: 0 };
+      }
+      const state = getRepostState();
+      const current = getRepostedPostIdsForUser(uid, state);
+      let isReposted = false;
+      if (current.has(pid)) {
+        current.delete(pid);
+      } else {
+        current.add(pid);
+        isReposted = true;
+      }
+      state.byUser[uid] = Array.from(current).slice(-FEED_SEEN_POSTS_LIMIT);
+      setRepostState(state);
+      const repostCount = buildRepostCountMap(state).get(pid) || 0;
+      return { isReposted, count: repostCount };
+    }
 function getSeenPostIdsSet() {
       try {
         const raw = localStorage.getItem(FEED_SEEN_POSTS_KEY);
@@ -984,6 +1058,7 @@ function getForYouScore(post, options = {}) {
       const likesByPost = options.likesByPost || new Map();
       const commentsByPost = options.commentsByPost || new Map();
       const workoutLogsByPost = options.workoutLogsByPost || new Map();
+      const repostCountsByPost = options.repostCountsByPost || new Map();
 
       const ageMs = Math.max(0, nowMs - getPostTimestamp(post));
       const recency = Math.exp(-ageMs / (36 * 60 * 60 * 1000));
@@ -996,6 +1071,10 @@ function getForYouScore(post, options = {}) {
         0,
         Number((workoutLogsByPost.get(post.id) || []).length || 0)
       );
+      const repostCount = Math.max(
+        0,
+        Number(repostCountsByPost.get(post.id) || 0)
+      );
       const hasMedia = !!post?.media_url;
       const isFollowing = followingIds.has(`${post?.user_id || ""}`);
       const isOwn = !!currentUserId && `${post?.user_id || ""}` === currentUserId;
@@ -1005,6 +1084,7 @@ function getForYouScore(post, options = {}) {
       score += Math.min(24, likeCount) * 0.24;
       score += Math.min(12, commentCount) * 0.35;
       score += Math.min(10, workoutCount) * 0.16;
+      score += Math.min(18, repostCount) * 0.22;
       score += hasMedia ? 0.8 : 0;
       score += isFollowing ? 0.55 : 0;
       score += isOwn ? -0.25 : 0;
@@ -1050,15 +1130,41 @@ function buildTrendingHashtags(posts = []) {
       const source = Array.isArray(posts) ? posts.slice(0, FEED_DISCOVERY_POST_SCAN_LIMIT) : [];
       source.forEach((post, index) => {
         const text = `${post?.note || ""} ${post?.caption || ""}`.trim();
-        const tags = parseHashtagsFromText(text);
+        const tags = Array.from(new Set(parseHashtagsFromText(text)));
         if (!tags.length) return;
-        const freshnessBoost = 1 + (source.length - index) / Math.max(1, source.length);
+        const postTime = getPostTimestamp(post);
+        const ageMs = Math.max(0, Date.now() - postTime);
+        const freshnessBoost = Math.exp(-ageMs / (48 * 60 * 60 * 1000));
+        const userId = `${post?.user_id || ""}`.trim();
         tags.forEach((tag) => {
-          counts.set(tag, (counts.get(tag) || 0) + freshnessBoost);
+          const current = counts.get(tag) || {
+            usage: 0,
+            score: 0,
+            users: new Set(),
+            latestTs: 0,
+          };
+          current.usage += 1;
+          current.score += 1 + freshnessBoost * 1.6;
+          if (userId) {
+            current.users.add(userId);
+          }
+          if (postTime > current.latestTs) {
+            current.latestTs = postTime;
+          }
+          counts.set(tag, current);
         });
       });
       return Array.from(counts.entries())
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => {
+          const aUsers = a[1].users?.size || 0;
+          const bUsers = b[1].users?.size || 0;
+          const aScore = a[1].score + aUsers * 1.25 + Math.min(4, a[1].usage) * 0.35;
+          const bScore = b[1].score + bUsers * 1.25 + Math.min(4, b[1].usage) * 0.35;
+          if (Math.abs(bScore - aScore) > 0.0001) {
+            return bScore - aScore;
+          }
+          return (b[1].latestTs || 0) - (a[1].latestTs || 0);
+        })
         .slice(0, FEED_DISCOVERY_TAG_LIMIT)
         .map(([tag]) => tag);
     }
@@ -1769,6 +1875,54 @@ function setupFeedCardActionDelegation() {
             "success"
           );
           scheduleRenderFeed();
+          return;
+        }
+        if (action === "toggle-repost") {
+          const currentUser = getCurrentUser();
+          const tr = t[getCurrentLang()] || t.ja;
+          if (!currentUser?.id) {
+            showToast(
+              tr.repostLoginRequired || "Log in to repost posts.",
+              "warning"
+            );
+            return;
+          }
+          const result = toggleRepostForUser(post.id, currentUser.id);
+          showToast(
+            result.isReposted
+              ? tr.repostedToast || "Reposted."
+              : tr.repostRemovedToast || "Repost removed.",
+            "success"
+          );
+          scheduleRenderFeed();
+          return;
+        }
+        if (action === "quote-post") {
+          const currentUser = getCurrentUser();
+          const tr = t[getCurrentLang()] || t.ja;
+          if (!currentUser?.id) {
+            showToast(
+              tr.quoteLoginRequired || "Log in to quote posts.",
+              "warning"
+            );
+            return;
+          }
+          const rawHandle =
+            post?.profile?.handle || post?.profile?.username || "user";
+          const handleText = formatHandle(rawHandle) || "@user";
+          const rawText = `${post?.note || post?.caption || ""}`.trim();
+          const clipped = rawText ? rawText.slice(0, 120) : "";
+          const quoteSeed = clipped
+            ? `${tr.quotePrefix || "QT"} ${handleText}: ${clipped}`
+            : `${tr.quotePrefix || "QT"} ${handleText}`;
+          openPostModal({
+            quotePostId: post.id,
+            quoteSeed,
+          });
+          showToast(
+            tr.quoteReadyToast || "Quote draft is ready.",
+            "info"
+          );
           return;
         }
         if (action === "hide-post") {
@@ -3154,6 +3308,12 @@ export function renderFeed(options = {}) {
     const savedPostIds = getSavedPostIdsSet();
     const hiddenPostIds = getHiddenPostIdsSet();
     const seenPostIds = getSeenPostIdsSet();
+    const repostState = getRepostState();
+    const repostCountsByPost = buildRepostCountMap(repostState);
+    const currentUserRepostedIds = getRepostedPostIdsForUser(
+      currentUser?.id,
+      repostState
+    );
     const allowedFilters = FEED_FILTERS;
     let normalizedFilter = currentFilter;
     if (!allowedFilters.includes(currentFilter)) {
@@ -3211,7 +3371,8 @@ export function renderFeed(options = {}) {
       }
       const likeCount = Number(getLikesByPost().get(post.id) || 0);
       const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
-      if (likeCount >= 5 || commentCount >= 3) {
+      const repostCount = Number(repostCountsByPost.get(`${post.id || ""}`) || 0);
+      if (likeCount >= 5 || commentCount >= 3 || repostCount >= 2) {
         return tr.feedReasonPopular || "Popular";
       }
       if (post?.media_url) {
@@ -3281,6 +3442,7 @@ export function renderFeed(options = {}) {
       Array.from(followingIds).sort().slice(0, 120).join(","),
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
+      Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
     ].join("|");
     const baseQueryKey = [
       currentUser?.id || "",
@@ -3294,6 +3456,7 @@ export function renderFeed(options = {}) {
       Array.from(followingIds).sort().slice(0, 120).join(","),
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
+      Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
     ].join("|");
     let gridCandidates = [];
     const canUseQueryCache =
@@ -3336,6 +3499,7 @@ export function renderFeed(options = {}) {
             likesByPost: getLikesByPost(),
             commentsByPost,
             workoutLogsByPost,
+            repostCountsByPost,
             sortOrder,
           });
         } else {
@@ -3778,6 +3942,27 @@ export function renderFeed(options = {}) {
       shareBtn.dataset.postAction = "share-post";
       shareBtn.textContent = tr.share || "Share";
       actions.appendChild(shareBtn);
+
+      const repostBtn = document.createElement("button");
+      repostBtn.className = "chip chip-log chip-repost";
+      repostBtn.dataset.postAction = "toggle-repost";
+      const repostCount = repostCountsByPost.get(`${post.id || ""}`) || 0;
+      const repostedByMe = currentUserRepostedIds.has(`${post.id || ""}`);
+      repostBtn.textContent = repostedByMe
+        ? tr.reposted || "Reposted"
+        : tr.repost || "Repost";
+      if (repostCount > 0) {
+        repostBtn.textContent += ` (${repostCount})`;
+      }
+      repostBtn.classList.toggle("chip-active", repostedByMe);
+      repostBtn.setAttribute("aria-pressed", repostedByMe ? "true" : "false");
+      actions.appendChild(repostBtn);
+
+      const quoteBtn = document.createElement("button");
+      quoteBtn.className = "chip chip-log";
+      quoteBtn.dataset.postAction = "quote-post";
+      quoteBtn.textContent = tr.quote || "Quote";
+      actions.appendChild(quoteBtn);
 
       if (!currentUser || post.user_id !== currentUser.id) {
         const hideBtn = document.createElement("button");

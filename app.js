@@ -96,6 +96,7 @@ import {
     let workoutLogsEnabled = true;
     let notifications = [];
     let notificationsEnabled = true;
+    let notificationsViewFilter = "all";
     let currentPublicProfileId = null;
     let currentGalleryPosts = [];
     let galleryPage = 1;
@@ -1737,9 +1738,9 @@ async function loadProfilePostCount() {
       renderPrList,
       renderInsights,
       renderOnboardingChecklist,
-      openPostModal: () => {
+      openPostModal: (options = {}) => {
         if (typeof openPostModal === "function") {
-          openPostModal();
+          openPostModal(options);
         }
       },
       setActivePage: (page) => {
@@ -2079,6 +2080,8 @@ async function loadProfilePostCount() {
       setText("notifications-sub", "notificationsSub");
       setText("btn-refresh-notifications", "notificationsRefresh");
       setText("btn-mark-all-read", "notificationsMarkRead");
+      setText("notification-filter-all", "all");
+      setText("notification-filter-unread", "notificationsUnread");
       setText("public-profile-title", "publicProfile");
       setText("btn-back-to-feed", "back");
       setText("btn-share-profile", "shareProfile");
@@ -3605,19 +3608,21 @@ async function loadProfilePostCount() {
       const backdrop = $("post-modal-backdrop");
       const closeBtn = $("btn-post-close");
 
-      const openModal = () => {
+      const openModal = (options = {}) => {
         if (!currentUser) {
           showToast("投稿するにはログインが必要です。", "warning");
           return;
         }
+        const quoteSeed = String(options?.quoteSeed || "").trim();
         renderPostComposerMode();
         setDraftStatus("");
         const draft = loadPostDraft();
         const tr = t[currentLang] || t.ja;
-        if (draft && !hasPostInputs()) {
+        const canApplyDraft = !quoteSeed;
+        if (draft && !hasPostInputs() && canApplyDraft) {
           applyPostDraft(draft);
           setDraftStatus(tr.draftRestored || "下書きを復元しました", true);
-        } else if (draft && hasPostInputs()) {
+        } else if (draft && hasPostInputs() && canApplyDraft) {
           const ok = window.confirm(
             tr.draftRestoreConfirm || "保存済みの下書きを復元しますか？"
           );
@@ -3625,6 +3630,23 @@ async function loadProfilePostCount() {
             applyPostDraft(draft);
             setDraftStatus(tr.draftRestored || "下書きを復元しました", true);
           }
+        }
+        if (quoteSeed) {
+          const captionEl = $("post-caption");
+          if (captionEl) {
+            const current = String(captionEl.value || "").trim();
+            if (!current) {
+              captionEl.value = `${quoteSeed}\n\n`;
+            } else if (!current.includes(quoteSeed)) {
+              captionEl.value = `${quoteSeed}\n\n${current}`;
+            }
+            captionEl.focus();
+            const length = captionEl.value.length;
+            captionEl.setSelectionRange(length, length);
+          }
+          setPostComposerMode(true, { persist: false });
+          setDraftStatus(tr.quoteReadyToast || "引用投稿の下書きを作成しました。", true);
+          queueDraftSave();
         }
         if (hasAdvancedPostInputs()) {
           setPostComposerMode(true, { persist: false });
@@ -3700,6 +3722,22 @@ async function loadProfilePostCount() {
       const refreshBtn = $("btn-refresh-notifications");
       const markAllBtn = $("btn-mark-all-read");
       const settingsMarkBtn = $("btn-settings-mark-read");
+      const filterAllBtn = $("notification-filter-all");
+      const filterUnreadBtn = $("notification-filter-unread");
+      const syncFilterButtons = () => {
+        if (filterAllBtn) {
+          filterAllBtn.classList.toggle(
+            "chip-active",
+            notificationsViewFilter !== "unread"
+          );
+        }
+        if (filterUnreadBtn) {
+          filterUnreadBtn.classList.toggle(
+            "chip-active",
+            notificationsViewFilter === "unread"
+          );
+        }
+      };
       if (refreshBtn) {
         refreshBtn.addEventListener("click", () => loadNotifications());
       }
@@ -3709,6 +3747,23 @@ async function loadProfilePostCount() {
       if (settingsMarkBtn) {
         settingsMarkBtn.addEventListener("click", () => markAllNotificationsRead());
       }
+      if (filterAllBtn && filterAllBtn.dataset.bound !== "true") {
+        filterAllBtn.dataset.bound = "true";
+        filterAllBtn.addEventListener("click", () => {
+          notificationsViewFilter = "all";
+          syncFilterButtons();
+          renderNotifications();
+        });
+      }
+      if (filterUnreadBtn && filterUnreadBtn.dataset.bound !== "true") {
+        filterUnreadBtn.dataset.bound = "true";
+        filterUnreadBtn.addEventListener("click", () => {
+          notificationsViewFilter = "unread";
+          syncFilterButtons();
+          renderNotifications();
+        });
+      }
+      syncFilterButtons();
       renderNotifications();
     }
 
@@ -4354,36 +4409,96 @@ async function loadProfilePostCount() {
     function renderNotifications() {
       const list = $("notification-list");
       const status = $("notification-status");
+      const unreadCountEl = $("notification-unread-count");
+      const filterAllBtn = $("notification-filter-all");
+      const filterUnreadBtn = $("notification-filter-unread");
+      const markAllBtn = $("btn-mark-all-read");
       if (!list || !status) return;
       const tr = t[currentLang] || t.ja;
 
       list.innerHTML = "";
       status.textContent = "";
+      if (filterAllBtn) {
+        filterAllBtn.classList.toggle(
+          "chip-active",
+          notificationsViewFilter !== "unread"
+        );
+      }
+      if (filterUnreadBtn) {
+        filterUnreadBtn.classList.toggle(
+          "chip-active",
+          notificationsViewFilter === "unread"
+        );
+      }
 
       if (!currentUser) {
         status.textContent =
           tr.notificationsLoginRequired || "Log in to see notifications.";
+        if (markAllBtn) markAllBtn.disabled = true;
+        if (unreadCountEl) {
+          unreadCountEl.classList.add("hidden");
+          unreadCountEl.textContent = "";
+        }
         return;
       }
       if (!notificationsEnabled) {
         status.textContent =
           tr.notificationsUnavailable || "Notifications unavailable.";
+        if (markAllBtn) markAllBtn.disabled = true;
+        if (unreadCountEl) {
+          unreadCountEl.classList.add("hidden");
+          unreadCountEl.textContent = "";
+        }
         return;
       }
       if (!notifications.length) {
         status.textContent = tr.notificationsEmpty || "No notifications.";
+        if (markAllBtn) markAllBtn.disabled = true;
+        if (unreadCountEl) {
+          unreadCountEl.classList.add("hidden");
+          unreadCountEl.textContent = "";
+        }
         return;
       }
 
-      const filtered = notifications.filter((note) => {
+      const visibleBySetting = notifications.filter((note) => {
         const flag = settings.notifications?.[note.type];
         if (flag === undefined) return true;
         return flag;
       });
+      const unreadCount = visibleBySetting.filter((note) => !note.read_at).length;
+      if (unreadCountEl) {
+        if (unreadCount > 0) {
+          unreadCountEl.classList.remove("hidden");
+          unreadCountEl.textContent = (tr.notificationsUnreadCount || "{count} unread").replace(
+            "{count}",
+            `${unreadCount}`
+          );
+        } else {
+          unreadCountEl.classList.add("hidden");
+          unreadCountEl.textContent = "";
+        }
+      }
+      if (markAllBtn) {
+        markAllBtn.disabled = unreadCount <= 0;
+      }
+
+      const filtered =
+        notificationsViewFilter === "unread"
+          ? visibleBySetting.filter((note) => !note.read_at)
+          : visibleBySetting;
+      filtered.sort((a, b) => {
+        const unreadA = a.read_at ? 1 : 0;
+        const unreadB = b.read_at ? 1 : 0;
+        if (unreadA !== unreadB) return unreadA - unreadB;
+        return (b.created_at || "").localeCompare(a.created_at || "");
+      });
 
       if (!filtered.length) {
         status.textContent =
-          tr.notificationsFiltered || "Notifications are hidden.";
+          notificationsViewFilter === "unread"
+            ? tr.notificationsEmptyUnread || "No unread notifications."
+            : tr.notificationsFiltered || "Notifications are hidden.";
         return;
       }
 
