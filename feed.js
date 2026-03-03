@@ -167,6 +167,7 @@ let feedKeyboardShortcutsBound = false;
 let feedCardActionDelegationBound = false;
 let feedPageSizeResizeBound = false;
 let feedPageSizeResizeTimer = null;
+const feedAdaptiveChunkSize = new Map();
 const feedImageHydrationQueue = [];
 let feedImageHydrationActive = 0;
 const feedProfileCache = new Map();
@@ -212,6 +213,9 @@ const FEED_SEARCH_CACHE_LIMIT = 2400;
 const FEED_SEARCH_CACHE_LIMIT_MOBILE = 1200;
 const FEED_SEARCH_TEXT_LIMIT = 280;
 const FEED_SEARCH_LOG_LIMIT = 8;
+const FEED_CHUNK_TARGET_MS_DESKTOP = 8;
+const FEED_CHUNK_TARGET_MS_MOBILE = 7;
+const FEED_CHUNK_HARD_MAX_MS = 16;
 const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
 const FEED_NETWORK_BACKOFF_MS = 120000;
@@ -1094,6 +1098,68 @@ function syncFeedPageSize(options = {}) {
         feedVisibleCount = Math.max(feedVisibleCount, nextSize);
       }
       return true;
+    }
+function getFeedChunkProfileKey(layout = "list", compactViewport = false) {
+      const mode = `${layout === "grid" ? "grid" : "list"}:${
+        compactViewport ? "mobile" : "desktop"
+      }`;
+      return isSaveDataEnabled() ? `${mode}:save` : mode;
+    }
+function getFeedChunkBounds(layout = "list", compactViewport = false) {
+      if (layout === "grid") {
+        if (compactViewport) {
+          return isSaveDataEnabled()
+            ? { min: 1, max: 3, defaultSize: 2 }
+            : { min: 2, max: 6, defaultSize: 4 };
+        }
+        return isSaveDataEnabled()
+          ? { min: 2, max: 6, defaultSize: 4 }
+          : { min: 4, max: 10, defaultSize: 8 };
+      }
+      if (compactViewport) {
+        return isSaveDataEnabled()
+          ? { min: 1, max: 2, defaultSize: 1 }
+          : { min: 1, max: 4, defaultSize: 2 };
+      }
+      return isSaveDataEnabled()
+        ? { min: 2, max: 4, defaultSize: 3 }
+        : { min: 3, max: 7, defaultSize: 5 };
+    }
+function getAdaptiveFeedChunkSize(layout = "list", compactViewport = false) {
+      const key = getFeedChunkProfileKey(layout, compactViewport);
+      const bounds = getFeedChunkBounds(layout, compactViewport);
+      const cached = Number(feedAdaptiveChunkSize.get(key));
+      if (Number.isFinite(cached)) {
+        return Math.max(bounds.min, Math.min(bounds.max, Math.round(cached)));
+      }
+      feedAdaptiveChunkSize.set(key, bounds.defaultSize);
+      return bounds.defaultSize;
+    }
+function tuneAdaptiveFeedChunkSize(
+      layout = "list",
+      compactViewport = false,
+      chunkDurationMs = 0,
+      renderedCount = 0
+    ) {
+      if (renderedCount <= 0 || !Number.isFinite(chunkDurationMs)) return;
+      const key = getFeedChunkProfileKey(layout, compactViewport);
+      const bounds = getFeedChunkBounds(layout, compactViewport);
+      const current = getAdaptiveFeedChunkSize(layout, compactViewport);
+      const targetMs = compactViewport
+        ? FEED_CHUNK_TARGET_MS_MOBILE
+        : FEED_CHUNK_TARGET_MS_DESKTOP;
+      let next = current;
+      if (chunkDurationMs > FEED_CHUNK_HARD_MAX_MS) {
+        next = current - 1;
+      } else if (chunkDurationMs > targetMs * 1.35) {
+        next = current - 1;
+      } else if (chunkDurationMs < targetMs * 0.52 && renderedCount >= current) {
+        next = current + 1;
+      }
+      next = Math.max(bounds.min, Math.min(bounds.max, Math.round(next)));
+      if (next !== current) {
+        feedAdaptiveChunkSize.set(key, next);
+      }
     }
 function getPostById(postId) {
       if (!postId) return null;
@@ -3263,13 +3329,7 @@ export function renderFeed(options = {}) {
     const viewportWidth =
       typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
     const compactViewport = viewportWidth <= 700;
-    const batchSize = feedLayout === "grid"
-      ? compactViewport
-        ? 4
-        : 8
-      : compactViewport
-        ? 2
-        : 5;
+    let batchSize = getAdaptiveFeedChunkSize(feedLayout, compactViewport);
     const finalizeMore = () => {
       feedChunkRendering = false;
       clearFeedMoreLoadingState();
@@ -3338,12 +3398,21 @@ export function renderFeed(options = {}) {
 
     const renderChunk = () => {
       if (renderToken !== feedRenderToken) return;
+      const chunkStartedAt = perfNow();
+      const startIndex = index;
       const fragment = document.createDocumentFragment();
       const end = Math.min(index + batchSize, visibleSlice.length);
       for (; index < end; index += 1) {
         fragment.appendChild(createPostCard(visibleSlice[index]));
       }
       container.appendChild(fragment);
+      tuneAdaptiveFeedChunkSize(
+        feedLayout,
+        compactViewport,
+        perfNow() - chunkStartedAt,
+        end - startIndex
+      );
+      batchSize = getAdaptiveFeedChunkSize(feedLayout, compactViewport);
       if (index < visibleSlice.length) {
         requestAnimationFrame(renderChunk);
       } else {
