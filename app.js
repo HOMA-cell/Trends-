@@ -3137,19 +3137,24 @@ async function loadProfilePostCount() {
       let miniHeaderLastVisible = null;
       let miniHeaderLastProgress = -1;
       const isFeedPageActive = () =>
-        (document.querySelector(".page-view.is-active")?.dataset.page || "feed") ===
-        "feed";
+        (document.body?.dataset?.page ||
+          document.querySelector(".page-view.is-active")?.dataset.page ||
+          "feed") === "feed";
       const applyScrollUi = () => {
         miniHeaderScrollRaf = 0;
         const feedPageActive = isFeedPageActive();
-        const isVisible = feedPageActive && window.scrollY > 120;
+        const liteMode = !!settings?.liteEffects;
+        const revealOffset = liteMode ? 180 : 120;
+        const isVisible = feedPageActive && window.scrollY > revealOffset;
         if (miniHeaderLastVisible !== isVisible) {
           miniHeader.classList.toggle("is-visible", isVisible);
           miniHeaderLastVisible = isVisible;
         }
         if (progressBar) {
           const allowProgress =
-            feedPageActive && (window.innerWidth || 1024) > 700;
+            feedPageActive &&
+            (window.innerWidth || 1024) > 700 &&
+            !liteMode;
           if (!allowProgress) {
             if (miniHeaderLastProgress !== 0) {
               progressBar.style.width = "0%";
@@ -3163,7 +3168,7 @@ async function loadProfilePostCount() {
             100,
             Math.max(0, total > 0 ? (window.scrollY / total) * 100 : 0)
           );
-          if (Math.abs(percent - miniHeaderLastProgress) >= 1.2) {
+          if (Math.abs(percent - miniHeaderLastProgress) >= 1.5) {
             progressBar.style.width = `${percent}%`;
             miniHeaderLastProgress = percent;
           }
@@ -3188,7 +3193,12 @@ async function loadProfilePostCount() {
       if (miniTop && miniTop.dataset.bound !== "true") {
         miniTop.dataset.bound = "true";
         miniTop.addEventListener("click", () => {
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          const reduceMotion =
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          const behavior =
+            settings?.liteEffects || reduceMotion ? "auto" : "smooth";
+          window.scrollTo({ top: 0, behavior });
         });
       }
     }
