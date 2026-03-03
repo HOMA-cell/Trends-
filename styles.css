@@ -605,6 +605,9 @@
       content-visibility: auto;
       contain-intrinsic-size: 320px;
     }
+    .post-card.post-card-seen {
+      opacity: 0.84;
+    }
     .post-card:hover {
       transform: translateY(-1px);
       box-shadow: 0 16px 28px rgba(15, 23, 42, 0.08);
@@ -673,6 +676,32 @@
     .post-sub {
       font-size: 11px;
       color: var(--text-sub);
+    }
+    .post-new-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid #f3b6a4;
+      background: #fff3ee;
+      color: #cc4b1f;
+      padding: 1px 6px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .post-reason-badge {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      border: 1px solid #e7ddcd;
+      background: #fbf7ef;
+      color: #6f6558;
+      padding: 1px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-top: 3px;
     }
     .avatar {
       width: 30px;
@@ -747,6 +776,33 @@
       aspect-ratio: 4 / 5;
       min-height: 140px;
       position: relative;
+    }
+    .post-like-burst {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(0.7);
+      font-size: 42px;
+      color: #f97316;
+      text-shadow: 0 10px 24px rgba(15, 23, 42, 0.25);
+      opacity: 0;
+      animation: likeBurst 0.5s ease forwards;
+      pointer-events: none;
+      user-select: none;
+      z-index: 3;
+    }
+    @keyframes likeBurst {
+      0% {
+        transform: translate(-50%, -50%) scale(0.7);
+        opacity: 0;
+      }
+      20% {
+        opacity: 1;
+      }
+      100% {
+        transform: translate(-50%, -60%) scale(1.14);
+        opacity: 0;
+      }
     }
     .post-media.is-loading img,
     .post-media.is-loading video {
@@ -1707,6 +1763,9 @@
       margin-top: 0;
       flex: 1;
       min-width: 0;
+    }
+    .feed-status-row .btn {
+      flex: 0 0 auto;
     }
     .feed-pull-indicator {
       height: 0;

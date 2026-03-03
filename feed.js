@@ -181,6 +181,8 @@ const warmedImageUrlSet = new Set();
 const warmedImageUrlQueue = [];
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const FEED_SAVED_POSTS_KEY = "trends_saved_posts_v1";
+const FEED_HIDDEN_POSTS_KEY = "trends_hidden_posts_v1";
+const FEED_SEEN_POSTS_KEY = "trends_seen_posts_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
@@ -229,7 +231,9 @@ const FEED_SECONDARY_RENDER_COOLDOWN_MS = 1100;
 const FEED_DISCOVERY_POST_SCAN_LIMIT = 180;
 const FEED_DISCOVERY_TAG_LIMIT = 8;
 const FEED_DISCOVERY_USER_LIMIT = 8;
+const FEED_SEEN_POSTS_LIMIT = 2000;
 let feedUiStateLoaded = false;
+let seenPostsObserver = null;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -855,6 +859,120 @@ function toggleSavedPostId(postId) {
       }
       setSavedPostIdsSet(savedSet);
       return isSaved;
+    }
+function getHiddenPostIdsSet() {
+      try {
+        const raw = localStorage.getItem(FEED_HIDDEN_POSTS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return new Set();
+        return new Set(
+          parsed
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+            .slice(0, FEED_SEEN_POSTS_LIMIT)
+        );
+      } catch {
+        return new Set();
+      }
+    }
+function setHiddenPostIdsSet(hiddenSet) {
+      try {
+        const next = Array.from(hiddenSet || [])
+          .map((id) => `${id || ""}`.trim())
+          .filter(Boolean)
+          .slice(0, FEED_SEEN_POSTS_LIMIT);
+        localStorage.setItem(FEED_HIDDEN_POSTS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function hidePostId(postId) {
+      const id = `${postId || ""}`.trim();
+      if (!id) return false;
+      const hidden = getHiddenPostIdsSet();
+      if (hidden.has(id)) return false;
+      hidden.add(id);
+      setHiddenPostIdsSet(hidden);
+      return true;
+    }
+function clearHiddenPostIds() {
+      try {
+        localStorage.removeItem(FEED_HIDDEN_POSTS_KEY);
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function getSeenPostIdsSet() {
+      try {
+        const raw = localStorage.getItem(FEED_SEEN_POSTS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return new Set();
+        return new Set(
+          parsed
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+            .slice(-FEED_SEEN_POSTS_LIMIT)
+        );
+      } catch {
+        return new Set();
+      }
+    }
+function setSeenPostIdsSet(seenSet) {
+      try {
+        const next = Array.from(seenSet || [])
+          .map((id) => `${id || ""}`.trim())
+          .filter(Boolean)
+          .slice(-FEED_SEEN_POSTS_LIMIT);
+        localStorage.setItem(FEED_SEEN_POSTS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function markPostAsSeen(postId) {
+      const id = `${postId || ""}`.trim();
+      if (!id) return false;
+      const seenSet = getSeenPostIdsSet();
+      if (seenSet.has(id)) return false;
+      seenSet.add(id);
+      setSeenPostIdsSet(seenSet);
+      return true;
+    }
+function ensureSeenPostsObserver() {
+      if (seenPostsObserver) return seenPostsObserver;
+      if (typeof IntersectionObserver === "undefined") return null;
+      seenPostsObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry?.isIntersecting || entry.intersectionRatio < 0.58) return;
+            const card = entry.target;
+            const postId = `${card?.getAttribute?.("data-post-id") || ""}`.trim();
+            if (!postId) return;
+            const changed = markPostAsSeen(postId);
+            if (changed) {
+              card.classList.add("post-card-seen");
+              const badge = card.querySelector(".post-new-badge");
+              if (badge) badge.remove();
+            }
+            seenPostsObserver?.unobserve(card);
+          });
+        },
+        {
+          root: null,
+          rootMargin: "0px",
+          threshold: [0.58],
+        }
+      );
+      return seenPostsObserver;
+    }
+function observeSeenPostCard(card, isSeen) {
+      if (!card || isSeen) return;
+      const observer = ensureSeenPostsObserver();
+      if (!observer) return;
+      observer.observe(card);
+    }
+function resetSeenPostsObserver() {
+      if (!seenPostsObserver) return;
+      seenPostsObserver.disconnect();
     }
 function getPostTimestamp(post) {
       return new Date(post?.date || post?.created_at || 0).getTime() || 0;
@@ -1653,6 +1771,18 @@ function setupFeedCardActionDelegation() {
           scheduleRenderFeed();
           return;
         }
+        if (action === "hide-post") {
+          const tr = t[getCurrentLang()] || t.ja;
+          if (hidePostId(post.id)) {
+            showToast(
+              tr.feedHiddenPost || "Post hidden from your feed.",
+              "success"
+            );
+            resetFeedPagination();
+            scheduleRenderFeed();
+          }
+          return;
+        }
         if (action === "share-post") {
           const tr = t[getCurrentLang()] || t.ja;
           const origin =
@@ -2283,6 +2413,20 @@ export function setupFeedControls() {
             followBtn.classList.remove("is-loading");
             followBtn.disabled = false;
           }
+        });
+      }
+      const restoreHiddenBtn = $("btn-feed-restore-hidden");
+      if (restoreHiddenBtn && restoreHiddenBtn.dataset.bound !== "true") {
+        restoreHiddenBtn.dataset.bound = "true";
+        restoreHiddenBtn.addEventListener("click", () => {
+          clearHiddenPostIds();
+          const tr = t[getCurrentLang()] || t.ja;
+          showToast(
+            tr.feedHiddenRestoreDone || "Hidden posts restored.",
+            "success"
+          );
+          resetFeedPagination();
+          scheduleRenderFeed();
         });
       }
 
@@ -2962,6 +3106,7 @@ export function renderFeed(options = {}) {
         cancelAnimationFrame(feedWindowUpdateRaf);
         feedWindowUpdateRaf = 0;
       }
+      resetSeenPostsObserver();
       restoreAllWindowedFeedCards(container);
       feedMoreAnchorTop = null;
       feedMoreAnchorScrollY = null;
@@ -3007,6 +3152,8 @@ export function renderFeed(options = {}) {
     }
     const searchValue = $("feed-search")?.value?.trim().toLowerCase() || "";
     const savedPostIds = getSavedPostIdsSet();
+    const hiddenPostIds = getHiddenPostIdsSet();
+    const seenPostIds = getSeenPostIdsSet();
     const allowedFilters = FEED_FILTERS;
     let normalizedFilter = currentFilter;
     if (!allowedFilters.includes(currentFilter)) {
@@ -3023,6 +3170,11 @@ export function renderFeed(options = {}) {
       persistFeedUiState();
     }
     updateFilterButtons();
+    const restoreHiddenBtn = $("btn-feed-restore-hidden");
+    if (restoreHiddenBtn) {
+      const hasHidden = hiddenPostIds.size > 0;
+      restoreHiddenBtn.classList.toggle("hidden", !hasHidden);
+    }
 
     const updateRetryButton = (show = false) => {
       if (!retryBtn) return;
@@ -3050,6 +3202,22 @@ export function renderFeed(options = {}) {
       if (diffHours < 24) return (tr.feedHoursAgo || "{count}時間前").replace("{count}", diffHours);
       const diffDays = Math.round(diffHours / 24);
       return (tr.feedDaysAgo || "{count}日前").replace("{count}", diffDays);
+    };
+    const getForYouReasonLabel = (post) => {
+      if (currentFilter !== "foryou") return "";
+      const userId = `${post?.user_id || ""}`;
+      if (followingIds.has(userId)) {
+        return tr.feedReasonFollowing || "Following";
+      }
+      const likeCount = Number(getLikesByPost().get(post.id) || 0);
+      const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
+      if (likeCount >= 5 || commentCount >= 3) {
+        return tr.feedReasonPopular || "Popular";
+      }
+      if (post?.media_url) {
+        return tr.feedReasonMedia || "With media";
+      }
+      return tr.feedReasonRecent || "Recent";
     };
 
     const canSeePost = (post) => {
@@ -3090,6 +3258,7 @@ export function renderFeed(options = {}) {
       currentUser,
       followingIds,
       savedPostIds,
+      hiddenPostIds,
       searchValue,
       tr,
     });
@@ -3111,6 +3280,7 @@ export function renderFeed(options = {}) {
       lastPostId,
       Array.from(followingIds).sort().slice(0, 120).join(","),
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
+      Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
     ].join("|");
     const baseQueryKey = [
       currentUser?.id || "",
@@ -3123,6 +3293,7 @@ export function renderFeed(options = {}) {
       lastPostId,
       Array.from(followingIds).sort().slice(0, 120).join(","),
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
+      Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
     ].join("|");
     let gridCandidates = [];
     const canUseQueryCache =
@@ -3144,6 +3315,9 @@ export function renderFeed(options = {}) {
         const visiblePosts = Array.isArray(allPosts)
           ? allPosts.filter((post) => {
               if (!canSeePost(post) || !matchesFilter(post)) {
+                return false;
+              }
+              if (hiddenPostIds.has(`${post?.id || ""}`)) {
                 return false;
               }
               if (filterMedia && !post.media_url) {
@@ -3544,6 +3718,13 @@ export function renderFeed(options = {}) {
         nameSpan.textContent = handleText;
         userRow.appendChild(nameSpan);
       }
+      const isSeen = seenPostIds.has(`${post.id || ""}`);
+      if (!isSeen) {
+        const newBadge = document.createElement("span");
+        newBadge.className = "post-new-badge";
+        newBadge.textContent = tr.feedNew || "NEW";
+        userRow.appendChild(newBadge);
+      }
 
       const subRow = document.createElement("div");
       subRow.className = "post-sub";
@@ -3559,6 +3740,13 @@ export function renderFeed(options = {}) {
 
       meta.appendChild(userRow);
       meta.appendChild(subRow);
+      const reasonLabel = getForYouReasonLabel(post);
+      if (reasonLabel) {
+        const reason = document.createElement("div");
+        reason.className = "post-reason-badge";
+        reason.textContent = reasonLabel;
+        meta.appendChild(reason);
+      }
 
       const actions = document.createElement("div");
       actions.className = "post-actions";
@@ -3591,6 +3779,14 @@ export function renderFeed(options = {}) {
       shareBtn.textContent = tr.share || "Share";
       actions.appendChild(shareBtn);
 
+      if (!currentUser || post.user_id !== currentUser.id) {
+        const hideBtn = document.createElement("button");
+        hideBtn.className = "chip chip-log";
+        hideBtn.dataset.postAction = "hide-post";
+        hideBtn.textContent = tr.feedHidePost || "Not interested";
+        actions.appendChild(hideBtn);
+      }
+
       if (currentUser && post.user_id !== currentUser.id) {
         const followBtn = document.createElement("button");
         followBtn.className = "chip chip-log btn-follow";
@@ -3615,6 +3811,9 @@ export function renderFeed(options = {}) {
       header.appendChild(actions);
 
       card.appendChild(header);
+      if (isSeen) {
+        card.classList.add("post-card-seen");
+      }
 
       if (post.media_url) {
         const mediaWrap = document.createElement("div");
@@ -3665,6 +3864,19 @@ export function renderFeed(options = {}) {
           }
           mediaWrap.appendChild(img);
         }
+        mediaWrap.addEventListener("dblclick", () => {
+          if (!currentUser) return;
+          const likeState = getLikeUiState(post.id, localLikedIds);
+          if (likeState?.isLiked) return;
+          toggleLikeForPost(post).catch((error) => {
+            console.error("double tap like failed", error);
+          });
+          const burst = document.createElement("div");
+          burst.className = "post-like-burst";
+          burst.textContent = "❤";
+          mediaWrap.appendChild(burst);
+          setTimeout(() => burst.remove(), 520);
+        });
         card.appendChild(mediaWrap);
       }
 
@@ -3790,7 +4002,7 @@ export function renderFeed(options = {}) {
           card.appendChild(commentSection);
         }
       }
-
+      observeSeenPostCard(card, isSeen);
       return card;
     };
 
@@ -3937,6 +4149,8 @@ function renderFeedDiscoverySections(payload = {}) {
   const currentUserId = `${currentUser?.id || ""}`;
   const followingIds =
     payload.followingIds instanceof Set ? payload.followingIds : new Set();
+  const hiddenPostIds =
+    payload.hiddenPostIds instanceof Set ? payload.hiddenPostIds : new Set();
   const canViewPost = (post) => {
     if (!post) return false;
     if (post.visibility === "private") {
@@ -3945,9 +4159,12 @@ function renderFeedDiscoverySections(payload = {}) {
     return true;
   };
   const visiblePosts = allPosts.filter((post) => canViewPost(post));
+  const discoveryPosts = visiblePosts.filter(
+    (post) => !hiddenPostIds.has(`${post?.id || ""}`)
+  );
 
   if (trendingWrap) {
-    const tags = buildTrendingHashtags(visiblePosts);
+    const tags = buildTrendingHashtags(discoveryPosts);
     trendingWrap.innerHTML = "";
     if (!tags.length) {
       const emptyChip = document.createElement("span");
@@ -3971,7 +4188,7 @@ function renderFeedDiscoverySections(payload = {}) {
   }
 
   if (suggestedWrap) {
-    const suggestedUsers = buildSuggestedUsers(visiblePosts, {
+    const suggestedUsers = buildSuggestedUsers(discoveryPosts, {
       currentUserId,
       followingIds,
     });
