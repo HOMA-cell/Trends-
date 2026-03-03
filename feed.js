@@ -1490,7 +1490,16 @@ function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
         compactViewport || Math.abs(delta) > 720
           ? "auto"
           : resolveFeedScrollBehavior(preferredBehavior);
-      const targetTop = previousScrollY + delta;
+      const currentY = window.scrollY || window.pageYOffset || previousScrollY;
+      const doc = document?.documentElement || null;
+      const maxTop = Math.max(
+        0,
+        (doc?.scrollHeight || 0) - (window.innerHeight || 0)
+      );
+      const targetTop = Math.min(
+        maxTop,
+        Math.max(0, currentY + delta)
+      );
       const applyScroll = () => {
         window.scrollTo({
           top: targetTop,
@@ -1499,7 +1508,9 @@ function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
         });
       };
       if (typeof window.requestAnimationFrame === "function") {
-        window.requestAnimationFrame(applyScroll);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(applyScroll);
+        });
         return;
       }
       applyScroll();
@@ -3330,6 +3341,26 @@ export function renderFeed(options = {}) {
       typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
     const compactViewport = viewportWidth <= 700;
     let batchSize = getAdaptiveFeedChunkSize(feedLayout, compactViewport);
+    const scheduleNextChunk = (callback) => {
+      if (typeof window === "undefined") {
+        setTimeout(callback, 0);
+        return;
+      }
+      if (
+        compactViewport &&
+        typeof window.requestIdleCallback === "function"
+      ) {
+        window.requestIdleCallback(
+          () => {
+            if (renderToken !== feedRenderToken) return;
+            callback();
+          },
+          { timeout: 42 }
+        );
+        return;
+      }
+      requestAnimationFrame(callback);
+    };
     const finalizeMore = () => {
       feedChunkRendering = false;
       clearFeedMoreLoadingState();
@@ -3414,14 +3445,14 @@ export function renderFeed(options = {}) {
       );
       batchSize = getAdaptiveFeedChunkSize(feedLayout, compactViewport);
       if (index < visibleSlice.length) {
-        requestAnimationFrame(renderChunk);
+        scheduleNextChunk(renderChunk);
       } else {
         finalizeMore();
       }
     };
 
     feedChunkRendering = true;
-    requestAnimationFrame(renderChunk);
+    scheduleNextChunk(renderChunk);
     return;
   }
 

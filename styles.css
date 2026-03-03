@@ -18,6 +18,9 @@
     html {
       scroll-behavior: smooth;
     }
+    html.lite-effects {
+      scroll-behavior: auto;
+    }
     @media (max-width: 700px) {
       html {
         scroll-behavior: auto;
@@ -51,6 +54,35 @@
         var(--bg);
       color: var(--text-main);
       line-height: 1.45;
+    }
+    body.lite-effects {
+      background: #f4efe6;
+    }
+    body.lite-effects header,
+    body.lite-effects .mini-header,
+    body.lite-effects .card {
+      backdrop-filter: none !important;
+      box-shadow: 0 5px 12px rgba(15, 23, 42, 0.05);
+    }
+    body.lite-effects .post-card {
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+      transition: none;
+    }
+    body.lite-effects .post-card:hover {
+      transform: none;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+    body.lite-effects .post-card.post-card-enter,
+    body.lite-effects .post-card.post-card-enter.is-ready {
+      opacity: 1;
+      transform: none;
+    }
+    body.lite-effects .feed-window-placeholder {
+      box-shadow: none;
+      background: #f7f2ea;
+    }
+    body.lite-effects .skeleton {
+      animation-duration: 2.2s;
     }
     .page {
       max-width: 1100px;
@@ -1081,10 +1113,12 @@
     }
     .settings-group-grid .card {
       margin-top: 0;
+      content-visibility: auto;
+      contain-intrinsic-size: 300px;
     }
     .settings-hero {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 10px;
       margin-top: 12px;
     }
@@ -2342,6 +2376,7 @@
 .feed-list .post-card {
   margin-bottom: 0;
   padding: 8px;
+  contain: layout style paint;
 }
 .feed-window-placeholder {
   border: 1px dashed var(--border);

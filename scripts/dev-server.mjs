@@ -38,6 +38,7 @@ function resolveType(filePath) {
 }
 
 const server = createServer(async (req, res) => {
+  const requestedPath = decodeURIComponent((req.url || "/").split("?")[0] || "/");
   try {
     const filePath = toLocalPath(req.url || "/");
     const st = statSync(filePath);
@@ -53,6 +54,34 @@ const server = createServer(async (req, res) => {
     });
     res.end(body);
   } catch {
+    if (requestedPath === "/favicon.ico") {
+      try {
+        const fallbackPath = join(ROOT, "icon.svg");
+        const body = await readFile(fallbackPath);
+        res.writeHead(200, {
+          "Content-Type": MIME[".svg"],
+          "Cache-Control": "no-store",
+        });
+        res.end(body);
+        return;
+      } catch {
+        // ignore and continue to default 404
+      }
+    }
+    if (!extname(requestedPath) || requestedPath.endsWith("/")) {
+      try {
+        const fallbackPath = join(ROOT, "index.html");
+        const body = await readFile(fallbackPath);
+        res.writeHead(200, {
+          "Content-Type": MIME[".html"],
+          "Cache-Control": "no-store",
+        });
+        res.end(body);
+        return;
+      } catch {
+        // ignore and continue to default 404
+      }
+    }
     res.writeHead(404, {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",

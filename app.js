@@ -1565,6 +1565,71 @@ async function loadProfilePostCount() {
         });
     }
 
+    function scheduleIdleTask(task, options = {}) {
+      const timeout = Number(options.timeout || 1000);
+      if (
+        typeof window !== "undefined" &&
+        typeof window.requestIdleCallback === "function"
+      ) {
+        window.requestIdleCallback(task, { timeout });
+        return;
+      }
+      setTimeout(() => {
+        task({
+          didTimeout: true,
+          timeRemaining: () => 0,
+        });
+      }, 32);
+    }
+
+    function runDeferredSetupTasks() {
+      const tasks = [
+        () => setupProfileEditor(),
+        () => setupTemplates(),
+        () => setupMediaModal(),
+        () => setupNotifications(),
+        () => setupOnboardingActions(),
+        () => setupCollapsibles(),
+        () => loadProfileEditCompactPreference(),
+        () => setupProfileEditAdvancedToggle(),
+        () => setupProfileEditUnloadGuard(),
+        () => setupProfileEditShortcuts(),
+        () => setupSettingsUI(),
+        () => setupExtraSectionsToggle(),
+        () => setupDebug(),
+        () => setupFollowButtons(),
+      ];
+      return new Promise((resolve) => {
+        let index = 0;
+        const runChunk = (deadline) => {
+          let guard = 0;
+          while (index < tasks.length) {
+            const hasBudget =
+              !deadline ||
+              deadline.didTimeout ||
+              (typeof deadline.timeRemaining === "function" &&
+                deadline.timeRemaining() > 6) ||
+              guard < 2;
+            if (!hasBudget) break;
+            const task = tasks[index];
+            index += 1;
+            guard += 1;
+            try {
+              task();
+            } catch (error) {
+              console.error("deferred setup task failed", error);
+            }
+          }
+          if (index >= tasks.length) {
+            resolve();
+            return;
+          }
+          scheduleIdleTask(runChunk, { timeout: 1200 });
+        };
+        scheduleIdleTask(runChunk, { timeout: 700 });
+      });
+    }
+
     async function init() {
       setupRuntimeIssueCapture();
       loadSupabaseConnectivityState();
@@ -1575,31 +1640,19 @@ async function loadProfilePostCount() {
       commentSync.setupOnlineSync();
       setupLanguageSwitcher();
       setupAuthUI();
-      setupProfileEditor();
       setupPostForm();
-      setupTemplates();
-      setupMediaModal();
-      setupNotifications();
-      setupOnboardingActions();
       setupFeedControls();
       setupPageTabs();
       setupMiniHeader();
       setupPostDetailModal();
-      setupCollapsibles();
-      loadProfileEditCompactPreference();
-      setupProfileEditAdvancedToggle();
-      setupProfileEditUnloadGuard();
-      setupProfileEditShortcuts();
-      setupSettingsUI();
-      setupExtraSectionsToggle();
-      setupDebug();
-      setupFollowButtons();
       setupProfileLinks();
       applySettings();
+      const deferredSetupPromise = runDeferredSetupTasks();
       await restoreSession();
       await loadFeed();
       await commentSync.flushQueue({ silent: true });
       handleHashRoute();
+      await deferredSetupPromise;
     }
     
 
@@ -1917,6 +1970,8 @@ async function loadProfilePostCount() {
       setText("settings-preferences-sub", "settingsPreferencesSub");
       setText("settings-compact-title", "settingsCompactTitle");
       setText("settings-compact-desc", "settingsCompactDesc");
+      setText("settings-lite-effects-title", "settingsLiteEffectsTitle");
+      setText("settings-lite-effects-desc", "settingsLiteEffectsDesc");
       setText("settings-show-extra-title", "settingsShowExtraTitle");
       setText("settings-show-extra-desc", "settingsShowExtraDesc");
       setText("settings-show-feed-stats-title", "settingsShowFeedStatsTitle");

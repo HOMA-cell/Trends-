@@ -2,6 +2,7 @@ export const SETTINGS_KEY = "trends_settings_v1";
 
 export const defaultSettings = {
   compactMode: false,
+  liteEffects: false,
   showExtraSections: false,
   showFeedStats: true,
   feedAutoLoadMore: true,
@@ -50,6 +51,7 @@ const PRESET_NOTIFICATIONS = {
 const PRESET_TARGETS = {
   minimal: {
     compactMode: true,
+    liteEffects: true,
     showExtraSections: false,
     showFeedStats: false,
     feedAutoLoadMore: false,
@@ -58,6 +60,7 @@ const PRESET_TARGETS = {
   },
   recommended: {
     compactMode: false,
+    liteEffects: false,
     showExtraSections: false,
     showFeedStats: true,
     feedAutoLoadMore: true,
@@ -66,6 +69,7 @@ const PRESET_TARGETS = {
   },
   balanced: {
     compactMode: false,
+    liteEffects: false,
     showExtraSections: false,
     showFeedStats: true,
     feedAutoLoadMore: true,
@@ -74,6 +78,7 @@ const PRESET_TARGETS = {
   },
   full: {
     compactMode: false,
+    liteEffects: false,
     showExtraSections: true,
     showFeedStats: true,
     feedAutoLoadMore: true,
@@ -81,6 +86,22 @@ const PRESET_TARGETS = {
     showBodyweight: true,
   },
 };
+
+function shouldEnableLiteEffectsByDefault() {
+  if (typeof window === "undefined") return false;
+  const width = window.innerWidth || 1024;
+  if (width > 700) return false;
+  const nav = typeof navigator !== "undefined" ? navigator : null;
+  const connection =
+    nav?.connection || nav?.mozConnection || nav?.webkitConnection || null;
+  const saveData = !!connection?.saveData;
+  const lowMemory =
+    Number.isFinite(nav?.deviceMemory) && Number(nav.deviceMemory) <= 4;
+  const lowCpu =
+    Number.isFinite(nav?.hardwareConcurrency) &&
+    Number(nav.hardwareConcurrency) <= 4;
+  return saveData || lowMemory || lowCpu;
+}
 
 function mergeSettings(current, next) {
   return {
@@ -95,6 +116,9 @@ function mergeSettings(current, next) {
 
 function normalizeSettings(settings) {
   const merged = mergeSettings(defaultSettings, settings || {});
+  if (typeof merged.liteEffects !== "boolean") {
+    merged.liteEffects = false;
+  }
   if (!["all", "mine"].includes(merged.defaultFilter)) {
     merged.defaultFilter = "all";
   }
@@ -186,6 +210,13 @@ export function createSettingsController(options) {
 
     const legacyExtra = localStorage.getItem("trends_show_extra_sections");
     const merged = normalizeSettings(stored);
+    const hasLiteEffectsPreference =
+      stored && typeof stored === "object"
+        ? Object.prototype.hasOwnProperty.call(stored, "liteEffects")
+        : false;
+    if (!hasLiteEffectsPreference && shouldEnableLiteEffectsByDefault()) {
+      merged.liteEffects = true;
+    }
     if (legacyExtra !== null && stored.showExtraSections === undefined) {
       merged.showExtraSections = legacyExtra === "true";
     }
@@ -252,6 +283,7 @@ export function createSettingsController(options) {
     };
 
     setChecked("settings-compact", current.compactMode);
+    setChecked("settings-lite-effects", current.liteEffects);
     setChecked("settings-show-extra", current.showExtraSections);
     setChecked("settings-show-feed-stats", current.showFeedStats);
     setChecked("settings-feed-auto-load", current.feedAutoLoadMore);
@@ -317,6 +349,9 @@ export function createSettingsController(options) {
     };
 
     bindToggle("settings-compact", (value) => saveSettings({ compactMode: value }));
+    bindToggle("settings-lite-effects", (value) =>
+      saveSettings({ liteEffects: value })
+    );
     bindToggle("settings-show-extra", (value) =>
       saveSettings({ showExtraSections: value })
     );
@@ -387,6 +422,8 @@ export function createSettingsController(options) {
     const languageChanged = isFirstApply || current.language !== getCurrentLang();
     const dateFormatChanged = isFirstApply || prev.dateFormat !== current.dateFormat;
     const compactModeChanged = isFirstApply || prev.compactMode !== current.compactMode;
+    const liteEffectsChanged =
+      isFirstApply || prev.liteEffects !== current.liteEffects;
     const showFeedStatsChanged =
       isFirstApply || prev.showFeedStats !== current.showFeedStats;
     const defaultFilterChanged =
@@ -408,6 +445,13 @@ export function createSettingsController(options) {
       !!prev.notifications?.follow !== !!current.notifications?.follow;
 
     document.body.classList.toggle("compact-mode", current.compactMode);
+    document.body.classList.toggle("lite-effects", !!current.liteEffects);
+    if (typeof document !== "undefined" && document.documentElement) {
+      document.documentElement.classList.toggle(
+        "lite-effects",
+        !!current.liteEffects
+      );
+    }
 
     const feedStats = $("feed-stat-grid");
     if (feedStats) {
@@ -520,6 +564,7 @@ export function createSettingsController(options) {
 
     const shouldRenderFeed =
       compactModeChanged ||
+      liteEffectsChanged ||
       showFeedStatsChanged ||
       defaultFilterChanged ||
       feedLayoutChanged ||
@@ -616,6 +661,12 @@ export function createSettingsController(options) {
             : currentTr.all || "All",
       },
       {
+        label: currentTr.settingsSummaryRender || "Rendering",
+        value: current.liteEffects
+          ? currentTr.settingsLiteEffectsEnabled || "Lite"
+          : currentTr.settingsLiteEffectsDisabled || "Standard",
+      },
+      {
         label: currentTr.settingsFeedLayoutTitle || "Feed layout",
         value:
           current.feedLayout === "grid"
@@ -665,6 +716,7 @@ export function createSettingsController(options) {
     const current = getSettings();
     const matches = (target) =>
       current.compactMode === target.compactMode &&
+      current.liteEffects === target.liteEffects &&
       current.showExtraSections === target.showExtraSections &&
       current.showFeedStats === target.showFeedStats &&
       current.feedAutoLoadMore === target.feedAutoLoadMore &&
