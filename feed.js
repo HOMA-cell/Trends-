@@ -137,6 +137,12 @@ let feedQueryCache = {
   workoutLogsRef: null,
   gridCandidates: [],
 };
+let feedBaseCandidatesCache = {
+  baseKey: "",
+  postsRef: null,
+  workoutLogsRef: null,
+  sortedPosts: [],
+};
 const postSearchHaystackCache = new Map();
 let secondaryRenderScheduled = false;
 let secondaryRenderLastRunAt = 0;
@@ -490,6 +496,12 @@ function invalidateFeedQueryCache() {
         postsRef: null,
         workoutLogsRef: null,
         gridCandidates: [],
+      };
+      feedBaseCandidatesCache = {
+        baseKey: "",
+        postsRef: null,
+        workoutLogsRef: null,
+        sortedPosts: [],
       };
     }
 function toSearchChunk(value, limit = FEED_SEARCH_TEXT_LIMIT) {
@@ -2639,6 +2651,16 @@ export function renderFeed(options = {}) {
       firstPostId,
       lastPostId,
     ].join("|");
+    const baseQueryKey = [
+      currentUser?.id || "",
+      currentFilter,
+      filterMedia ? "1" : "0",
+      filterWorkout ? "1" : "0",
+      sortOrder,
+      Array.isArray(allPosts) ? allPosts.length : 0,
+      firstPostId,
+      lastPostId,
+    ].join("|");
     let gridCandidates = [];
     const canUseQueryCache =
       feedQueryCache.queryKey === queryKey &&
@@ -2648,31 +2670,50 @@ export function renderFeed(options = {}) {
     if (canUseQueryCache) {
       gridCandidates = feedQueryCache.gridCandidates;
     } else {
-      const visiblePosts = Array.isArray(allPosts)
-        ? allPosts.filter((post) => {
-            if (!canSeePost(post) || !matchesFilter(post) || !matchesSearch(post)) {
-              return false;
-            }
-            if (filterMedia && !post.media_url) {
-              return false;
-            }
-            if (filterWorkout && !(workoutLogsByPost.get(post.id) || []).length) {
-              return false;
-            }
-            return true;
-          })
-        : [];
-      const sortedPosts = visiblePosts.slice().sort((a, b) => {
-        const aTime = new Date(a.date || a.created_at || 0).getTime();
-        const bTime = new Date(b.date || b.created_at || 0).getTime();
-        if (sortOrder === "oldest") {
-          return aTime - bTime;
-        }
-        return bTime - aTime;
-      });
-      gridCandidates = feedLayout === "grid"
-        ? sortedPosts.filter((post) => post.media_url)
-        : sortedPosts;
+      let sortedBasePosts = [];
+      const canUseBaseCache =
+        feedBaseCandidatesCache.baseKey === baseQueryKey &&
+        feedBaseCandidatesCache.postsRef === allPosts &&
+        feedBaseCandidatesCache.workoutLogsRef === workoutLogsByPost;
+      if (canUseBaseCache) {
+        sortedBasePosts = feedBaseCandidatesCache.sortedPosts;
+      } else {
+        const visiblePosts = Array.isArray(allPosts)
+          ? allPosts.filter((post) => {
+              if (!canSeePost(post) || !matchesFilter(post)) {
+                return false;
+              }
+              if (filterMedia && !post.media_url) {
+                return false;
+              }
+              if (filterWorkout && !(workoutLogsByPost.get(post.id) || []).length) {
+                return false;
+              }
+              return true;
+            })
+          : [];
+        sortedBasePosts = visiblePosts.slice().sort((a, b) => {
+          const aTime = new Date(a.date || a.created_at || 0).getTime();
+          const bTime = new Date(b.date || b.created_at || 0).getTime();
+          if (sortOrder === "oldest") {
+            return aTime - bTime;
+          }
+          return bTime - aTime;
+        });
+        feedBaseCandidatesCache = {
+          baseKey: baseQueryKey,
+          postsRef: allPosts,
+          workoutLogsRef: workoutLogsByPost,
+          sortedPosts: sortedBasePosts,
+        };
+      }
+      const searchedPosts = searchValue
+        ? sortedBasePosts.filter((post) => matchesSearch(post))
+        : sortedBasePosts;
+      gridCandidates =
+        feedLayout === "grid"
+          ? searchedPosts.filter((post) => post.media_url)
+          : searchedPosts;
       feedQueryCache = {
         queryKey,
         postsRef: allPosts,
