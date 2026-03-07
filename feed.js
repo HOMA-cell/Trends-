@@ -183,6 +183,7 @@ const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const FEED_SAVED_POSTS_KEY = "trends_saved_posts_v1";
 const FEED_HIDDEN_POSTS_KEY = "trends_hidden_posts_v1";
 const FEED_MUTED_USERS_KEY = "trends_muted_users_v1";
+const FEED_MUTED_TERMS_KEY = "trends_muted_terms_v1";
 const FEED_SEEN_POSTS_KEY = "trends_seen_posts_v1";
 const FEED_REPOST_STATE_KEY = "trends_repost_state_v1";
 const FEED_PINNED_POSTS_KEY = "trends_profile_pinned_post_v1";
@@ -951,6 +952,85 @@ function clearMutedUserIds() {
       } catch {
         // ignore localStorage write failures
       }
+    }
+function normalizeMutedTerm(term) {
+      return `${term || ""}`
+        .trim()
+        .toLowerCase()
+        .replace(/^#+/g, "")
+        .slice(0, 32);
+    }
+function getMutedTermsSet() {
+      try {
+        const raw = localStorage.getItem(FEED_MUTED_TERMS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return new Set();
+        const normalized = parsed
+          .map((term) => normalizeMutedTerm(term))
+          .filter(Boolean)
+          .slice(0, 120);
+        return new Set(normalized);
+      } catch {
+        return new Set();
+      }
+    }
+function setMutedTermsSet(termSet) {
+      try {
+        const next = Array.from(termSet || [])
+          .map((term) => normalizeMutedTerm(term))
+          .filter(Boolean)
+          .slice(0, 120);
+        localStorage.setItem(FEED_MUTED_TERMS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function toggleMutedTerm(term) {
+      const normalized = normalizeMutedTerm(term);
+      if (!normalized) return { active: false, term: "" };
+      const termSet = getMutedTermsSet();
+      let active = false;
+      if (termSet.has(normalized)) {
+        termSet.delete(normalized);
+      } else {
+        termSet.add(normalized);
+        active = true;
+      }
+      setMutedTermsSet(termSet);
+      return { active, term: normalized };
+    }
+function clearMutedTerms() {
+      try {
+        localStorage.removeItem(FEED_MUTED_TERMS_KEY);
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function getMuteTermCandidateForPost(post) {
+      const text = `${post?.note || post?.caption || ""}`;
+      const hashtagMatch = text.match(/#([^\s#]{2,24})/u);
+      if (hashtagMatch?.[1]) {
+        return normalizeMutedTerm(hashtagMatch[1]);
+      }
+      const alphaMatch = text.match(/\b([a-zA-Z][a-zA-Z0-9_-]{2,20})\b/);
+      if (alphaMatch?.[1]) {
+        return normalizeMutedTerm(alphaMatch[1]);
+      }
+      const jpMatch = text.match(/([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]{2,12})/u);
+      if (jpMatch?.[1]) {
+        return normalizeMutedTerm(jpMatch[1]);
+      }
+      return "";
+    }
+function isPostMutedByTerms(post, mutedTermsSet, workoutLogsMap) {
+      if (!post || !mutedTermsSet || mutedTermsSet.size === 0) return false;
+      const haystack = getPostSearchHaystack(post, workoutLogsMap);
+      if (!haystack) return false;
+      return Array.from(mutedTermsSet).some((term) => {
+        const normalized = normalizeMutedTerm(term);
+        if (!normalized) return false;
+        return haystack.includes(normalized) || haystack.includes(`#${normalized}`);
+      });
     }
 function getPinnedPostsByUserMap() {
       try {
@@ -2078,6 +2158,26 @@ function setupFeedCardActionDelegation() {
           scheduleRenderFeed();
           return;
         }
+        if (action === "toggle-mute-term") {
+          const tr = t[getCurrentLang()] || t.ja;
+          const fallbackTerm = getMuteTermCandidateForPost(post);
+          const requestedTerm = `${actionBtn.getAttribute("data-mute-term") || ""}`.trim();
+          const targetTerm = normalizeMutedTerm(requestedTerm || fallbackTerm);
+          if (!targetTerm) {
+            showToast(tr.feedMuteTermMissing || "No keyword to mute.", "warning");
+            return;
+          }
+          const result = toggleMutedTerm(targetTerm);
+          showToast(
+            result.active
+              ? `${tr.feedMutedTermSet || "Muted keyword"}: #${result.term}`
+              : `${tr.feedMutedTermRemoved || "Keyword unmuted"}: #${result.term}`,
+            "success"
+          );
+          resetFeedPagination();
+          scheduleRenderFeed();
+          return;
+        }
         if (action === "share-post") {
           const tr = t[getCurrentLang()] || t.ja;
           const origin =
@@ -2755,6 +2855,33 @@ export function setupFeedControls() {
             tr.feedMutedRestoreDone || "Muted users restored.",
             "success"
           );
+          resetFeedPagination();
+          scheduleRenderFeed();
+        });
+      }
+      const restoreMutedTermsBtn = $("btn-feed-restore-muted-terms");
+      if (restoreMutedTermsBtn && restoreMutedTermsBtn.dataset.bound !== "true") {
+        restoreMutedTermsBtn.dataset.bound = "true";
+        restoreMutedTermsBtn.addEventListener("click", () => {
+          clearMutedTerms();
+          const tr = t[getCurrentLang()] || t.ja;
+          showToast(
+            tr.feedMutedTermsRestoreDone || "Muted words restored.",
+            "success"
+          );
+          resetFeedPagination();
+          scheduleRenderFeed();
+        });
+      }
+      const mutedTermsWrap = $("feed-muted-terms");
+      if (mutedTermsWrap && mutedTermsWrap.dataset.bound !== "true") {
+        mutedTermsWrap.dataset.bound = "true";
+        mutedTermsWrap.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-muted-term-remove]");
+          if (!btn) return;
+          const term = normalizeMutedTerm(btn.getAttribute("data-muted-term-remove"));
+          if (!term) return;
+          toggleMutedTerm(term);
           resetFeedPagination();
           scheduleRenderFeed();
         });
@@ -3485,6 +3612,7 @@ export function renderFeed(options = {}) {
     const savedPostIds = getSavedPostIdsSet();
     const hiddenPostIds = getHiddenPostIdsSet();
     const mutedUserIds = getMutedUserIdsSet();
+    const mutedTerms = getMutedTermsSet();
     const seenPostIds = getSeenPostIdsSet();
     const repostState = getRepostState();
     const repostCountsByPost = buildRepostCountMap(repostState);
@@ -3511,6 +3639,8 @@ export function renderFeed(options = {}) {
     updateFilterButtons();
     const restoreHiddenBtn = $("btn-feed-restore-hidden");
     const restoreMutedBtn = $("btn-feed-restore-muted");
+    const restoreMutedTermsBtn = $("btn-feed-restore-muted-terms");
+    const mutedTermsWrap = $("feed-muted-terms");
     if (restoreHiddenBtn) {
       const hasHidden = hiddenPostIds.size > 0;
       restoreHiddenBtn.classList.toggle("hidden", !hasHidden);
@@ -3518,6 +3648,23 @@ export function renderFeed(options = {}) {
     if (restoreMutedBtn) {
       const hasMuted = mutedUserIds.size > 0;
       restoreMutedBtn.classList.toggle("hidden", !hasMuted);
+    }
+    if (restoreMutedTermsBtn) {
+      const hasMutedTerms = mutedTerms.size > 0;
+      restoreMutedTermsBtn.classList.toggle("hidden", !hasMutedTerms);
+    }
+    if (mutedTermsWrap) {
+      mutedTermsWrap.innerHTML = "";
+      const previewTerms = Array.from(mutedTerms).slice(0, 8);
+      mutedTermsWrap.classList.toggle("hidden", previewTerms.length === 0);
+      previewTerms.forEach((term) => {
+        const btn = document.createElement("button");
+        btn.className = "chip chip-muted-term-pill";
+        btn.type = "button";
+        btn.setAttribute("data-muted-term-remove", term);
+        btn.textContent = `#${term}`;
+        mutedTermsWrap.appendChild(btn);
+      });
     }
 
     const updateRetryButton = (show = false) => {
@@ -3625,6 +3772,7 @@ export function renderFeed(options = {}) {
       savedPostIds,
       hiddenPostIds,
       mutedUserIds,
+      mutedTerms,
       searchValue,
       tr,
     });
@@ -3648,6 +3796,7 @@ export function renderFeed(options = {}) {
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
       Array.from(mutedUserIds).sort().slice(0, 120).join(","),
+      Array.from(mutedTerms).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
       currentPinnedPostId,
     ].join("|");
@@ -3664,6 +3813,7 @@ export function renderFeed(options = {}) {
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
       Array.from(mutedUserIds).sort().slice(0, 120).join(","),
+      Array.from(mutedTerms).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
       currentPinnedPostId,
     ].join("|");
@@ -3695,6 +3845,9 @@ export function renderFeed(options = {}) {
               const postUserId = `${post?.user_id || ""}`.trim();
               const viewerId = `${currentUser?.id || ""}`.trim();
               if (postUserId && postUserId !== viewerId && mutedUserIds.has(postUserId)) {
+                return false;
+              }
+              if (isPostMutedByTerms(post, mutedTerms, workoutLogsByPost)) {
                 return false;
               }
               if (filterMedia && !post.media_url) {
@@ -4205,6 +4358,21 @@ export function renderFeed(options = {}) {
         muteBtn.classList.toggle("chip-active", isMutedUser);
         muteBtn.setAttribute("aria-pressed", isMutedUser ? "true" : "false");
         actions.appendChild(muteBtn);
+
+        const muteTermCandidate = getMuteTermCandidateForPost(post);
+        if (muteTermCandidate) {
+          const isMutedTerm = mutedTerms.has(muteTermCandidate);
+          const muteTermBtn = document.createElement("button");
+          muteTermBtn.className = "chip chip-log chip-muted-term";
+          muteTermBtn.dataset.postAction = "toggle-mute-term";
+          muteTermBtn.setAttribute("data-mute-term", muteTermCandidate);
+          muteTermBtn.textContent = isMutedTerm
+            ? tr.feedMutedTerm || "Muted word"
+            : tr.feedMuteTerm || "Mute word";
+          muteTermBtn.classList.toggle("chip-active", isMutedTerm);
+          muteTermBtn.setAttribute("aria-pressed", isMutedTerm ? "true" : "false");
+          actions.appendChild(muteTermBtn);
+        }
       }
 
       if (currentUser && post.user_id !== currentUser.id) {
@@ -4588,6 +4756,8 @@ function renderFeedDiscoverySections(payload = {}) {
     payload.hiddenPostIds instanceof Set ? payload.hiddenPostIds : new Set();
   const mutedUserIds =
     payload.mutedUserIds instanceof Set ? payload.mutedUserIds : new Set();
+  const mutedTerms =
+    payload.mutedTerms instanceof Set ? payload.mutedTerms : new Set();
   const canViewPost = (post) => {
     if (!post) return false;
     if (post.visibility === "private") {
@@ -4599,7 +4769,8 @@ function renderFeedDiscoverySections(payload = {}) {
   const discoveryPosts = visiblePosts.filter(
     (post) =>
       !hiddenPostIds.has(`${post?.id || ""}`) &&
-      !mutedUserIds.has(`${post?.user_id || ""}`)
+      !mutedUserIds.has(`${post?.user_id || ""}`) &&
+      !isPostMutedByTerms(post, mutedTerms, getWorkoutLogsByPost())
   );
 
   if (trendingWrap) {

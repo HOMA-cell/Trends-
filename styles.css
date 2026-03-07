@@ -448,6 +448,12 @@
       border-color: #9ab1d9;
       box-shadow: 0 6px 12px rgba(62, 79, 115, 0.12);
     }
+    .chip-muted-term.chip-active {
+      background: #edf8f1;
+      color: #24643f;
+      border-color: #79b08e;
+      box-shadow: 0 6px 12px rgba(36, 100, 63, 0.14);
+    }
     .btn-follow.is-following {
       background: var(--primary-soft);
       color: var(--primary);
@@ -1871,6 +1877,22 @@
     }
     .feed-status-row .btn {
       flex: 0 0 auto;
+    }
+    .feed-muted-terms {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .chip-muted-term-pill {
+      border: 1px solid #d8e6da;
+      background: #f5fbf6;
+      color: #2f6b46;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
     }
     .feed-pull-indicator {
       height: 0;
