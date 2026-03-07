@@ -1925,6 +1925,7 @@ async function loadProfilePostCount() {
       setText("btn-feed-clear", "feedClear");
       setText("btn-feed-retry", "feedRetry");
       setText("btn-feed-restore-hidden", "feedRestoreHidden");
+      setText("btn-feed-restore-muted", "feedRestoreMuted");
       setText("btn-feed-options", "feedOptions");
       setText("btn-feed-layout", "feedLayoutGrid");
       setText("filter-foryou", "foryou");

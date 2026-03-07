@@ -182,6 +182,7 @@ const warmedImageUrlQueue = [];
 const FEED_CACHE_KEY = "trends_feed_cache_v1";
 const FEED_SAVED_POSTS_KEY = "trends_saved_posts_v1";
 const FEED_HIDDEN_POSTS_KEY = "trends_hidden_posts_v1";
+const FEED_MUTED_USERS_KEY = "trends_muted_users_v1";
 const FEED_SEEN_POSTS_KEY = "trends_seen_posts_v1";
 const FEED_REPOST_STATE_KEY = "trends_repost_state_v1";
 const FEED_PINNED_POSTS_KEY = "trends_profile_pinned_post_v1";
@@ -900,6 +901,53 @@ function hidePostId(postId) {
 function clearHiddenPostIds() {
       try {
         localStorage.removeItem(FEED_HIDDEN_POSTS_KEY);
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function getMutedUserIdsSet() {
+      try {
+        const raw = localStorage.getItem(FEED_MUTED_USERS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return new Set();
+        return new Set(
+          parsed
+            .map((id) => `${id || ""}`.trim())
+            .filter(Boolean)
+            .slice(0, FEED_SEEN_POSTS_LIMIT)
+        );
+      } catch {
+        return new Set();
+      }
+    }
+function setMutedUserIdsSet(userSet) {
+      try {
+        const next = Array.from(userSet || [])
+          .map((id) => `${id || ""}`.trim())
+          .filter(Boolean)
+          .slice(0, FEED_SEEN_POSTS_LIMIT);
+        localStorage.setItem(FEED_MUTED_USERS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function toggleMutedUserId(userId) {
+      const uid = `${userId || ""}`.trim();
+      if (!uid) return false;
+      const mutedSet = getMutedUserIdsSet();
+      let isMuted = false;
+      if (mutedSet.has(uid)) {
+        mutedSet.delete(uid);
+      } else {
+        mutedSet.add(uid);
+        isMuted = true;
+      }
+      setMutedUserIdsSet(mutedSet);
+      return isMuted;
+    }
+function clearMutedUserIds() {
+      try {
+        localStorage.removeItem(FEED_MUTED_USERS_KEY);
       } catch {
         // ignore localStorage write failures
       }
@@ -2014,6 +2062,22 @@ function setupFeedCardActionDelegation() {
           }
           return;
         }
+        if (action === "toggle-mute-user") {
+          const tr = t[getCurrentLang()] || t.ja;
+          const userId = `${post?.user_id || ""}`.trim();
+          const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
+          if (!userId || userId === currentUserId) return;
+          const isMuted = toggleMutedUserId(userId);
+          showToast(
+            isMuted
+              ? tr.feedMutedSet || "User muted."
+              : tr.feedMutedRemoved || "User unmuted.",
+            "success"
+          );
+          resetFeedPagination();
+          scheduleRenderFeed();
+          return;
+        }
         if (action === "share-post") {
           const tr = t[getCurrentLang()] || t.ja;
           const origin =
@@ -2675,6 +2739,20 @@ export function setupFeedControls() {
           const tr = t[getCurrentLang()] || t.ja;
           showToast(
             tr.feedHiddenRestoreDone || "Hidden posts restored.",
+            "success"
+          );
+          resetFeedPagination();
+          scheduleRenderFeed();
+        });
+      }
+      const restoreMutedBtn = $("btn-feed-restore-muted");
+      if (restoreMutedBtn && restoreMutedBtn.dataset.bound !== "true") {
+        restoreMutedBtn.dataset.bound = "true";
+        restoreMutedBtn.addEventListener("click", () => {
+          clearMutedUserIds();
+          const tr = t[getCurrentLang()] || t.ja;
+          showToast(
+            tr.feedMutedRestoreDone || "Muted users restored.",
             "success"
           );
           resetFeedPagination();
@@ -3406,6 +3484,7 @@ export function renderFeed(options = {}) {
     const searchValue = $("feed-search")?.value?.trim().toLowerCase() || "";
     const savedPostIds = getSavedPostIdsSet();
     const hiddenPostIds = getHiddenPostIdsSet();
+    const mutedUserIds = getMutedUserIdsSet();
     const seenPostIds = getSeenPostIdsSet();
     const repostState = getRepostState();
     const repostCountsByPost = buildRepostCountMap(repostState);
@@ -3431,9 +3510,14 @@ export function renderFeed(options = {}) {
     }
     updateFilterButtons();
     const restoreHiddenBtn = $("btn-feed-restore-hidden");
+    const restoreMutedBtn = $("btn-feed-restore-muted");
     if (restoreHiddenBtn) {
       const hasHidden = hiddenPostIds.size > 0;
       restoreHiddenBtn.classList.toggle("hidden", !hasHidden);
+    }
+    if (restoreMutedBtn) {
+      const hasMuted = mutedUserIds.size > 0;
+      restoreMutedBtn.classList.toggle("hidden", !hasMuted);
     }
 
     const updateRetryButton = (show = false) => {
@@ -3540,6 +3624,7 @@ export function renderFeed(options = {}) {
       followingIds,
       savedPostIds,
       hiddenPostIds,
+      mutedUserIds,
       searchValue,
       tr,
     });
@@ -3562,6 +3647,7 @@ export function renderFeed(options = {}) {
       Array.from(followingIds).sort().slice(0, 120).join(","),
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
+      Array.from(mutedUserIds).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
       currentPinnedPostId,
     ].join("|");
@@ -3577,6 +3663,7 @@ export function renderFeed(options = {}) {
       Array.from(followingIds).sort().slice(0, 120).join(","),
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
+      Array.from(mutedUserIds).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
       currentPinnedPostId,
     ].join("|");
@@ -3603,6 +3690,11 @@ export function renderFeed(options = {}) {
                 return false;
               }
               if (hiddenPostIds.has(`${post?.id || ""}`)) {
+                return false;
+              }
+              const postUserId = `${post?.user_id || ""}`.trim();
+              const viewerId = `${currentUser?.id || ""}`.trim();
+              if (postUserId && postUserId !== viewerId && mutedUserIds.has(postUserId)) {
                 return false;
               }
               if (filterMedia && !post.media_url) {
@@ -4102,6 +4194,17 @@ export function renderFeed(options = {}) {
         hideBtn.dataset.postAction = "hide-post";
         hideBtn.textContent = tr.feedHidePost || "Not interested";
         actions.appendChild(hideBtn);
+
+        const isMutedUser = mutedUserIds.has(`${post.user_id || ""}`);
+        const muteBtn = document.createElement("button");
+        muteBtn.className = "chip chip-log chip-muted-user";
+        muteBtn.dataset.postAction = "toggle-mute-user";
+        muteBtn.textContent = isMutedUser
+          ? tr.feedMutedUser || "Muted"
+          : tr.feedMuteUser || "Mute";
+        muteBtn.classList.toggle("chip-active", isMutedUser);
+        muteBtn.setAttribute("aria-pressed", isMutedUser ? "true" : "false");
+        actions.appendChild(muteBtn);
       }
 
       if (currentUser && post.user_id !== currentUser.id) {
@@ -4483,6 +4586,8 @@ function renderFeedDiscoverySections(payload = {}) {
     payload.followingIds instanceof Set ? payload.followingIds : new Set();
   const hiddenPostIds =
     payload.hiddenPostIds instanceof Set ? payload.hiddenPostIds : new Set();
+  const mutedUserIds =
+    payload.mutedUserIds instanceof Set ? payload.mutedUserIds : new Set();
   const canViewPost = (post) => {
     if (!post) return false;
     if (post.visibility === "private") {
@@ -4492,7 +4597,9 @@ function renderFeedDiscoverySections(payload = {}) {
   };
   const visiblePosts = allPosts.filter((post) => canViewPost(post));
   const discoveryPosts = visiblePosts.filter(
-    (post) => !hiddenPostIds.has(`${post?.id || ""}`)
+    (post) =>
+      !hiddenPostIds.has(`${post?.id || ""}`) &&
+      !mutedUserIds.has(`${post?.user_id || ""}`)
   );
 
   if (trendingWrap) {

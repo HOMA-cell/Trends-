@@ -220,6 +220,58 @@ function renderProfileBadges(targetEl, badges = []) {
     targetEl.appendChild(badge);
   });
 }
+function renderProfileCompletion(targetEl, profile, tr) {
+  if (!targetEl) return;
+  targetEl.innerHTML = "";
+  if (!profile) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+  const checks = [
+    `${profile?.display_name || ""}`.trim(),
+    `${profile?.handle || ""}`.trim(),
+    `${profile?.bio || ""}`.trim(),
+    `${profile?.avatar_url || ""}`.trim(),
+    `${profile?.training_goal || ""}`.trim(),
+    `${profile?.training_split || ""}`.trim(),
+    `${profile?.favorite_lifts || ""}`.trim(),
+    `${profile?.instagram || profile?.tiktok || profile?.youtube || profile?.website || ""}`.trim(),
+  ];
+  const total = checks.length;
+  const done = checks.filter(Boolean).length;
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  const remaining = Math.max(0, total - done);
+  if (percent >= 100) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+  targetEl.classList.remove("hidden");
+  const title = document.createElement("div");
+  title.className = "profile-completion-title";
+  title.textContent = tr.profileCompletionTitle || "Profile completion";
+  const meta = document.createElement("div");
+  meta.className = "profile-completion-meta";
+  meta.textContent = (tr.profileCompletionDone || "{percent}% complete").replace(
+    "{percent}",
+    `${percent}`
+  );
+  const bar = document.createElement("div");
+  bar.className = "profile-completion-track";
+  const fill = document.createElement("div");
+  fill.className = "profile-completion-fill";
+  fill.style.width = `${percent}%`;
+  bar.appendChild(fill);
+  const hint = document.createElement("div");
+  hint.className = "profile-completion-hint";
+  hint.textContent = (tr.profileCompletionHint || "{count} more fields to complete").replace(
+    "{count}",
+    `${remaining}`
+  );
+  targetEl.appendChild(title);
+  targetEl.appendChild(meta);
+  targetEl.appendChild(bar);
+  targetEl.appendChild(hint);
+}
 function renderPinnedPostPreview(targetEl, post, tr) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
@@ -571,6 +623,7 @@ export function updateProfileSummary() {
   const linksEl = $("profile-links");
   const statsGridEl = $("profile-stats-grid");
   const quickStatsEl = $("profile-quick-stats");
+  const completionEl = $("profile-completion");
   const badgesEl = $("profile-badges");
   const pinnedEl = $("profile-pinned");
   const avatarEl = $("profile-avatar");
@@ -598,6 +651,7 @@ export function updateProfileSummary() {
     !linksEl &&
     !statsGridEl &&
     !quickStatsEl &&
+    !completionEl &&
     !badgesEl &&
     !pinnedEl &&
     !avatarEl &&
@@ -641,6 +695,10 @@ export function updateProfileSummary() {
     if (quickStatsEl) {
       quickStatsEl.innerHTML = "";
       quickStatsEl.classList.add("hidden");
+    }
+    if (completionEl) {
+      completionEl.innerHTML = "";
+      completionEl.classList.add("hidden");
     }
     if (badgesEl) {
       badgesEl.innerHTML = "";
@@ -728,6 +786,7 @@ export function updateProfileSummary() {
   renderProfileFacts(factsEl, currentProfile, tr);
   renderProfileHighlights(highlightsEl, currentProfile, tr);
   renderProfileLinks(linksEl, currentProfile, tr);
+  renderProfileCompletion(completionEl, currentProfile, tr);
   toggleSectionVisibility("profile-facts-title", factsEl);
   toggleSectionVisibility("profile-highlights-title", highlightsEl);
   toggleSectionVisibility("profile-links-title", linksEl);
