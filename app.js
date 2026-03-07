@@ -1761,6 +1761,7 @@ async function loadProfilePostCount() {
       getSettings: () => settings,
       getAllPosts: () => allPosts,
       getUserPosts,
+      getWorkoutLogsByPost: () => workoutLogsByPost,
       getProfilePostCount: () => profilePostCount || 0,
       getFollowingCount: () => currentFollowingCount || 0,
       getFollowersCount: () => currentFollowersCount || 0,

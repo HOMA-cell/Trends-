@@ -6,6 +6,7 @@ import {
   formatHandle,
   formatDateDisplay,
   formatHeight,
+  formatWeight,
   computeStreak,
   toDateKey,
   normalizeUrl,
@@ -20,6 +21,7 @@ let profileContext = {
   getSettings: () => ({}),
   getAllPosts: () => [],
   getUserPosts: () => [],
+  getWorkoutLogsByPost: () => new Map(),
   getProfilePostCount: () => 0,
   getFollowingCount: () => 0,
   getFollowersCount: () => 0,
@@ -50,6 +52,7 @@ const getCurrentProfile = () => profileContext.getCurrentProfile?.();
 const getSettings = () => profileContext.getSettings?.() || {};
 const getAllPosts = () => profileContext.getAllPosts?.() || [];
 const getUserPosts = () => profileContext.getUserPosts?.() || [];
+const getWorkoutLogsByPost = () => profileContext.getWorkoutLogsByPost?.() || new Map();
 const getProfilePostCount = () => profileContext.getProfilePostCount?.() || 0;
 const getFollowingCount = () => profileContext.getFollowingCount?.() || 0;
 const getFollowersCount = () => profileContext.getFollowersCount?.() || 0;
@@ -76,6 +79,172 @@ const publicProfilePostsCache = {
   byUser: new Map(),
 };
 let publicProfileGallerySignature = "";
+const PROFILE_PINNED_POST_KEY = "trends_profile_pinned_post_v1";
+function getPinnedPostsMap() {
+  try {
+    const raw = localStorage.getItem(PROFILE_PINNED_POST_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== "object") return {};
+    const normalized = {};
+    Object.entries(parsed).forEach(([userId, postId]) => {
+      const uid = `${userId || ""}`.trim();
+      const pid = `${postId || ""}`.trim();
+      if (!uid || !pid) return;
+      normalized[uid] = pid;
+    });
+    return normalized;
+  } catch {
+    return {};
+  }
+}
+function getPinnedPostIdForUser(userId) {
+  const uid = `${userId || ""}`.trim();
+  if (!uid) return "";
+  const mapByUser = getPinnedPostsMap();
+  return `${mapByUser[uid] || ""}`.trim();
+}
+function toTimeValue(value) {
+  const time = new Date(value || 0).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+function isWithinDays(value, days = 7) {
+  const time = toTimeValue(value);
+  if (!time) return false;
+  return Date.now() - time <= days * 24 * 60 * 60 * 1000;
+}
+function formatCompactNumber(value) {
+  if (!Number.isFinite(Number(value))) return "0";
+  try {
+    return new Intl.NumberFormat(undefined, {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(Number(value));
+  } catch {
+    return `${Math.round(Number(value) * 10) / 10}`;
+  }
+}
+function buildProfileMetrics(posts = [], workoutLogsByPost = new Map()) {
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const dateKeys = new Set();
+  let mediaCount = 0;
+  let weeklyPosts = 0;
+  let activeDays30 = new Set();
+  let workoutPostCount = 0;
+  let totalSets = 0;
+  let bestLift = { weight: 0, exercise: "" };
+  let latestPostTime = 0;
+
+  safePosts.forEach((post) => {
+    const dateValue = post?.date || post?.created_at;
+    const dateKey = toDateKey(dateValue);
+    if (dateKey) dateKeys.add(dateKey);
+    if (post?.media_url) mediaCount += 1;
+    if (isWithinDays(dateValue, 7)) weeklyPosts += 1;
+    if (isWithinDays(dateValue, 30) && dateKey) {
+      activeDays30.add(dateKey);
+    }
+    const postTime = toTimeValue(dateValue);
+    if (postTime > latestPostTime) latestPostTime = postTime;
+
+    const logs = workoutLogsByPost.get(post?.id) || [];
+    if (!logs.length) return;
+    workoutPostCount += 1;
+    logs.forEach((exercise) => {
+      const sets = Array.isArray(exercise?.sets) ? exercise.sets : [];
+      totalSets += sets.length;
+      sets.forEach((set) => {
+        const weight = Number(set?.weight || 0);
+        if (!Number.isFinite(weight) || weight <= 0) return;
+        if (weight <= bestLift.weight) return;
+        bestLift = {
+          weight,
+          exercise: `${exercise?.exercise || ""}`.trim(),
+        };
+      });
+    });
+  });
+
+  const todayKey = toDateKey(new Date());
+  const streak =
+    todayKey && dateKeys.has(todayKey) ? computeStreak(dateKeys) : 0;
+  const mediaRate = safePosts.length
+    ? Math.round((mediaCount / safePosts.length) * 100)
+    : 0;
+
+  return {
+    postCount: safePosts.length,
+    weeklyPosts,
+    activeDays30: activeDays30.size,
+    mediaCount,
+    mediaRate,
+    workoutPostCount,
+    totalSets,
+    bestLift,
+    streak,
+    latestPostTime,
+  };
+}
+function buildProfileBadges(metrics, profile, followersCount, tr) {
+  const badges = [];
+  if ((metrics?.streak || 0) >= 7) {
+    badges.push(tr.profileBadgeConsistency || "Consistent");
+  }
+  if ((metrics?.mediaCount || 0) >= 6) {
+    badges.push(tr.profileBadgeCreator || "Media creator");
+  }
+  if ((metrics?.workoutPostCount || 0) >= 12 || (metrics?.totalSets || 0) >= 120) {
+    badges.push(tr.profileBadgeDedicated || "Dedicated lifter");
+  }
+  const linkCount = [
+    profile?.instagram,
+    profile?.tiktok,
+    profile?.youtube,
+    profile?.website,
+  ]
+    .map((value) => `${value || ""}`.trim())
+    .filter(Boolean).length;
+  if ((followersCount || 0) >= 20 || linkCount >= 2) {
+    badges.push(tr.profileBadgeSocial || "Social ready");
+  }
+  return badges.slice(0, 3);
+}
+function renderProfileBadges(targetEl, badges = []) {
+  if (!targetEl) return;
+  targetEl.innerHTML = "";
+  const safeBadges = Array.isArray(badges) ? badges.filter(Boolean) : [];
+  targetEl.classList.toggle("hidden", safeBadges.length === 0);
+  safeBadges.forEach((label) => {
+    const badge = document.createElement("span");
+    badge.className = "profile-badge";
+    badge.textContent = label;
+    targetEl.appendChild(badge);
+  });
+}
+function renderPinnedPostPreview(targetEl, post, tr) {
+  if (!targetEl) return;
+  targetEl.innerHTML = "";
+  if (!post) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+  targetEl.classList.remove("hidden");
+  const title = document.createElement("div");
+  title.className = "profile-pinned-title";
+  title.textContent = tr.profilePinnedTitle || "Pinned post";
+  const body = document.createElement("div");
+  body.className = "profile-pinned-body";
+  const rawText = `${post?.note || post?.caption || ""}`.trim();
+  const preview = rawText.length > 120 ? `${rawText.slice(0, 120)}…` : rawText;
+  body.textContent = preview || "—";
+  const sub = document.createElement("div");
+  sub.className = "profile-pinned-sub";
+  sub.textContent = formatDateDisplay(post?.date || post?.created_at || "");
+  targetEl.appendChild(title);
+  targetEl.appendChild(body);
+  if (sub.textContent) {
+    targetEl.appendChild(sub);
+  }
+}
 function getPublicProfilePostCollections(userId, allPosts, currentUser) {
   if (!Array.isArray(allPosts) || !allPosts.length) {
     return { userPosts: [], mediaPosts: [] };
@@ -318,13 +487,80 @@ export function renderProfileLinks(linksEl, profile, tr) {
 export function renderProfileStatsGrid(targetEl, posts, tr) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
-  targetEl.classList.add("hidden");
+  const settings = getSettings();
+  if (!settings.showProfileStats) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+  const metrics = buildProfileMetrics(posts, getWorkoutLogsByPost());
+  const bestLiftLabel = metrics.bestLift.weight
+    ? metrics.bestLift.exercise
+      ? `${metrics.bestLift.exercise} · ${formatWeight(metrics.bestLift.weight)}`
+      : formatWeight(metrics.bestLift.weight)
+    : "-";
+  const cards = [
+    {
+      label: tr.profileWorkouts || "Workouts",
+      value: `${metrics.workoutPostCount}`,
+    },
+    {
+      label: tr.profileTotalSets || "Total sets",
+      value: formatCompactNumber(metrics.totalSets),
+    },
+    {
+      label: tr.profileBestLift || "Best lift",
+      value: bestLiftLabel,
+    },
+  ];
+  cards.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "profile-stat";
+    const label = document.createElement("div");
+    label.className = "profile-stat-label";
+    label.textContent = item.label;
+    const value = document.createElement("div");
+    value.className = "profile-stat-value";
+    value.textContent = item.value;
+    card.appendChild(label);
+    card.appendChild(value);
+    targetEl.appendChild(card);
+  });
+  targetEl.classList.toggle("hidden", cards.length === 0);
 }
 
 export function renderProfileQuickStats(targetEl, posts, tr) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
-  targetEl.classList.add("hidden");
+  const settings = getSettings();
+  if (!settings.showProfileStats) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+  const metrics = buildProfileMetrics(posts, getWorkoutLogsByPost());
+  const quickItems = [
+    {
+      label: tr.profileQuickPosts7d || "Posts (7d)",
+      value: `${metrics.weeklyPosts}`,
+    },
+    {
+      label: tr.profileQuickActiveDays30d || "Active days (30d)",
+      value: `${metrics.activeDays30}`,
+    },
+  ];
+  quickItems.forEach((item) => {
+    const chip = document.createElement("div");
+    chip.className = "profile-quick-chip";
+    const label = document.createElement("div");
+    label.className = "profile-quick-label";
+    label.textContent = item.label;
+    const value = document.createElement("div");
+    value.className = "profile-quick-value";
+    value.textContent = item.value;
+    chip.appendChild(label);
+    chip.appendChild(value);
+    targetEl.appendChild(chip);
+  });
+  targetEl.classList.toggle("hidden", quickItems.length === 0);
 }
 
 export function updateProfileSummary() {
@@ -335,6 +571,8 @@ export function updateProfileSummary() {
   const linksEl = $("profile-links");
   const statsGridEl = $("profile-stats-grid");
   const quickStatsEl = $("profile-quick-stats");
+  const badgesEl = $("profile-badges");
+  const pinnedEl = $("profile-pinned");
   const avatarEl = $("profile-avatar");
   const nameEl = $("profile-name");
   const emailEl = $("profile-email");
@@ -360,6 +598,8 @@ export function updateProfileSummary() {
     !linksEl &&
     !statsGridEl &&
     !quickStatsEl &&
+    !badgesEl &&
+    !pinnedEl &&
     !avatarEl &&
     !nameEl &&
     !emailEl &&
@@ -401,6 +641,14 @@ export function updateProfileSummary() {
     if (quickStatsEl) {
       quickStatsEl.innerHTML = "";
       quickStatsEl.classList.add("hidden");
+    }
+    if (badgesEl) {
+      badgesEl.innerHTML = "";
+      badgesEl.classList.add("hidden");
+    }
+    if (pinnedEl) {
+      pinnedEl.innerHTML = "";
+      pinnedEl.classList.add("hidden");
     }
     if (avatarEl) renderAvatar(avatarEl, null, "-");
     if (nameEl) nameEl.textContent = "-";
@@ -492,6 +740,19 @@ export function updateProfileSummary() {
   toggleCollapsibleVisibility("profile-details", hasProfileExtras);
   renderProfileStatsGrid(statsGridEl, userPosts, tr);
   renderProfileQuickStats(quickStatsEl, userPosts, tr);
+  const metrics = buildProfileMetrics(userPosts, getWorkoutLogsByPost());
+  const badges = buildProfileBadges(
+    metrics,
+    currentProfile,
+    followersCount,
+    tr
+  );
+  renderProfileBadges(badgesEl, badges);
+  const pinnedPostId = getPinnedPostIdForUser(currentUser?.id);
+  const pinnedPost = userPosts.find(
+    (post) => `${post?.id || ""}` === pinnedPostId
+  );
+  renderPinnedPostPreview(pinnedEl, pinnedPost, tr);
   if (joinedEl) {
     joinedEl.textContent = `${tr.profileJoined || "Joined"}: ${joinedStr}`;
   }
@@ -611,12 +872,15 @@ export async function openPublicProfile(userId, options = {}) {
   const linksEl = $("public-profile-links");
   const statsGridEl = $("public-profile-stats-grid");
   const quickStatsEl = $("public-profile-quick-stats");
+  const badgesEl = $("public-profile-badges");
+  const pinnedEl = $("public-profile-pinned");
   const avatarEl = $("public-profile-avatar");
   const displayEl = $("public-profile-name");
   const nameEl = $("public-profile-handle");
   const bioEl = $("public-profile-bio");
   const joinedEl = $("public-profile-joined");
   const postsEl = $("public-profile-posts");
+  const streakEl = $("public-profile-streak");
   const followingEl = $("public-profile-following");
   const followersEl = $("public-profile-followers");
   const followBtn = $("btn-public-follow");
@@ -671,9 +935,15 @@ export async function openPublicProfile(userId, options = {}) {
 
   renderProfileStatsGrid(statsGridEl, userPosts, tr);
   renderProfileQuickStats(quickStatsEl, userPosts, tr);
+  const metrics = buildProfileMetrics(userPosts, getWorkoutLogsByPost());
 
   if (postsEl) {
     postsEl.textContent = `${tr.profilePosts || "Posts"}: ${userPosts.length}`;
+  }
+  if (streakEl) {
+    streakEl.textContent = `${tr.profileStreak || "Streak"}: ${
+      metrics.streak
+    }${tr.profileStreakUnit || ""}`;
   }
 
   const counts = await loadFollowCountsCached(userId, { force: forceCounts });
@@ -683,6 +953,13 @@ export async function openPublicProfile(userId, options = {}) {
   if (followersEl) {
     followersEl.textContent = `${tr.profileFollowers || "Followers"}: ${counts.followers}`;
   }
+  const badges = buildProfileBadges(metrics, profile, counts.followers, tr);
+  renderProfileBadges(badgesEl, badges);
+  const pinnedPostId = getPinnedPostIdForUser(userId);
+  const pinnedPost = userPosts.find(
+    (post) => `${post?.id || ""}` === pinnedPostId
+  );
+  renderPinnedPostPreview(pinnedEl, pinnedPost, tr);
 
   if (followBtn) {
     if (!currentUser || currentUser.id === userId) {

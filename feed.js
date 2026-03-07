@@ -184,6 +184,7 @@ const FEED_SAVED_POSTS_KEY = "trends_saved_posts_v1";
 const FEED_HIDDEN_POSTS_KEY = "trends_hidden_posts_v1";
 const FEED_SEEN_POSTS_KEY = "trends_seen_posts_v1";
 const FEED_REPOST_STATE_KEY = "trends_repost_state_v1";
+const FEED_PINNED_POSTS_KEY = "trends_profile_pinned_post_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
@@ -902,6 +903,65 @@ function clearHiddenPostIds() {
       } catch {
         // ignore localStorage write failures
       }
+    }
+function getPinnedPostsByUserMap() {
+      try {
+        const raw = localStorage.getItem(FEED_PINNED_POSTS_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        if (!parsed || typeof parsed !== "object") return {};
+        const normalized = {};
+        Object.entries(parsed).forEach(([userId, postId]) => {
+          const uid = `${userId || ""}`.trim();
+          const pid = `${postId || ""}`.trim();
+          if (!uid || !pid) return;
+          normalized[uid] = pid;
+        });
+        return normalized;
+      } catch {
+        return {};
+      }
+    }
+function setPinnedPostsByUserMap(mapByUser = {}) {
+      try {
+        const normalized = {};
+        Object.entries(mapByUser || {}).forEach(([userId, postId]) => {
+          const uid = `${userId || ""}`.trim();
+          const pid = `${postId || ""}`.trim();
+          if (!uid || !pid) return;
+          normalized[uid] = pid;
+        });
+        localStorage.setItem(FEED_PINNED_POSTS_KEY, JSON.stringify(normalized));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function getPinnedPostIdForUser(userId) {
+      const uid = `${userId || ""}`.trim();
+      if (!uid) return "";
+      const mapByUser = getPinnedPostsByUserMap();
+      return `${mapByUser[uid] || ""}`.trim();
+    }
+function isPinnedPostForUser(postId, userId) {
+      const pid = `${postId || ""}`.trim();
+      if (!pid) return false;
+      return getPinnedPostIdForUser(userId) === pid;
+    }
+function togglePinnedPostForUser(postId, userId) {
+      const pid = `${postId || ""}`.trim();
+      const uid = `${userId || ""}`.trim();
+      if (!pid || !uid) {
+        return { isPinned: false, postId: "" };
+      }
+      const mapByUser = getPinnedPostsByUserMap();
+      const currentPinned = `${mapByUser[uid] || ""}`.trim();
+      if (currentPinned === pid) {
+        delete mapByUser[uid];
+        setPinnedPostsByUserMap(mapByUser);
+        return { isPinned: false, postId: "" };
+      }
+      mapByUser[uid] = pid;
+      setPinnedPostsByUserMap(mapByUser);
+      return { isPinned: true, postId: pid };
     }
 function getRepostState() {
       try {
@@ -1877,6 +1937,23 @@ function setupFeedCardActionDelegation() {
           scheduleRenderFeed();
           return;
         }
+        if (action === "toggle-pin") {
+          const currentUser = getCurrentUser();
+          const tr = t[getCurrentLang()] || t.ja;
+          if (!currentUser?.id || `${post.user_id || ""}` !== `${currentUser.id || ""}`) {
+            return;
+          }
+          const result = togglePinnedPostForUser(post.id, currentUser.id);
+          showToast(
+            result.isPinned
+              ? tr.pinPostSet || "Pinned to profile."
+              : tr.pinPostRemoved || "Pin removed.",
+            "success"
+          );
+          scheduleRenderFeed();
+          updateProfileSummary();
+          return;
+        }
         if (action === "toggle-repost") {
           const currentUser = getCurrentUser();
           const tr = t[getCurrentLang()] || t.ja;
@@ -1965,6 +2042,27 @@ function setupFeedCardActionDelegation() {
           await deletePost(post.id);
         }
       });
+    }
+function clearFeedMoreGhostCards(container = null) {
+      const root = container || $("feed-list");
+      if (!root) return;
+      root
+        .querySelectorAll(".feed-more-ghost")
+        .forEach((node) => node.remove());
+    }
+function appendFeedMoreGhostCards(container = null, count = 2) {
+      const root = container || $("feed-list");
+      if (!root) return;
+      clearFeedMoreGhostCards(root);
+      const safeCount = Math.max(1, Math.min(4, Number(count) || 2));
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < safeCount; i += 1) {
+        const ghost = document.createElement("div");
+        ghost.className = "post-card skeleton feed-skeleton feed-more-ghost";
+        ghost.setAttribute("aria-hidden", "true");
+        fragment.appendChild(ghost);
+      }
+      root.appendChild(fragment);
     }
 function captureFeedMoreAnchor(moreWrap) {
       if (!moreWrap || typeof window === "undefined") {
@@ -3276,6 +3374,7 @@ export function renderFeed(options = {}) {
       if (moreWrap) {
         moreWrap.classList.remove("is-loading");
       }
+      clearFeedMoreGhostCards(container);
     };
 
     const perfNow = () =>
@@ -3310,6 +3409,7 @@ export function renderFeed(options = {}) {
     const seenPostIds = getSeenPostIdsSet();
     const repostState = getRepostState();
     const repostCountsByPost = buildRepostCountMap(repostState);
+    const currentPinnedPostId = getPinnedPostIdForUser(currentUser?.id);
     const currentUserRepostedIds = getRepostedPostIdsForUser(
       currentUser?.id,
       repostState
@@ -3380,6 +3480,26 @@ export function renderFeed(options = {}) {
       }
       return tr.feedReasonRecent || "Recent";
     };
+    const prioritizePinnedPosts = (posts = []) => {
+      if (!Array.isArray(posts) || !posts.length) return [];
+      if (!currentUser?.id || !currentPinnedPostId) return posts;
+      if (!["mine", "saved"].includes(currentFilter)) return posts;
+      let pinnedPost = null;
+      const rest = [];
+      posts.forEach((post) => {
+        if (!post) return;
+        if (
+          `${post.id || ""}` === currentPinnedPostId &&
+          `${post.user_id || ""}` === `${currentUser.id || ""}`
+        ) {
+          if (!pinnedPost) pinnedPost = post;
+          return;
+        }
+        rest.push(post);
+      });
+      if (!pinnedPost) return posts;
+      return [pinnedPost, ...rest];
+    };
 
     const canSeePost = (post) => {
       if (post.visibility === "private") {
@@ -3443,6 +3563,7 @@ export function renderFeed(options = {}) {
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
+      currentPinnedPostId,
     ].join("|");
     const baseQueryKey = [
       currentUser?.id || "",
@@ -3457,6 +3578,7 @@ export function renderFeed(options = {}) {
       Array.from(savedPostIds).sort().slice(0, 120).join(","),
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
+      currentPinnedPostId,
     ].join("|");
     let gridCandidates = [];
     const canUseQueryCache =
@@ -3512,6 +3634,7 @@ export function renderFeed(options = {}) {
             return bTime - aTime;
           });
         }
+        sortedBasePosts = prioritizePinnedPosts(sortedBasePosts);
         feedBaseCandidatesCache = {
           baseKey: baseQueryKey,
           postsRef: allPosts,
@@ -3889,6 +4012,15 @@ export function renderFeed(options = {}) {
         newBadge.textContent = tr.feedNew || "NEW";
         userRow.appendChild(newBadge);
       }
+      const isPinnedByOwner =
+        `${post.user_id || ""}` &&
+        isPinnedPostForUser(post.id, post.user_id);
+      if (isPinnedByOwner) {
+        const pinBadge = document.createElement("span");
+        pinBadge.className = "post-pin-badge";
+        pinBadge.textContent = tr.postPinnedBadge || "Pinned";
+        userRow.appendChild(pinBadge);
+      }
 
       const subRow = document.createElement("div");
       subRow.className = "post-sub";
@@ -3984,6 +4116,19 @@ export function renderFeed(options = {}) {
       }
 
       if (currentUser && post.user_id === currentUser.id) {
+        const isPinnedByMe =
+          `${post.user_id || ""}` === `${currentUser.id || ""}` &&
+          isPinnedPostForUser(post.id, currentUser.id);
+        const pinBtn = document.createElement("button");
+        pinBtn.className = "chip chip-log chip-pin";
+        pinBtn.dataset.postAction = "toggle-pin";
+        pinBtn.textContent = isPinnedByMe
+          ? tr.pinned || "Pinned"
+          : tr.pin || "Pin";
+        pinBtn.classList.toggle("chip-active", isPinnedByMe);
+        pinBtn.setAttribute("aria-pressed", isPinnedByMe ? "true" : "false");
+        actions.appendChild(pinBtn);
+
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "chip chip-delete";
         deleteBtn.dataset.postAction = "delete-post";
@@ -4245,6 +4390,8 @@ export function renderFeed(options = {}) {
             moreBtn.disabled = true;
             moreBtn.textContent = tr.feedMoreLoading || tr.loading || "読み込み中...";
             moreWrap.classList.add("is-loading");
+            const ghostCount = isCompactViewport() ? 1 : 2;
+            appendFeedMoreGhostCards(container, ghostCount);
             feedVisibleCount += feedPageSize;
             renderFeed({ appendOnly: true });
           });
