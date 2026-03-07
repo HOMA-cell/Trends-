@@ -1934,6 +1934,9 @@ async function loadProfilePostCount() {
       setText("filter-following", "following");
       setText("filter-mine", "mine");
       setText("filter-saved", "saved");
+      setText("rank-fresh", "feedTuneFresh");
+      setText("rank-balanced", "feedTuneBalanced");
+      setText("rank-viral", "feedTuneViral");
       setText("feed-trending-title", "feedTrendingTitle");
       setText("feed-topic-follow-title", "feedTopicFollowTitle");
       setText("feed-following-topics-title", "feedFollowingTopicsTitle");

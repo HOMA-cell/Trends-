@@ -514,6 +514,17 @@
       gap: 6px;
       align-items: center;
     }
+    .feed-rank-controls {
+      align-items: center;
+      opacity: 1;
+      transition: opacity 0.18s ease;
+    }
+    .feed-rank-controls.is-disabled {
+      opacity: 0.6;
+    }
+    .feed-rank-controls .chip:disabled {
+      cursor: not-allowed;
+    }
     .chips-scroll {
       flex-wrap: nowrap;
       overflow-x: auto;

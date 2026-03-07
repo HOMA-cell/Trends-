@@ -96,6 +96,7 @@ let currentFilter = "foryou";
 let filterMedia = false;
 let filterWorkout = false;
 let sortOrder = "newest";
+let forYouTuning = "balanced";
 let feedLayout = "list";
 let isFeedLoading = false;
 let feedError = "";
@@ -825,6 +826,9 @@ function setFeedNetworkBackoff() {
 function isAllowedFeedFilter(filter) {
       return FEED_FILTERS.includes(`${filter || ""}`);
     }
+function isAllowedForYouTuning(value) {
+      return ["fresh", "balanced", "viral"].includes(`${value || ""}`);
+    }
 function getSavedPostIdsSet() {
       try {
         const raw = localStorage.getItem(FEED_SAVED_POSTS_KEY);
@@ -1301,6 +1305,9 @@ function getForYouScore(post, options = {}) {
       const currentUserId = `${options.currentUserId || ""}`;
       const followingIds = options.followingIds || new Set();
       const followedTopics = options.followedTopics || new Set();
+      const tuning = isAllowedForYouTuning(options.forYouTuning)
+        ? options.forYouTuning
+        : "balanced";
       const likesByPost = options.likesByPost || new Map();
       const commentsByPost = options.commentsByPost || new Map();
       const workoutLogsByPost = options.workoutLogsByPost || new Map();
@@ -1326,16 +1333,49 @@ function getForYouScore(post, options = {}) {
       const isOwn = !!currentUserId && `${post?.user_id || ""}` === currentUserId;
       const topicTerms = getPostTopicTerms(post, workoutLogsByPost);
       const hasTopicMatch = topicTerms.some((term) => followedTopics.has(term));
+      const modeWeights = {
+        fresh: {
+          recency: 6.2,
+          like: 0.17,
+          comment: 0.25,
+          workout: 0.14,
+          repost: 0.15,
+          media: 0.45,
+          following: 0.42,
+          topic: 0.85,
+        },
+        balanced: {
+          recency: 4.6,
+          like: 0.24,
+          comment: 0.35,
+          workout: 0.16,
+          repost: 0.22,
+          media: 0.8,
+          following: 0.55,
+          topic: 1.05,
+        },
+        viral: {
+          recency: 2.8,
+          like: 0.33,
+          comment: 0.48,
+          workout: 0.17,
+          repost: 0.36,
+          media: 1.05,
+          following: 0.38,
+          topic: 0.92,
+        },
+      };
+      const weights = modeWeights[tuning] || modeWeights.balanced;
 
       let score = 0;
-      score += recency * 4.6;
-      score += Math.min(24, likeCount) * 0.24;
-      score += Math.min(12, commentCount) * 0.35;
-      score += Math.min(10, workoutCount) * 0.16;
-      score += Math.min(18, repostCount) * 0.22;
-      score += hasMedia ? 0.8 : 0;
-      score += isFollowing ? 0.55 : 0;
-      score += hasTopicMatch ? 1.05 : 0;
+      score += recency * weights.recency;
+      score += Math.min(24, likeCount) * weights.like;
+      score += Math.min(12, commentCount) * weights.comment;
+      score += Math.min(10, workoutCount) * weights.workout;
+      score += Math.min(18, repostCount) * weights.repost;
+      score += hasMedia ? weights.media : 0;
+      score += isFollowing ? weights.following : 0;
+      score += hasTopicMatch ? weights.topic : 0;
       score += isOwn ? -0.25 : 0;
       return score;
     }
@@ -1453,12 +1493,16 @@ function loadFeedUiState() {
         const parsed = JSON.parse(raw);
         const nextFilter = String(parsed?.currentFilter || "");
         const nextSort = String(parsed?.sortOrder || "");
+        const nextTuning = String(parsed?.forYouTuning || "");
         const nextSearch = String(parsed?.search || "").trim().toLowerCase();
         if (isAllowedFeedFilter(nextFilter)) {
           currentFilter = nextFilter;
         }
         if (["newest", "oldest"].includes(nextSort)) {
           sortOrder = nextSort;
+        }
+        if (isAllowedForYouTuning(nextTuning)) {
+          forYouTuning = nextTuning;
         }
         if (typeof parsed?.filterMedia === "boolean") {
           filterMedia = parsed.filterMedia;
@@ -1476,6 +1520,9 @@ function persistFeedUiState() {
         const payload = {
           currentFilter: isAllowedFeedFilter(currentFilter) ? currentFilter : "all",
           sortOrder: sortOrder === "oldest" ? "oldest" : "newest",
+          forYouTuning: isAllowedForYouTuning(forYouTuning)
+            ? forYouTuning
+            : "balanced",
           filterMedia: !!filterMedia,
           filterWorkout: !!filterWorkout,
           search: String(feedLastCommittedSearch || "").slice(0, 120),
@@ -2725,6 +2772,12 @@ export function setFeedState(next = {}) {
         sortOrder = next.sortOrder;
         shouldPersistUi = true;
       }
+      if (typeof next.forYouTuning === "string") {
+        forYouTuning = isAllowedForYouTuning(next.forYouTuning)
+          ? next.forYouTuning
+          : "balanced";
+        shouldPersistUi = true;
+      }
       if (typeof next.isFeedLoading === "boolean") {
         isFeedLoading = next.isFeedLoading;
       }
@@ -2800,6 +2853,48 @@ export function setupFeedControls() {
       if (filterSaved) {
         filterSaved.addEventListener("click", () => {
           applyFilter("saved");
+        });
+      }
+      const applyForYouTuning = (nextTuning) => {
+        const normalized = isAllowedForYouTuning(nextTuning)
+          ? nextTuning
+          : "balanced";
+        if (forYouTuning === normalized) return;
+        forYouTuning = normalized;
+        persistFeedUiState();
+        resetFeedPagination();
+        updateFilterButtons();
+        scheduleRenderFeed();
+        const tr = t[getCurrentLang()] || t.ja;
+        const labelMap = {
+          fresh: tr.feedTuneFresh || "Fresh",
+          balanced: tr.feedTuneBalanced || "Balanced",
+          viral: tr.feedTuneViral || "Viral",
+        };
+        showToast(
+          (tr.feedTuneApplied || "Feed tuning: {mode}").replace(
+            "{mode}",
+            labelMap[normalized] || labelMap.balanced
+          ),
+          "success"
+        );
+      };
+      const rankFreshBtn = $("rank-fresh");
+      if (rankFreshBtn) {
+        rankFreshBtn.addEventListener("click", () => {
+          applyForYouTuning("fresh");
+        });
+      }
+      const rankBalancedBtn = $("rank-balanced");
+      if (rankBalancedBtn) {
+        rankBalancedBtn.addEventListener("click", () => {
+          applyForYouTuning("balanced");
+        });
+      }
+      const rankViralBtn = $("rank-viral");
+      if (rankViralBtn) {
+        rankViralBtn.addEventListener("click", () => {
+          applyForYouTuning("viral");
         });
       }
       const filterPublic = $("filter-public");
@@ -3404,6 +3499,23 @@ export function updateFilterButtons() {
       const workoutBtn = $("filter-workout");
       if (mediaBtn) mediaBtn.classList.toggle("chip-active", filterMedia);
       if (workoutBtn) workoutBtn.classList.toggle("chip-active", filterWorkout);
+      const tuningButtons = [
+        ["rank-fresh", "fresh"],
+        ["rank-balanced", "balanced"],
+        ["rank-viral", "viral"],
+      ];
+      const canTune = currentFilter === "foryou";
+      tuningButtons.forEach(([id, mode]) => {
+        const el = $(id);
+        if (!el) return;
+        el.classList.toggle("chip-active", forYouTuning === mode);
+        el.disabled = !canTune;
+        el.setAttribute("aria-disabled", canTune ? "false" : "true");
+      });
+      const tuningWrap = $("feed-rank-controls");
+      if (tuningWrap) {
+        tuningWrap.classList.toggle("is-disabled", !canTune);
+      }
     }
 export async function loadFeed(options = {}) {
       if (feedLoadPromise) {
@@ -3812,8 +3924,14 @@ export function renderFeed(options = {}) {
       const likeCount = Number(getLikesByPost().get(post.id) || 0);
       const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
       const repostCount = Number(repostCountsByPost.get(`${post.id || ""}`) || 0);
+      if (forYouTuning === "viral" && likeCount + commentCount + repostCount >= 3) {
+        return tr.feedReasonViral || "Viral";
+      }
       if (likeCount >= 5 || commentCount >= 3 || repostCount >= 2) {
         return tr.feedReasonPopular || "Popular";
+      }
+      if (forYouTuning === "fresh") {
+        return tr.feedReasonFresh || "Fresh";
       }
       if (post?.media_url) {
         return tr.feedReasonMedia || "With media";
@@ -3894,6 +4012,7 @@ export function renderFeed(options = {}) {
     const queryKey = [
       currentUser?.id || "",
       currentFilter,
+      forYouTuning,
       filterMedia ? "1" : "0",
       filterWorkout ? "1" : "0",
       sortOrder,
@@ -3914,6 +4033,7 @@ export function renderFeed(options = {}) {
     const baseQueryKey = [
       currentUser?.id || "",
       currentFilter,
+      forYouTuning,
       filterMedia ? "1" : "0",
       filterWorkout ? "1" : "0",
       sortOrder,
@@ -3976,6 +4096,7 @@ export function renderFeed(options = {}) {
             currentUserId: currentUser?.id || "",
             followingIds,
             followedTopics,
+            forYouTuning,
             likesByPost: getLikesByPost(),
             commentsByPost,
             workoutLogsByPost,
@@ -4121,6 +4242,7 @@ export function renderFeed(options = {}) {
     const renderSignature = [
       feedLayout,
       currentFilter,
+      forYouTuning,
       filterMedia ? "1" : "0",
       filterWorkout ? "1" : "0",
       sortOrder,
