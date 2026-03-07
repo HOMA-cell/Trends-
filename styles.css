@@ -454,6 +454,17 @@
       border-color: #79b08e;
       box-shadow: 0 6px 12px rgba(36, 100, 63, 0.14);
     }
+    .chip-topic-follow.chip-active {
+      background: #eef6ff;
+      color: #215285;
+      border-color: #7aa6d9;
+      box-shadow: 0 6px 12px rgba(33, 82, 133, 0.14);
+    }
+    .chip-followed-topic {
+      border-color: #c8d9ef;
+      background: #f4f8ff;
+      color: #275381;
+    }
     .btn-follow.is-following {
       background: var(--primary-soft);
       color: var(--primary);
@@ -538,6 +549,9 @@
       letter-spacing: 0.04em;
       color: var(--text-sub);
       margin-bottom: 6px;
+    }
+    .feed-discovery-item .feed-discovery-title:not(:first-child) {
+      margin-top: 8px;
     }
     .feed-suggested-row {
       display: inline-flex;

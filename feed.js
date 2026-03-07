@@ -184,6 +184,7 @@ const FEED_SAVED_POSTS_KEY = "trends_saved_posts_v1";
 const FEED_HIDDEN_POSTS_KEY = "trends_hidden_posts_v1";
 const FEED_MUTED_USERS_KEY = "trends_muted_users_v1";
 const FEED_MUTED_TERMS_KEY = "trends_muted_terms_v1";
+const FEED_FOLLOWED_TOPICS_KEY = "trends_followed_topics_v1";
 const FEED_SEEN_POSTS_KEY = "trends_seen_posts_v1";
 const FEED_REPOST_STATE_KEY = "trends_repost_state_v1";
 const FEED_PINNED_POSTS_KEY = "trends_profile_pinned_post_v1";
@@ -960,6 +961,9 @@ function normalizeMutedTerm(term) {
         .replace(/^#+/g, "")
         .slice(0, 32);
     }
+function normalizeTopicTerm(term) {
+      return normalizeMutedTerm(term);
+    }
 function getMutedTermsSet() {
       try {
         const raw = localStorage.getItem(FEED_MUTED_TERMS_KEY);
@@ -1031,6 +1035,59 @@ function isPostMutedByTerms(post, mutedTermsSet, workoutLogsMap) {
         if (!normalized) return false;
         return haystack.includes(normalized) || haystack.includes(`#${normalized}`);
       });
+    }
+function getFollowedTopicsSet() {
+      try {
+        const raw = localStorage.getItem(FEED_FOLLOWED_TOPICS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return new Set();
+        const normalized = parsed
+          .map((term) => normalizeTopicTerm(term))
+          .filter(Boolean)
+          .slice(0, 120);
+        return new Set(normalized);
+      } catch {
+        return new Set();
+      }
+    }
+function setFollowedTopicsSet(topicSet) {
+      try {
+        const next = Array.from(topicSet || [])
+          .map((term) => normalizeTopicTerm(term))
+          .filter(Boolean)
+          .slice(0, 120);
+        localStorage.setItem(FEED_FOLLOWED_TOPICS_KEY, JSON.stringify(next));
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function toggleFollowedTopic(term) {
+      const normalized = normalizeTopicTerm(term);
+      if (!normalized) return { active: false, term: "" };
+      const topicSet = getFollowedTopicsSet();
+      let active = false;
+      if (topicSet.has(normalized)) {
+        topicSet.delete(normalized);
+      } else {
+        topicSet.add(normalized);
+        active = true;
+      }
+      setFollowedTopicsSet(topicSet);
+      return { active, term: normalized };
+    }
+function getPostTopicTerms(post, workoutLogsMap = null) {
+      if (!post) return [];
+      const text = `${post?.note || ""} ${post?.caption || ""}`.trim();
+      const hashtags = parseHashtagsFromText(text).slice(0, 8);
+      if (hashtags.length) return Array.from(new Set(hashtags.map(normalizeTopicTerm).filter(Boolean)));
+      const fallback = getMuteTermCandidateForPost(post);
+      if (fallback) return [normalizeTopicTerm(fallback)].filter(Boolean);
+      if (workoutLogsMap && typeof workoutLogsMap.get === "function") {
+        const logs = workoutLogsMap.get(post?.id) || [];
+        const lift = `${logs?.[0]?.exercise || ""}`.trim();
+        if (lift) return [normalizeTopicTerm(lift)].filter(Boolean);
+      }
+      return [];
     }
 function getPinnedPostsByUserMap() {
       try {
@@ -1243,6 +1300,7 @@ function getForYouScore(post, options = {}) {
       const nowMs = options.nowMs || Date.now();
       const currentUserId = `${options.currentUserId || ""}`;
       const followingIds = options.followingIds || new Set();
+      const followedTopics = options.followedTopics || new Set();
       const likesByPost = options.likesByPost || new Map();
       const commentsByPost = options.commentsByPost || new Map();
       const workoutLogsByPost = options.workoutLogsByPost || new Map();
@@ -1266,6 +1324,8 @@ function getForYouScore(post, options = {}) {
       const hasMedia = !!post?.media_url;
       const isFollowing = followingIds.has(`${post?.user_id || ""}`);
       const isOwn = !!currentUserId && `${post?.user_id || ""}` === currentUserId;
+      const topicTerms = getPostTopicTerms(post, workoutLogsByPost);
+      const hasTopicMatch = topicTerms.some((term) => followedTopics.has(term));
 
       let score = 0;
       score += recency * 4.6;
@@ -1275,6 +1335,7 @@ function getForYouScore(post, options = {}) {
       score += Math.min(18, repostCount) * 0.22;
       score += hasMedia ? 0.8 : 0;
       score += isFollowing ? 0.55 : 0;
+      score += hasTopicMatch ? 1.05 : 0;
       score += isOwn ? -0.25 : 0;
       return score;
     }
@@ -1317,8 +1378,7 @@ function buildTrendingHashtags(posts = []) {
       const counts = new Map();
       const source = Array.isArray(posts) ? posts.slice(0, FEED_DISCOVERY_POST_SCAN_LIMIT) : [];
       source.forEach((post, index) => {
-        const text = `${post?.note || ""} ${post?.caption || ""}`.trim();
-        const tags = Array.from(new Set(parseHashtagsFromText(text)));
+        const tags = Array.from(new Set(getPostTopicTerms(post)));
         if (!tags.length) return;
         const postTime = getPostTimestamp(post);
         const ageMs = Math.max(0, Date.now() - postTime);
@@ -2791,6 +2851,50 @@ export function setupFeedControls() {
           scheduleRenderFeed();
         });
       }
+      const topicFollowWrap = $("feed-follow-topic-tags");
+      if (topicFollowWrap && topicFollowWrap.dataset.bound !== "true") {
+        topicFollowWrap.dataset.bound = "true";
+        topicFollowWrap.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-follow-topic]");
+          if (!btn) return;
+          const term = normalizeTopicTerm(btn.getAttribute("data-follow-topic"));
+          if (!term) return;
+          const result = toggleFollowedTopic(term);
+          const tr = t[getCurrentLang()] || t.ja;
+          showToast(
+            result.active
+              ? tr.feedTopicFollowedToast || "Topic followed."
+              : tr.feedTopicUnfollowedToast || "Topic unfollowed.",
+            "success"
+          );
+          resetFeedPagination();
+          scheduleRenderFeed();
+        });
+      }
+      const followedTopicsWrap = $("feed-followed-topics");
+      if (followedTopicsWrap && followedTopicsWrap.dataset.bound !== "true") {
+        followedTopicsWrap.dataset.bound = "true";
+        followedTopicsWrap.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-followed-topic]");
+          if (!btn) return;
+          const term = normalizeTopicTerm(btn.getAttribute("data-followed-topic"));
+          if (!term) return;
+          const searchInput = $("feed-search");
+          const nextSearch = `#${term}`;
+          const currentSearch = searchInput?.value?.trim().toLowerCase() || "";
+          if (searchInput && currentSearch !== nextSearch.toLowerCase()) {
+            searchInput.value = nextSearch;
+            feedLastCommittedSearch = nextSearch.toLowerCase();
+            persistFeedUiState();
+            resetFeedPagination();
+            scheduleRenderFeed();
+            return;
+          }
+          toggleFollowedTopic(term);
+          resetFeedPagination();
+          scheduleRenderFeed();
+        });
+      }
       const suggestedUsersWrap = $("feed-suggested-users");
       if (suggestedUsersWrap && suggestedUsersWrap.dataset.bound !== "true") {
         suggestedUsersWrap.dataset.bound = "true";
@@ -3613,6 +3717,7 @@ export function renderFeed(options = {}) {
     const hiddenPostIds = getHiddenPostIdsSet();
     const mutedUserIds = getMutedUserIdsSet();
     const mutedTerms = getMutedTermsSet();
+    const followedTopics = getFollowedTopicsSet();
     const seenPostIds = getSeenPostIdsSet();
     const repostState = getRepostState();
     const repostCountsByPost = buildRepostCountMap(repostState);
@@ -3697,6 +3802,10 @@ export function renderFeed(options = {}) {
     const getForYouReasonLabel = (post) => {
       if (currentFilter !== "foryou") return "";
       const userId = `${post?.user_id || ""}`;
+      const topicTerms = getPostTopicTerms(post, workoutLogsByPost);
+      if (topicTerms.some((term) => followedTopics.has(term))) {
+        return tr.feedReasonTopic || "Topic match";
+      }
       if (followingIds.has(userId)) {
         return tr.feedReasonFollowing || "Following";
       }
@@ -3773,6 +3882,7 @@ export function renderFeed(options = {}) {
       hiddenPostIds,
       mutedUserIds,
       mutedTerms,
+      followedTopics,
       searchValue,
       tr,
     });
@@ -3797,6 +3907,7 @@ export function renderFeed(options = {}) {
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
       Array.from(mutedUserIds).sort().slice(0, 120).join(","),
       Array.from(mutedTerms).sort().slice(0, 120).join(","),
+      Array.from(followedTopics).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
       currentPinnedPostId,
     ].join("|");
@@ -3814,6 +3925,7 @@ export function renderFeed(options = {}) {
       Array.from(hiddenPostIds).sort().slice(0, 120).join(","),
       Array.from(mutedUserIds).sort().slice(0, 120).join(","),
       Array.from(mutedTerms).sort().slice(0, 120).join(","),
+      Array.from(followedTopics).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
       currentPinnedPostId,
     ].join("|");
@@ -3863,6 +3975,7 @@ export function renderFeed(options = {}) {
           sortedBasePosts = rankForYouPosts(visiblePosts, {
             currentUserId: currentUser?.id || "",
             followingIds,
+            followedTopics,
             likesByPost: getLikesByPost(),
             commentsByPost,
             workoutLogsByPost,
@@ -4732,8 +4845,10 @@ export function renderFeed(options = {}) {
 function renderFeedDiscoverySections(payload = {}) {
   const discoveryRoot = $("feed-discovery");
   const trendingWrap = $("feed-trending-tags");
+  const topicFollowWrap = $("feed-follow-topic-tags");
+  const followedTopicsWrap = $("feed-followed-topics");
   const suggestedWrap = $("feed-suggested-users");
-  if (!discoveryRoot && !trendingWrap && !suggestedWrap) return;
+  if (!discoveryRoot && !trendingWrap && !topicFollowWrap && !followedTopicsWrap && !suggestedWrap) return;
 
   const currentFilterValue = `${payload.currentFilter || ""}`;
   const shouldShow = ["foryou", "all", "following"].includes(currentFilterValue);
@@ -4742,6 +4857,8 @@ function renderFeedDiscoverySections(payload = {}) {
   }
   if (!shouldShow) {
     if (trendingWrap) trendingWrap.innerHTML = "";
+    if (topicFollowWrap) topicFollowWrap.innerHTML = "";
+    if (followedTopicsWrap) followedTopicsWrap.innerHTML = "";
     if (suggestedWrap) suggestedWrap.innerHTML = "";
     return;
   }
@@ -4758,6 +4875,8 @@ function renderFeedDiscoverySections(payload = {}) {
     payload.mutedUserIds instanceof Set ? payload.mutedUserIds : new Set();
   const mutedTerms =
     payload.mutedTerms instanceof Set ? payload.mutedTerms : new Set();
+  const followedTopics =
+    payload.followedTopics instanceof Set ? payload.followedTopics : new Set();
   const canViewPost = (post) => {
     if (!post) return false;
     if (post.visibility === "private") {
@@ -4793,6 +4912,58 @@ function renderFeedDiscoverySections(payload = {}) {
             payload.searchValue.includes(tag));
         chip.classList.toggle("chip-active", !!active);
         trendingWrap.appendChild(chip);
+      });
+    }
+
+    if (topicFollowWrap) {
+      topicFollowWrap.innerHTML = "";
+      const followTags = tags.slice(0, FEED_DISCOVERY_TAG_LIMIT);
+      if (!followTags.length) {
+        const emptyChip = document.createElement("span");
+        emptyChip.className = "chip chip-muted";
+        emptyChip.textContent = tr.feedNoTrending || "No trending tags yet";
+        topicFollowWrap.appendChild(emptyChip);
+      } else {
+        followTags.forEach((tag) => {
+          const normalized = normalizeTopicTerm(tag);
+          const active = followedTopics.has(normalized);
+          const chip = document.createElement("button");
+          chip.className = "chip chip-topic-follow";
+          chip.setAttribute("data-follow-topic", normalized);
+          chip.textContent = active
+            ? `${tr.feedTopicFollowing || "Following"} #${normalized}`
+            : `${tr.feedTopicFollow || "Follow"} #${normalized}`;
+          chip.classList.toggle("chip-active", active);
+          chip.setAttribute("aria-pressed", active ? "true" : "false");
+          topicFollowWrap.appendChild(chip);
+        });
+      }
+    }
+  } else if (topicFollowWrap) {
+    topicFollowWrap.innerHTML = "";
+  }
+
+  if (followedTopicsWrap) {
+    followedTopicsWrap.innerHTML = "";
+    const followedList = Array.from(followedTopics).slice(0, 10);
+    if (!followedList.length) {
+      const emptyChip = document.createElement("span");
+      emptyChip.className = "chip chip-muted";
+      emptyChip.textContent =
+        tr.feedNoFollowingTopics || "No followed topics yet";
+      followedTopicsWrap.appendChild(emptyChip);
+    } else {
+      followedList.forEach((topic) => {
+        const chip = document.createElement("button");
+        chip.className = "chip chip-followed-topic";
+        chip.setAttribute("data-followed-topic", topic);
+        chip.textContent = `#${topic}`;
+        const active =
+          payload.searchValue &&
+          (payload.searchValue.includes(`#${topic}`) ||
+            payload.searchValue.includes(topic));
+        chip.classList.toggle("chip-active", !!active);
+        followedTopicsWrap.appendChild(chip);
       });
     }
   }

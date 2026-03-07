@@ -1935,6 +1935,8 @@ async function loadProfilePostCount() {
       setText("filter-mine", "mine");
       setText("filter-saved", "saved");
       setText("feed-trending-title", "feedTrendingTitle");
+      setText("feed-topic-follow-title", "feedTopicFollowTitle");
+      setText("feed-following-topics-title", "feedFollowingTopicsTitle");
       setText("feed-suggested-title", "feedSuggestedTitle");
       setText("filter-public", "publicOnly");
       setText("filter-media", "filterMedia");
