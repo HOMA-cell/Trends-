@@ -921,6 +921,20 @@
       white-space: pre-wrap;
       line-height: 1.45;
     }
+    .chip-caption-toggle {
+      align-self: flex-start;
+      padding: 2px 8px;
+      font-size: 11px;
+      min-height: 0;
+      border-color: transparent;
+      color: var(--text-sub);
+      background: rgba(15, 23, 42, 0.05);
+    }
+    .chip-caption-toggle:hover {
+      border-color: var(--border);
+      color: var(--text-main);
+      background: rgba(15, 23, 42, 0.08);
+    }
     .empty {
       font-size: 12px;
       color: var(--text-sub);

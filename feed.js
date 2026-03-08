@@ -108,6 +108,7 @@ let feedVisibleCount = 8;
 let feedLastLoadedAt = null;
 let feedLoadingGeneration = 0;
 let currentDetailPostId = null;
+const expandedCaptionPostIds = new Set();
 let feedRenderToken = 0;
 let feedLoadPromise = null;
 let feedNotice = "";
@@ -165,6 +166,7 @@ let feedWindowLastRunY = 0;
 let feedWindowingEnabled = false;
 const feedWindowedCards = new Map();
 let feedKeyboardShortcutsBound = false;
+let feedDetailKeyboardBound = false;
 let feedCardActionDelegationBound = false;
 let feedPageSizeResizeBound = false;
 let feedPageSizeResizeTimer = null;
@@ -238,6 +240,7 @@ const FEED_DISCOVERY_POST_SCAN_LIMIT = 180;
 const FEED_DISCOVERY_TAG_LIMIT = 8;
 const FEED_DISCOVERY_USER_LIMIT = 8;
 const FEED_SEEN_POSTS_LIMIT = 2000;
+const FEED_CAPTION_TRIM_LIMIT = 140;
 let feedUiStateLoaded = false;
 let seenPostsObserver = null;
 const openBackdrop = (backdrop) => {
@@ -261,6 +264,28 @@ const closeBackdrop = (backdrop) => {
         backdrop.classList.add("hidden");
       }, MODAL_ANIM_MS);
     };
+function getPostHashValue(postId) {
+      const normalized = `${postId || ""}`.trim();
+      if (!normalized) return "";
+      return `#post=${encodeURIComponent(normalized)}`;
+    }
+function setPostHash(postId) {
+      if (typeof window === "undefined") return;
+      const nextHash = getPostHashValue(postId);
+      if (!nextHash) return;
+      if (window.location.hash === nextHash) return;
+      window.location.hash = nextHash;
+    }
+function clearPostHash(postId = "") {
+      if (typeof window === "undefined") return;
+      const hash = window.location.hash || "";
+      if (!hash.startsWith("#post=")) return;
+      if (postId) {
+        const expectedHash = getPostHashValue(postId);
+        if (hash !== expectedHash) return;
+      }
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
 function hydrateDeferredVideo(videoEl) {
       if (!videoEl) return;
       if (videoEl.dataset.deferredLoaded === "true") {
@@ -2154,6 +2179,17 @@ function setupFeedCardActionDelegation() {
           }
           return;
         }
+        if (action === "toggle-caption") {
+          const normalizedPostId = `${postId || ""}`.trim();
+          if (!normalizedPostId) return;
+          if (expandedCaptionPostIds.has(normalizedPostId)) {
+            expandedCaptionPostIds.delete(normalizedPostId);
+          } else {
+            expandedCaptionPostIds.add(normalizedPostId);
+          }
+          refreshFeedPostCaption(postId);
+          return;
+        }
         const post = getPostById(postId);
         if (!post) return;
         if (action === "toggle-like") {
@@ -2292,7 +2328,21 @@ function setupFeedCardActionDelegation() {
           const path =
             typeof window !== "undefined" ? window.location.pathname : "";
           const shareUrl = `${origin}${path}#post=${post.id}`;
+          const shareTextRaw = `${post?.note || post?.caption || ""}`.trim();
+          const sharePayload = {
+            title: tr.detailTitle || "Post details",
+            text: shareTextRaw ? shareTextRaw.slice(0, 160) : "",
+            url: shareUrl,
+          };
           try {
+            if (
+              typeof navigator !== "undefined" &&
+              typeof navigator.share === "function"
+            ) {
+              await navigator.share(sharePayload);
+              showToast(tr.feedShared || "Shared.", "success");
+              return;
+            }
             if (
               typeof navigator !== "undefined" &&
               navigator.clipboard &&
@@ -2304,6 +2354,9 @@ function setupFeedCardActionDelegation() {
               showToast(shareUrl, "info");
             }
           } catch (error) {
+            if (error?.name === "AbortError") {
+              return;
+            }
             console.error("share post failed", error);
             showToast(shareUrl, "info");
           }
@@ -4736,14 +4789,26 @@ export function renderFeed(options = {}) {
       if (post.note || post.caption) {
         const caption = document.createElement("div");
         caption.className = "post-caption";
-        const text = post.note || post.caption;
-        const trimmed = text ? text.toString().trim() : "";
-        if (trimmed.length > 140) {
-          caption.textContent = `${trimmed.slice(0, 140)}…`;
-        } else {
-          caption.textContent = trimmed;
-        }
+        const fullText = `${post.note || post.caption || ""}`.trim();
+        const previewText = getCaptionPreviewText(fullText);
+        const isExpandable = fullText.length > FEED_CAPTION_TRIM_LIMIT;
+        const isExpanded = expandedCaptionPostIds.has(`${post.id || ""}`);
+        caption.setAttribute("data-caption-text", "true");
+        caption.setAttribute("data-caption-full", fullText);
+        caption.setAttribute("data-caption-preview", previewText);
+        caption.textContent = isExpandable && !isExpanded ? previewText : fullText;
         body.appendChild(caption);
+        if (isExpandable) {
+          const captionToggle = document.createElement("button");
+          captionToggle.type = "button";
+          captionToggle.className = "chip chip-caption-toggle";
+          captionToggle.dataset.postAction = "toggle-caption";
+          captionToggle.textContent = isExpanded
+            ? tr.captionLess || "Less"
+            : tr.captionMore || "More";
+          captionToggle.setAttribute("aria-pressed", isExpanded ? "true" : "false");
+          body.appendChild(captionToggle);
+        }
       }
 
       if (body.childNodes.length) {
@@ -5315,6 +5380,36 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commen
         commentBtn.textContent = tr.commentsShow || "View comments";
       }
     }
+function getCaptionPreviewText(fullText = "") {
+      if (fullText.length <= FEED_CAPTION_TRIM_LIMIT) {
+        return fullText;
+      }
+      return `${fullText.slice(0, FEED_CAPTION_TRIM_LIMIT)}…`;
+    }
+function applyCaptionStateOnCard(card, expanded, tr) {
+      if (!card) return;
+      const caption = card.querySelector("[data-caption-text]");
+      if (!caption) return;
+      const fullText = `${caption.getAttribute("data-caption-full") || ""}`;
+      const previewText = `${caption.getAttribute("data-caption-preview") || ""}`;
+      caption.textContent = expanded ? fullText : previewText;
+      const toggleBtn = card.querySelector("button[data-post-action='toggle-caption']");
+      if (!toggleBtn) return;
+      toggleBtn.textContent = expanded
+        ? tr.captionLess || "Less"
+        : tr.captionMore || "More";
+      toggleBtn.setAttribute("aria-pressed", expanded ? "true" : "false");
+    }
+function refreshFeedPostCaption(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      const expanded = expandedCaptionPostIds.has(normalizedPostId);
+      const selector = `.post-card[data-post-id="${normalizedPostId}"]`;
+      document.querySelectorAll(selector).forEach((card) => {
+        applyCaptionStateOnCard(card, expanded, tr);
+      });
+    }
 function buildFeedCommentSection(
       post,
       tr,
@@ -5603,6 +5698,36 @@ export async function toggleLikeForPost(post) {
         });
       }
     }
+function isPostDetailOpen(backdrop = null) {
+      const target = backdrop || $("detail-modal-backdrop");
+      if (!target) return false;
+      return !target.classList.contains("hidden");
+    }
+function getDetailNavigablePosts() {
+      const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
+      return (getAllPosts() || []).filter((post) => {
+        if (!post) return false;
+        if (post.visibility === "private") {
+          return !!currentUserId && `${post.user_id || ""}` === currentUserId;
+        }
+        return true;
+      });
+    }
+function openAdjacentPostDetail(step = 1) {
+      if (!currentDetailPostId) return false;
+      const posts = getDetailNavigablePosts();
+      if (!posts.length) return false;
+      const index = posts.findIndex(
+        (post) => `${post?.id || ""}` === `${currentDetailPostId || ""}`
+      );
+      if (index < 0) return false;
+      const nextIndex = index + (step > 0 ? 1 : -1);
+      if (nextIndex < 0 || nextIndex >= posts.length) return false;
+      const targetPostId = `${posts[nextIndex]?.id || ""}`.trim();
+      if (!targetPostId) return false;
+      openPostDetail(targetPostId);
+      return true;
+    }
 export function setupPostDetailModal() {
       const feedList = $("feed-list");
       const publicList = $("public-profile-posts-list");
@@ -5640,28 +5765,73 @@ export function setupPostDetailModal() {
       if (closeBtn && closeBtn.dataset.bound !== "true") {
         closeBtn.dataset.bound = "true";
         closeBtn.addEventListener("click", () => {
-          closeBackdrop(backdrop);
+          closePostDetail();
         });
       }
       if (backdrop && backdrop.dataset.bound !== "true") {
         backdrop.dataset.bound = "true";
         backdrop.addEventListener("click", (event) => {
           if (event.target === backdrop) {
-            closeBackdrop(backdrop);
+            closePostDetail();
+          }
+        });
+      }
+      if (!feedDetailKeyboardBound && typeof window !== "undefined") {
+        feedDetailKeyboardBound = true;
+        window.addEventListener("keydown", (event) => {
+          if (event.defaultPrevented || event.isComposing) return;
+          if (!isPostDetailOpen(backdrop)) return;
+          if (event.metaKey || event.ctrlKey || event.altKey) return;
+          if (isEditableTarget(event.target)) return;
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closePostDetail();
+            return;
+          }
+          if (event.key === "ArrowRight") {
+            if (openAdjacentPostDetail(1)) {
+              event.preventDefault();
+            }
+            return;
+          }
+          if (event.key === "ArrowLeft") {
+            if (openAdjacentPostDetail(-1)) {
+              event.preventDefault();
+            }
           }
         });
       }
     }
-export function openPostDetail(postId) {
+export function closePostDetail(options = {}) {
+      const backdrop = $("detail-modal-backdrop");
+      if (backdrop) {
+        closeBackdrop(backdrop);
+      }
+      const previousPostId = currentDetailPostId;
+      currentDetailPostId = null;
+      if (options.syncHash !== false) {
+        clearPostHash(previousPostId);
+      }
+    }
+export function openPostDetail(postId, options = {}) {
       const backdrop = $("detail-modal-backdrop");
       if (!backdrop) return;
-      currentDetailPostId = postId;
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      const hasPost = (getAllPosts() || []).some(
+        (item) => `${item?.id || ""}` === normalizedPostId
+      );
+      if (!hasPost) return;
+      currentDetailPostId = normalizedPostId;
       renderPostDetail();
       openBackdrop(backdrop);
+      if (options.syncHash !== false) {
+        setPostHash(normalizedPostId);
+      }
       const commentsByPost = getCommentsByPost();
       const commentsEnabled = isCommentsEnabled();
-      if (!commentsByPost.has(postId) && commentsEnabled) {
-        loadCommentsForPost(postId).then(() => renderPostDetail());
+      if (!commentsByPost.has(normalizedPostId) && commentsEnabled) {
+        loadCommentsForPost(normalizedPostId).then(() => renderPostDetail());
       }
     }
 export function renderPostDetail() {

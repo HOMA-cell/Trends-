@@ -30,6 +30,8 @@ import {
   setupFeedControls,
   setupFollowButtons,
   setupPostDetailModal,
+  openPostDetail,
+  closePostDetail,
   updateFilterButtons,
   loadFeed,
   renderFeed,
@@ -1674,12 +1676,38 @@ async function loadProfilePostCount() {
     function handleHashRoute() {
       const hash = window.location.hash || "";
       if (hash.startsWith("#profile=")) {
+        closePostDetail({ syncHash: false });
         const userId = hash.replace("#profile=", "");
         if (userId) {
           openPublicProfile(userId);
           return;
         }
       }
+      if (hash.startsWith("#post=")) {
+        currentPublicProfileId = null;
+        if (typeof setActivePage === "function") {
+          setActivePage("feed");
+        }
+        let postId = "";
+        try {
+          postId = decodeURIComponent(hash.replace("#post=", "")).trim();
+        } catch {
+          postId = hash.replace("#post=", "").trim();
+        }
+        if (postId) {
+          if (typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => {
+              openPostDetail(postId, { syncHash: false });
+            });
+          } else {
+            setTimeout(() => {
+              openPostDetail(postId, { syncHash: false });
+            }, 0);
+          }
+          return;
+        }
+      }
+      closePostDetail({ syncHash: false });
       currentPublicProfileId = null;
       if (typeof setActivePage === "function") {
         setActivePage("feed");
