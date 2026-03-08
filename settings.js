@@ -47,6 +47,7 @@ const PRESET_NOTIFICATIONS = {
   comment: true,
   follow: true,
 };
+const SIMPLE_SETTINGS_MODE = true;
 
 const PRESET_TARGETS = {
   minimal: {
@@ -183,6 +184,7 @@ export function createSettingsController(options) {
   const translations = options.translations || {};
 
   let applyPrev = null;
+  let settingsAdvancedVisible = false;
 
   function tr() {
     return translations[getCurrentLang()] || translations.ja || {};
@@ -258,6 +260,18 @@ export function createSettingsController(options) {
   function updateSettingsExpandLabel() {
     const btn = $("btn-settings-expand");
     if (!btn) return;
+    if (SIMPLE_SETTINGS_MODE) {
+      const showAdvanced =
+        tr().settingsShowAdvanced || "Show advanced settings";
+      const hideAdvanced =
+        tr().settingsHideAdvanced || "Hide advanced settings";
+      btn.textContent = settingsAdvancedVisible ? hideAdvanced : showAdvanced;
+      btn.setAttribute(
+        "aria-expanded",
+        settingsAdvancedVisible ? "true" : "false"
+      );
+      return;
+    }
     const allOpen = SETTINGS_COLLAPSIBLE_KEYS.every((key) => {
       const wrapper = document.querySelector(`[data-collapsible="${key}"]`);
       const content = wrapper?.querySelector("[data-collapsible-content]");
@@ -323,7 +337,99 @@ export function createSettingsController(options) {
     EXTRA_SECTION_KEYS.forEach((key) => setCollapsibleOpen(key, shown));
   }
 
+  function setElHidden(el, hidden) {
+    if (!el) return;
+    el.classList.toggle("hidden", !!hidden);
+  }
+
+  function setSettingsItemHidden(controlId, hidden) {
+    const control = $(controlId);
+    const item = control?.closest(".settings-item");
+    setElHidden(item, hidden);
+  }
+
+  function setSettingsHeroHidden(controlId, hidden) {
+    const control = $(controlId);
+    const item = control?.closest(".settings-hero-item");
+    setElHidden(item, hidden);
+  }
+
+  function setSettingsCardHidden(collapsibleKey, hidden) {
+    const card = document.querySelector(`[data-collapsible="${collapsibleKey}"]`);
+    setElHidden(card, hidden);
+  }
+
+  function syncSettingsGroupVisibility() {
+    document.querySelectorAll(".settings-group").forEach((group) => {
+      const cards = Array.from(group.querySelectorAll(".card[data-collapsible]"));
+      const hasVisibleCard = cards.some(
+        (card) => !card.classList.contains("hidden")
+      );
+      setElHidden(group, !hasVisibleCard);
+    });
+  }
+
+  function applySimpleSettingsLayout() {
+    if (!SIMPLE_SETTINGS_MODE) return;
+    const advanced = !!settingsAdvancedVisible;
+    const settingsSub = $("settings-sub");
+    if (settingsSub) {
+      settingsSub.textContent =
+        advanced
+          ? tr().settingsSubAdvanced ||
+            "Advanced controls are visible."
+          : tr().settingsSubSimple ||
+            "Only essential controls are shown.";
+    }
+
+    setElHidden($("settings-summary"), true);
+    setElHidden($("settings-presets"), true);
+    setElHidden($("settings-quick"), true);
+
+    setSettingsHeroHidden("settings-compact", !advanced);
+    setSettingsHeroHidden("settings-show-feed-stats", !advanced);
+    setSettingsHeroHidden("settings-show-extra", !advanced);
+    setSettingsHeroHidden("settings-lite-effects", false);
+
+    setSettingsCardHidden("settings-preferences", false);
+    setSettingsCardHidden("settings-notifications", false);
+    setSettingsCardHidden("settings-language", false);
+    setSettingsCardHidden("settings-privacy", !advanced);
+    setSettingsCardHidden("settings-data", !advanced);
+    setSettingsCardHidden("settings-templates", !advanced);
+    setSettingsCardHidden("settings-tips", !advanced);
+
+    setSettingsItemHidden("settings-default-filter", !advanced);
+    setSettingsItemHidden("settings-feed-layout", !advanced);
+    setSettingsItemHidden("settings-feed-auto-load", !advanced);
+    setSettingsItemHidden("settings-default-visibility", false);
+    setSettingsItemHidden("settings-language", false);
+    setSettingsItemHidden("settings-date-format", !advanced);
+    setSettingsItemHidden("settings-weight-unit", !advanced);
+    setSettingsItemHidden("settings-height-unit", !advanced);
+    setSettingsItemHidden("settings-show-email", !advanced);
+    setSettingsItemHidden("settings-show-profile-stats", !advanced);
+    setSettingsItemHidden("settings-show-bodyweight", !advanced);
+
+    if (!advanced) {
+      setCollapsibleOpen("settings-preferences", true);
+      setCollapsibleOpen("settings-notifications", true);
+      setCollapsibleOpen("settings-language", true);
+      setCollapsibleOpen("settings-privacy", false);
+      setCollapsibleOpen("settings-data", false);
+      setCollapsibleOpen("settings-templates", false);
+      setCollapsibleOpen("settings-tips", false);
+    }
+    syncSettingsGroupVisibility();
+  }
+
   function toggleSettingsSections() {
+    if (SIMPLE_SETTINGS_MODE) {
+      settingsAdvancedVisible = !settingsAdvancedVisible;
+      applySimpleSettingsLayout();
+      updateSettingsExpandLabel();
+      return;
+    }
     const shouldOpen = SETTINGS_COLLAPSIBLE_KEYS.some((key) => {
       const wrapper = document.querySelector(`[data-collapsible="${key}"]`);
       const content = wrapper?.querySelector("[data-collapsible-content]");
@@ -557,6 +663,7 @@ export function createSettingsController(options) {
 
     updateWeightLabels();
     updateHeightLabel();
+    applySimpleSettingsLayout();
     updateSettingsExpandLabel();
     populateSettingsUI();
     updateSettingsSummary();
