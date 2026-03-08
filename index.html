@@ -80,6 +80,7 @@
                 type="text"
                 placeholder="caption / handle / メモで検索"
               />
+              <button class="btn btn-ghost btn-xs" id="btn-feed-discovery-toggle">発見を表示</button>
               <button class="btn btn-ghost btn-xs hidden" id="btn-feed-clear">クリア</button>
               <button class="btn btn-ghost btn-xs" id="btn-feed-refresh">更新</button>
             </div>
@@ -87,11 +88,17 @@
   
           <!-- すべて / 自分 -->
           <div class="feed-filters">
-            <div class="chips">
+            <div class="chips feed-primary-filters">
               <button class="chip chip-active" id="filter-foryou">おすすめ</button>
               <button class="chip" id="filter-all">すべて</button>
-              <button class="chip" id="filter-following">フォロー中</button>
               <button class="chip" id="filter-mine">自分</button>
+            </div>
+            <button class="btn btn-ghost btn-xs" id="btn-feed-options">詳細</button>
+          </div>
+
+          <div class="feed-advanced" id="feed-advanced">
+            <div class="chips feed-secondary-filters">
+              <button class="chip" id="filter-following">フォロー中</button>
               <button class="chip" id="filter-saved">保存済み</button>
             </div>
             <div class="chips feed-rank-controls" id="feed-rank-controls">

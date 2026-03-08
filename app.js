@@ -1952,6 +1952,7 @@ async function loadProfilePostCount() {
       setText("btn-feed-refresh", "feedRefresh");
       setText("btn-feed-clear", "feedClear");
       setText("btn-feed-retry", "feedRetry");
+      setText("btn-feed-discovery-toggle", "feedDiscoveryShow");
       setText("btn-feed-restore-hidden", "feedRestoreHidden");
       setText("btn-feed-restore-muted", "feedRestoreMuted");
       setText("btn-feed-restore-muted-terms", "feedRestoreMutedTerms");

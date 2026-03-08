@@ -243,6 +243,7 @@ const FEED_SEEN_POSTS_LIMIT = 2000;
 const FEED_CAPTION_TRIM_LIMIT = 140;
 const FEED_CAPTION_TAG_LIMIT = 5;
 let feedUiStateLoaded = false;
+let feedDiscoveryExpanded = false;
 let seenPostsObserver = null;
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
@@ -1544,6 +1545,9 @@ function loadFeedUiState() {
         if (typeof parsed?.filterWorkout === "boolean") {
           filterWorkout = parsed.filterWorkout;
         }
+        if (typeof parsed?.discoveryExpanded === "boolean") {
+          feedDiscoveryExpanded = parsed.discoveryExpanded;
+        }
         feedLastCommittedSearch = nextSearch.slice(0, 120);
       } catch {
         // ignore persisted feed UI parse failures
@@ -1559,6 +1563,7 @@ function persistFeedUiState() {
             : "balanced",
           filterMedia: !!filterMedia,
           filterWorkout: !!filterWorkout,
+          discoveryExpanded: !!feedDiscoveryExpanded,
           search: String(feedLastCommittedSearch || "").slice(0, 120),
         };
         localStorage.setItem(FEED_UI_STATE_KEY, JSON.stringify(payload));
@@ -3261,6 +3266,15 @@ export function setupFeedControls() {
           feedOptionsBtn.classList.toggle("is-active", isOpen);
         });
       }
+      const discoveryToggleBtn = $("btn-feed-discovery-toggle");
+      if (discoveryToggleBtn && discoveryToggleBtn.dataset.bound !== "true") {
+        discoveryToggleBtn.dataset.bound = "true";
+        discoveryToggleBtn.addEventListener("click", () => {
+          feedDiscoveryExpanded = !feedDiscoveryExpanded;
+          persistFeedUiState();
+          scheduleRenderFeed();
+        });
+      }
 
       const runFeedSoftRefresh = async () => {
         if (isFeedLoading || feedLoadPromise) return false;
@@ -3832,6 +3846,7 @@ export function renderFeed(options = {}) {
     const moreHint = $("feed-more-hint");
     const moreBtn = $("btn-feed-more");
     const layoutBtn = $("btn-feed-layout");
+    const discoveryToggleBtn = $("btn-feed-discovery-toggle");
     if (!container) return;
     const forcePageRender = !!options.forcePageRender;
     if (!forcePageRender && !isFeedPageActive()) {
@@ -4067,6 +4082,7 @@ export function renderFeed(options = {}) {
     renderFeedDiscoverySections({
       allPosts,
       currentFilter,
+      discoveryExpanded: feedDiscoveryExpanded,
       currentUser,
       followingIds,
       savedPostIds,
@@ -4077,6 +4093,21 @@ export function renderFeed(options = {}) {
       searchValue,
       tr,
     });
+    if (discoveryToggleBtn) {
+      const canShowDiscovery = ["foryou", "all", "following"].includes(currentFilter);
+      discoveryToggleBtn.classList.toggle("hidden", !canShowDiscovery);
+      discoveryToggleBtn.disabled = !canShowDiscovery;
+      if (canShowDiscovery) {
+        discoveryToggleBtn.textContent = feedDiscoveryExpanded
+          ? tr.feedDiscoveryHide || "発見を閉じる"
+          : tr.feedDiscoveryShow || "発見を表示";
+      }
+      discoveryToggleBtn.classList.toggle("is-active", canShowDiscovery && feedDiscoveryExpanded);
+      discoveryToggleBtn.setAttribute(
+        "aria-expanded",
+        canShowDiscovery && feedDiscoveryExpanded ? "true" : "false"
+      );
+    }
 
     const firstPostId = Array.isArray(allPosts) && allPosts.length ? allPosts[0]?.id || "" : "";
     const lastPostId = Array.isArray(allPosts) && allPosts.length
@@ -5072,11 +5103,12 @@ function renderFeedDiscoverySections(payload = {}) {
   if (!discoveryRoot && !trendingWrap && !topicFollowWrap && !followedTopicsWrap && !suggestedWrap) return;
 
   const currentFilterValue = `${payload.currentFilter || ""}`;
+  const discoveryExpanded = payload.discoveryExpanded !== false;
   const shouldShow = ["foryou", "all", "following"].includes(currentFilterValue);
   if (discoveryRoot) {
-    discoveryRoot.classList.toggle("hidden", !shouldShow);
+    discoveryRoot.classList.toggle("hidden", !shouldShow || !discoveryExpanded);
   }
-  if (!shouldShow) {
+  if (!shouldShow || !discoveryExpanded) {
     if (trendingWrap) trendingWrap.innerHTML = "";
     if (topicFollowWrap) topicFollowWrap.innerHTML = "";
     if (followedTopicsWrap) followedTopicsWrap.innerHTML = "";
