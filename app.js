@@ -722,20 +722,12 @@ async function loadProfilePostCount() {
     }
 
     function loadProfileEditCompactPreference() {
+      profileEditCompact = true;
       try {
-        const stored = localStorage.getItem(PROFILE_EDIT_COMPACT_KEY);
-        if (stored === "0") {
-          profileEditCompact = false;
-          return;
-        }
-        if (stored === "1") {
-          profileEditCompact = true;
-          return;
-        }
+        localStorage.setItem(PROFILE_EDIT_COMPACT_KEY, "1");
       } catch (error) {
         console.warn("profile edit compact preference load failed", error);
       }
-      profileEditCompact = true;
     }
 
     function updateProfileEditCompactToggleLabel() {
@@ -754,6 +746,8 @@ async function loadProfilePostCount() {
       section.classList.toggle("profile-edit-compact", profileEditCompact);
       if (profileEditCompact) {
         setProfileEditGroupsOpen(false);
+      } else {
+        setProfileEditGroupsOpen(true);
       }
       updateProfileEditCompactToggleLabel();
       queueCollapsibleHeightRefresh();

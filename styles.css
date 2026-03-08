@@ -1708,6 +1708,9 @@
       gap: 8px;
       margin-bottom: 6px;
     }
+    #profile-edit-section .profile-edit-group [data-collapsible-btn] {
+      display: none;
+    }
     .profile-edit-dirty {
       margin-top: 8px;
       font-size: 11px;
