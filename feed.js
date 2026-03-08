@@ -241,6 +241,7 @@ const FEED_DISCOVERY_TAG_LIMIT = 8;
 const FEED_DISCOVERY_USER_LIMIT = 8;
 const FEED_SEEN_POSTS_LIMIT = 2000;
 const FEED_CAPTION_TRIM_LIMIT = 140;
+const FEED_CAPTION_TAG_LIMIT = 5;
 let feedUiStateLoaded = false;
 let seenPostsObserver = null;
 const openBackdrop = (backdrop) => {
@@ -1438,6 +1439,14 @@ function parseHashtagsFromText(text) {
             .toLowerCase()
         )
         .filter(Boolean);
+    }
+function getCaptionHashtags(text, limit = FEED_CAPTION_TAG_LIMIT) {
+      const safeLimit = Math.max(0, Number(limit) || FEED_CAPTION_TAG_LIMIT);
+      if (safeLimit <= 0) return [];
+      const hashtags = parseHashtagsFromText(text).map((tag) =>
+        normalizeTopicTerm(tag)
+      );
+      return Array.from(new Set(hashtags.filter(Boolean))).slice(0, safeLimit);
     }
 function buildTrendingHashtags(posts = []) {
       const counts = new Map();
@@ -2802,6 +2811,23 @@ export function resetFeedPagination() {
       syncFeedPageSize({ resetVisible: true });
       feedVisibleCount = feedPageSize;
     }
+function applyFeedSearchTerm(term = "") {
+      const normalized = `${term || ""}`.trim();
+      const searchInput = $("feed-search");
+      if (searchInput) {
+        searchInput.value = normalized;
+      }
+      const clearBtn = $("btn-feed-clear");
+      if (clearBtn) {
+        const hasValue = !!normalized;
+        clearBtn.classList.toggle("hidden", !hasValue);
+        clearBtn.disabled = !hasValue;
+      }
+      feedLastCommittedSearch = normalized.toLowerCase();
+      persistFeedUiState();
+      resetFeedPagination();
+      scheduleRenderFeed();
+    }
 export function setFeedState(next = {}) {
       let shouldPersistUi = false;
       if (typeof next.currentFilter === "string") {
@@ -2984,19 +3010,7 @@ export function setupFeedControls() {
           if (!btn) return;
           const tag = `${btn.getAttribute("data-trending-tag") || ""}`.trim();
           if (!tag) return;
-          const searchInput = $("feed-search");
-          if (searchInput) {
-            searchInput.value = `#${tag}`;
-          }
-          const clearBtn = $("btn-feed-clear");
-          if (clearBtn) {
-            clearBtn.classList.remove("hidden");
-            clearBtn.disabled = false;
-          }
-          feedLastCommittedSearch = `#${tag}`.toLowerCase();
-          persistFeedUiState();
-          resetFeedPagination();
-          scheduleRenderFeed();
+          applyFeedSearchTerm(`#${tag}`);
         });
       }
       const topicFollowWrap = $("feed-follow-topic-tags");
@@ -3027,20 +3041,26 @@ export function setupFeedControls() {
           if (!btn) return;
           const term = normalizeTopicTerm(btn.getAttribute("data-followed-topic"));
           if (!term) return;
-          const searchInput = $("feed-search");
           const nextSearch = `#${term}`;
-          const currentSearch = searchInput?.value?.trim().toLowerCase() || "";
-          if (searchInput && currentSearch !== nextSearch.toLowerCase()) {
-            searchInput.value = nextSearch;
-            feedLastCommittedSearch = nextSearch.toLowerCase();
-            persistFeedUiState();
-            resetFeedPagination();
-            scheduleRenderFeed();
+          const currentSearch = $("feed-search")?.value?.trim().toLowerCase() || "";
+          if (currentSearch !== nextSearch.toLowerCase()) {
+            applyFeedSearchTerm(nextSearch);
             return;
           }
           toggleFollowedTopic(term);
           resetFeedPagination();
           scheduleRenderFeed();
+        });
+      }
+      const feedList = $("feed-list");
+      if (feedList && feedList.dataset.searchTagBound !== "true") {
+        feedList.dataset.searchTagBound = "true";
+        feedList.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-feed-search-tag]");
+          if (!btn) return;
+          const tag = normalizeTopicTerm(btn.getAttribute("data-feed-search-tag"));
+          if (!tag) return;
+          applyFeedSearchTerm(`#${tag}`);
         });
       }
       const suggestedUsersWrap = $("feed-suggested-users");
@@ -4809,6 +4829,20 @@ export function renderFeed(options = {}) {
           captionToggle.setAttribute("aria-pressed", isExpanded ? "true" : "false");
           body.appendChild(captionToggle);
         }
+        const captionTags = getCaptionHashtags(fullText, FEED_CAPTION_TAG_LIMIT);
+        if (captionTags.length) {
+          const tagRow = document.createElement("div");
+          tagRow.className = "post-caption-tags";
+          captionTags.forEach((tag) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "chip chip-caption-tag";
+            chip.setAttribute("data-feed-search-tag", tag);
+            chip.textContent = `#${tag}`;
+            tagRow.appendChild(chip);
+          });
+          body.appendChild(tagRow);
+        }
       }
 
       if (body.childNodes.length) {
@@ -5776,6 +5810,17 @@ export function setupPostDetailModal() {
           }
         });
       }
+      if (backdrop && backdrop.dataset.searchTagBound !== "true") {
+        backdrop.dataset.searchTagBound = "true";
+        backdrop.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-feed-search-tag]");
+          if (!btn) return;
+          const tag = normalizeTopicTerm(btn.getAttribute("data-feed-search-tag"));
+          if (!tag) return;
+          applyFeedSearchTerm(`#${tag}`);
+          closePostDetail();
+        });
+      }
       if (!feedDetailKeyboardBound && typeof window !== "undefined") {
         feedDetailKeyboardBound = true;
         window.addEventListener("keydown", (event) => {
@@ -5950,8 +5995,23 @@ export function renderPostDetail() {
         if (post.note || post.caption) {
           const caption = document.createElement("div");
           caption.className = "post-caption";
-          caption.textContent = post.note || post.caption || "";
+          const captionText = `${post.note || post.caption || ""}`.trim();
+          caption.textContent = captionText;
           body.appendChild(caption);
+          const captionTags = getCaptionHashtags(captionText, FEED_CAPTION_TAG_LIMIT);
+          if (captionTags.length) {
+            const tagRow = document.createElement("div");
+            tagRow.className = "post-caption-tags";
+            captionTags.forEach((tag) => {
+              const chip = document.createElement("button");
+              chip.type = "button";
+              chip.className = "chip chip-caption-tag";
+              chip.setAttribute("data-feed-search-tag", tag);
+              chip.textContent = `#${tag}`;
+              tagRow.appendChild(chip);
+            });
+            body.appendChild(tagRow);
+          }
         }
         bodyEl.appendChild(body);
       }

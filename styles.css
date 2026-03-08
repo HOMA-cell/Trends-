@@ -935,6 +935,25 @@
       color: var(--text-main);
       background: rgba(15, 23, 42, 0.08);
     }
+    .post-caption-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .chip-caption-tag {
+      padding: 2px 8px;
+      min-height: 0;
+      font-size: 11px;
+      border-color: rgba(239, 101, 71, 0.3);
+      background: rgba(239, 101, 71, 0.08);
+      color: #b6492f;
+    }
+    .chip-caption-tag:hover {
+      background: rgba(239, 101, 71, 0.16);
+      border-color: rgba(239, 101, 71, 0.46);
+      color: #993d28;
+    }
     .empty {
       font-size: 12px;
       color: var(--text-sub);
