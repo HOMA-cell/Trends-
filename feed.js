@@ -242,9 +242,185 @@ const FEED_DISCOVERY_USER_LIMIT = 8;
 const FEED_SEEN_POSTS_LIMIT = 2000;
 const FEED_CAPTION_TRIM_LIMIT = 140;
 const FEED_CAPTION_TAG_LIMIT = 5;
+const ADS_SETTINGS_KEY = "trends_ads_config_v1";
+const ADSENSE_SCRIPT_BASE =
+  "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js";
+const FEED_AD_MIN_INTERVAL = 4;
+const FEED_AD_MAX_INTERVAL = 20;
+const FEED_AD_MIN_START_AT = 2;
+const FEED_AD_MAX_START_AT = 40;
+const FEED_AD_MAX_COUNT = 8;
 let feedUiStateLoaded = false;
 let feedDiscoveryExpanded = false;
 let seenPostsObserver = null;
+let adSenseScriptClient = "";
+let adSenseScriptLoading = false;
+let adSenseScriptLoaded = false;
+
+function clampNumber(value, min, max, fallback) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return fallback;
+      return Math.min(max, Math.max(min, Math.round(num)));
+    }
+function normalizeAdsClientId(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      if (/^ca-pub-\d{10,24}$/i.test(raw)) return raw;
+      if (/^\d{10,24}$/.test(raw)) return `ca-pub-${raw}`;
+      return raw;
+    }
+function normalizeAdsSlotId(value) {
+      return String(value || "")
+        .trim()
+        .replace(/[^\d]/g, "")
+        .slice(0, 20);
+    }
+function normalizeFeedAdsSettings(payload = {}, fallback = {}) {
+      return {
+        enabled:
+          payload.enabled === undefined
+            ? fallback.enabled !== false
+            : payload.enabled !== false,
+        client: normalizeAdsClientId(
+          payload.client === undefined ? fallback.client : payload.client
+        ),
+        feedSlot: normalizeAdsSlotId(
+          payload.feedSlot === undefined ? fallback.feedSlot : payload.feedSlot
+        ),
+        testMode:
+          payload.testMode === undefined
+            ? fallback.testMode !== false
+            : payload.testMode !== false,
+        feedInterval: clampNumber(
+          payload.feedInterval === undefined
+            ? fallback.feedInterval
+            : payload.feedInterval,
+          FEED_AD_MIN_INTERVAL,
+          FEED_AD_MAX_INTERVAL,
+          8
+        ),
+        feedStartAt: clampNumber(
+          payload.feedStartAt === undefined
+            ? fallback.feedStartAt
+            : payload.feedStartAt,
+          FEED_AD_MIN_START_AT,
+          FEED_AD_MAX_START_AT,
+          4
+        ),
+        feedMaxAds: clampNumber(
+          payload.feedMaxAds === undefined ? fallback.feedMaxAds : payload.feedMaxAds,
+          0,
+          FEED_AD_MAX_COUNT,
+          3
+        ),
+      };
+    }
+function getRuntimeFeedAdsSettings() {
+      const defaults = normalizeFeedAdsSettings(
+        typeof window !== "undefined" ? window.__TRENDS_ADS__ || {} : {},
+        {}
+      );
+      try {
+        const stored = JSON.parse(localStorage.getItem(ADS_SETTINGS_KEY) || "{}");
+        return normalizeFeedAdsSettings(stored, defaults);
+      } catch {
+        return defaults;
+      }
+    }
+function isFeedAdsConfigured(settings) {
+      return !!(
+        settings &&
+        settings.enabled !== false &&
+        settings.client &&
+        settings.feedSlot
+      );
+    }
+function ensureAdSenseScript(settings) {
+      if (typeof document === "undefined") return;
+      if (!isFeedAdsConfigured(settings)) return;
+      const client = settings.client;
+      if (!client || adSenseScriptClient === client && adSenseScriptLoaded) return;
+      if (adSenseScriptLoading && adSenseScriptClient === client) return;
+      if (adSenseScriptLoaded && adSenseScriptClient && adSenseScriptClient !== client) {
+        return;
+      }
+      let scriptEl = document.querySelector("script[data-adsense-loader='trends']");
+      if (!scriptEl) {
+        scriptEl = document.createElement("script");
+        scriptEl.async = true;
+        scriptEl.crossOrigin = "anonymous";
+        scriptEl.dataset.adsenseLoader = "trends";
+        document.head.appendChild(scriptEl);
+      }
+      scriptEl.src = `${ADSENSE_SCRIPT_BASE}?client=${encodeURIComponent(client)}`;
+      adSenseScriptClient = client;
+      adSenseScriptLoading = true;
+      scriptEl.onload = () => {
+        adSenseScriptLoading = false;
+        adSenseScriptLoaded = true;
+      };
+      scriptEl.onerror = () => {
+        adSenseScriptLoading = false;
+      };
+    }
+function requestFeedAdRender(insEl) {
+      if (!insEl || typeof window === "undefined") return;
+      if (insEl.dataset.adRendered === "true") return;
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        insEl.dataset.adRendered = "true";
+      } catch {
+        // ignore ad render errors (ad blocker / not loaded)
+      }
+    }
+function shouldInsertFeedAdBeforePost({
+      postIndex,
+      insertedCount,
+      visibleCount,
+      settings,
+      enabled,
+    }) {
+      if (!enabled || !isFeedAdsConfigured(settings)) return false;
+      if (postIndex < settings.feedStartAt) return false;
+      if (postIndex >= visibleCount) return false;
+      if (insertedCount >= settings.feedMaxAds) return false;
+      return (postIndex - settings.feedStartAt) % settings.feedInterval === 0;
+    }
+function createFeedAdCard(settings, tr) {
+      const card = document.createElement("div");
+      card.className = "feed-ad-card";
+      card.setAttribute("data-ad-kind", "in-feed");
+      const label = document.createElement("div");
+      label.className = "feed-ad-label";
+      label.textContent = tr.feedSponsoredLabel || "Sponsored";
+      card.appendChild(label);
+
+      const body = document.createElement("div");
+      body.className = "feed-ad-body";
+      const ins = document.createElement("ins");
+      ins.className = "adsbygoogle";
+      ins.style.display = "block";
+      ins.setAttribute("data-ad-client", settings.client);
+      ins.setAttribute("data-ad-slot", settings.feedSlot);
+      ins.setAttribute("data-ad-format", "fluid");
+      ins.setAttribute("data-full-width-responsive", "true");
+      if (settings.testMode !== false) {
+        ins.setAttribute("data-adtest", "on");
+      }
+      body.appendChild(ins);
+      card.appendChild(body);
+
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => {
+          requestFeedAdRender(ins);
+        });
+      } else {
+        setTimeout(() => {
+          requestFeedAdRender(ins);
+        }, 0);
+      }
+      return card;
+    }
 const openBackdrop = (backdrop) => {
       if (!backdrop) return;
       if (backdrop._closeTimer) {
@@ -3904,6 +4080,11 @@ export function renderFeed(options = {}) {
     const autoLoadMoreEnabled = settings.feedAutoLoadMore !== false;
     const followingIds = getFollowingIds();
     const tr = t[currentLang] || t.ja;
+    const adsSettings = getRuntimeFeedAdsSettings();
+    const feedAdsEnabled = feedLayout === "list" && isFeedAdsConfigured(adsSettings);
+    if (feedAdsEnabled) {
+      ensureAdSenseScript(adsSettings);
+    }
     const pullIndicator = $("feed-pull-indicator");
     if (
       pullIndicator &&
@@ -4364,6 +4545,9 @@ export function renderFeed(options = {}) {
       container.dataset.feedSignature === renderSignature &&
       existingCount > 0 &&
       existingCount < visibleSlice.length;
+    const existingAdCount = canAppend
+      ? container.querySelectorAll(".feed-ad-card[data-ad-kind='in-feed']").length
+      : 0;
     const renderMode = canAppend ? "append" : "full";
 
     if (!gridCandidates.length) {
@@ -4973,6 +5157,7 @@ export function renderFeed(options = {}) {
     };
 
     let index = canAppend ? existingCount : 0;
+    let renderedAdCount = existingAdCount;
     const viewportWidth =
       typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
     const compactViewport = viewportWidth <= 700;
@@ -5072,6 +5257,18 @@ export function renderFeed(options = {}) {
       const fragment = document.createDocumentFragment();
       const end = Math.min(index + batchSize, visibleSlice.length);
       for (; index < end; index += 1) {
+        if (
+          shouldInsertFeedAdBeforePost({
+            postIndex: index,
+            insertedCount: renderedAdCount,
+            visibleCount: visibleSlice.length,
+            settings: adsSettings,
+            enabled: feedAdsEnabled,
+          })
+        ) {
+          fragment.appendChild(createFeedAdCard(adsSettings, tr));
+          renderedAdCount += 1;
+        }
         fragment.appendChild(createPostCard(visibleSlice[index]));
       }
       container.appendChild(fragment);

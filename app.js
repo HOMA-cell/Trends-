@@ -147,6 +147,7 @@ import {
       "https://api.github.com/repos/HOMA-cell/Trends-/commits/main";
     const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
     const RUNTIME_ISSUES_KEY = "trends_runtime_issues_v1";
+    const ADS_SETTINGS_KEY = "trends_ads_config_v1";
     const RUNTIME_ISSUES_LIMIT = 20;
     const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
     const SUPABASE_CONNECTIVITY_RETRY_MS = 120000;
@@ -813,6 +814,88 @@ async function loadProfilePostCount() {
       updateExtraSectionsVisibility();
     }
 
+    function setupAdsSettingsUI() {
+      const clientInput = $("settings-ads-client");
+      const slotInput = $("settings-ads-slot");
+      const testModeToggle = $("settings-ads-testmode");
+      const enabledToggle = $("settings-ads-enabled");
+      const saveBtn = $("btn-ads-save");
+      const resetBtn = $("btn-ads-reset");
+      const statusEl = $("settings-ads-status");
+      if (
+        !clientInput ||
+        !slotInput ||
+        !testModeToggle ||
+        !enabledToggle ||
+        !saveBtn ||
+        !resetBtn
+      ) {
+        return;
+      }
+      const setStatus = (message = "", durationMs = 3200) => {
+        if (!statusEl) return;
+        statusEl.textContent = message;
+        if (!message) return;
+        setTimeout(() => {
+          if (statusEl.textContent === message) {
+            statusEl.textContent = "";
+          }
+        }, durationMs);
+      };
+      const fill = () => {
+        const current = loadAdsSettings();
+        clientInput.value = current.client || "";
+        slotInput.value = current.feedSlot || "";
+        testModeToggle.checked = current.testMode !== false;
+        enabledToggle.checked = current.enabled !== false;
+      };
+      fill();
+      if (saveBtn.dataset.bound !== "true") {
+        saveBtn.dataset.bound = "true";
+        saveBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          const next = saveAdsSettings({
+            client: clientInput.value,
+            feedSlot: slotInput.value,
+            testMode: testModeToggle.checked,
+            enabled: enabledToggle.checked,
+          });
+          fill();
+          const hasRequired = !!next.client && !!next.feedSlot;
+          setStatus(
+            hasRequired
+              ? tr.settingsAdsSaved || "広告設定を保存しました。フィードを更新します。"
+              : tr.settingsAdsSavedPartial ||
+                "保存しました。Publisher ID / Slot IDを入力すると広告表示できます。"
+          );
+          renderFeed({ forcePageRender: true });
+        });
+      }
+      if (resetBtn.dataset.bound !== "true") {
+        resetBtn.dataset.bound = "true";
+        resetBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          const ok = window.confirm(
+            tr.settingsAdsResetConfirm || "広告設定をクリアしますか？"
+          );
+          if (!ok) return;
+          clearAdsSettings();
+          fill();
+          setStatus(tr.settingsAdsResetDone || "広告設定をクリアしました。");
+          renderFeed({ forcePageRender: true });
+        });
+      }
+      if (
+        typeof window !== "undefined" &&
+        !window.__trendsAdsUiListenerBound
+      ) {
+        window.__trendsAdsUiListenerBound = true;
+        window.addEventListener("trends-ads-config-changed", () => {
+          fill();
+        });
+      }
+    }
+
 
 
 
@@ -933,6 +1016,102 @@ async function loadProfilePostCount() {
       const head = raw.slice(0, 6);
       const tail = raw.slice(-4);
       return `${head}...${tail} (${raw.length})`;
+    }
+
+    function normalizeAdsClientId(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      if (/^ca-pub-\d{10,24}$/i.test(raw)) {
+        return raw;
+      }
+      if (/^\d{10,24}$/.test(raw)) {
+        return `ca-pub-${raw}`;
+      }
+      return raw;
+    }
+
+    function normalizeAdsSlotId(value) {
+      return String(value || "")
+        .trim()
+        .replace(/[^\d]/g, "")
+        .slice(0, 20);
+    }
+
+    function getDefaultAdsSettings() {
+      const globalConfig =
+        typeof window !== "undefined" && window.__TRENDS_ADS__
+          ? window.__TRENDS_ADS__
+          : {};
+      return {
+        enabled: globalConfig.enabled !== false,
+        client: normalizeAdsClientId(globalConfig.client || ""),
+        feedSlot: normalizeAdsSlotId(globalConfig.feedSlot || ""),
+        testMode: globalConfig.testMode !== false,
+      };
+    }
+
+    function normalizeAdsSettingsPayload(payload = {}, fallback = {}) {
+      return {
+        enabled:
+          payload.enabled === undefined
+            ? fallback.enabled !== false
+            : payload.enabled !== false,
+        client: normalizeAdsClientId(
+          payload.client === undefined ? fallback.client : payload.client
+        ),
+        feedSlot: normalizeAdsSlotId(
+          payload.feedSlot === undefined ? fallback.feedSlot : payload.feedSlot
+        ),
+        testMode:
+          payload.testMode === undefined
+            ? fallback.testMode !== false
+            : payload.testMode !== false,
+      };
+    }
+
+    function loadAdsSettings() {
+      const defaults = getDefaultAdsSettings();
+      try {
+        const raw = JSON.parse(localStorage.getItem(ADS_SETTINGS_KEY) || "{}");
+        return normalizeAdsSettingsPayload(raw, defaults);
+      } catch {
+        return defaults;
+      }
+    }
+
+    function saveAdsSettings(next = {}) {
+      const current = loadAdsSettings();
+      const normalized = normalizeAdsSettingsPayload(next, current);
+      try {
+        localStorage.setItem(ADS_SETTINGS_KEY, JSON.stringify(normalized));
+      } catch {
+        // ignore localStorage write failure
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("trends-ads-config-changed", {
+            detail: normalized,
+          })
+        );
+      }
+      return normalized;
+    }
+
+    function clearAdsSettings() {
+      try {
+        localStorage.removeItem(ADS_SETTINGS_KEY);
+      } catch {
+        // ignore localStorage write failure
+      }
+      const defaults = getDefaultAdsSettings();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("trends-ads-config-changed", {
+            detail: defaults,
+          })
+        );
+      }
+      return defaults;
     }
 
     function isLikelyFetchError(error) {
@@ -1584,6 +1763,7 @@ async function loadProfilePostCount() {
         () => setupProfileEditShortcuts(),
         () => setupSettingsUI(),
         () => setupExtraSectionsToggle(),
+        () => setupAdsSettingsUI(),
         () => setupDebug(),
         () => setupFollowButtons(),
       ];
@@ -1978,6 +2158,10 @@ async function loadProfilePostCount() {
       setText("btn-auth-reset-connection", "authResetConnection");
       setPlaceholder("auth-email", "accountEmailPlaceholder");
       setPlaceholder("auth-password", "accountPasswordPlaceholder");
+      setText("footer-privacy-link", "footerPrivacy");
+      setText("footer-terms-link", "footerTerms");
+      setText("footer-contact-link", "footerContact");
+      setText("footer-note", "footerAdNotice");
 
       setText("settings-title", "settingsTitle");
       setText("settings-sub", "settingsSub");
@@ -2070,6 +2254,18 @@ async function loadProfilePostCount() {
       setText("btn-supabase-reset", "settingsSupabaseReset");
       setPlaceholder("settings-supabase-url", "settingsSupabaseUrlLabel");
       setPlaceholder("settings-supabase-key", "settingsSupabaseKeyLabel");
+      setText("settings-ads-title", "settingsAdsTitle");
+      setText("settings-ads-sub", "settingsAdsSub");
+      setText("settings-ads-client-label", "settingsAdsClientLabel");
+      setText("settings-ads-slot-label", "settingsAdsSlotLabel");
+      setText("settings-ads-testmode-title", "settingsAdsTestModeTitle");
+      setText("settings-ads-testmode-desc", "settingsAdsTestModeDesc");
+      setText("settings-ads-enabled-title", "settingsAdsEnabledTitle");
+      setText("settings-ads-enabled-desc", "settingsAdsEnabledDesc");
+      setText("btn-ads-save", "settingsAdsSave");
+      setText("btn-ads-reset", "settingsAdsReset");
+      setPlaceholder("settings-ads-client", "settingsAdsClientPlaceholder");
+      setPlaceholder("settings-ads-slot", "settingsAdsSlotPlaceholder");
       const supabaseSourceEl = $("settings-supabase-source");
       if (supabaseSourceEl) {
         const sourceText =

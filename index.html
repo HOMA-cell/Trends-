@@ -20,7 +20,7 @@
 
   <!-- ================== Styles ================== -->
   <link rel="stylesheet" href="styles.css">
-  
+  <script src="ads-config.js"></script>
 
   <!-- 右上の小さいナビボタン -->
   
@@ -898,6 +898,59 @@
                   <div class="settings-note" id="settings-supabase-source"></div>
                   <div class="settings-note" id="settings-connection-diagnostic" role="status" aria-live="polite"></div>
                 </div>
+                <div class="settings-supabase-config">
+                  <div class="settings-note" id="settings-ads-title">広告収益化（AdSense）</div>
+                  <div class="settings-note" id="settings-ads-sub">Publisher ID と Feed Slot を設定するとフィード内に広告を表示します。</div>
+                  <div class="field">
+                    <label id="settings-ads-client-label">Publisher ID</label>
+                    <input
+                      id="settings-ads-client"
+                      type="text"
+                      placeholder="ca-pub-xxxxxxxxxxxxxxxx"
+                      autocapitalize="off"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </div>
+                  <div class="field">
+                    <label id="settings-ads-slot-label">Feed Slot ID</label>
+                    <input
+                      id="settings-ads-slot"
+                      type="text"
+                      placeholder="1234567890"
+                      inputmode="numeric"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </div>
+                  <div class="settings-list settings-grid">
+                    <div class="settings-item">
+                      <div class="settings-info">
+                        <div class="settings-title" id="settings-ads-testmode-title">テスト広告を使う</div>
+                        <div class="settings-desc" id="settings-ads-testmode-desc">審査/確認中はON、本番配信時はOFF推奨。</div>
+                      </div>
+                      <label class="toggle">
+                        <input type="checkbox" id="settings-ads-testmode" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                    <div class="settings-item">
+                      <div class="settings-info">
+                        <div class="settings-title" id="settings-ads-enabled-title">広告表示を有効化</div>
+                        <div class="settings-desc" id="settings-ads-enabled-desc">ONでフィード内広告を表示します。</div>
+                      </div>
+                      <label class="toggle">
+                        <input type="checkbox" id="settings-ads-enabled" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="settings-actions">
+                    <button class="btn btn-ghost" id="btn-ads-save">広告設定を保存</button>
+                    <button class="btn btn-ghost" id="btn-ads-reset">広告設定をクリア</button>
+                  </div>
+                  <div class="settings-note" id="settings-ads-status" role="status" aria-live="polite"></div>
+                </div>
                 <div class="settings-build-meta" id="settings-build-meta">
                   <div class="settings-note">
                     <span id="settings-build-version-label">アプリ版</span>:
@@ -960,6 +1013,14 @@
       </div>
   
     </div> <!-- .layout 終わり -->
+    <footer class="site-footer">
+      <div class="site-footer-links">
+        <a href="./privacy.html" id="footer-privacy-link" target="_blank" rel="noopener noreferrer">プライバシー</a>
+        <a href="./terms.html" id="footer-terms-link" target="_blank" rel="noopener noreferrer">利用規約</a>
+        <a href="./contact.html" id="footer-contact-link" target="_blank" rel="noopener noreferrer">お問い合わせ</a>
+      </div>
+      <div class="site-footer-note" id="footer-note">広告配信時は Cookie と計測が使われる場合があります。</div>
+    </footer>
 
   <!-- 右下の小さい投稿ボタン -->
   <button class="fab" id="fab-open-post">＋</button>
