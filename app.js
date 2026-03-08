@@ -171,15 +171,11 @@ import {
     const PROFILE_EDIT_COLLAPSIBLE_KEYS = [
       "profile-edit-identity",
       "profile-edit-training",
-      "profile-edit-media",
-      "profile-edit-links",
     ];
     const PROFILE_EDIT_TRACKED_FIELD_IDS = [
       "profile-display",
       "profile-handle",
       "profile-bio-input",
-      "profile-avatar-url",
-      "profile-banner-url",
       "profile-location",
       "profile-height",
       "profile-experience",
@@ -187,11 +183,6 @@ import {
       "profile-gym",
       "profile-split",
       "profile-favorite",
-      "profile-instagram",
-      "profile-tiktok",
-      "profile-youtube",
-      "profile-website",
-      "profile-accent",
     ];
     const commentSync = createCommentSync({
       supabase,
@@ -2649,8 +2640,19 @@ async function loadProfilePostCount() {
         }
 
         const bio = bioEl?.value.trim() || null;
-        let avatarUrl = avatarUrlEl?.value.trim() || null;
-        let bannerUrl = bannerUrlEl?.value.trim() || null;
+        const readOptionalNullable = (el, fallback = null) => {
+          if (!el) return fallback;
+          const value = el.value.trim();
+          return value ? value : null;
+        };
+        let avatarUrl = readOptionalNullable(
+          avatarUrlEl,
+          currentProfile?.avatar_url || null
+        );
+        let bannerUrl = readOptionalNullable(
+          bannerUrlEl,
+          currentProfile?.banner_url || null
+        );
         const location = locationEl?.value.trim() || null;
         const heightRaw = heightEl?.value ? Number(heightEl.value) : null;
         const heightValue =
@@ -2662,11 +2664,25 @@ async function loadProfilePostCount() {
         const gym = gymEl?.value.trim() || null;
         const split = splitEl?.value.trim() || null;
         const favorite = favoriteEl?.value.trim() || null;
-        const instagram = instagramEl?.value.trim() || null;
-        const tiktok = tiktokEl?.value.trim() || null;
-        const youtube = youtubeEl?.value.trim() || null;
-        const website = websiteEl?.value.trim() || null;
-        const accent = accentEl?.value || "#e4572e";
+        const instagram = readOptionalNullable(
+          instagramEl,
+          currentProfile?.instagram || null
+        );
+        const tiktok = readOptionalNullable(
+          tiktokEl,
+          currentProfile?.tiktok || null
+        );
+        const youtube = readOptionalNullable(
+          youtubeEl,
+          currentProfile?.youtube || null
+        );
+        const website = readOptionalNullable(
+          websiteEl,
+          currentProfile?.website || null
+        );
+        const accent = accentEl
+          ? accentEl.value || "#e4572e"
+          : currentProfile?.accent_color || "#e4572e";
 
         const avatarValidationError = getFileValidationError(pendingAvatarFile, "avatar");
         if (avatarValidationError) {

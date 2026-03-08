@@ -620,7 +620,6 @@ export function updateProfileSummary() {
   const bannerEl = $("profile-banner");
   const factsEl = $("profile-facts");
   const highlightsEl = $("profile-highlights");
-  const linksEl = $("profile-links");
   const statsGridEl = $("profile-stats-grid");
   const quickStatsEl = $("profile-quick-stats");
   const completionEl = $("profile-completion");
@@ -648,7 +647,6 @@ export function updateProfileSummary() {
     !bannerEl &&
     !factsEl &&
     !highlightsEl &&
-    !linksEl &&
     !statsGridEl &&
     !quickStatsEl &&
     !completionEl &&
@@ -683,10 +681,6 @@ export function updateProfileSummary() {
     if (highlightsEl) {
       highlightsEl.innerHTML = "";
       highlightsEl.classList.add("hidden");
-    }
-    if (linksEl) {
-      linksEl.innerHTML = "";
-      linksEl.classList.add("hidden");
     }
     if (statsGridEl) {
       statsGridEl.innerHTML = "";
@@ -727,7 +721,6 @@ export function updateProfileSummary() {
     if (statTotalEl) statTotalEl.textContent = "-";
     toggleSectionVisibility("profile-facts-title", factsEl);
     toggleSectionVisibility("profile-highlights-title", highlightsEl);
-    toggleSectionVisibility("profile-links-title", linksEl);
     toggleCollapsibleVisibility("profile-details", false);
     return;
   }
@@ -785,16 +778,13 @@ export function updateProfileSummary() {
   }
   renderProfileFacts(factsEl, currentProfile, tr);
   renderProfileHighlights(highlightsEl, currentProfile, tr);
-  renderProfileLinks(linksEl, currentProfile, tr);
   renderProfileCompletion(completionEl, currentProfile, tr);
   toggleSectionVisibility("profile-facts-title", factsEl);
   toggleSectionVisibility("profile-highlights-title", highlightsEl);
-  toggleSectionVisibility("profile-links-title", linksEl);
   const hasProfileExtras = Boolean(
     currentProfile?.banner_url ||
       (factsEl && factsEl.children.length) ||
-      (highlightsEl && highlightsEl.children.length) ||
-      (linksEl && linksEl.children.length)
+      (highlightsEl && highlightsEl.children.length)
   );
   toggleCollapsibleVisibility("profile-details", hasProfileExtras);
   renderProfileStatsGrid(statsGridEl, userPosts, tr);
@@ -928,7 +918,6 @@ export async function openPublicProfile(userId, options = {}) {
   const bannerEl = $("public-profile-banner");
   const factsEl = $("public-profile-facts");
   const highlightsEl = $("public-profile-highlights");
-  const linksEl = $("public-profile-links");
   const statsGridEl = $("public-profile-stats-grid");
   const quickStatsEl = $("public-profile-quick-stats");
   const badgesEl = $("public-profile-badges");
@@ -967,15 +956,12 @@ export async function openPublicProfile(userId, options = {}) {
   }
   renderProfileFacts(factsEl, profile, tr);
   renderProfileHighlights(highlightsEl, profile, tr);
-  renderProfileLinks(linksEl, profile, tr);
   toggleSectionVisibility("public-profile-facts-title", factsEl);
   toggleSectionVisibility("public-profile-highlights-title", highlightsEl);
-  toggleSectionVisibility("public-profile-links-title", linksEl);
   const hasPublicExtras = Boolean(
     profile?.banner_url ||
       (factsEl && factsEl.children.length) ||
-      (highlightsEl && highlightsEl.children.length) ||
-      (linksEl && linksEl.children.length)
+      (highlightsEl && highlightsEl.children.length)
   );
   toggleCollapsibleVisibility("public-profile-details", hasPublicExtras);
   if (joinedEl) {
