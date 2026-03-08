@@ -1967,10 +1967,17 @@ async function loadProfilePostCount() {
 
       // アカウント / Tips / Debug
       setText("account-title", "account");
+      setText("account-subtitle", "accountSignedOutHint");
+      setText("account-session-chip", "accountSignedInBadge");
+      setText("auth-email-label", "accountEmailLabel");
+      setText("auth-password-label", "accountPasswordLabel");
       setText("btn-auth", "loginSignup");
       setText("btn-logout", "logout");
+      setText("auth-caption", "accountAutoCreateHint");
       setText("btn-auth-open-settings", "authOpenConnectionSettings");
       setText("btn-auth-reset-connection", "authResetConnection");
+      setPlaceholder("auth-email", "accountEmailPlaceholder");
+      setPlaceholder("auth-password", "accountPasswordPlaceholder");
 
       setText("settings-title", "settingsTitle");
       setText("settings-sub", "settingsSub");
@@ -2240,6 +2247,9 @@ async function loadProfilePostCount() {
       if (typeof setupDebug === "function") {
         setupDebug();
       }
+      if (typeof updateAuthUIState === "function") {
+        updateAuthUIState();
+      }
       if (typeof renderBuildMeta === "function") {
         renderBuildMeta();
       }
@@ -2250,11 +2260,18 @@ async function loadProfilePostCount() {
 
       // ------------------ Auth ------------------
     function setupAuthUI() {
+      const authForm = $("auth-form");
       const authBtn = $("btn-auth");
       const logoutBtn = $("btn-logout");
       const openSettingsBtn = $("btn-auth-open-settings");
       const resetConnectionBtn = $("btn-auth-reset-connection");
-      if (authBtn && authBtn.dataset.bound !== "true") {
+      if (authForm && authForm.dataset.bound !== "true") {
+        authForm.dataset.bound = "true";
+        authForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          handleAuthSubmit();
+        });
+      } else if (authBtn && authBtn.dataset.bound !== "true") {
         authBtn.dataset.bound = "true";
         authBtn.addEventListener("click", handleAuthSubmit);
       }
@@ -3000,13 +3017,38 @@ async function loadProfilePostCount() {
 
     function updateAuthUIState() {
       const loggedIn = !!currentUser;
+      const tr = t[currentLang] || t.ja;
+      const authEmail = $("auth-email");
+      const authPassword = $("auth-password");
+      const authSignedOut = $("auth-signed-out");
+      const authSignedIn = $("auth-signed-in");
+      const accountSubtitle = $("account-subtitle");
+      const accountSessionChip = $("account-session-chip");
+      const accountLabel = $("account-user");
+      const accountEmail = $("account-user-email");
+      const accountAvatar = $("account-avatar");
+      const profileSection = $("profile-section");
+      const profileEditSection = $("profile-edit-section");
+      const loginRequired = $("login-required");
+      const postSubmitBtn = $("btn-submit");
 
-      $("auth-email").disabled = loggedIn;
-      $("auth-password").disabled = loggedIn;
-      $("btn-auth").style.display = loggedIn ? "none" : "inline-flex";
-      $("btn-logout").style.display = loggedIn ? "inline-flex" : "none";
-      $("login-required").style.display = loggedIn ? "none" : "block";
-      $("btn-submit").disabled = !loggedIn;
+      if (authEmail) authEmail.disabled = loggedIn;
+      if (authPassword) authPassword.disabled = loggedIn;
+      if (authSignedOut) authSignedOut.classList.toggle("hidden", loggedIn);
+      if (authSignedIn) authSignedIn.classList.toggle("hidden", !loggedIn);
+      if (accountSessionChip) {
+        accountSessionChip.classList.toggle("hidden", !loggedIn);
+        accountSessionChip.textContent =
+          tr.accountSignedInBadge || "Signed in";
+      }
+      if (accountSubtitle) {
+        accountSubtitle.textContent = loggedIn
+          ? tr.accountSignedInHint || "Logged in. Update your profile and start posting."
+          : tr.accountSignedOutHint ||
+            "Sign in with email to start posting and saving.";
+      }
+      if (loginRequired) loginRequired.style.display = loggedIn ? "none" : "block";
+      if (postSubmitBtn) postSubmitBtn.disabled = !loggedIn;
       const topPostBtn = $("btn-open-post");
       if (topPostBtn) topPostBtn.disabled = !loggedIn;
       const miniPostBtn = $("mini-btn-post");
@@ -3014,16 +3056,36 @@ async function loadProfilePostCount() {
       const fab = $("fab-open-post");
       if (fab) fab.disabled = !loggedIn;
 
-      const accountLabel = $("account-user");
       if (loggedIn && currentProfile) {
         const display = getProfileDisplayName(currentProfile, "user");
         const handle = currentProfile.handle ? formatHandle(currentProfile.handle) : "";
-        accountLabel.textContent = handle ? `${display} ${handle}` : display;
+        if (accountLabel) {
+          accountLabel.textContent = handle ? `${display} ${handle}` : display;
+        }
+        if (accountEmail) {
+          accountEmail.textContent = currentUser?.email || "-";
+        }
+        if (accountAvatar) {
+          const initial = String(display || currentUser?.email || "U")
+            .trim()
+            .charAt(0)
+            .toUpperCase();
+          accountAvatar.textContent = initial || "U";
+        }
       } else if (loggedIn && currentUser?.email) {
-        accountLabel.textContent = currentUser.email;
+        if (accountLabel) accountLabel.textContent = currentUser.email;
+        if (accountEmail) accountEmail.textContent = currentUser.email;
+        if (accountAvatar) {
+          const initial = String(currentUser.email).charAt(0).toUpperCase();
+          accountAvatar.textContent = initial || "U";
+        }
       } else {
-        accountLabel.textContent = "-";
+        if (accountLabel) accountLabel.textContent = "-";
+        if (accountEmail) accountEmail.textContent = "-";
+        if (accountAvatar) accountAvatar.textContent = "-";
       }
+      if (profileSection) profileSection.classList.toggle("hidden", !loggedIn);
+      if (profileEditSection) profileEditSection.classList.toggle("hidden", !loggedIn);
       renderAuthNetworkStatus();
     }
 

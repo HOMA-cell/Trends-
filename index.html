@@ -169,28 +169,47 @@
   
       <!-- アカウント ページ -->
       <div class="page-view" data-page="account">
-        <section id="panel-account" class="card side-panel">
-          <div class="card-title" id="account-title">アカウント</div>
-      
-          <!-- ログイン中のユーザー名を表示 -->
-          <div class="account-row">
-            <div class="account-name" id="account-user"></div>
+        <section id="panel-account" class="card side-panel account-shell">
+          <div class="account-header">
+            <div>
+              <div class="card-title" id="account-title">アカウント</div>
+              <div class="card-sub" id="account-subtitle">メールで続行して投稿を始めましょう。</div>
+            </div>
+            <div class="account-session-chip hidden" id="account-session-chip">ログイン中</div>
           </div>
-      
-          <input id="auth-email" type="email" placeholder="email@example.com" />
-          <input id="auth-password" type="password" placeholder="Password" />
-      
-          <div class="account-buttons">
-            <button class="btn btn-primary" id="btn-auth">
-              ログイン / サインアップ
-            </button>
-            <button class="btn btn-ghost" id="btn-logout" style="display: none;">
-              ログアウト
-            </button>
+
+          <div class="auth-signed-out" id="auth-signed-out">
+            <form id="auth-form" class="auth-form" autocomplete="on">
+              <label class="sr-only" id="auth-email-label" for="auth-email">メール</label>
+              <input id="auth-email" type="email" placeholder="email@example.com" autocomplete="email" />
+              <label class="sr-only" id="auth-password-label" for="auth-password">パスワード</label>
+              <input
+                id="auth-password"
+                type="password"
+                placeholder="Password"
+                autocomplete="current-password"
+              />
+              <button class="btn btn-primary auth-submit" id="btn-auth" type="submit">
+                ログイン / サインアップ
+              </button>
+            </form>
+            <div class="auth-caption" id="auth-caption">初回は自動でアカウント作成されます。</div>
           </div>
-          <div class="account-buttons" style="margin-top: 8px;">
-            <button class="btn btn-ghost" id="btn-toggle-sections">追加パネルを表示</button>
+
+          <div class="auth-signed-in hidden" id="auth-signed-in">
+            <div class="account-row">
+              <div class="avatar" id="account-avatar">-</div>
+              <div class="account-row-meta">
+                <div class="account-name" id="account-user">-</div>
+                <div class="account-email" id="account-user-email">-</div>
+              </div>
+            </div>
+            <div class="account-buttons">
+              <button class="btn btn-ghost" id="btn-logout">ログアウト</button>
+              <button class="btn btn-ghost" id="btn-toggle-sections">追加パネルを表示</button>
+            </div>
           </div>
+
           <div class="template-status" id="auth-network-status" role="status" aria-live="polite"></div>
           <div class="account-buttons hidden" id="auth-network-actions">
             <button class="btn btn-ghost btn-xs" id="btn-auth-open-settings">接続設定を開く</button>
@@ -198,7 +217,7 @@
           </div>
         </section>
       
-        <section class="card profile-card" id="profile-section" data-collapsible="profile-details" data-default-open="false">
+        <section class="card profile-card hidden" id="profile-section" data-collapsible="profile-details" data-default-open="false">
           <div class="card-header">
             <div class="card-title" id="profile-title">プロフィール</div>
             <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
@@ -246,7 +265,7 @@
           <div id="onboarding-status" class="template-status"></div>
         </section>
 
-        <section class="card" id="profile-edit-section" style="margin-top: 12px;">
+        <section class="card hidden" id="profile-edit-section" style="margin-top: 12px;">
           <div class="card-title" id="profile-edit-title">プロフィール編集</div>
           <div class="card-sub" id="profile-edit-sub">
             表示名や自己紹介を更新できます。
