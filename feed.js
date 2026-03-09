@@ -5117,7 +5117,7 @@ export function renderFeed(options = {}) {
       });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      appendPrimaryAction(saveBtn);
+      appendSecondaryAction(saveBtn);
 
       const shareBtn = document.createElement("button");
       shareBtn.className = "chip chip-log chip-action";
@@ -5127,7 +5127,7 @@ export function renderFeed(options = {}) {
         icon: "↗",
         label: tr.share || "Share",
       });
-      appendPrimaryAction(shareBtn);
+      appendSecondaryAction(shareBtn);
 
       const repostBtn = document.createElement("button");
       repostBtn.className = "chip chip-log chip-repost";

@@ -1870,15 +1870,22 @@ async function loadProfilePostCount() {
 
     // ------------------ 言語切り替え ------------------
     function setupLanguageSwitcher() {
-      const select = $("lang-select");
-      if (!select) return;
-      select.value = currentLang;
-      if (select.dataset.bound !== "true") {
+      const selects = [$("lang-select"), $("mini-lang-select")].filter(Boolean);
+      if (!selects.length) return;
+      selects.forEach((select) => {
+        select.value = currentLang;
+        if (select.dataset.bound === "true") return;
         select.dataset.bound = "true";
         select.addEventListener("change", () => {
-          saveSettings({ language: select.value });
+          const next = select.value || currentLang;
+          selects.forEach((peer) => {
+            if (peer !== select) {
+              peer.value = next;
+            }
+          });
+          saveSettings({ language: next });
         });
-      }
+      });
       applyTranslations();
     }
 
@@ -2127,7 +2134,6 @@ async function loadProfilePostCount() {
       setText("mini-nav-feed", "navFeed");
       setText("mini-nav-account", "navAccount");
       setText("mini-nav-settings", "navSettings");
-      setText("mini-btn-top", "backToTop");
       setText("mini-btn-post", "newPost");
 
       // 新規投稿まわり（要素がなければ自動的にスキップされる）
@@ -3719,7 +3725,6 @@ async function loadProfilePostCount() {
     function setupMiniHeader() {
       const miniHeader = $("mini-header");
       const miniPost = $("mini-btn-post");
-      const miniTop = $("mini-btn-top");
       const progressBar = $("mini-progress-bar");
       if (!miniHeader) return;
 
@@ -3733,9 +3738,11 @@ async function loadProfilePostCount() {
       const applyScrollUi = () => {
         miniHeaderScrollRaf = 0;
         const feedPageActive = isFeedPageActive();
+        const compactScreen = (window.innerWidth || 1024) <= 700;
         const liteMode = !!settings?.liteEffects;
         const revealOffset = liteMode ? 180 : 120;
-        const isVisible = feedPageActive && window.scrollY > revealOffset;
+        const isVisible =
+          compactScreen || (feedPageActive && window.scrollY > revealOffset);
         if (miniHeaderLastVisible !== isVisible) {
           miniHeader.classList.toggle("is-visible", isVisible);
           miniHeaderLastVisible = isVisible;
@@ -3777,18 +3784,6 @@ async function loadProfilePostCount() {
           if (typeof openPostModal === "function") {
             openPostModal();
           }
-        });
-      }
-
-      if (miniTop && miniTop.dataset.bound !== "true") {
-        miniTop.dataset.bound = "true";
-        miniTop.addEventListener("click", () => {
-          const reduceMotion =
-            typeof window.matchMedia === "function" &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          const behavior =
-            settings?.liteEffects || reduceMotion ? "auto" : "smooth";
-          window.scrollTo({ top: 0, behavior });
         });
       }
     }
