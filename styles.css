@@ -3255,3 +3255,159 @@ body.compact-mode .profile-stat {
 body.compact-mode .feed-filters {
   margin-bottom: 6px;
 }
+
+@media (max-width: 700px) {
+  .page {
+    padding: 10px 10px 16px;
+  }
+
+  header {
+    top: max(6px, env(safe-area-inset-top));
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 16px;
+    gap: 8px;
+  }
+
+  #app-title {
+    font-size: 18px;
+    line-height: 1.1;
+  }
+
+  #app-sub {
+    display: none;
+  }
+
+  .title-block {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+    gap: 4px;
+  }
+
+  .title-block .mini-nav {
+    width: auto;
+    margin-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .title-block .mini-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .top-controls {
+    width: auto;
+    margin-left: 0;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  #btn-open-post {
+    min-width: 86px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  #lang-select {
+    max-width: 96px;
+  }
+
+  .mini-nav-btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .page-view[data-page="feed"] > .card {
+    padding: 10px;
+  }
+
+  #feed-title {
+    display: none;
+  }
+
+  .feed-header {
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+
+  .feed-search-wrap {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 6px;
+    align-items: center;
+  }
+
+  #feed-search {
+    grid-column: 1 / -1;
+    max-width: none;
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 16px;
+  }
+
+  #btn-feed-discovery-toggle,
+  #btn-feed-refresh,
+  #btn-feed-clear {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+    order: 0;
+  }
+
+  .feed-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .feed-filter-actions {
+    width: auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .feed-primary-filters {
+    padding-bottom: 0;
+    min-width: 0;
+  }
+
+  .feed-primary-filters .chip,
+  .feed-filter-actions .btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .feed-advanced {
+    margin-bottom: 0;
+  }
+
+  .feed-advanced.is-open {
+    margin-bottom: 8px;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .stat-item {
+    padding: 8px 8px;
+    min-height: 74px;
+    gap: 2px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+  }
+
+  .stat-value {
+    font-size: 13px;
+  }
+}
