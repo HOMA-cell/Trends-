@@ -1269,6 +1269,22 @@
       flex-direction: column;
       gap: 10px;
     }
+    .account-session-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px;
+      background: #fffcf8;
+    }
+    .account-session-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
     .account-row {
       display: flex;
       align-items: center;
@@ -1927,6 +1943,21 @@
       flex-wrap: wrap;
       margin-top: 8px;
     }
+    .profile-edit-advanced-entry {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      background: #fffaf5;
+    }
+    .profile-edit-advanced-note {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
     .profile-edit-compact-hint {
       margin-top: 8px;
       font-size: 11px;
@@ -1995,6 +2026,9 @@
     .profile-editor .field-span textarea {
       min-height: 90px;
     }
+    .profile-advanced-modal {
+      max-width: 560px;
+    }
     #profile-edit-section.profile-edit-compact [data-collapsible^="profile-edit-"] {
       display: none;
     }
@@ -2007,6 +2041,13 @@
     @media (max-width: 700px) {
       .profile-editor {
         grid-template-columns: 1fr;
+      }
+      .profile-edit-advanced-entry {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .profile-edit-advanced-entry .btn {
+        width: 100%;
       }
       .mini-progress {
         display: none;

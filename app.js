@@ -761,30 +761,41 @@ async function loadProfilePostCount() {
     }
 
     function setupProfileEditAdvancedToggle() {
-      const advancedBtn = $("btn-profile-edit-toggle-advanced");
-      if (advancedBtn && advancedBtn.dataset.bound !== "true") {
-        advancedBtn.dataset.bound = "true";
-        advancedBtn.addEventListener("click", () => {
-          setProfileEditGroupsOpen(!areProfileEditGroupsOpen());
-        });
-      }
-      const compactBtn = $("btn-profile-edit-compact");
-      if (compactBtn && compactBtn.dataset.bound !== "true") {
-        compactBtn.dataset.bound = "true";
-        compactBtn.addEventListener("click", () => {
-          profileEditCompact = !profileEditCompact;
-          try {
-            localStorage.setItem(
-              PROFILE_EDIT_COMPACT_KEY,
-              profileEditCompact ? "1" : "0"
-            );
-          } catch (error) {
-            console.warn("profile edit compact preference save failed", error);
+      const openBtn = $("btn-open-profile-advanced");
+      const backdrop = $("profile-advanced-modal-backdrop");
+      const closeBtn = $("btn-profile-advanced-close");
+      const doneBtn = $("btn-profile-advanced-done");
+      const closeAdvancedModal = () => {
+        closeBackdrop(backdrop);
+      };
+      if (openBtn && openBtn.dataset.bound !== "true") {
+        openBtn.dataset.bound = "true";
+        openBtn.addEventListener("click", () => {
+          if (!currentUser) {
+            const tr = t[currentLang] || t.ja;
+            showToast(tr.profileLoginRequired || "ログインしてください。", "warning");
+            return;
           }
-          applyProfileEditCompactMode();
-          updateProfileEditAdvancedToggleLabel();
+          openBackdrop(backdrop);
         });
       }
+      if (closeBtn && closeBtn.dataset.bound !== "true") {
+        closeBtn.dataset.bound = "true";
+        closeBtn.addEventListener("click", closeAdvancedModal);
+      }
+      if (doneBtn && doneBtn.dataset.bound !== "true") {
+        doneBtn.dataset.bound = "true";
+        doneBtn.addEventListener("click", closeAdvancedModal);
+      }
+      if (backdrop && backdrop.dataset.bound !== "true") {
+        backdrop.dataset.bound = "true";
+        backdrop.addEventListener("click", (event) => {
+          if (event.target === backdrop) {
+            closeAdvancedModal();
+          }
+        });
+      }
+
       const activePage =
         document.querySelector(".page-view.is-active")?.dataset.page || "";
       collapseProfileEditGroupsOnMobile(activePage);
@@ -806,7 +817,10 @@ async function loadProfilePostCount() {
 
     function setupExtraSectionsToggle() {
       const btn = $("btn-toggle-sections");
-      if (!btn) return;
+      if (!btn) {
+        updateExtraSectionsVisibility();
+        return;
+      }
       if (btn.dataset.bound !== "true") {
         btn.dataset.bound = "true";
         btn.addEventListener("click", () => {
@@ -2381,8 +2395,11 @@ async function loadProfilePostCount() {
       setText("profile-edit-basics-title", "profileEditBasicsTitle");
       setText("profile-edit-identity-title", "profileEditIdentityTitle");
       setText("profile-edit-training-title", "profileEditTrainingTitle");
+      setText("profile-advanced-title", "profileEditTitle");
       setText("profile-edit-media-title", "profileEditMediaTitle");
       setText("profile-edit-links-title", "profileEditLinksTitle");
+      setText("btn-open-profile-advanced", "profileEditShowAdvanced");
+      setText("profile-edit-advanced-note", "profileEditCompactHint");
       setText("btn-profile-edit-compact", "profileEditShowAdvanced");
       setText("btn-profile-edit-toggle-advanced", "profileEditExpandAll");
       setText("profile-edit-compact-hint", "profileEditCompactHint");
@@ -2688,23 +2705,30 @@ async function loadProfilePostCount() {
       }
 
       const editSection = $("profile-edit-section");
-      if (editSection && editSection.dataset.dirtyBound !== "true") {
-        editSection.dataset.dirtyBound = "true";
-        const onProfileInput = (event) => {
-          const target = event.target;
-          if (!(target instanceof HTMLElement)) return;
-          if (!target.closest("#profile-edit-section")) return;
-          if (target.id === "profile-avatar-file" || target.id === "profile-banner-file") {
-            return;
-          }
-          if (target.matches("input, textarea, select")) {
-            refreshProfileEditDirtyState();
-            scheduleProfileEditDraftSave();
-          }
-        };
-        editSection.addEventListener("input", onProfileInput);
-        editSection.addEventListener("change", onProfileInput);
-      }
+      const profileAdvancedBackdrop = $("profile-advanced-modal-backdrop");
+      const onProfileInput = (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (
+          !target.closest("#profile-edit-section") &&
+          !target.closest("#profile-advanced-modal-backdrop")
+        ) {
+          return;
+        }
+        if (target.id === "profile-avatar-file" || target.id === "profile-banner-file") {
+          return;
+        }
+        if (target.matches("input, textarea, select")) {
+          refreshProfileEditDirtyState();
+          scheduleProfileEditDraftSave();
+        }
+      };
+      [editSection, profileAdvancedBackdrop].forEach((root) => {
+        if (!root || root.dataset.dirtyBound === "true") return;
+        root.dataset.dirtyBound = "true";
+        root.addEventListener("input", onProfileInput);
+        root.addEventListener("change", onProfileInput);
+      });
 
       const saveBtn = $("btn-save-profile");
       if (saveBtn) {
@@ -3273,9 +3297,9 @@ async function loadProfilePostCount() {
       const accountSessionChip = $("account-session-chip");
       const accountLabel = $("account-user");
       const accountEmail = $("account-user-email");
-      const accountAvatar = $("account-avatar");
       const profileSection = $("profile-section");
       const profileEditSection = $("profile-edit-section");
+      const openAdvancedBtn = $("btn-open-profile-advanced");
       const loginRequired = $("login-required");
       const postSubmitBtn = $("btn-submit");
 
@@ -3290,7 +3314,8 @@ async function loadProfilePostCount() {
       }
       if (accountSubtitle) {
         accountSubtitle.textContent = loggedIn
-          ? tr.accountSignedInHint || "Logged in. Update your profile and start posting."
+          ? tr.profileEditSub ||
+            "Update your display name and bio."
           : tr.accountSignedOutHint ||
             "Sign in with email to start posting and saving.";
       }
@@ -3302,6 +3327,13 @@ async function loadProfilePostCount() {
       if (miniPostBtn) miniPostBtn.disabled = !loggedIn;
       const fab = $("fab-open-post");
       if (fab) fab.disabled = !loggedIn;
+      if (openAdvancedBtn) openAdvancedBtn.disabled = !loggedIn;
+      if (!loggedIn) {
+        const profileAdvancedBackdrop = $("profile-advanced-modal-backdrop");
+        if (profileAdvancedBackdrop && !profileAdvancedBackdrop.classList.contains("hidden")) {
+          closeBackdrop(profileAdvancedBackdrop);
+        }
+      }
 
       if (loggedIn && currentProfile) {
         const display = getProfileDisplayName(currentProfile, "user");
@@ -3312,24 +3344,12 @@ async function loadProfilePostCount() {
         if (accountEmail) {
           accountEmail.textContent = currentUser?.email || "-";
         }
-        if (accountAvatar) {
-          const initial = String(display || currentUser?.email || "U")
-            .trim()
-            .charAt(0)
-            .toUpperCase();
-          accountAvatar.textContent = initial || "U";
-        }
       } else if (loggedIn && currentUser?.email) {
         if (accountLabel) accountLabel.textContent = currentUser.email;
         if (accountEmail) accountEmail.textContent = currentUser.email;
-        if (accountAvatar) {
-          const initial = String(currentUser.email).charAt(0).toUpperCase();
-          accountAvatar.textContent = initial || "U";
-        }
       } else {
         if (accountLabel) accountLabel.textContent = "-";
         if (accountEmail) accountEmail.textContent = "-";
-        if (accountAvatar) accountAvatar.textContent = "-";
       }
       if (profileSection) profileSection.classList.toggle("hidden", !loggedIn);
       if (profileEditSection) profileEditSection.classList.toggle("hidden", !loggedIn);

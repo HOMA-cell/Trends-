@@ -203,16 +203,12 @@
           </div>
 
           <div class="auth-signed-in hidden" id="auth-signed-in">
-            <div class="account-row">
-              <div class="avatar" id="account-avatar">-</div>
-              <div class="account-row-meta">
+            <div class="account-session-row">
+              <div class="account-session-meta">
                 <div class="account-name" id="account-user">-</div>
                 <div class="account-email" id="account-user-email">-</div>
               </div>
-            </div>
-            <div class="account-buttons">
-              <button class="btn btn-ghost" id="btn-logout">ログアウト</button>
-              <button class="btn btn-ghost" id="btn-toggle-sections">追加パネルを表示</button>
+              <button class="btn btn-ghost btn-xs" id="btn-logout">ログアウト</button>
             </div>
           </div>
 
@@ -276,12 +272,11 @@
           <div class="card-sub" id="profile-edit-sub">
             表示名や自己紹介を更新できます。
           </div>
-          <div class="profile-edit-toolbar">
-            <button class="btn btn-ghost btn-xs" id="btn-profile-edit-compact">項目を増やす</button>
-            <button class="btn btn-ghost btn-xs" id="btn-profile-edit-toggle-advanced">詳細をまとめて表示</button>
-          </div>
-          <div class="profile-edit-compact-hint hidden" id="profile-edit-compact-hint">
-            基本項目のみ表示中。必要なときだけ項目を増やせます。
+          <div class="profile-edit-advanced-entry">
+            <button class="btn btn-ghost btn-xs" id="btn-open-profile-advanced">詳細プロフィールを編集</button>
+            <div class="profile-edit-advanced-note" id="profile-edit-advanced-note">
+              目標・ジム・身長などは「詳細プロフィール」で編集できます。
+            </div>
           </div>
 
           <div class="profile-edit-group">
@@ -294,56 +289,6 @@
               <div class="field field-span">
                 <label id="profile-bio-label">自己紹介</label>
                 <textarea id="profile-bio-input" placeholder="筋トレのこだわりなど"></textarea>
-              </div>
-            </div>
-          </div>
-
-          <div class="profile-edit-group" data-collapsible="profile-edit-identity" data-default-open="false">
-            <div class="profile-edit-group-header">
-              <div class="profile-edit-group-title" id="profile-edit-identity-title">プロフィール詳細</div>
-              <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
-            </div>
-            <div class="profile-editor collapsible-content" data-collapsible-content>
-              <div class="field">
-                <label id="profile-handle-label">ハンドル</label>
-                <input id="profile-handle" type="text" placeholder="handle" />
-              </div>
-              <div class="field">
-                <label id="profile-location-label">場所</label>
-                <input id="profile-location" type="text" placeholder="Tokyo" />
-              </div>
-              <div class="field">
-                <label id="profile-height-label">身長</label>
-                <input id="profile-height" type="number" placeholder="170" />
-              </div>
-            </div>
-          </div>
-
-          <div class="profile-edit-group" data-collapsible="profile-edit-training" data-default-open="false">
-            <div class="profile-edit-group-header">
-              <div class="profile-edit-group-title" id="profile-edit-training-title">トレーニング詳細</div>
-              <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
-            </div>
-            <div class="profile-editor collapsible-content" data-collapsible-content>
-              <div class="field">
-                <label id="profile-experience-label">経験</label>
-                <select id="profile-experience"></select>
-              </div>
-              <div class="field">
-                <label id="profile-goal-label">目標</label>
-                <input id="profile-goal" type="text" placeholder="筋肥大 / パワーアップ" />
-              </div>
-              <div class="field">
-                <label id="profile-gym-label">ジム</label>
-                <input id="profile-gym" type="text" placeholder="Anytime Fitness" />
-              </div>
-              <div class="field">
-                <label id="profile-split-label">分割</label>
-                <input id="profile-split" type="text" placeholder="Push/Pull/Legs" />
-              </div>
-              <div class="field field-span">
-                <label id="profile-favorite-label">好きな種目</label>
-                <textarea id="profile-favorite" placeholder="Bench, Squat, Deadlift"></textarea>
               </div>
             </div>
           </div>
@@ -1030,6 +975,64 @@
 
   <!-- 右下の小さい投稿ボタン -->
   <button class="fab" id="fab-open-post">＋</button>
+
+  <!-- 投稿モーダル -->
+  <div class="modal-backdrop hidden" id="profile-advanced-modal-backdrop" data-no-page-swipe>
+    <section class="card modal-panel profile-advanced-modal">
+      <div class="modal-header-row">
+        <div class="card-title" id="profile-advanced-title">詳細プロフィール</div>
+        <button class="modal-close-btn" id="btn-profile-advanced-close">×</button>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-title" id="profile-edit-identity-title">プロフィール詳細</div>
+        <div class="profile-editor">
+          <div class="field">
+            <label id="profile-handle-label">ハンドル</label>
+            <input id="profile-handle" type="text" placeholder="handle" />
+          </div>
+          <div class="field">
+            <label id="profile-location-label">場所</label>
+            <input id="profile-location" type="text" placeholder="Tokyo" />
+          </div>
+          <div class="field">
+            <label id="profile-height-label">身長</label>
+            <input id="profile-height" type="number" placeholder="170" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-title" id="profile-edit-training-title">トレーニング詳細</div>
+        <div class="profile-editor">
+          <div class="field">
+            <label id="profile-experience-label">経験</label>
+            <select id="profile-experience"></select>
+          </div>
+          <div class="field">
+            <label id="profile-goal-label">目標</label>
+            <input id="profile-goal" type="text" placeholder="筋肥大 / パワーアップ" />
+          </div>
+          <div class="field">
+            <label id="profile-gym-label">ジム</label>
+            <input id="profile-gym" type="text" placeholder="Anytime Fitness" />
+          </div>
+          <div class="field">
+            <label id="profile-split-label">分割</label>
+            <input id="profile-split" type="text" placeholder="Push/Pull/Legs" />
+          </div>
+          <div class="field field-span">
+            <label id="profile-favorite-label">好きな種目</label>
+            <textarea id="profile-favorite" placeholder="Bench, Squat, Deadlift"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="button" id="btn-profile-advanced-done">完了</button>
+      </div>
+    </section>
+  </div>
 
   <!-- 投稿モーダル -->
   <div class="modal-backdrop hidden" id="post-modal-backdrop">
