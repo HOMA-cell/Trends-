@@ -259,6 +259,12 @@
       display: grid;
       grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
       gap: 16px;
+      position: relative;
+      overflow-x: clip;
+    }
+    .layout.is-page-transitioning {
+      overflow: hidden;
+      min-height: var(--page-transition-height, 1px);
     }
     @media (max-width: 900px) {
       .layout {
@@ -467,6 +473,27 @@
       opacity: 0.6;
       pointer-events: none;
     }
+    .chip-compact {
+      min-height: 34px;
+      padding: 6px 12px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    .chip-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .chip-action .chip-icon {
+      font-size: 12px;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+    .chip-action .chip-label {
+      line-height: 1;
+      white-space: nowrap;
+      font-size: 11px;
+    }
 
     .feed-search-wrap {
       flex: 1;
@@ -503,6 +530,17 @@
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 6px;
+    }
+    .feed-filter-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    #btn-feed-shorts-mode.is-active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
     }
     .feed-primary-filters {
       flex: 1;
@@ -637,6 +675,10 @@
         width: 100%;
         justify-content: space-between;
       }
+      .feed-filter-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
       .feed-discovery {
         grid-template-columns: 1fr;
       }
@@ -744,6 +786,45 @@
       .post-card.post-card-enter {
         transform: none;
       }
+      .post-footer {
+        gap: 8px;
+      }
+      .post-action-row-primary {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+      }
+      .post-action-row-primary::-webkit-scrollbar {
+        display: none;
+      }
+      .post-action-row-primary .chip-compact {
+        flex: 0 0 auto;
+      }
+      .post-action-row-primary .chip-action[data-action-kind="save"] .chip-label,
+      .post-action-row-primary .chip-action[data-action-kind="share"] .chip-label {
+        display: none;
+      }
+      .post-action-row-primary .chip-action[data-action-kind="save"],
+      .post-action-row-primary .chip-action[data-action-kind="share"] {
+        min-width: 40px;
+        justify-content: center;
+        padding-inline: 10px;
+      }
+      .post-action-menu {
+        align-self: stretch;
+      }
+      .post-action-menu > summary {
+        width: 100%;
+        justify-content: center;
+      }
+      .post-action-menu-panel {
+        width: 100%;
+        min-width: 0;
+      }
+      .post-action-row-secondary {
+        justify-content: flex-start;
+      }
     }
     .skeleton {
       background: linear-gradient(110deg, #f0ebe2 8%, #f8f4ed 18%, #f0ebe2 33%);
@@ -826,6 +907,7 @@
       font-size: 10px;
       font-weight: 600;
       margin-top: 3px;
+      white-space: nowrap;
     }
     .avatar {
       width: 30px;
@@ -883,6 +965,63 @@
       align-items: center;
       flex-wrap: wrap;
       justify-content: flex-end;
+    }
+    .post-footer {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .post-action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .post-action-row-primary {
+      justify-content: flex-start;
+    }
+    .post-action-row-secondary {
+      justify-content: flex-end;
+    }
+    .post-footer .chip-action {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text-main);
+      font-size: 12px;
+      padding-inline: 12px;
+    }
+    .post-footer .chip-action.chip-like.chip-like-on {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+      box-shadow: 0 6px 12px rgba(228, 87, 46, 0.16);
+    }
+    .post-action-menu {
+      margin: 0;
+      align-self: flex-end;
+    }
+    .post-action-menu > summary {
+      list-style: none;
+      cursor: pointer;
+      user-select: none;
+    }
+    .post-action-menu > summary::-webkit-details-marker {
+      display: none;
+    }
+    .post-action-menu[open] > summary {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .post-action-menu-panel {
+      margin-top: 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: #fff;
+      padding: 8px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      min-width: min(100%, 320px);
     }
     .post-media img,
     .post-media video {
@@ -2808,6 +2947,97 @@
   flex-direction: column;
   gap: 6px;
 }
+.feed-list.shorts-view {
+  gap: 12px;
+}
+.feed-list.shorts-view .feed-more {
+  margin-top: 2px;
+}
+.feed-list.shorts-view .shorts-card {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 22px;
+  background: #05070d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.feed-list.shorts-view .shorts-media {
+  margin: 0;
+  aspect-ratio: 9 / 16;
+  max-height: min(78vh, 760px);
+  border-radius: 0;
+  background: #05070d;
+}
+.feed-list.shorts-view .shorts-media video,
+.feed-list.shorts-view .shorts-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+.feed-list.shorts-view .shorts-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.44) 36%,
+    rgba(0, 0, 0, 0.78) 100%
+  );
+}
+.feed-list.shorts-view .shorts-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.feed-list.shorts-view .shorts-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #f7fafc;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+.feed-list.shorts-view .shorts-caption {
+  color: #f8fafc;
+  font-size: 13px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.feed-list.shorts-view .shorts-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.feed-list.shorts-view .shorts-actions .chip {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.26);
+  color: #fff;
+}
+.feed-list.shorts-view .shorts-actions .chip.chip-active {
+  background: rgba(255, 255, 255, 0.28);
+}
+.feed-list.shorts-view .post-card-seen {
+  opacity: 1;
+}
 .feed-list.grid-view {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2914,7 +3144,64 @@
 
 .page-view.is-active {
   display: block;
-}  
+}
+.page-view.is-transitioning {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  pointer-events: none;
+  will-change: transform, opacity;
+  touch-action: pan-y;
+  transition:
+    transform 340ms cubic-bezier(0.22, 0.72, 0.22, 1),
+    opacity 220ms ease;
+}
+.page-view.is-entering {
+  z-index: 3;
+}
+.page-view.is-leaving {
+  z-index: 2;
+}
+.page-view.is-entering.from-right {
+  transform: translateX(100%);
+  opacity: 0;
+}
+.page-view.is-entering.from-left {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+.page-view.is-entering.is-entered {
+  transform: translateX(0);
+  opacity: 1;
+}
+.page-view.is-leaving.to-left {
+  transform: translateX(0);
+  opacity: 1;
+}
+.page-view.is-leaving.to-right {
+  transform: translateX(0);
+  opacity: 1;
+}
+.page-view.is-leaving.to-left.is-leaved {
+  transform: translateX(-24%);
+  opacity: 0;
+}
+.page-view.is-leaving.to-right.is-leaved {
+  transform: translateX(24%);
+  opacity: 0;
+}
+@media (max-width: 700px) {
+  .layout,
+  .page-view {
+    touch-action: pan-y;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-view.is-transitioning {
+    transition: none;
+  }
+}
 
 .site-footer {
   margin-top: 16px;

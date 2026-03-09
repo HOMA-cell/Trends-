@@ -148,6 +148,8 @@ import {
     const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
     const RUNTIME_ISSUES_KEY = "trends_runtime_issues_v1";
     const ADS_SETTINGS_KEY = "trends_ads_config_v1";
+    const FORCE_FRESH_PARAM = "fresh";
+    const FORCE_FRESH_DONE_KEY = "trends_force_fresh_done_v1";
     const RUNTIME_ISSUES_LIMIT = 20;
     const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
     const SUPABASE_CONNECTIVITY_RETRY_MS = 120000;
@@ -1669,6 +1671,46 @@ async function loadProfilePostCount() {
       }
     }
 
+    async function forceFreshReloadIfRequested() {
+      if (typeof window === "undefined") return false;
+      const params = new URLSearchParams(window.location.search || "");
+      const wantsFresh = params.get(FORCE_FRESH_PARAM) === "1";
+      if (!wantsFresh) return false;
+      const alreadyDone = sessionStorage.getItem(FORCE_FRESH_DONE_KEY) === "1";
+      if (alreadyDone) return false;
+      sessionStorage.setItem(FORCE_FRESH_DONE_KEY, "1");
+      try {
+        if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(
+            registrations.map((registration) => registration.unregister())
+          );
+        }
+      } catch {
+        // ignore service worker cleanup errors
+      }
+      try {
+        if (typeof caches !== "undefined") {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((key) => caches.delete(key)));
+        }
+      } catch {
+        // ignore cache storage cleanup errors
+      }
+      try {
+        localStorage.removeItem("trends_feed_cache_v1");
+      } catch {
+        // ignore storage cleanup failures
+      }
+      params.delete(FORCE_FRESH_PARAM);
+      const nextQuery = params.toString();
+      const nextUrl = `${window.location.pathname}${
+        nextQuery ? `?${nextQuery}` : ""
+      }${window.location.hash || ""}`;
+      window.location.replace(nextUrl);
+      return true;
+    }
+
     function setupServiceWorker() {
       if (serviceWorkerSetupDone) return;
       serviceWorkerSetupDone = true;
@@ -1800,9 +1842,11 @@ async function loadProfilePostCount() {
 
     async function init() {
       setupRuntimeIssueCapture();
+      const forcedFresh = await forceFreshReloadIfRequested();
+      if (forcedFresh) return;
       loadSupabaseConnectivityState();
       loadSettings();
-      loadBuildMeta();
+      await loadBuildMeta();
       setupServiceWorker();
       commentSync.loadQueue();
       commentSync.setupOnlineSync();
@@ -2122,6 +2166,7 @@ async function loadProfilePostCount() {
       setText("btn-feed-restore-muted", "feedRestoreMuted");
       setText("btn-feed-restore-muted-terms", "feedRestoreMutedTerms");
       setText("btn-feed-options", "feedOptions");
+      setText("btn-feed-shorts-mode", "feedModeShorts");
       setText("btn-feed-layout", "feedLayoutGrid");
       setText("filter-foryou", "foryou");
       setText("filter-all", "all");
@@ -3363,9 +3408,73 @@ async function loadProfilePostCount() {
       const views = document.querySelectorAll(".page-view");
       if (!tabs.length || !views.length) return;
 
+      const viewList = Array.from(views);
+      const layoutRoot = document.querySelector(".layout");
+      const pageIndexMap = new Map();
+      viewList.forEach((view, index) => {
+        const key = `${view.dataset.page || ""}`;
+        if (!key) return;
+        pageIndexMap.set(key, index);
+      });
+      const PAGE_TRANSITION_MS = 320;
+      let pageTransitionTimer = null;
+
+      const clearTransitionClasses = (view) => {
+        if (!view) return;
+        view.classList.remove(
+          "is-transitioning",
+          "is-entering",
+          "is-entered",
+          "is-leaving",
+          "is-leaved",
+          "from-left",
+          "from-right",
+          "to-left",
+          "to-right"
+        );
+      };
+      const finishPageTransition = () => {
+        if (pageTransitionTimer) {
+          clearTimeout(pageTransitionTimer);
+          pageTransitionTimer = null;
+        }
+        viewList.forEach((view) => {
+          clearTransitionClasses(view);
+        });
+        if (layoutRoot) {
+          layoutRoot.classList.remove("is-page-transitioning");
+          layoutRoot.style.removeProperty("--page-transition-height");
+          layoutRoot.style.removeProperty("min-height");
+        }
+      };
+
       const pageScrollMap = new Map();
       const getVisiblePage = () =>
         document.querySelector(".page-view.is-active")?.dataset.page || "";
+      const orderedMainPages = Array.from(tabs)
+        .map((tab) => tab.getAttribute("data-page-target") || "")
+        .filter(Boolean)
+        .filter((page, index, list) => list.indexOf(page) === index);
+      const getAdjacentMainPage = (page, direction = 1) => {
+        const index = orderedMainPages.indexOf(page);
+        if (index < 0) return "";
+        const nextIndex = index + direction;
+        if (nextIndex < 0 || nextIndex >= orderedMainPages.length) return "";
+        return orderedMainPages[nextIndex] || "";
+      };
+      const updateTabState = (page) => {
+        tabs.forEach((tab) => {
+          const target = tab.getAttribute("data-page-target");
+          tab.classList.toggle("is-active", target === page);
+        });
+      };
+      const getViewByPage = (page) =>
+        viewList.find((view) => view.dataset.page === page) || null;
+      const getPageTransitionDirection = (fromPage, toPage) => {
+        const fromIndex = pageIndexMap.has(fromPage) ? pageIndexMap.get(fromPage) : 0;
+        const toIndex = pageIndexMap.has(toPage) ? pageIndexMap.get(toPage) : 0;
+        return toIndex >= fromIndex ? "forward" : "backward";
+      };
       const rememberScroll = (page) => {
         if (!page) return;
         pageScrollMap.set(page, Math.max(0, window.scrollY || window.pageYOffset || 0));
@@ -3379,6 +3488,7 @@ async function loadProfilePostCount() {
 
       const setPage = (page, options = {}) => {
         const prevPage = getVisiblePage();
+        if (!page) return false;
         if (
           prevPage &&
           prevPage !== page &&
@@ -3393,13 +3503,65 @@ async function loadProfilePostCount() {
         if (prevPage && prevPage !== page) {
           rememberScroll(prevPage);
         }
-        views.forEach((view) => {
-          view.classList.toggle("is-active", view.dataset.page === page);
-        });
-        tabs.forEach((tab) => {
-          const target = tab.getAttribute("data-page-target");
-          tab.classList.toggle("is-active", target === page);
-        });
+
+        const prevView = getViewByPage(prevPage);
+        const nextView = getViewByPage(page);
+        const shouldAnimate =
+          !options.skipAnimation &&
+          !!prevView &&
+          !!nextView &&
+          prevPage !== page;
+
+        finishPageTransition();
+        if (shouldAnimate && prevView && nextView) {
+          const direction = getPageTransitionDirection(prevPage, page);
+          const enterFromClass = direction === "forward" ? "from-right" : "from-left";
+          const leaveToClass = direction === "forward" ? "to-left" : "to-right";
+          prevView.classList.add("is-active");
+          nextView.classList.add("is-active");
+          prevView.classList.add("is-transitioning", "is-leaving", leaveToClass);
+          nextView.classList.add("is-transitioning", "is-entering", enterFromClass);
+          if (layoutRoot) {
+            const transitionHeight = Math.max(
+              prevView.offsetHeight || 0,
+              nextView.offsetHeight || 0,
+              1
+            );
+            layoutRoot.style.setProperty(
+              "--page-transition-height",
+              `${transitionHeight}px`
+            );
+            layoutRoot.style.minHeight = `${transitionHeight}px`;
+            layoutRoot.classList.add("is-page-transitioning");
+          }
+          nextView.getBoundingClientRect();
+          requestAnimationFrame(() => {
+            nextView.classList.add("is-entered");
+            prevView.classList.add("is-leaved");
+          });
+          pageTransitionTimer = setTimeout(() => {
+            viewList.forEach((view) => {
+              clearTransitionClasses(view);
+              view.classList.toggle("is-active", view.dataset.page === page);
+            });
+            if (layoutRoot) {
+              layoutRoot.classList.remove("is-page-transitioning");
+              layoutRoot.style.removeProperty("--page-transition-height");
+              layoutRoot.style.removeProperty("min-height");
+            }
+            pageTransitionTimer = null;
+            if (options.restoreScroll !== false) {
+              restoreScroll(page, options.scrollBehavior || "auto");
+            }
+          }, PAGE_TRANSITION_MS);
+        } else {
+          viewList.forEach((view) => {
+            clearTransitionClasses(view);
+            view.classList.toggle("is-active", view.dataset.page === page);
+          });
+        }
+
+        updateTabState(page);
         if (document?.body) {
           document.body.dataset.page = page;
         }
@@ -3415,7 +3577,7 @@ async function loadProfilePostCount() {
           renderOnboardingChecklist();
         }
         queueCollapsibleHeightRefresh();
-        if (options.restoreScroll !== false) {
+        if (!shouldAnimate && options.restoreScroll !== false) {
           restoreScroll(page, options.scrollBehavior || "auto");
         }
         if (page === "feed" && prevPage !== "feed") {
@@ -3441,6 +3603,117 @@ async function loadProfilePostCount() {
           setPage(targetPage, { scrollBehavior: "smooth" });
         });
       });
+
+      // Mobile swipe navigation: feed <-> account <-> settings
+      let swipeActive = false;
+      let swipeStartX = 0;
+      let swipeStartY = 0;
+      let swipeStartAt = 0;
+      let swipeTargetPage = "";
+      let swipePointerId = null;
+      const SWIPE_MIN_X = 52;
+      const SWIPE_MAX_Y = 110;
+      const SWIPE_MAX_DURATION_MS = 520;
+      const shouldIgnoreSwipeTarget = (target) => {
+        if (!(target instanceof Element)) return false;
+        return !!target.closest(
+          "input, textarea, select, button, a, label, [contenteditable='true'], [data-no-page-swipe], video"
+        );
+      };
+      const beginSwipe = ({ x, y, page, pointerId = null }) => {
+        swipeActive = true;
+        swipeStartX = x;
+        swipeStartY = y;
+        swipeStartAt = Date.now();
+        swipeTargetPage = page;
+        swipePointerId = pointerId;
+      };
+      const endSwipe = ({ x, y }) => {
+        if (!swipeActive) return;
+        swipeActive = false;
+        swipePointerId = null;
+        const elapsed = Date.now() - swipeStartAt;
+        if (elapsed > SWIPE_MAX_DURATION_MS) return;
+        const dx = x - swipeStartX;
+        const dy = y - swipeStartY;
+        if (Math.abs(dy) > SWIPE_MAX_Y) return;
+        if (Math.abs(dx) < SWIPE_MIN_X) return;
+        if (Math.abs(dx) < Math.abs(dy) * 1.05) return;
+        const nextPage =
+          dx < 0
+            ? getAdjacentMainPage(swipeTargetPage, 1)
+            : getAdjacentMainPage(swipeTargetPage, -1);
+        if (!nextPage) return;
+        setPage(nextPage, { scrollBehavior: "smooth" });
+      };
+      if (typeof window !== "undefined") {
+        if (typeof window.PointerEvent === "function") {
+          window.addEventListener(
+            "pointerdown",
+            (event) => {
+              if (event.isPrimary === false) return;
+              if (!["touch", "pen"].includes(`${event.pointerType || ""}`)) return;
+              const page = getVisiblePage();
+              if (!orderedMainPages.includes(page)) return;
+              if (shouldIgnoreSwipeTarget(event.target)) return;
+              beginSwipe({
+                x: event.clientX,
+                y: event.clientY,
+                page,
+                pointerId: event.pointerId,
+              });
+            },
+            { passive: true }
+          );
+          window.addEventListener(
+            "pointerup",
+            (event) => {
+              if (!swipeActive) return;
+              if (swipePointerId !== null && event.pointerId !== swipePointerId) return;
+              endSwipe({ x: event.clientX, y: event.clientY });
+            },
+            { passive: true }
+          );
+          window.addEventListener(
+            "pointercancel",
+            () => {
+              swipeActive = false;
+              swipePointerId = null;
+            },
+            { passive: true }
+          );
+        } else {
+          window.addEventListener(
+            "touchstart",
+            (event) => {
+              const touch = event.touches?.[0];
+              if (!touch || event.touches.length !== 1) return;
+              const page = getVisiblePage();
+              if (!orderedMainPages.includes(page)) return;
+              if (shouldIgnoreSwipeTarget(event.target)) return;
+              beginSwipe({ x: touch.clientX, y: touch.clientY, page });
+            },
+            { passive: true }
+          );
+          window.addEventListener(
+            "touchend",
+            (event) => {
+              const touch = event.changedTouches?.[0];
+              if (!touch) return;
+              endSwipe({ x: touch.clientX, y: touch.clientY });
+            },
+            { passive: true }
+          );
+          window.addEventListener(
+            "touchcancel",
+            () => {
+              swipeActive = false;
+              swipePointerId = null;
+            },
+            { passive: true }
+          );
+        }
+      }
     }
 
     function setupMiniHeader() {

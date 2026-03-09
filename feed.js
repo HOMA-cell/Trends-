@@ -98,6 +98,7 @@ let filterWorkout = false;
 let sortOrder = "newest";
 let forYouTuning = "balanced";
 let feedLayout = "list";
+let feedViewMode = "feed";
 let isFeedLoading = false;
 let feedError = "";
 let feedErrorCode = "";
@@ -195,6 +196,7 @@ const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
 const FEED_FILTERS = ["foryou", "all", "following", "mine", "saved", "public"];
+const FEED_VIEW_MODES = ["feed", "shorts"];
 const FEED_POST_SELECT_FIELDS =
   "id,user_id,date,created_at,visibility,note,caption,bodyweight,media_url,media_type";
 const FEED_PROFILE_SELECT_FIELDS =
@@ -1032,6 +1034,9 @@ function isAllowedFeedFilter(filter) {
 function isAllowedForYouTuning(value) {
       return ["fresh", "balanced", "viral"].includes(`${value || ""}`);
     }
+function isAllowedFeedViewMode(value) {
+      return FEED_VIEW_MODES.includes(`${value || ""}`);
+    }
 function getSavedPostIdsSet() {
       try {
         const raw = localStorage.getItem(FEED_SAVED_POSTS_KEY);
@@ -1705,6 +1710,7 @@ function loadFeedUiState() {
         const nextFilter = String(parsed?.currentFilter || "");
         const nextSort = String(parsed?.sortOrder || "");
         const nextTuning = String(parsed?.forYouTuning || "");
+        const nextViewMode = String(parsed?.feedViewMode || "");
         const nextSearch = String(parsed?.search || "").trim().toLowerCase();
         if (isAllowedFeedFilter(nextFilter)) {
           currentFilter = nextFilter;
@@ -1714,6 +1720,9 @@ function loadFeedUiState() {
         }
         if (isAllowedForYouTuning(nextTuning)) {
           forYouTuning = nextTuning;
+        }
+        if (isAllowedFeedViewMode(nextViewMode)) {
+          feedViewMode = nextViewMode;
         }
         if (typeof parsed?.filterMedia === "boolean") {
           filterMedia = parsed.filterMedia;
@@ -1737,6 +1746,7 @@ function persistFeedUiState() {
           forYouTuning: isAllowedForYouTuning(forYouTuning)
             ? forYouTuning
             : "balanced",
+          feedViewMode: isAllowedFeedViewMode(feedViewMode) ? feedViewMode : "feed",
           filterMedia: !!filterMedia,
           filterWorkout: !!filterWorkout,
           discoveryExpanded: !!feedDiscoveryExpanded,
@@ -3020,6 +3030,12 @@ export function setFeedState(next = {}) {
       if (typeof next.feedLayout === "string") {
         feedLayout = next.feedLayout;
       }
+      if (typeof next.feedViewMode === "string") {
+        feedViewMode = isAllowedFeedViewMode(next.feedViewMode)
+          ? next.feedViewMode
+          : "feed";
+        shouldPersistUi = true;
+      }
       if (typeof next.filterMedia === "boolean") {
         filterMedia = next.filterMedia;
         shouldPersistUi = true;
@@ -3518,6 +3534,16 @@ export function setupFeedControls() {
           scheduleRenderFeed();
         });
       }
+      const shortsModeBtn = $("btn-feed-shorts-mode");
+      if (shortsModeBtn && shortsModeBtn.dataset.bound !== "true") {
+        shortsModeBtn.dataset.bound = "true";
+        shortsModeBtn.addEventListener("click", () => {
+          feedViewMode = feedViewMode === "shorts" ? "feed" : "shorts";
+          persistFeedUiState();
+          resetFeedPagination();
+          scheduleRenderFeed();
+        });
+      }
       if (!feedPageSizeResizeBound && typeof window !== "undefined") {
         feedPageSizeResizeBound = true;
         window.addEventListener(
@@ -3558,6 +3584,13 @@ export function setupFeedControls() {
             if (!liveLayoutBtn) return;
             event.preventDefault();
             liveLayoutBtn.click();
+            return;
+          }
+          if (event.key.toLowerCase() === "v" && !isEditableTarget(target)) {
+            const liveShortsBtn = $("btn-feed-shorts-mode");
+            if (!liveShortsBtn) return;
+            event.preventDefault();
+            liveShortsBtn.click();
           }
         });
       }
@@ -3762,6 +3795,10 @@ export function updateFilterButtons() {
       const workoutBtn = $("filter-workout");
       if (mediaBtn) mediaBtn.classList.toggle("chip-active", filterMedia);
       if (workoutBtn) workoutBtn.classList.toggle("chip-active", filterWorkout);
+      const shortsModeBtn = $("btn-feed-shorts-mode");
+      if (shortsModeBtn) {
+        shortsModeBtn.classList.toggle("is-active", feedViewMode === "shorts");
+      }
       const tuningButtons = [
         ["rank-fresh", "fresh"],
         ["rank-balanced", "balanced"],
@@ -4022,6 +4059,10 @@ export function renderFeed(options = {}) {
     const moreHint = $("feed-more-hint");
     const moreBtn = $("btn-feed-more");
     const layoutBtn = $("btn-feed-layout");
+    const shortsModeBtn = $("btn-feed-shorts-mode");
+    const feedOptionsBtn = $("btn-feed-options");
+    const feedAdvanced = $("feed-advanced");
+    const statGrid = $("feed-stat-grid");
     const discoveryToggleBtn = $("btn-feed-discovery-toggle");
     if (!container) return;
     const forcePageRender = !!options.forcePageRender;
@@ -4080,8 +4121,10 @@ export function renderFeed(options = {}) {
     const autoLoadMoreEnabled = settings.feedAutoLoadMore !== false;
     const followingIds = getFollowingIds();
     const tr = t[currentLang] || t.ja;
+    const isShortsMode = feedViewMode === "shorts";
     const adsSettings = getRuntimeFeedAdsSettings();
-    const feedAdsEnabled = feedLayout === "list" && isFeedAdsConfigured(adsSettings);
+    const feedAdsEnabled =
+      !isShortsMode && feedLayout === "list" && isFeedAdsConfigured(adsSettings);
     if (feedAdsEnabled) {
       ensureAdSenseScript(adsSettings);
     }
@@ -4260,10 +4303,16 @@ export function renderFeed(options = {}) {
       const haystack = getPostSearchHaystack(post, workoutLogsByPost);
       return haystack.includes(searchValue);
     };
+    const isVideoPost = (post) => {
+      if (!post?.media_url) return false;
+      const mediaType = `${post?.media_type || ""}`.trim().toLowerCase();
+      if (mediaType === "video") return true;
+      return /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(`${post.media_url}`);
+    };
     renderFeedDiscoverySections({
       allPosts,
       currentFilter,
-      discoveryExpanded: feedDiscoveryExpanded,
+      discoveryExpanded: !isShortsMode && feedDiscoveryExpanded,
       currentUser,
       followingIds,
       savedPostIds,
@@ -4274,8 +4323,23 @@ export function renderFeed(options = {}) {
       searchValue,
       tr,
     });
+    if (statGrid) {
+      statGrid.classList.toggle("hidden", isShortsMode);
+    }
+    if (feedAdvanced) {
+      if (isShortsMode) {
+        feedAdvanced.classList.remove("is-open");
+        feedAdvanced.classList.add("hidden");
+      } else {
+        feedAdvanced.classList.remove("hidden");
+      }
+    }
+    if (feedOptionsBtn) {
+      feedOptionsBtn.classList.toggle("hidden", isShortsMode);
+    }
     if (discoveryToggleBtn) {
-      const canShowDiscovery = ["foryou", "all", "following"].includes(currentFilter);
+      const canShowDiscovery =
+        !isShortsMode && ["foryou", "all", "following"].includes(currentFilter);
       discoveryToggleBtn.classList.toggle("hidden", !canShowDiscovery);
       discoveryToggleBtn.disabled = !canShowDiscovery;
       if (canShowDiscovery) {
@@ -4298,6 +4362,7 @@ export function renderFeed(options = {}) {
       currentUser?.id || "",
       currentFilter,
       forYouTuning,
+      feedViewMode,
       filterMedia ? "1" : "0",
       filterWorkout ? "1" : "0",
       sortOrder,
@@ -4319,6 +4384,7 @@ export function renderFeed(options = {}) {
       currentUser?.id || "",
       currentFilter,
       forYouTuning,
+      feedViewMode,
       filterMedia ? "1" : "0",
       filterWorkout ? "1" : "0",
       sortOrder,
@@ -4409,10 +4475,14 @@ export function renderFeed(options = {}) {
       const searchedPosts = searchValue
         ? sortedBasePosts.filter((post) => matchesSearch(post))
         : sortedBasePosts;
-      gridCandidates =
-        feedLayout === "grid"
-          ? searchedPosts.filter((post) => post.media_url)
-          : searchedPosts;
+      if (isShortsMode) {
+        gridCandidates = searchedPosts.filter((post) => isVideoPost(post));
+      } else {
+        gridCandidates =
+          feedLayout === "grid"
+            ? searchedPosts.filter((post) => post.media_url)
+            : searchedPosts;
+      }
       feedQueryCache = {
         queryKey,
         postsRef: allPosts,
@@ -4421,13 +4491,24 @@ export function renderFeed(options = {}) {
       };
     }
 
-    container.classList.toggle("grid-view", feedLayout === "grid");
+    const effectiveLayout = isShortsMode ? "list" : feedLayout;
+    container.classList.toggle("shorts-view", isShortsMode);
+    container.classList.toggle("grid-view", !isShortsMode && feedLayout === "grid");
     if (layoutBtn) {
       const label =
         feedLayout === "grid"
           ? tr.feedLayoutList || "List"
           : tr.feedLayoutGrid || "Grid";
       layoutBtn.textContent = label;
+      layoutBtn.classList.toggle("hidden", isShortsMode);
+      layoutBtn.disabled = isShortsMode;
+    }
+    if (shortsModeBtn) {
+      shortsModeBtn.classList.toggle("is-active", isShortsMode);
+      shortsModeBtn.textContent = isShortsMode
+        ? tr.feedModeFeed || "Feed"
+        : tr.feedModeShorts || "Shorts";
+      shortsModeBtn.setAttribute("aria-pressed", isShortsMode ? "true" : "false");
     }
 
     const resetStatusState = () => {
@@ -4525,7 +4606,8 @@ export function renderFeed(options = {}) {
       queueFeedMetadataForPosts(metaTargetIds);
     }
     const renderSignature = [
-      feedLayout,
+      effectiveLayout,
+      feedViewMode,
       currentFilter,
       forYouTuning,
       filterMedia ? "1" : "0",
@@ -4565,7 +4647,9 @@ export function renderFeed(options = {}) {
       title.className = "empty-title";
       const isSavedEmpty = currentFilter === "saved";
       const isFollowingEmpty = currentFilter === "following";
-      title.textContent = isSavedEmpty
+      title.textContent = isShortsMode
+        ? tr.feedShortsEmptyTitle || "ショート動画がまだありません。"
+        : isSavedEmpty
         ? tr.feedSavedEmptyTitle || "保存した投稿がありません。"
         : isFollowingEmpty
         ? tr.feedFollowingEmptyTitle || "フォロー中ユーザーの投稿がありません。"
@@ -4591,6 +4675,9 @@ export function renderFeed(options = {}) {
             "認証に失敗しています。Anon key が正しいか確認してください。"
           : tr.feedEmptyConnectionHint ||
             "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。"
+        : isShortsMode
+        ? tr.feedShortsEmptyDesc ||
+          "動画付き投稿をするとここに表示されます。"
         : isSavedEmpty
         ? tr.feedSavedEmptyDesc || "カード右上の保存ボタンで後で見返せます。"
         : isFollowingEmpty
@@ -4720,6 +4807,181 @@ export function renderFeed(options = {}) {
 
     const localLikedIds = getLikedIds();
     const shouldAnimateEntry = canAppend && shouldUseFeedEntryAnimation();
+    const createShortsCard = (post) => {
+      const card = document.createElement("article");
+      card.className = "post-card shorts-card";
+      if (shouldAnimateEntry) {
+        card.classList.add("post-card-enter");
+        requestAnimationFrame(() => {
+          card.classList.add("is-ready");
+        });
+      }
+      card.setAttribute("data-post-id", post.id);
+      const isSeen = seenPostIds.has(`${post.id || ""}`);
+      if (isSeen) {
+        card.classList.add("post-card-seen");
+      }
+
+      const mediaWrap = document.createElement("div");
+      mediaWrap.className = "post-media shorts-media";
+      mountMediaSkeleton(mediaWrap);
+      const renderMediaFallback = () => {
+        clearMediaSkeleton(mediaWrap);
+        mediaWrap.classList.add("is-error");
+        mediaWrap.innerHTML = "";
+        const fallback = document.createElement("div");
+        fallback.className = "media-fallback";
+        fallback.textContent = tr.mediaUnavailable || "Media unavailable";
+        mediaWrap.appendChild(fallback);
+      };
+      if (isVideoPost(post)) {
+        const video = document.createElement("video");
+        video.preload = "none";
+        video.controls = true;
+        video.playsInline = true;
+        video.classList.add("video-deferred");
+        video.dataset.src = post.media_url;
+        video.addEventListener(
+          "loadeddata",
+          () => {
+            clearMediaSkeleton(mediaWrap);
+          },
+          { once: true }
+        );
+        video.addEventListener("error", renderMediaFallback, { once: true });
+        observeDeferredVideo(video);
+        mediaWrap.appendChild(video);
+      } else {
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.fetchPriority = "auto";
+        img.referrerPolicy = "no-referrer";
+        img.alt = "short media";
+        img.classList.add("image-deferred");
+        img.addEventListener(
+          "load",
+          () => {
+            clearMediaSkeleton(mediaWrap);
+          },
+          { once: true }
+        );
+        img.addEventListener("error", renderMediaFallback, { once: true });
+        if (warmedImageUrlSet.has(post.media_url)) {
+          img.src = post.media_url;
+          img.dataset.deferredLoaded = "true";
+          img.classList.remove("image-deferred");
+        } else {
+          img.dataset.src = post.media_url;
+          observeDeferredImage(img);
+        }
+        mediaWrap.appendChild(img);
+      }
+      mediaWrap.addEventListener("dblclick", () => {
+        if (!currentUser) return;
+        const likeState = getLikeUiState(post.id, localLikedIds);
+        if (likeState?.isLiked) return;
+        toggleLikeForPost(post).catch((error) => {
+          console.error("double tap like failed", error);
+        });
+      });
+      card.appendChild(mediaWrap);
+
+      const overlay = document.createElement("div");
+      overlay.className = "shorts-overlay";
+      const meta = document.createElement("div");
+      meta.className = "shorts-meta";
+      const rawHandle = post.profile?.handle || post.profile?.username || "user";
+      const handleText = formatHandle(rawHandle) || "@user";
+      const relativeText = formatRelative(post.date || post.created_at);
+      const dateText = formatPostDate(post);
+      const metaLabel = document.createElement("span");
+      metaLabel.textContent = [handleText, relativeText || dateText].filter(Boolean).join(" · ");
+      meta.appendChild(metaLabel);
+      const shortsBadge = document.createElement("span");
+      shortsBadge.className = "shorts-badge";
+      shortsBadge.textContent = tr.shortsBadge || "SHORTS";
+      meta.appendChild(shortsBadge);
+      overlay.appendChild(meta);
+
+      const captionText = `${post.note || post.caption || ""}`.trim();
+      if (captionText) {
+        const caption = document.createElement("div");
+        caption.className = "shorts-caption";
+        caption.textContent = captionText;
+        overlay.appendChild(caption);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "shorts-actions";
+
+      const likeBtn = document.createElement("button");
+      likeBtn.className = "chip chip-like chip-action";
+      likeBtn.dataset.postAction = "toggle-like";
+      const likeState = getLikeUiState(post.id, localLikedIds);
+      applyLikeButtonState(likeBtn, likeState, tr);
+      actions.appendChild(likeBtn);
+
+      const commentBtn = document.createElement("button");
+      commentBtn.className = "chip chip-log chip-action";
+      commentBtn.dataset.postAction = "toggle-comments";
+      updateCommentButtonState(commentBtn, post.id, tr, commentsByPost, commentsExpanded);
+      actions.appendChild(commentBtn);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "chip chip-log chip-save chip-action";
+      saveBtn.dataset.postAction = "toggle-save";
+      const isSaved = savedPostIds.has(`${post.id || ""}`);
+      const saveLabel = isSaved ? tr.saved || "Saved" : tr.save || "Save";
+      setActionButtonContent(saveBtn, {
+        kind: "save",
+        icon: "🔖",
+        label: saveLabel,
+      });
+      saveBtn.classList.toggle("chip-active", isSaved);
+      saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
+      actions.appendChild(saveBtn);
+
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "chip chip-log chip-action";
+      shareBtn.dataset.postAction = "share-post";
+      setActionButtonContent(shareBtn, {
+        kind: "share",
+        icon: "↗",
+        label: tr.share || "Share",
+      });
+      actions.appendChild(shareBtn);
+
+      if (currentUser && post.user_id && post.user_id !== currentUser.id) {
+        const followBtn = document.createElement("button");
+        followBtn.className = "chip chip-log btn-follow";
+        followBtn.setAttribute("data-user-id", post.user_id);
+        const isFollowing = followingIds.has(post.user_id);
+        followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
+        followBtn.classList.toggle("is-following", isFollowing);
+        followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
+        actions.appendChild(followBtn);
+      }
+
+      overlay.appendChild(actions);
+      card.appendChild(overlay);
+
+      if (commentsExpanded.has(post.id)) {
+        const commentSection = buildFeedCommentSection(
+          post,
+          tr,
+          currentUser,
+          commentsByPost,
+          commentsLoading,
+          commentsEnabled
+        );
+        if (commentSection) {
+          card.appendChild(commentSection);
+        }
+      }
+      observeSeenPostCard(card, isSeen);
+      return card;
+    };
     const createPostCard = (post) => {
       const card = document.createElement("div");
       card.className = "post-card";
@@ -4812,36 +5074,60 @@ export function renderFeed(options = {}) {
         meta.appendChild(reason);
       }
 
-      const actions = document.createElement("div");
-      actions.className = "post-actions";
+      const footer = document.createElement("div");
+      footer.className = "post-footer";
+      const primaryActions = document.createElement("div");
+      primaryActions.className = "post-actions post-action-row post-action-row-primary";
+      const secondaryActions = document.createElement("div");
+      secondaryActions.className =
+        "post-actions post-action-row post-action-row-secondary";
+      const appendPrimaryAction = (button) => {
+        if (!button) return;
+        button.classList.add("chip-compact");
+        primaryActions.appendChild(button);
+      };
+      const appendSecondaryAction = (button) => {
+        if (!button) return;
+        button.classList.add("chip-compact");
+        secondaryActions.appendChild(button);
+      };
 
       const likeBtn = document.createElement("button");
-      likeBtn.className = "chip chip-like";
+      likeBtn.className = "chip chip-like chip-action";
       likeBtn.dataset.postAction = "toggle-like";
       const likeState = getLikeUiState(post.id, localLikedIds);
       applyLikeButtonState(likeBtn, likeState, tr);
-      actions.appendChild(likeBtn);
+      appendPrimaryAction(likeBtn);
 
       const commentBtn = document.createElement("button");
-      commentBtn.className = "chip chip-log";
+      commentBtn.className = "chip chip-log chip-action";
       commentBtn.dataset.postAction = "toggle-comments";
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost, commentsExpanded);
-      actions.appendChild(commentBtn);
+      appendPrimaryAction(commentBtn);
 
       const saveBtn = document.createElement("button");
-      saveBtn.className = "chip chip-log chip-save";
+      saveBtn.className = "chip chip-log chip-save chip-action";
       saveBtn.dataset.postAction = "toggle-save";
       const isSaved = savedPostIds.has(`${post.id || ""}`);
-      saveBtn.textContent = isSaved ? tr.saved || "Saved" : tr.save || "Save";
+      const saveLabel = isSaved ? tr.saved || "Saved" : tr.save || "Save";
+      setActionButtonContent(saveBtn, {
+        kind: "save",
+        icon: "🔖",
+        label: saveLabel,
+      });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      actions.appendChild(saveBtn);
+      appendPrimaryAction(saveBtn);
 
       const shareBtn = document.createElement("button");
-      shareBtn.className = "chip chip-log";
+      shareBtn.className = "chip chip-log chip-action";
       shareBtn.dataset.postAction = "share-post";
-      shareBtn.textContent = tr.share || "Share";
-      actions.appendChild(shareBtn);
+      setActionButtonContent(shareBtn, {
+        kind: "share",
+        icon: "↗",
+        label: tr.share || "Share",
+      });
+      appendPrimaryAction(shareBtn);
 
       const repostBtn = document.createElement("button");
       repostBtn.className = "chip chip-log chip-repost";
@@ -4856,20 +5142,20 @@ export function renderFeed(options = {}) {
       }
       repostBtn.classList.toggle("chip-active", repostedByMe);
       repostBtn.setAttribute("aria-pressed", repostedByMe ? "true" : "false");
-      actions.appendChild(repostBtn);
+      appendSecondaryAction(repostBtn);
 
       const quoteBtn = document.createElement("button");
       quoteBtn.className = "chip chip-log";
       quoteBtn.dataset.postAction = "quote-post";
       quoteBtn.textContent = tr.quote || "Quote";
-      actions.appendChild(quoteBtn);
+      appendSecondaryAction(quoteBtn);
 
       if (!currentUser || post.user_id !== currentUser.id) {
         const hideBtn = document.createElement("button");
         hideBtn.className = "chip chip-log";
         hideBtn.dataset.postAction = "hide-post";
         hideBtn.textContent = tr.feedHidePost || "Not interested";
-        actions.appendChild(hideBtn);
+        appendSecondaryAction(hideBtn);
 
         const isMutedUser = mutedUserIds.has(`${post.user_id || ""}`);
         const muteBtn = document.createElement("button");
@@ -4880,7 +5166,7 @@ export function renderFeed(options = {}) {
           : tr.feedMuteUser || "Mute";
         muteBtn.classList.toggle("chip-active", isMutedUser);
         muteBtn.setAttribute("aria-pressed", isMutedUser ? "true" : "false");
-        actions.appendChild(muteBtn);
+        appendSecondaryAction(muteBtn);
 
         const muteTermCandidate = getMuteTermCandidateForPost(post);
         if (muteTermCandidate) {
@@ -4894,7 +5180,7 @@ export function renderFeed(options = {}) {
             : tr.feedMuteTerm || "Mute word";
           muteTermBtn.classList.toggle("chip-active", isMutedTerm);
           muteTermBtn.setAttribute("aria-pressed", isMutedTerm ? "true" : "false");
-          actions.appendChild(muteTermBtn);
+          appendSecondaryAction(muteTermBtn);
         }
       }
 
@@ -4906,7 +5192,7 @@ export function renderFeed(options = {}) {
         followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
         followBtn.classList.toggle("is-following", isFollowing);
         followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
-        actions.appendChild(followBtn);
+        appendSecondaryAction(followBtn);
       }
 
       if (currentUser && post.user_id === currentUser.id) {
@@ -4921,18 +5207,17 @@ export function renderFeed(options = {}) {
           : tr.pin || "Pin";
         pinBtn.classList.toggle("chip-active", isPinnedByMe);
         pinBtn.setAttribute("aria-pressed", isPinnedByMe ? "true" : "false");
-        actions.appendChild(pinBtn);
+        appendSecondaryAction(pinBtn);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "chip chip-delete";
         deleteBtn.dataset.postAction = "delete-post";
         deleteBtn.textContent = tr.delete || "Delete";
-        actions.appendChild(deleteBtn);
+        appendSecondaryAction(deleteBtn);
       }
 
       header.appendChild(avatar);
       header.appendChild(meta);
-      header.appendChild(actions);
 
       card.appendChild(header);
       if (isSeen) {
@@ -5139,6 +5424,26 @@ export function renderFeed(options = {}) {
         card.appendChild(logWrap);
       }
 
+      if (primaryActions.childNodes.length) {
+        footer.appendChild(primaryActions);
+      }
+      if (secondaryActions.childNodes.length) {
+        const secondaryWrap = document.createElement("details");
+        secondaryWrap.className = "post-action-menu";
+        const summary = document.createElement("summary");
+        summary.className = "chip chip-log post-action-more";
+        summary.textContent = tr.feedOptions || "Details";
+        secondaryWrap.appendChild(summary);
+        const panel = document.createElement("div");
+        panel.className = "post-action-menu-panel";
+        panel.appendChild(secondaryActions);
+        secondaryWrap.appendChild(panel);
+        footer.appendChild(secondaryWrap);
+      }
+      if (footer.childNodes.length) {
+        card.appendChild(footer);
+      }
+
       if (commentsExpanded.has(post.id)) {
         const commentSection = buildFeedCommentSection(
           post,
@@ -5161,7 +5466,7 @@ export function renderFeed(options = {}) {
     const viewportWidth =
       typeof window === "undefined" ? 1024 : window.innerWidth || 1024;
     const compactViewport = viewportWidth <= 700;
-    let batchSize = getAdaptiveFeedChunkSize(feedLayout, compactViewport);
+    let batchSize = getAdaptiveFeedChunkSize(effectiveLayout, compactViewport);
     const scheduleNextChunk = (callback) => {
       if (typeof window === "undefined") {
         setTimeout(callback, 0);
@@ -5198,7 +5503,9 @@ export function renderFeed(options = {}) {
         } else {
           moreHint.textContent = baseHint;
         }
-        moreBtn.textContent = tr.feedMore || "もっと見る";
+        moreBtn.textContent = isShortsMode
+          ? tr.feedMoreShorts || "次のショート"
+          : tr.feedMore || "もっと見る";
         if (!moreBtn.dataset.bound) {
           moreBtn.dataset.bound = "true";
           moreBtn.addEventListener("click", (event) => {
@@ -5245,7 +5552,8 @@ export function renderFeed(options = {}) {
       });
       const shouldWindow =
         isFeedWindowingAllowed() &&
-        feedLayout === "list" &&
+        !isShortsMode &&
+        effectiveLayout === "list" &&
         visibleSlice.length >= getFeedWindowMinItems();
       syncFeedWindowing(shouldWindow);
     };
@@ -5256,8 +5564,10 @@ export function renderFeed(options = {}) {
       const startIndex = index;
       const fragment = document.createDocumentFragment();
       const end = Math.min(index + batchSize, visibleSlice.length);
+      const cardBuilder = isShortsMode ? createShortsCard : createPostCard;
       for (; index < end; index += 1) {
         if (
+          !isShortsMode &&
           shouldInsertFeedAdBeforePost({
             postIndex: index,
             insertedCount: renderedAdCount,
@@ -5269,16 +5579,16 @@ export function renderFeed(options = {}) {
           fragment.appendChild(createFeedAdCard(adsSettings, tr));
           renderedAdCount += 1;
         }
-        fragment.appendChild(createPostCard(visibleSlice[index]));
+        fragment.appendChild(cardBuilder(visibleSlice[index]));
       }
       container.appendChild(fragment);
       tuneAdaptiveFeedChunkSize(
-        feedLayout,
+        effectiveLayout,
         compactViewport,
         perfNow() - chunkStartedAt,
         end - startIndex
       );
-      batchSize = getAdaptiveFeedChunkSize(feedLayout, compactViewport);
+      batchSize = getAdaptiveFeedChunkSize(effectiveLayout, compactViewport);
       if (index < visibleSlice.length) {
         scheduleNextChunk(renderChunk);
       } else {
@@ -5579,6 +5889,26 @@ function getLikeUiState(postId, localLikedIds = null) {
         isLoading: pendingLikePostIds.has(postId),
       };
     }
+function setActionButtonContent(button, { kind = "", icon = "", label = "" } = {}) {
+      if (!button) return;
+      if (kind) {
+        button.setAttribute("data-action-kind", kind);
+      }
+      const normalizedLabel = `${label || ""}`.trim();
+      if (normalizedLabel) {
+        button.setAttribute("data-action-label", normalizedLabel);
+        button.setAttribute("aria-label", normalizedLabel);
+      }
+      button.textContent = "";
+      const iconEl = document.createElement("span");
+      iconEl.className = "chip-icon";
+      iconEl.textContent = icon;
+      const labelEl = document.createElement("span");
+      labelEl.className = "chip-label";
+      labelEl.textContent = normalizedLabel;
+      button.appendChild(iconEl);
+      button.appendChild(labelEl);
+    }
 function applyLikeButtonState(likeBtn, state, tr) {
       if (!likeBtn || !state) return;
       likeBtn.classList.toggle("chip-like-on", state.isLiked);
@@ -5586,7 +5916,20 @@ function applyLikeButtonState(likeBtn, state, tr) {
       likeBtn.disabled = !!state.isLoading;
       likeBtn.setAttribute("aria-pressed", state.isLiked ? "true" : "false");
       likeBtn.setAttribute("aria-busy", state.isLoading ? "true" : "false");
-      likeBtn.textContent = `${tr.like || "Like"}${state.likeCount ? ` (${state.likeCount})` : ""}`;
+      const likeLabel = tr.like || "Like";
+      if (likeBtn.classList.contains("chip-compact")) {
+        setActionButtonContent(likeBtn, {
+          kind: "like",
+          icon: state.isLiked ? "♥" : "♡",
+          label: state.likeCount ? `${state.likeCount}` : likeLabel,
+        });
+        return;
+      }
+      setActionButtonContent(likeBtn, {
+        kind: "like",
+        icon: state.isLiked ? "♥" : "♡",
+        label: `${likeLabel}${state.likeCount ? ` (${state.likeCount})` : ""}`,
+      });
     }
 function updateLikeButtonsForPost(postId) {
       if (!postId) return;
@@ -5635,12 +5978,27 @@ function refreshFeedFollowButtonsForUser(targetUserId) {
 function updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commentsExpanded) {
       if (!commentBtn || !postId) return;
       const commentCount = commentsByPost.get(postId)?.length || 0;
+      const commentsLabel = tr.comments || "Comments";
       if (commentsExpanded.has(postId)) {
-        commentBtn.textContent = tr.commentsHide || "Hide";
+        setActionButtonContent(commentBtn, {
+          kind: "comments",
+          icon: "💬",
+          label: tr.commentsHide || "Hide",
+        });
       } else if (commentCount) {
-        commentBtn.textContent = `${tr.comments || "Comments"} (${commentCount})`;
+        setActionButtonContent(commentBtn, {
+          kind: "comments",
+          icon: "💬",
+          label: commentBtn.classList.contains("chip-compact")
+            ? `${commentCount}`
+            : `${commentsLabel} (${commentCount})`,
+        });
       } else {
-        commentBtn.textContent = tr.commentsShow || "View comments";
+        setActionButtonContent(commentBtn, {
+          kind: "comments",
+          icon: "💬",
+          label: commentsLabel,
+        });
       }
     }
 function getCaptionPreviewText(fullText = "") {
