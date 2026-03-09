@@ -3457,17 +3457,6 @@ async function loadProfilePostCount() {
       const pageScrollMap = new Map();
       const getVisiblePage = () =>
         document.querySelector(".page-view.is-active")?.dataset.page || "";
-      const orderedMainPages = Array.from(tabs)
-        .map((tab) => tab.getAttribute("data-page-target") || "")
-        .filter(Boolean)
-        .filter((page, index, list) => list.indexOf(page) === index);
-      const getAdjacentMainPage = (page, direction = 1) => {
-        const index = orderedMainPages.indexOf(page);
-        if (index < 0) return "";
-        const nextIndex = index + direction;
-        if (nextIndex < 0 || nextIndex >= orderedMainPages.length) return "";
-        return orderedMainPages[nextIndex] || "";
-      };
       const updateTabState = (page) => {
         tabs.forEach((tab) => {
           const target = tab.getAttribute("data-page-target");
@@ -3610,7 +3599,7 @@ async function loadProfilePostCount() {
         });
       });
 
-      // Mobile swipe navigation: feed <-> account <-> settings
+      // Mobile swipe navigation: feed <-> shorts
       let swipeActive = false;
       let swipeStartX = 0;
       let swipeStartY = 0;
@@ -3634,6 +3623,21 @@ async function loadProfilePostCount() {
         swipeTargetPage = page;
         swipePointerId = pointerId;
       };
+      const triggerFeedViewSwipe = (direction) => {
+        if (swipeTargetPage !== "feed") return;
+        const shortsBtn = $("btn-feed-shorts-mode");
+        if (!shortsBtn) return;
+        const isShortsMode =
+          shortsBtn.classList.contains("is-active") ||
+          shortsBtn.getAttribute("aria-pressed") === "true";
+        if (direction === "to-shorts" && !isShortsMode) {
+          shortsBtn.click();
+          return;
+        }
+        if (direction === "to-feed" && isShortsMode) {
+          shortsBtn.click();
+        }
+      };
       const endSwipe = ({ x, y }) => {
         if (!swipeActive) return;
         swipeActive = false;
@@ -3645,12 +3649,7 @@ async function loadProfilePostCount() {
         if (Math.abs(dy) > SWIPE_MAX_Y) return;
         if (Math.abs(dx) < SWIPE_MIN_X) return;
         if (Math.abs(dx) < Math.abs(dy) * 1.05) return;
-        const nextPage =
-          dx < 0
-            ? getAdjacentMainPage(swipeTargetPage, 1)
-            : getAdjacentMainPage(swipeTargetPage, -1);
-        if (!nextPage) return;
-        setPage(nextPage, { scrollBehavior: "smooth" });
+        triggerFeedViewSwipe(dx < 0 ? "to-shorts" : "to-feed");
       };
       if (typeof window !== "undefined") {
         if (typeof window.PointerEvent === "function") {
@@ -3660,7 +3659,7 @@ async function loadProfilePostCount() {
               if (event.isPrimary === false) return;
               if (!["touch", "pen"].includes(`${event.pointerType || ""}`)) return;
               const page = getVisiblePage();
-              if (!orderedMainPages.includes(page)) return;
+              if (page !== "feed") return;
               if (shouldIgnoreSwipeTarget(event.target)) return;
               beginSwipe({
                 x: event.clientX,
@@ -3695,7 +3694,7 @@ async function loadProfilePostCount() {
               const touch = event.touches?.[0];
               if (!touch || event.touches.length !== 1) return;
               const page = getVisiblePage();
-              if (!orderedMainPages.includes(page)) return;
+              if (page !== "feed") return;
               if (shouldIgnoreSwipeTarget(event.target)) return;
               beginSwipe({ x: touch.clientX, y: touch.clientY, page });
             },
