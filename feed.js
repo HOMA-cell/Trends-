@@ -5918,11 +5918,15 @@ function applyLikeButtonState(likeBtn, state, tr) {
       likeBtn.setAttribute("aria-busy", state.isLoading ? "true" : "false");
       const likeLabel = tr.like || "Like";
       if (likeBtn.classList.contains("chip-compact")) {
+        const compactCount = Number.isFinite(Number(state.likeCount))
+          ? Number(state.likeCount)
+          : 0;
         setActionButtonContent(likeBtn, {
           kind: "like",
           icon: state.isLiked ? "♥" : "♡",
-          label: state.likeCount ? `${state.likeCount}` : likeLabel,
+          label: `${compactCount}`,
         });
+        likeBtn.setAttribute("aria-label", `${likeLabel} (${compactCount})`);
         return;
       }
       setActionButtonContent(likeBtn, {
@@ -5979,26 +5983,37 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commen
       if (!commentBtn || !postId) return;
       const commentCount = commentsByPost.get(postId)?.length || 0;
       const commentsLabel = tr.comments || "Comments";
+      const isCompact = commentBtn.classList.contains("chip-compact");
+      const compactLabel = `${Math.max(0, Number(commentCount || 0))}`;
       if (commentsExpanded.has(postId)) {
         setActionButtonContent(commentBtn, {
           kind: "comments",
           icon: "💬",
-          label: tr.commentsHide || "Hide",
+          label: isCompact ? compactLabel : tr.commentsHide || "Hide",
         });
+        if (isCompact) {
+          commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactLabel})`);
+        }
       } else if (commentCount) {
         setActionButtonContent(commentBtn, {
           kind: "comments",
           icon: "💬",
-          label: commentBtn.classList.contains("chip-compact")
-            ? `${commentCount}`
+          label: isCompact
+            ? compactLabel
             : `${commentsLabel} (${commentCount})`,
         });
+        if (isCompact) {
+          commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactLabel})`);
+        }
       } else {
         setActionButtonContent(commentBtn, {
           kind: "comments",
           icon: "💬",
-          label: commentsLabel,
+          label: isCompact ? compactLabel : commentsLabel,
         });
+        if (isCompact) {
+          commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactLabel})`);
+        }
       }
     }
 function getCaptionPreviewText(fullText = "") {
