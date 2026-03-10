@@ -75,34 +75,37 @@
       <!-- Feed ページ -->
       <div class="page-view is-active" data-page="feed">
         <section class="card">
-          <div class="feed-header">
-            <div class="card-title" id="feed-title">Feed</div>
-            <div class="feed-search-wrap">
-              <input
-                id="feed-search"
-                type="text"
-                placeholder="caption / handle / メモで検索"
-              />
-              <button class="btn btn-ghost btn-xs" id="btn-feed-discovery-toggle">発見を表示</button>
-              <button class="btn btn-ghost btn-xs hidden" id="btn-feed-clear">クリア</button>
-              <button class="btn btn-ghost btn-xs" id="btn-feed-refresh">更新</button>
-            </div>
-          </div>
-  
-          <!-- すべて / 自分 -->
-          <div class="feed-filters">
+          <div class="feed-toolbar">
+            <input
+              id="feed-search"
+              type="text"
+              placeholder="caption / handle / メモで検索"
+            />
             <div class="chips feed-primary-filters">
               <button class="chip chip-active" id="filter-foryou">おすすめ</button>
               <button class="chip" id="filter-all">すべて</button>
               <button class="chip" id="filter-mine">自分</button>
             </div>
-            <div class="feed-filter-actions">
+            <div class="feed-sort feed-inline-sort">
+              <select id="feed-sort" class="select-sm">
+                <option value="newest" id="sort-newest">Newest</option>
+                <option value="oldest" id="sort-oldest">Oldest</option>
+              </select>
+            </div>
+            <div class="feed-toolbar-actions">
+              <button class="btn btn-ghost btn-xs hidden" id="btn-feed-clear">クリア</button>
+              <button class="btn btn-ghost btn-xs" id="btn-feed-refresh">更新</button>
               <button class="btn btn-ghost btn-xs" id="btn-feed-shorts-mode">ショート</button>
-              <button class="btn btn-ghost btn-xs" id="btn-feed-options">詳細</button>
+              <button class="btn btn-ghost btn-xs" id="btn-feed-options" aria-haspopup="menu" aria-expanded="false">⋯</button>
             </div>
           </div>
 
           <div class="feed-advanced" id="feed-advanced">
+            <div class="feed-advanced-top">
+              <button class="btn btn-ghost btn-xs" id="btn-feed-discovery-toggle">発見を表示</button>
+              <button class="btn btn-ghost btn-xs" id="btn-feed-layout">グリッド</button>
+              <button class="btn btn-ghost btn-xs" id="btn-feed-stats-toggle">統計を表示</button>
+            </div>
             <div class="chips feed-secondary-filters">
               <button class="chip" id="filter-following">フォロー中</button>
               <button class="chip" id="filter-saved">保存済み</button>
@@ -111,15 +114,6 @@
               <button class="chip" id="rank-fresh">新着寄り</button>
               <button class="chip chip-active" id="rank-balanced">バランス</button>
               <button class="chip" id="rank-viral">バズ重視</button>
-            </div>
-            <div class="feed-actions">
-              <div class="feed-sort">
-                <select id="feed-sort" class="select-sm">
-                  <option value="newest" id="sort-newest">Newest</option>
-                  <option value="oldest" id="sort-oldest">Oldest</option>
-                </select>
-              </div>
-              <button class="btn btn-ghost btn-xs" id="btn-feed-layout">グリッド</button>
             </div>
           </div>
 
@@ -138,7 +132,7 @@
             </div>
           </div>
 
-          <div class="stat-grid" id="feed-stat-grid">
+          <div class="stat-grid hidden" id="feed-stat-grid">
             <div class="stat-item">
               <div class="stat-label" id="stat-today-label">今日の投稿</div>
               <div class="stat-value" id="stat-today">-</div>

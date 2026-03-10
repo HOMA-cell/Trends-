@@ -561,7 +561,9 @@ export function createSettingsController(options) {
 
     const feedStats = $("feed-stat-grid");
     if (feedStats) {
-      feedStats.classList.toggle("hidden", !current.showFeedStats);
+      if (!current.showFeedStats) {
+        feedStats.classList.add("hidden");
+      }
     }
 
     const emailEl = $("profile-email");

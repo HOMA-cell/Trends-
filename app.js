@@ -2180,7 +2180,6 @@ async function loadProfilePostCount() {
       setText("btn-feed-restore-hidden", "feedRestoreHidden");
       setText("btn-feed-restore-muted", "feedRestoreMuted");
       setText("btn-feed-restore-muted-terms", "feedRestoreMutedTerms");
-      setText("btn-feed-options", "feedOptions");
       setText("btn-feed-shorts-mode", "feedModeShorts");
       setText("btn-feed-layout", "feedLayoutGrid");
       setText("filter-foryou", "foryou");
@@ -2204,6 +2203,11 @@ async function loadProfilePostCount() {
       setText("stat-streak-label", "statStreakLabel");
       setText("stat-total-label", "statTotalLabel");
       setPlaceholder("feed-search", "searchPlaceholder");
+      const feedMenuBtn = $("btn-feed-options");
+      if (feedMenuBtn) {
+        feedMenuBtn.textContent = "⋯";
+        feedMenuBtn.setAttribute("aria-label", tr.feedOptions || "Details");
+      }
 
       // アカウント / Tips / Debug
       setText("account-title", "account");

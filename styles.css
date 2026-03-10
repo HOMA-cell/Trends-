@@ -376,17 +376,13 @@
       color: var(--danger);
     }
 
-    .feed-header {
-      display: flex;
-      justify-content: space-between;
+    .feed-toolbar {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.2fr) minmax(0, 1fr) auto auto;
+      gap: 8px;
       align-items: center;
       margin-bottom: 8px;
-      gap: 8px;
-    }
-    .feed-header .card-title {
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
+      min-width: 0;
     }
     .chips {
       display: flex;
@@ -504,23 +500,31 @@
       display: none;
     }
 
-    .feed-search-wrap {
-      flex: 1;
-      display: flex;
-      justify-content: flex-end;
+    .feed-toolbar-actions {
+      display: inline-flex;
+      justify-self: end;
       align-items: center;
       gap: 6px;
       min-width: 0;
     }
     #feed-search {
       width: 100%;
-      flex: 1 1 180px;
-      max-width: 260px;
+      max-width: none;
       min-width: 0;
       padding: 6px 10px;
       border-radius: 999px;
       border: 1px solid var(--border);
       font-size: 12px;
+      min-height: 34px;
+    }
+    .feed-inline-sort .select-sm {
+      min-height: 34px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      background: #fff;
+      min-width: 110px;
     }
     #btn-feed-discovery-toggle {
       border-style: dashed;
@@ -530,21 +534,21 @@
       border-color: var(--primary);
       color: var(--primary);
     }
+    #btn-feed-stats-toggle.is-active,
+    #btn-feed-layout.is-active,
+    #btn-feed-options.is-active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
     #btn-feed-clear {
       min-width: 52px;
     }
-    .feed-filters {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-    .feed-filter-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
+    #btn-feed-options {
+      min-width: 34px;
+      font-size: 18px;
+      line-height: 1;
+      padding: 4px 8px;
     }
     #btn-feed-shorts-mode.is-active {
       background: var(--primary-soft);
@@ -570,17 +574,8 @@
     .feed-secondary-filters::-webkit-scrollbar {
       display: none;
     }
-    #btn-feed-options.is-active {
-      background: var(--primary-soft);
-      border-color: var(--primary);
-      color: var(--primary);
-    }
-    .feed-actions {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
     .feed-rank-controls {
+      display: flex;
       align-items: center;
       opacity: 1;
       transition: opacity 0.18s ease;
@@ -647,12 +642,11 @@
       color: var(--primary);
       border-color: var(--primary);
     }
-    .feed-actions .select-sm {
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      font-size: 11px;
-      background: #fff;
+    .feed-advanced-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
     }
     @media (max-width: 700px) {
       body {
@@ -661,32 +655,22 @@
       .page {
         padding: 10px;
       }
-      .feed-header {
-        flex-direction: column;
-        align-items: stretch;
+      .feed-toolbar {
+        grid-template-columns: minmax(0, 1fr);
         gap: 6px;
       }
-      .feed-search-wrap {
-        justify-content: stretch;
-        flex-wrap: wrap;
-      }
-      #feed-search {
-        max-width: none;
-      }
-      #btn-feed-discovery-toggle {
-        order: 2;
-      }
-      #btn-feed-clear,
-      #btn-feed-refresh {
-        order: 3;
-      }
-      .feed-actions {
-        width: 100%;
-        justify-content: space-between;
-      }
-      .feed-filter-actions {
+      .feed-toolbar-actions {
         width: 100%;
         justify-content: flex-end;
+      }
+      .feed-inline-sort {
+        width: 100%;
+      }
+      .feed-inline-sort .select-sm {
+        width: 100%;
+      }
+      .feed-primary-filters {
+        width: 100%;
       }
       .feed-discovery {
         grid-template-columns: 1fr;
@@ -696,10 +680,10 @@
       }
     }
     .feed-advanced {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
       margin-bottom: 10px;
       overflow: hidden;
       max-height: 0;
@@ -707,16 +691,16 @@
       transform: translateY(-4px);
       border: 1px solid transparent;
       border-radius: var(--radius-md);
-      padding: 0 8px;
+      padding: 0 10px;
       transition: max-height 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
     }
     .feed-advanced.is-open {
-      max-height: 220px;
+      max-height: 360px;
       opacity: 1;
       transform: translateY(0);
       border-color: var(--border);
       background: #fffdf9;
-      padding: 8px;
+      padding: 8px 10px;
     }
     .feed-sort {
       display: flex;
@@ -725,7 +709,6 @@
     }
     @media (max-width: 700px) {
       .feed-advanced {
-        grid-template-columns: 1fr;
         gap: 8px;
       }
     }
@@ -3375,7 +3358,7 @@ body.compact-mode .insight-item,
 body.compact-mode .profile-stat {
   padding: 8px 10px;
 }
-body.compact-mode .feed-filters {
+body.compact-mode .feed-toolbar {
   margin-bottom: 6px;
 }
 
@@ -3461,52 +3444,41 @@ body.compact-mode .feed-filters {
     display: none;
   }
 
-  .feed-header {
-    margin-bottom: 6px;
+  .feed-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 8px;
     gap: 6px;
-  }
-
-  .feed-search-wrap {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 6px;
-    align-items: center;
   }
 
   #feed-search {
-    grid-column: 1 / -1;
     max-width: none;
-    min-height: 38px;
+    min-height: 36px;
     padding: 8px 12px;
-    font-size: 16px;
+    font-size: 15px;
   }
 
-  #btn-feed-discovery-toggle,
+  .feed-inline-sort {
+    width: 100%;
+  }
+
+  .feed-inline-sort .select-sm {
+    width: 100%;
+    min-height: 34px;
+    font-size: 12px;
+  }
+
+  .feed-toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
   #btn-feed-refresh,
-  #btn-feed-clear {
+  #btn-feed-clear,
+  #btn-feed-shorts-mode {
     min-height: 32px;
     padding: 6px 10px;
     font-size: 12px;
-    order: 0;
-  }
-
-  #btn-feed-discovery-toggle {
-    display: none;
-  }
-
-  .feed-filters {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-
-  .feed-filter-actions {
-    width: auto;
-    justify-content: flex-end;
-    gap: 6px;
   }
 
   .feed-primary-filters {
@@ -3515,10 +3487,16 @@ body.compact-mode .feed-filters {
   }
 
   .feed-primary-filters .chip,
-  .feed-filter-actions .btn {
+  .feed-toolbar-actions .btn {
     min-height: 32px;
     padding: 6px 10px;
     font-size: 12px;
+  }
+
+  #btn-feed-options {
+    min-width: 32px;
+    padding-inline: 8px;
+    font-size: 17px;
   }
 
   .feed-advanced {

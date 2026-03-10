@@ -169,6 +169,7 @@ const feedWindowedCards = new Map();
 let feedKeyboardShortcutsBound = false;
 let feedDetailKeyboardBound = false;
 let feedCardActionDelegationBound = false;
+let feedAdvancedDismissBound = false;
 let feedPageSizeResizeBound = false;
 let feedPageSizeResizeTimer = null;
 const feedAdaptiveChunkSize = new Map();
@@ -254,6 +255,7 @@ const FEED_AD_MAX_START_AT = 40;
 const FEED_AD_MAX_COUNT = 8;
 let feedUiStateLoaded = false;
 let feedDiscoveryExpanded = false;
+let feedStatsExpanded = false;
 let seenPostsObserver = null;
 let adSenseScriptClient = "";
 let adSenseScriptLoading = false;
@@ -1733,6 +1735,9 @@ function loadFeedUiState() {
         if (typeof parsed?.discoveryExpanded === "boolean") {
           feedDiscoveryExpanded = parsed.discoveryExpanded;
         }
+        if (typeof parsed?.statsExpanded === "boolean") {
+          feedStatsExpanded = parsed.statsExpanded;
+        }
         feedLastCommittedSearch = nextSearch.slice(0, 120);
       } catch {
         // ignore persisted feed UI parse failures
@@ -1750,6 +1755,7 @@ function persistFeedUiState() {
           filterMedia: !!filterMedia,
           filterWorkout: !!filterWorkout,
           discoveryExpanded: !!feedDiscoveryExpanded,
+          statsExpanded: !!feedStatsExpanded,
           search: String(feedLastCommittedSearch || "").slice(0, 120),
         };
         localStorage.setItem(FEED_UI_STATE_KEY, JSON.stringify(payload));
@@ -3451,11 +3457,40 @@ export function setupFeedControls() {
 
       const feedAdvanced = $("feed-advanced");
       const feedOptionsBtn = $("btn-feed-options");
+      const closeFeedAdvancedMenu = () => {
+        if (!feedAdvanced || !feedOptionsBtn) return;
+        feedAdvanced.classList.remove("is-open");
+        feedOptionsBtn.classList.remove("is-active");
+        feedOptionsBtn.setAttribute("aria-expanded", "false");
+      };
       if (feedOptionsBtn && feedAdvanced && !feedOptionsBtn.dataset.bound) {
         feedOptionsBtn.dataset.bound = "true";
-        feedOptionsBtn.addEventListener("click", () => {
+        feedOptionsBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           const isOpen = feedAdvanced.classList.toggle("is-open");
           feedOptionsBtn.classList.toggle("is-active", isOpen);
+          feedOptionsBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+      }
+      if (
+        !feedAdvancedDismissBound &&
+        typeof document !== "undefined" &&
+        feedAdvanced &&
+        feedOptionsBtn
+      ) {
+        feedAdvancedDismissBound = true;
+        document.addEventListener("click", (event) => {
+          if (!feedAdvanced.classList.contains("is-open")) return;
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          if (feedAdvanced.contains(target) || feedOptionsBtn.contains(target)) return;
+          closeFeedAdvancedMenu();
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key !== "Escape") return;
+          if (!feedAdvanced.classList.contains("is-open")) return;
+          closeFeedAdvancedMenu();
         });
       }
       const discoveryToggleBtn = $("btn-feed-discovery-toggle");
@@ -3463,6 +3498,15 @@ export function setupFeedControls() {
         discoveryToggleBtn.dataset.bound = "true";
         discoveryToggleBtn.addEventListener("click", () => {
           feedDiscoveryExpanded = !feedDiscoveryExpanded;
+          persistFeedUiState();
+          scheduleRenderFeed();
+        });
+      }
+      const feedStatsToggleBtn = $("btn-feed-stats-toggle");
+      if (feedStatsToggleBtn && feedStatsToggleBtn.dataset.bound !== "true") {
+        feedStatsToggleBtn.dataset.bound = "true";
+        feedStatsToggleBtn.addEventListener("click", () => {
+          feedStatsExpanded = !feedStatsExpanded;
           persistFeedUiState();
           scheduleRenderFeed();
         });
@@ -4063,6 +4107,7 @@ export function renderFeed(options = {}) {
     const feedOptionsBtn = $("btn-feed-options");
     const feedAdvanced = $("feed-advanced");
     const statGrid = $("feed-stat-grid");
+    const statsToggleBtn = $("btn-feed-stats-toggle");
     const discoveryToggleBtn = $("btn-feed-discovery-toggle");
     if (!container) return;
     const forcePageRender = !!options.forcePageRender;
@@ -4323,8 +4368,10 @@ export function renderFeed(options = {}) {
       searchValue,
       tr,
     });
+    const canShowStatsFromSettings = settings.showFeedStats !== false;
+    const canShowStats = !isShortsMode && canShowStatsFromSettings;
     if (statGrid) {
-      statGrid.classList.toggle("hidden", isShortsMode);
+      statGrid.classList.toggle("hidden", !canShowStats || !feedStatsExpanded);
     }
     if (feedAdvanced) {
       if (isShortsMode) {
@@ -4335,7 +4382,27 @@ export function renderFeed(options = {}) {
       }
     }
     if (feedOptionsBtn) {
+      feedOptionsBtn.textContent = "⋯";
+      feedOptionsBtn.setAttribute("aria-label", tr.feedOptions || "Details");
       feedOptionsBtn.classList.toggle("hidden", isShortsMode);
+      if (isShortsMode) {
+        feedOptionsBtn.classList.remove("is-active");
+        feedOptionsBtn.setAttribute("aria-expanded", "false");
+      }
+    }
+    if (statsToggleBtn) {
+      statsToggleBtn.classList.toggle("hidden", !canShowStats);
+      statsToggleBtn.disabled = !canShowStats;
+      if (canShowStats) {
+        statsToggleBtn.textContent = feedStatsExpanded
+          ? tr.feedStatsHide || "統計を隠す"
+          : tr.feedStatsShow || "統計を表示";
+      }
+      statsToggleBtn.classList.toggle("is-active", canShowStats && feedStatsExpanded);
+      statsToggleBtn.setAttribute(
+        "aria-expanded",
+        canShowStats && feedStatsExpanded ? "true" : "false"
+      );
     }
     if (discoveryToggleBtn) {
       const canShowDiscovery =
