@@ -474,25 +474,34 @@
       pointer-events: none;
     }
     .chip-compact {
-      min-height: 32px;
-      padding: 5px 10px;
+      min-height: 28px;
+      padding: 4px 9px;
       font-weight: 600;
       letter-spacing: 0.01em;
     }
     .chip-action {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
     }
     .chip-action .chip-icon {
-      font-size: 11px;
+      font-size: 12px;
       line-height: 1;
       flex: 0 0 auto;
     }
     .chip-action .chip-label {
       line-height: 1;
       white-space: nowrap;
-      font-size: 10px;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+    .chip-icon-only {
+      min-width: 28px;
+      justify-content: center;
+      padding-inline: 7px;
+    }
+    .chip-icon-only .chip-label {
+      display: none;
     }
 
     .feed-search-wrap {
@@ -791,14 +800,9 @@
       }
       .post-action-row-primary {
         display: flex;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
+        flex-wrap: wrap;
         gap: 6px;
         padding-bottom: 2px;
-      }
-      .post-action-row-primary::-webkit-scrollbar {
-        display: none;
       }
       .post-action-row-primary .chip-compact {
         flex: 0 0 auto;
@@ -979,14 +983,17 @@
     }
     .post-action-row-secondary {
       justify-content: flex-end;
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
     }
     .post-footer .chip-action {
       border: 1px solid var(--border);
       background: #fff;
       color: var(--text-main);
-      font-size: 11px;
-      min-height: 32px;
-      padding-inline: 10px;
+      font-size: 10px;
+      min-height: 28px;
+      padding-inline: 8px;
       border-radius: 999px;
       white-space: nowrap;
     }
@@ -1007,8 +1014,9 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 34px;
-      padding: 6px 12px;
+      min-height: 28px;
+      min-width: 28px;
+      padding: 4px 8px;
     }
     .post-action-menu > summary::-webkit-details-marker {
       display: none;
@@ -1023,9 +1031,16 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background: #fff;
-      padding: 8px;
+      padding: 6px;
       box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
       min-width: min(100%, 320px);
+    }
+    .post-action-row-secondary .chip-compact {
+      width: 100%;
+      justify-content: flex-start;
+      border-radius: 10px;
+      min-height: 30px;
+      padding-inline: 10px;
     }
     .post-media img,
     .post-media video {
@@ -3116,16 +3131,32 @@
 }
 .feed-list.shorts-view .shorts-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
 }
 .feed-list.shorts-view .shorts-actions .chip {
   background: rgba(255, 255, 255, 0.18);
   border-color: rgba(255, 255, 255, 0.26);
   color: #fff;
 }
+.feed-list.shorts-view .shorts-actions .chip-compact {
+  min-height: 30px;
+  padding: 5px 9px;
+}
 .feed-list.shorts-view .shorts-actions .chip.chip-active {
   background: rgba(255, 255, 255, 0.28);
+}
+.feed-list.shorts-view .shorts-action-menu {
+  margin-left: auto;
+}
+.feed-list.shorts-view .shorts-action-menu .post-action-menu-panel {
+  background: rgba(11, 15, 24, 0.95);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.feed-list.shorts-view .shorts-action-menu .post-action-row-secondary .chip-compact {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #f8fafc;
 }
 .feed-list.shorts-view .post-card-seen {
   opacity: 1;

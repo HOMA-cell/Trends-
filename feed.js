@@ -4914,19 +4914,42 @@ export function renderFeed(options = {}) {
 
       const actions = document.createElement("div");
       actions.className = "shorts-actions";
+      const secondaryActions = document.createElement("div");
+      secondaryActions.className = "post-actions post-action-row post-action-row-secondary";
+      const appendShortPrimaryAction = (button) => {
+        if (!button) return;
+        button.classList.add("chip-compact");
+        actions.appendChild(button);
+      };
+      const appendShortMenuAction = (button) => {
+        if (!button) return;
+        button.classList.add("chip-compact");
+        secondaryActions.appendChild(button);
+      };
 
       const likeBtn = document.createElement("button");
       likeBtn.className = "chip chip-like chip-action";
       likeBtn.dataset.postAction = "toggle-like";
       const likeState = getLikeUiState(post.id, localLikedIds);
       applyLikeButtonState(likeBtn, likeState, tr);
-      actions.appendChild(likeBtn);
+      appendShortPrimaryAction(likeBtn);
 
       const commentBtn = document.createElement("button");
       commentBtn.className = "chip chip-log chip-action";
       commentBtn.dataset.postAction = "toggle-comments";
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost, commentsExpanded);
-      actions.appendChild(commentBtn);
+      appendShortPrimaryAction(commentBtn);
+
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "chip chip-log chip-action";
+      shareBtn.dataset.postAction = "share-post";
+      setActionButtonContent(shareBtn, {
+        kind: "share",
+        icon: "↗",
+        label: "",
+      });
+      shareBtn.setAttribute("aria-label", tr.share || "Share");
+      appendShortPrimaryAction(shareBtn);
 
       const saveBtn = document.createElement("button");
       saveBtn.className = "chip chip-log chip-save chip-action";
@@ -4940,17 +4963,7 @@ export function renderFeed(options = {}) {
       });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      actions.appendChild(saveBtn);
-
-      const shareBtn = document.createElement("button");
-      shareBtn.className = "chip chip-log chip-action";
-      shareBtn.dataset.postAction = "share-post";
-      setActionButtonContent(shareBtn, {
-        kind: "share",
-        icon: "↗",
-        label: tr.share || "Share",
-      });
-      actions.appendChild(shareBtn);
+      appendShortMenuAction(saveBtn);
 
       if (currentUser && post.user_id && post.user_id !== currentUser.id) {
         const followBtn = document.createElement("button");
@@ -4960,7 +4973,22 @@ export function renderFeed(options = {}) {
         followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
         followBtn.classList.toggle("is-following", isFollowing);
         followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
-        actions.appendChild(followBtn);
+        appendShortMenuAction(followBtn);
+      }
+
+      if (secondaryActions.childNodes.length) {
+        const secondaryWrap = document.createElement("details");
+        secondaryWrap.className = "post-action-menu shorts-action-menu";
+        const summary = document.createElement("summary");
+        summary.className = "chip chip-log post-action-more";
+        summary.textContent = "⋯";
+        summary.setAttribute("aria-label", tr.feedOptions || "Details");
+        secondaryWrap.appendChild(summary);
+        const panel = document.createElement("div");
+        panel.className = "post-action-menu-panel";
+        panel.appendChild(secondaryActions);
+        secondaryWrap.appendChild(panel);
+        actions.appendChild(secondaryWrap);
       }
 
       overlay.appendChild(actions);
@@ -5125,9 +5153,10 @@ export function renderFeed(options = {}) {
       setActionButtonContent(shareBtn, {
         kind: "share",
         icon: "↗",
-        label: tr.share || "Share",
+        label: "",
       });
-      appendSecondaryAction(shareBtn);
+      shareBtn.setAttribute("aria-label", tr.share || "Share");
+      appendPrimaryAction(shareBtn);
 
       const repostBtn = document.createElement("button");
       repostBtn.className = "chip chip-log chip-repost";
@@ -5432,7 +5461,8 @@ export function renderFeed(options = {}) {
         secondaryWrap.className = "post-action-menu";
         const summary = document.createElement("summary");
         summary.className = "chip chip-log post-action-more";
-        summary.textContent = tr.feedOptions || "Details";
+        summary.textContent = "⋯";
+        summary.setAttribute("aria-label", tr.feedOptions || "Details");
         secondaryWrap.appendChild(summary);
         const panel = document.createElement("div");
         panel.className = "post-action-menu-panel";
@@ -5898,16 +5928,22 @@ function setActionButtonContent(button, { kind = "", icon = "", label = "" } = {
       if (normalizedLabel) {
         button.setAttribute("data-action-label", normalizedLabel);
         button.setAttribute("aria-label", normalizedLabel);
+        button.classList.remove("chip-icon-only");
+      } else {
+        button.removeAttribute("data-action-label");
+        button.classList.add("chip-icon-only");
       }
       button.textContent = "";
       const iconEl = document.createElement("span");
       iconEl.className = "chip-icon";
       iconEl.textContent = icon;
-      const labelEl = document.createElement("span");
-      labelEl.className = "chip-label";
-      labelEl.textContent = normalizedLabel;
       button.appendChild(iconEl);
-      button.appendChild(labelEl);
+      if (normalizedLabel) {
+        const labelEl = document.createElement("span");
+        labelEl.className = "chip-label";
+        labelEl.textContent = normalizedLabel;
+        button.appendChild(labelEl);
+      }
     }
 function applyLikeButtonState(likeBtn, state, tr) {
       if (!likeBtn || !state) return;
