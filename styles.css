@@ -675,6 +675,19 @@
       .feed-discovery {
         grid-template-columns: 1fr;
       }
+      #comment-sheet-backdrop {
+        padding: 0;
+      }
+      .comment-sheet-panel {
+        width: 100%;
+        max-width: none;
+        max-height: 86vh;
+        border-radius: 18px 18px 0 0;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      }
+      .comment-sheet-body {
+        max-height: calc(86vh - 54px);
+      }
       .skeleton {
         animation: none;
       }
@@ -1120,7 +1133,7 @@
       font-size: 12px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
       line-height: 1.4;
     }
     .post-weight {
@@ -1129,6 +1142,13 @@
     .post-caption {
       white-space: pre-wrap;
       line-height: 1.45;
+    }
+    .post-card .post-caption {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .chip-caption-toggle {
       align-self: flex-start;
@@ -1205,6 +1225,36 @@
       border-radius: var(--radius-md);
       border: 1px solid var(--border);
       font-size: 12px;
+    }
+    .comment-sheet-panel {
+      width: min(100%, 620px);
+      max-width: 620px;
+      max-height: 84vh;
+      border-radius: 18px 18px 0 0;
+    }
+    #comment-sheet-backdrop {
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0 12px;
+    }
+    .comment-sheet-body {
+      max-height: min(72vh, 640px);
+      overflow-y: auto;
+      padding-top: 6px;
+      scrollbar-width: thin;
+    }
+    .comment-sheet-content {
+      margin-top: 0;
+      border-top: none;
+      padding-top: 0;
+    }
+    .comment-sheet-content .comment-form .btn {
+      min-height: 34px;
+      padding-inline: 12px;
+      flex-shrink: 0;
+    }
+    .comment-sheet-content .comment-form textarea {
+      min-height: 54px;
     }
 
     .sr-only {

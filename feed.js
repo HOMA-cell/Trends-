@@ -65,12 +65,10 @@ const getAllPosts = () => feedContext.getAllPosts?.() || [];
 const setAllPosts = (posts) => feedContext.setAllPosts?.(posts);
 const getWorkoutLogsByPost = () => feedContext.getWorkoutLogsByPost?.() || new Map();
 const getCommentsByPost = () => feedContext.getCommentsByPost?.() || new Map();
-const getCommentsExpanded = () => feedContext.getCommentsExpanded?.() || new Set();
 const getCommentsLoading = () => feedContext.getCommentsLoading?.() || new Set();
 const isCommentsEnabled = () => !!feedContext.isCommentsEnabled?.();
 const loadCommentsForPost = (...args) => feedContext.loadCommentsForPost?.(...args);
 const submitComment = (...args) => feedContext.submitComment?.(...args);
-const toggleComments = (...args) => feedContext.toggleComments?.(...args);
 const createNotification = (...args) => feedContext.createNotification?.(...args);
 const deletePost = (...args) => feedContext.deletePost?.(...args);
 const getProfilesForUsers = (...args) =>
@@ -109,7 +107,6 @@ let feedVisibleCount = 8;
 let feedLastLoadedAt = null;
 let feedLoadingGeneration = 0;
 let currentDetailPostId = null;
-const expandedCaptionPostIds = new Set();
 let feedRenderToken = 0;
 let feedLoadPromise = null;
 let feedNotice = "";
@@ -168,8 +165,10 @@ let feedWindowingEnabled = false;
 const feedWindowedCards = new Map();
 let feedKeyboardShortcutsBound = false;
 let feedDetailKeyboardBound = false;
+let feedCommentKeyboardBound = false;
 let feedCardActionDelegationBound = false;
 let feedAdvancedDismissBound = false;
+let feedCommentSheetBound = false;
 let feedPageSizeResizeBound = false;
 let feedPageSizeResizeTimer = null;
 const feedAdaptiveChunkSize = new Map();
@@ -256,6 +255,7 @@ const FEED_AD_MAX_COUNT = 8;
 let feedUiStateLoaded = false;
 let feedDiscoveryExpanded = false;
 let feedStatsExpanded = false;
+let activeCommentPostId = "";
 let seenPostsObserver = null;
 let adSenseScriptClient = "";
 let adSenseScriptLoading = false;
@@ -2364,6 +2364,127 @@ async function flushFeedMetadataQueue() {
       scheduleRenderFeed();
       scheduleSecondaryRenders();
     }
+function getCommentSheetBackdrop() {
+      return $("comment-sheet-backdrop");
+    }
+function getCommentSheetBody() {
+      return $("comment-sheet-body");
+    }
+function isCommentSheetOpenForPost(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return false;
+      const backdrop = getCommentSheetBackdrop();
+      if (!backdrop) return false;
+      return (
+        activeCommentPostId === normalizedPostId &&
+        !backdrop.classList.contains("hidden")
+      );
+    }
+function closeCommentSheet() {
+      const previousPostId = activeCommentPostId;
+      activeCommentPostId = "";
+      const backdrop = getCommentSheetBackdrop();
+      if (backdrop) {
+        closeBackdrop(backdrop);
+      }
+      if (previousPostId) {
+        refreshFeedPostComments(previousPostId);
+      }
+    }
+function renderCommentSheetForPost(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      const post = getPostById(normalizedPostId);
+      const bodyRoot = getCommentSheetBody();
+      const titleEl = $("comment-sheet-title");
+      if (!bodyRoot) return;
+      bodyRoot.innerHTML = "";
+      if (!post) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      const currentUser = getCurrentUser();
+      const commentsByPost = getCommentsByPost();
+      const commentsLoading = getCommentsLoading();
+      const commentsEnabled = isCommentsEnabled();
+      const handle = formatHandle(
+        post.profile?.handle || post.profile?.username || "user"
+      );
+      if (titleEl) {
+        const commentsTitle = tr.comments || "Comments";
+        titleEl.textContent = handle
+          ? `${commentsTitle} · ${handle}`
+          : commentsTitle;
+      }
+      const section = buildFeedCommentSection(
+        post,
+        tr,
+        currentUser,
+        commentsByPost,
+        commentsLoading,
+        commentsEnabled
+      );
+      if (section) {
+        section.classList.add("comment-sheet-content");
+        bodyRoot.appendChild(section);
+      }
+    }
+function openCommentSheet(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      const post = getPostById(normalizedPostId);
+      if (!post) return;
+      const previousPostId = activeCommentPostId;
+      activeCommentPostId = normalizedPostId;
+      if (previousPostId && previousPostId !== normalizedPostId) {
+        refreshFeedPostComments(previousPostId);
+      }
+      renderCommentSheetForPost(normalizedPostId);
+      const backdrop = getCommentSheetBackdrop();
+      if (backdrop) {
+        openBackdrop(backdrop);
+      }
+      refreshFeedPostComments(normalizedPostId);
+      if (isCommentsEnabled()) {
+        loadCommentsForPost(normalizedPostId).finally(() => {
+          refreshFeedPostComments(normalizedPostId);
+        });
+      }
+    }
+function ensureCommentSheetBindings() {
+      if (feedCommentSheetBound || typeof document === "undefined") return;
+      const backdrop = getCommentSheetBackdrop();
+      const closeBtn = $("btn-comment-sheet-close");
+      if (!backdrop) return;
+      feedCommentSheetBound = true;
+      if (closeBtn && closeBtn.dataset.bound !== "true") {
+        closeBtn.dataset.bound = "true";
+        closeBtn.addEventListener("click", () => {
+          closeCommentSheet();
+        });
+      }
+      backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) {
+          closeCommentSheet();
+        }
+      });
+      document.addEventListener("click", (event) => {
+        const trigger = event.target?.closest?.("[data-page-target]");
+        if (!trigger) return;
+        const nextPage = `${trigger.getAttribute("data-page-target") || ""}`;
+        if (nextPage && nextPage !== "feed" && activeCommentPostId) {
+          closeCommentSheet();
+        }
+      });
+      if (!feedCommentKeyboardBound && typeof window !== "undefined") {
+        feedCommentKeyboardBound = true;
+        window.addEventListener("keydown", (event) => {
+          if (event.defaultPrevented || event.isComposing) return;
+          if (event.key !== "Escape") return;
+          if (!activeCommentPostId) return;
+          event.preventDefault();
+          closeCommentSheet();
+        });
+      }
+    }
 function setupFeedCardActionDelegation() {
       if (feedCardActionDelegationBound) return;
       feedCardActionDelegationBound = true;
@@ -2379,21 +2500,11 @@ function setupFeedCardActionDelegation() {
         if (!action) return;
         event.preventDefault();
         if (action === "toggle-comments") {
-          toggleComments(postId);
-          if (!refreshFeedPostComments(postId)) {
-            scheduleRenderFeed();
+          if (isCommentSheetOpenForPost(postId)) {
+            closeCommentSheet();
+            return;
           }
-          return;
-        }
-        if (action === "toggle-caption") {
-          const normalizedPostId = `${postId || ""}`.trim();
-          if (!normalizedPostId) return;
-          if (expandedCaptionPostIds.has(normalizedPostId)) {
-            expandedCaptionPostIds.delete(normalizedPostId);
-          } else {
-            expandedCaptionPostIds.add(normalizedPostId);
-          }
-          refreshFeedPostCaption(postId);
+          openCommentSheet(postId);
           return;
         }
         const post = getPostById(postId);
@@ -3079,6 +3190,7 @@ export function setFeedState(next = {}) {
     }
 export function setupFeedControls() {
       loadFeedUiState();
+      ensureCommentSheetBindings();
       feedIsOnline = getOnlineState();
       setupFeedCardActionDelegation();
       syncFeedPageSize({ resetVisible: true });
@@ -4160,9 +4272,6 @@ export function renderFeed(options = {}) {
     const allPosts = getAllPosts();
     const workoutLogsByPost = getWorkoutLogsByPost();
     const commentsByPost = getCommentsByPost();
-    const commentsExpanded = getCommentsExpanded();
-    const commentsLoading = getCommentsLoading();
-    const commentsEnabled = isCommentsEnabled();
     const autoLoadMoreEnabled = settings.feedAutoLoadMore !== false;
     const followingIds = getFollowingIds();
     const tr = t[currentLang] || t.ja;
@@ -4874,7 +4983,7 @@ export function renderFeed(options = {}) {
 
     const localLikedIds = getLikedIds();
     const shouldAnimateEntry = canAppend && shouldUseFeedEntryAnimation();
-    const createShortsCard = (post) => {
+    const createShortsCard = (post, feedIndex = 0) => {
       const card = document.createElement("article");
       card.className = "post-card shorts-card";
       if (shouldAnimateEntry) {
@@ -4901,9 +5010,10 @@ export function renderFeed(options = {}) {
         fallback.textContent = tr.mediaUnavailable || "Media unavailable";
         mediaWrap.appendChild(fallback);
       };
+      const prioritizeMedia = !appendOnly && feedIndex < 2;
       if (isVideoPost(post)) {
         const video = document.createElement("video");
-        video.preload = "none";
+        video.preload = prioritizeMedia ? "metadata" : "none";
         video.controls = true;
         video.playsInline = true;
         video.classList.add("video-deferred");
@@ -4920,9 +5030,9 @@ export function renderFeed(options = {}) {
         mediaWrap.appendChild(video);
       } else {
         const img = document.createElement("img");
-        img.loading = "lazy";
+        img.loading = prioritizeMedia ? "eager" : "lazy";
         img.decoding = "async";
-        img.fetchPriority = "auto";
+        img.fetchPriority = prioritizeMedia ? "high" : "auto";
         img.referrerPolicy = "no-referrer";
         img.alt = "short media";
         img.classList.add("image-deferred");
@@ -5004,7 +5114,7 @@ export function renderFeed(options = {}) {
       const commentBtn = document.createElement("button");
       commentBtn.className = "chip chip-log chip-action";
       commentBtn.dataset.postAction = "toggle-comments";
-      updateCommentButtonState(commentBtn, post.id, tr, commentsByPost, commentsExpanded);
+      updateCommentButtonState(commentBtn, post.id, tr, commentsByPost);
       appendShortPrimaryAction(commentBtn);
 
       const shareBtn = document.createElement("button");
@@ -5061,23 +5171,10 @@ export function renderFeed(options = {}) {
       overlay.appendChild(actions);
       card.appendChild(overlay);
 
-      if (commentsExpanded.has(post.id)) {
-        const commentSection = buildFeedCommentSection(
-          post,
-          tr,
-          currentUser,
-          commentsByPost,
-          commentsLoading,
-          commentsEnabled
-        );
-        if (commentSection) {
-          card.appendChild(commentSection);
-        }
-      }
       observeSeenPostCard(card, isSeen);
       return card;
     };
-    const createPostCard = (post) => {
+    const createPostCard = (post, feedIndex = 0) => {
       const card = document.createElement("div");
       card.className = "post-card";
       if (shouldAnimateEntry) {
@@ -5197,7 +5294,7 @@ export function renderFeed(options = {}) {
       const commentBtn = document.createElement("button");
       commentBtn.className = "chip chip-log chip-action";
       commentBtn.dataset.postAction = "toggle-comments";
-      updateCommentButtonState(commentBtn, post.id, tr, commentsByPost, commentsExpanded);
+      updateCommentButtonState(commentBtn, post.id, tr, commentsByPost);
       appendPrimaryAction(commentBtn);
 
       const saveBtn = document.createElement("button");
@@ -5320,6 +5417,7 @@ export function renderFeed(options = {}) {
         card.classList.add("post-card-seen");
       }
 
+      const prioritizeMedia = !appendOnly && feedIndex < 2;
       if (post.media_url) {
         const mediaWrap = document.createElement("div");
         mediaWrap.className = "post-media";
@@ -5336,7 +5434,7 @@ export function renderFeed(options = {}) {
         };
         if (post.media_type === "video") {
           const video = document.createElement("video");
-          video.preload = "none";
+          video.preload = prioritizeMedia ? "metadata" : "none";
           video.controls = true;
           video.playsInline = true;
           video.classList.add("video-deferred");
@@ -5349,9 +5447,13 @@ export function renderFeed(options = {}) {
           mediaWrap.appendChild(video);
         } else {
           const img = document.createElement("img");
-          img.loading = "lazy";
+          img.loading = prioritizeMedia ? "eager" : "lazy";
           img.decoding = "async";
-          img.fetchPriority = feedLayout === "grid" ? "low" : "auto";
+          img.fetchPriority = prioritizeMedia
+            ? "high"
+            : feedLayout === "grid"
+              ? "low"
+              : "auto";
           img.referrerPolicy = "no-referrer";
           img.alt = "post media";
           img.classList.add("image-deferred");
@@ -5407,38 +5509,11 @@ export function renderFeed(options = {}) {
         caption.className = "post-caption";
         const fullText = `${post.note || post.caption || ""}`.trim();
         const previewText = getCaptionPreviewText(fullText);
-        const isExpandable = fullText.length > FEED_CAPTION_TRIM_LIMIT;
-        const isExpanded = expandedCaptionPostIds.has(`${post.id || ""}`);
         caption.setAttribute("data-caption-text", "true");
         caption.setAttribute("data-caption-full", fullText);
         caption.setAttribute("data-caption-preview", previewText);
-        caption.textContent = isExpandable && !isExpanded ? previewText : fullText;
+        caption.textContent = previewText;
         body.appendChild(caption);
-        if (isExpandable) {
-          const captionToggle = document.createElement("button");
-          captionToggle.type = "button";
-          captionToggle.className = "chip chip-caption-toggle";
-          captionToggle.dataset.postAction = "toggle-caption";
-          captionToggle.textContent = isExpanded
-            ? tr.captionLess || "Less"
-            : tr.captionMore || "More";
-          captionToggle.setAttribute("aria-pressed", isExpanded ? "true" : "false");
-          body.appendChild(captionToggle);
-        }
-        const captionTags = getCaptionHashtags(fullText, FEED_CAPTION_TAG_LIMIT);
-        if (captionTags.length) {
-          const tagRow = document.createElement("div");
-          tagRow.className = "post-caption-tags";
-          captionTags.forEach((tag) => {
-            const chip = document.createElement("button");
-            chip.type = "button";
-            chip.className = "chip chip-caption-tag";
-            chip.setAttribute("data-feed-search-tag", tag);
-            chip.textContent = `#${tag}`;
-            tagRow.appendChild(chip);
-          });
-          body.appendChild(tagRow);
-        }
       }
 
       if (body.childNodes.length) {
@@ -5453,69 +5528,28 @@ export function renderFeed(options = {}) {
         logTitle.className = "post-weight";
         logTitle.textContent = tr.workoutLogTitle || "Workout log";
         logWrap.appendChild(logTitle);
-        const liteWorkoutPreview =
-          isLiteEffectsEnabled() || isCompactViewport();
-        if (liteWorkoutPreview) {
-          const exerciseCount = logs.length;
-          const setCount = logs.reduce(
-            (sum, item) => sum + ((item?.sets || []).length || 0),
-            0
-          );
-          const compactRow = document.createElement("div");
-          compactRow.className = "post-sub";
-          compactRow.textContent = `${exerciseCount}${
-            tr.workoutExerciseCountLabel || "種目"
-          } · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
-          logWrap.appendChild(compactRow);
+        const exerciseCount = logs.length;
+        const setCount = logs.reduce(
+          (sum, item) => sum + ((item?.sets || []).length || 0),
+          0
+        );
+        const compactRow = document.createElement("div");
+        compactRow.className = "post-sub";
+        compactRow.textContent = `${exerciseCount}${
+          tr.workoutExerciseCountLabel || "種目"
+        } · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
+        logWrap.appendChild(compactRow);
 
-          const topNames = logs
-            .slice(0, 2)
-            .map((item) => String(item?.exercise || "").trim())
-            .filter(Boolean)
-            .join(" / ");
-          if (topNames) {
-            const namesRow = document.createElement("div");
-            namesRow.className = "post-sub";
-            namesRow.textContent = topNames;
-            logWrap.appendChild(namesRow);
-          }
-        } else {
-          const getPrLabel = (type) => {
-            if (!type) return "";
-            if (type === "weight") return tr.prWeight || "Weight PR";
-            if (type === "reps") return tr.prReps || "Rep PR";
-            return tr.prLabel || "PR";
-          };
-          const visibleLogs = logs.slice(0, 2);
-          visibleLogs.forEach((exercise) => {
-            const row = document.createElement("div");
-            row.className = "post-sub";
-            const setsText = (exercise.sets || [])
-              .map((set) => {
-                const weightText = set.weight ? `@${formatWeight(set.weight)}` : "";
-                const prLabel = getPrLabel(set.pr_type);
-                const prSuffix = prLabel ? ` (${prLabel})` : "";
-                return `${set.set_index || ""} ${set.reps}reps ${weightText}${prSuffix}`.trim();
-              })
-              .join(", ");
-            row.textContent = `${exercise.exercise}: ${setsText}`;
-            logWrap.appendChild(row);
-            if (exercise.note) {
-              const note = document.createElement("div");
-              note.className = "post-sub";
-              note.textContent = `${tr.workoutNoteLabel || "Note"}: ${exercise.note}`;
-              logWrap.appendChild(note);
-            }
-          });
-          if (logs.length > 2) {
-            const more = document.createElement("div");
-            more.className = "post-sub";
-            more.textContent = (tr.workoutMore || "ほか{count}件").replace(
-              "{count}",
-              `${logs.length - 2}`
-            );
-            logWrap.appendChild(more);
-          }
+        const topNames = logs
+          .slice(0, 2)
+          .map((item) => String(item?.exercise || "").trim())
+          .filter(Boolean)
+          .join(" / ");
+        if (topNames) {
+          const namesRow = document.createElement("div");
+          namesRow.className = "post-sub";
+          namesRow.textContent = topNames;
+          logWrap.appendChild(namesRow);
         }
         card.appendChild(logWrap);
       }
@@ -5541,19 +5575,6 @@ export function renderFeed(options = {}) {
         card.appendChild(footer);
       }
 
-      if (commentsExpanded.has(post.id)) {
-        const commentSection = buildFeedCommentSection(
-          post,
-          tr,
-          currentUser,
-          commentsByPost,
-          commentsLoading,
-          commentsEnabled
-        );
-        if (commentSection) {
-          card.appendChild(commentSection);
-        }
-      }
       observeSeenPostCard(card, isSeen);
       return card;
     };
@@ -5676,7 +5697,7 @@ export function renderFeed(options = {}) {
           fragment.appendChild(createFeedAdCard(adsSettings, tr));
           renderedAdCount += 1;
         }
-        fragment.appendChild(cardBuilder(visibleSlice[index]));
+        fragment.appendChild(cardBuilder(visibleSlice[index], index));
       }
       container.appendChild(fragment);
       tuneAdaptiveFeedChunkSize(
@@ -6082,25 +6103,18 @@ function refreshFeedFollowButtonsForUser(targetUserId) {
       });
       return updatedCount;
     }
-function updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commentsExpanded) {
+function updateCommentButtonState(commentBtn, postId, tr, commentsByPost) {
       if (!commentBtn || !postId) return;
       const commentCount = commentsByPost.get(postId)?.length || 0;
       const commentsLabel = tr.comments || "Comments";
       const isCompact = commentBtn.classList.contains("chip-compact");
       const compactLabel = `${Math.max(0, Number(commentCount || 0))}`;
-      if (commentsExpanded.has(postId)) {
+      const isOpen = isCommentSheetOpenForPost(postId);
+      commentBtn.classList.toggle("chip-active", !!isOpen);
+      if (commentCount) {
         setActionButtonContent(commentBtn, {
           kind: "comments",
-          icon: "💬",
-          label: isCompact ? compactLabel : tr.commentsHide || "Hide",
-        });
-        if (isCompact) {
-          commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactLabel})`);
-        }
-      } else if (commentCount) {
-        setActionButtonContent(commentBtn, {
-          kind: "comments",
-          icon: "💬",
+          icon: isOpen ? "🗨" : "💬",
           label: isCompact
             ? compactLabel
             : `${commentsLabel} (${commentCount})`,
@@ -6111,7 +6125,7 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commen
       } else {
         setActionButtonContent(commentBtn, {
           kind: "comments",
-          icon: "💬",
+          icon: isOpen ? "🗨" : "💬",
           label: isCompact ? compactLabel : commentsLabel,
         });
         if (isCompact) {
@@ -6124,30 +6138,6 @@ function getCaptionPreviewText(fullText = "") {
         return fullText;
       }
       return `${fullText.slice(0, FEED_CAPTION_TRIM_LIMIT)}…`;
-    }
-function applyCaptionStateOnCard(card, expanded, tr) {
-      if (!card) return;
-      const caption = card.querySelector("[data-caption-text]");
-      if (!caption) return;
-      const fullText = `${caption.getAttribute("data-caption-full") || ""}`;
-      const previewText = `${caption.getAttribute("data-caption-preview") || ""}`;
-      caption.textContent = expanded ? fullText : previewText;
-      const toggleBtn = card.querySelector("button[data-post-action='toggle-caption']");
-      if (!toggleBtn) return;
-      toggleBtn.textContent = expanded
-        ? tr.captionLess || "Less"
-        : tr.captionMore || "More";
-      toggleBtn.setAttribute("aria-pressed", expanded ? "true" : "false");
-    }
-function refreshFeedPostCaption(postId) {
-      const normalizedPostId = `${postId || ""}`.trim();
-      if (!normalizedPostId) return;
-      const tr = t[getCurrentLang()] || t.ja;
-      const expanded = expandedCaptionPostIds.has(normalizedPostId);
-      const selector = `.post-card[data-post-id="${normalizedPostId}"]`;
-      document.querySelectorAll(selector).forEach((card) => {
-        applyCaptionStateOnCard(card, expanded, tr);
-      });
     }
 function buildFeedCommentSection(
       post,
@@ -6264,52 +6254,30 @@ function buildFeedCommentSection(
 
       return commentSection;
     }
-function findFeedCardByPostId(postId) {
-      if (!postId) return null;
-      const cards = document.querySelectorAll(".post-card[data-post-id]");
-      for (const card of cards) {
-        if (`${card.getAttribute("data-post-id") || ""}` === `${postId}`) {
-          return card;
-        }
-      }
-      return null;
-    }
 export function refreshFeedPostComments(postId) {
       if (!postId) return false;
-      const card = findFeedCardByPostId(postId);
-      if (!card) return false;
       const post = getPostById(postId);
-      if (!post) return false;
+      if (!post) {
+        if (activeCommentPostId === `${postId}`) {
+          closeCommentSheet();
+        }
+        return false;
+      }
 
       const tr = t[getCurrentLang()] || t.ja;
-      const currentUser = getCurrentUser();
       const commentsByPost = getCommentsByPost();
-      const commentsExpanded = getCommentsExpanded();
-      const commentsLoading = getCommentsLoading();
-      const commentsEnabled = isCommentsEnabled();
-
-      const commentBtn = card.querySelector("button[data-post-action=\"toggle-comments\"]");
-      updateCommentButtonState(commentBtn, postId, tr, commentsByPost, commentsExpanded);
-
-      const prevSection = card.querySelector(".comment-section");
-      if (prevSection) {
-        prevSection.remove();
+      const selector = `.post-card[data-post-id="${postId}"]`;
+      const cards = document.querySelectorAll(selector);
+      cards.forEach((card) => {
+        const commentBtn = card.querySelector(
+          "button[data-post-action=\"toggle-comments\"]"
+        );
+        updateCommentButtonState(commentBtn, postId, tr, commentsByPost);
+      });
+      if (activeCommentPostId === `${postId}`) {
+        renderCommentSheetForPost(postId);
       }
-      if (!commentsExpanded.has(postId)) {
-        return true;
-      }
-      const commentSection = buildFeedCommentSection(
-        post,
-        tr,
-        currentUser,
-        commentsByPost,
-        commentsLoading,
-        commentsEnabled
-      );
-      if (commentSection) {
-        card.appendChild(commentSection);
-      }
-      return true;
+      return cards.length > 0 || activeCommentPostId === `${postId}`;
     }
 export function getLikedIds() {
       try {
@@ -6566,6 +6534,9 @@ export function closePostDetail(options = {}) {
 export function openPostDetail(postId, options = {}) {
       const backdrop = $("detail-modal-backdrop");
       if (!backdrop) return;
+      if (activeCommentPostId) {
+        closeCommentSheet();
+      }
       const normalizedPostId = `${postId || ""}`.trim();
       if (!normalizedPostId) return;
       const hasPost = (getAllPosts() || []).some(
