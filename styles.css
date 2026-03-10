@@ -2169,6 +2169,53 @@
       flex-wrap: wrap;
       margin-top: 8px;
     }
+    .onboarding-step-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .onboarding-step-card.done {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+    .onboarding-step-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .onboarding-step-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .onboarding-step-badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-sub);
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .onboarding-step-card.done .onboarding-step-badge {
+      border-color: #86efac;
+      background: #dcfce7;
+      color: #166534;
+    }
+    .onboarding-step-desc {
+      font-size: 11px;
+      color: var(--text-sub);
+      line-height: 1.45;
+    }
+    .onboarding-step-btn {
+      align-self: flex-start;
+    }
     .check-item {
       border: 1px solid var(--border);
       border-radius: var(--radius-md);

@@ -2094,11 +2094,6 @@ async function loadProfilePostCount() {
       return posts;
     }
 
-    function getUserPostIds() {
-      getUserPosts();
-      return userPostsCache.postIds;
-    }
-
     function getUserPostsSortedByDateDesc() {
       const posts = getUserPosts();
       if (!posts.length) return [];
@@ -4360,27 +4355,16 @@ async function loadProfilePostCount() {
     }
 
     function setupOnboardingActions() {
-      const postBtn = $("btn-onboarding-post");
-      const profileBtn = $("btn-onboarding-profile");
-      if (postBtn && postBtn.dataset.bound !== "true") {
-        postBtn.dataset.bound = "true";
-        postBtn.addEventListener("click", () => {
-          if (!currentUser) {
-            const tr = t[currentLang] || t.ja;
-            showToast(tr.pleaseLogin || "ログインしてください。", "warning");
-            if (typeof setActivePage === "function") {
-              setActivePage("account");
-            }
-            return;
+      const runOnboardingAction = (action) => {
+        const tr = t[currentLang] || t.ja;
+        if (!currentUser) {
+          showToast(tr.pleaseLogin || "ログインしてください。", "warning");
+          if (typeof setActivePage === "function") {
+            setActivePage("account");
           }
-          if (typeof openPostModal === "function") {
-            openPostModal();
-          }
-        });
-      }
-      if (profileBtn && profileBtn.dataset.bound !== "true") {
-        profileBtn.dataset.bound = "true";
-        profileBtn.addEventListener("click", () => {
+          return;
+        }
+        if (action === "profile") {
           if (typeof setActivePage === "function") {
             setActivePage("account");
           }
@@ -4388,6 +4372,50 @@ async function loadProfilePostCount() {
           if (editSection) {
             editSection.scrollIntoView({ behavior: "smooth", block: "start" });
           }
+          const displayInput = $("profile-display");
+          if (displayInput && !displayInput.disabled) {
+            setTimeout(() => {
+              displayInput.focus();
+            }, 120);
+          }
+          return;
+        }
+        if (action === "post") {
+          if (typeof openPostModal === "function") {
+            openPostModal();
+          }
+          return;
+        }
+        if (action === "follow") {
+          if (typeof setActivePage === "function") {
+            setActivePage("feed");
+          }
+          const forYouBtn = $("filter-foryou");
+          if (forYouBtn) {
+            forYouBtn.click();
+          }
+          const discoveryBtn = $("btn-feed-discovery-toggle");
+          const discovery = $("feed-discovery");
+          if (discoveryBtn && discovery?.classList.contains("hidden")) {
+            discoveryBtn.click();
+          }
+          setTimeout(() => {
+            if (discovery) {
+              discovery.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }, 120);
+        }
+      };
+
+      const checklist = $("checklist");
+      if (checklist && checklist.dataset.bound !== "true") {
+        checklist.dataset.bound = "true";
+        checklist.addEventListener("click", (event) => {
+          const btn = event.target.closest("[data-onboarding-action]");
+          if (!btn) return;
+          const action = `${btn.getAttribute("data-onboarding-action") || ""}`.trim();
+          if (!action) return;
+          runOnboardingAction(action);
         });
       }
     }
@@ -5843,57 +5871,81 @@ async function loadProfilePostCount() {
       }
 
       const userPosts = getUserPosts();
-      const userPostIds = getUserPostIds();
-      const hasWorkout = Array.from(workoutLogsByPost.keys()).some((postId) =>
-        userPostIds.has(postId)
-      );
-      const hasMedia = userPosts.some((post) => post.media_url);
-
-      const items = [
+      const followingCount = followingIds?.size || 0;
+      const isJa = currentLang === "ja";
+      const steps = [
         {
-          label: tr.checklistProfile || "Fill out your profile",
-          done: Boolean(currentProfile?.display_name && currentProfile?.bio),
+          id: "profile",
+          title: isJa ? "ステップ1: はじめる" : "Step 1: Get Started",
+          description: isJa
+            ? "表示名と自己紹介だけ設定して、プロフィールを完成させます。"
+            : "Set only display name and bio to complete your profile.",
+          actionLabel: tr.onboardingActionProfile || "プロフィールを整える",
+          done: Boolean(
+            String(currentProfile?.display_name || "").trim() &&
+              String(currentProfile?.bio || "").trim()
+          ),
         },
         {
-          label: tr.checklistAvatar || "Add an avatar",
-          done: Boolean(currentProfile?.avatar_url),
-        },
-        {
-          label: tr.checklistFirstPost || "Make your first post",
+          id: "post",
+          title: isJa ? "ステップ2: 初投稿" : "Step 2: First Post",
+          description: isJa
+            ? "写真・動画と一言キャプションで最初の投稿を作成します。"
+            : "Create your first post with media and a short caption.",
+          actionLabel: tr.onboardingActionPost || "初投稿する",
           done: userPosts.length > 0,
         },
         {
-          label: tr.checklistFirstWorkout || "Post a workout log",
-          done: hasWorkout,
-        },
-        {
-          label: tr.checklistFirstMedia || "Upload a photo/video",
-          done: hasMedia,
-        },
-        {
-          label: tr.checklistTemplate || "Create a template",
-          done: templates.length > 0,
-        },
-        {
-          label: tr.checklistPR || "Record a PR",
-          done: exercisePRs.size > 0,
+          id: "follow",
+          title: isJa ? "ステップ3: おすすめフォロー" : "Step 3: Suggested Follows",
+          description: isJa
+            ? "おすすめユーザーを1人以上フォローしてフィードを最適化します。"
+            : "Follow at least one suggested account to personalize feed.",
+          actionLabel: isJa ? "おすすめを開く" : "Open suggestions",
+          done: followingCount > 0,
         },
       ];
 
-      items.forEach((item) => {
+      steps.forEach((step) => {
         const row = document.createElement("div");
-        row.className = `check-item${item.done ? " done" : ""}`;
-        const dot = document.createElement("div");
-        dot.className = "check-dot";
-        const text = document.createElement("div");
-        text.textContent = item.label;
-        row.appendChild(dot);
-        row.appendChild(text);
+        row.className = `onboarding-step-card${step.done ? " done" : ""}`;
+
+        const head = document.createElement("div");
+        head.className = "onboarding-step-head";
+        const title = document.createElement("div");
+        title.className = "onboarding-step-title";
+        title.textContent = step.title;
+        const badge = document.createElement("span");
+        badge.className = "onboarding-step-badge";
+        badge.textContent = step.done
+          ? isJa
+            ? "完了"
+            : "Done"
+          : isJa
+            ? "未完了"
+            : "Pending";
+        head.appendChild(title);
+        head.appendChild(badge);
+
+        const desc = document.createElement("div");
+        desc.className = "onboarding-step-desc";
+        desc.textContent = step.description;
+        row.appendChild(head);
+        row.appendChild(desc);
+
+        if (!step.done) {
+          const actionBtn = document.createElement("button");
+          actionBtn.className = "btn btn-ghost btn-xs onboarding-step-btn";
+          actionBtn.type = "button";
+          actionBtn.setAttribute("data-onboarding-action", step.id);
+          actionBtn.textContent = step.actionLabel;
+          row.appendChild(actionBtn);
+        }
         list.appendChild(row);
       });
 
-      const doneCount = items.filter((item) => item.done).length;
-      const totalCount = items.length || 1;
+      const doneCount = steps.filter((item) => item.done).length;
+      const totalCount = steps.length || 1;
       const percent = Math.round((doneCount / totalCount) * 100);
       if (bar) bar.style.width = `${percent}%`;
       if (meta) {
@@ -5904,7 +5956,7 @@ async function loadProfilePostCount() {
           .replace("{total}", `${totalCount}`);
       }
 
-      if (items.every((item) => item.done)) {
+      if (steps.every((item) => item.done)) {
         status.textContent = tr.onboardingComplete || "All set!";
       }
     }
