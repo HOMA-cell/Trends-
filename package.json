@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
-    "check": "node --check app.js && node --check feed.js && node --check profile.js && node --check settings.js && node --check i18n.js && node --check commentSync.js && node --check profileEditState.js && node --check utils.js && node --check supabaseClient.js",
+    "check": "node --check app.js && node --check feed.js && node --check dm.js && node --check profile.js && node --check settings.js && node --check i18n.js && node --check commentSync.js && node --check profileEditState.js && node --check utils.js && node --check supabaseClient.js",
     "ci": "npm run check && npm run lint",
     "lint": "eslint . --ext .js,.mjs",
     "lint:fix": "eslint . --ext .js,.mjs --fix"

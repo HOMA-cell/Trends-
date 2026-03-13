@@ -36,6 +36,7 @@
         <!-- ここがミニナビ -->
         <div class="mini-nav">
           <button class="mini-nav-btn is-active" data-page-target="feed" id="nav-feed">フィード</button>
+          <button class="mini-nav-btn" data-page-target="messages" id="nav-messages">DM</button>
           <button class="mini-nav-btn" data-page-target="account" id="nav-account">アカウント</button>
           <button class="mini-nav-btn" data-page-target="settings" id="nav-settings">設定</button>
         </div>
@@ -55,6 +56,7 @@
       <div class="mini-header-title" id="mini-header-title">Trends</div>
       <div class="mini-nav">
         <button class="mini-nav-btn" data-page-target="feed" id="mini-nav-feed">フィード</button>
+        <button class="mini-nav-btn" data-page-target="messages" id="mini-nav-messages">DM</button>
         <button class="mini-nav-btn" data-page-target="account" id="mini-nav-account">アカウント</button>
         <button class="mini-nav-btn" data-page-target="settings" id="mini-nav-settings">設定</button>
       </div>
@@ -168,6 +170,50 @@
         </section>
       </div>
   
+      <!-- DM ページ -->
+      <div class="page-view" data-page="messages">
+        <section class="card dm-shell">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="messages-title">ダイレクトメッセージ</div>
+              <div class="card-sub" id="messages-sub">フォロー中ユーザーと会話できます。</div>
+            </div>
+            <button class="btn btn-ghost btn-xs" id="btn-dm-refresh">更新</button>
+          </div>
+          <div class="template-status" id="dm-login-required"></div>
+          <div id="dm-layout" class="dm-layout hidden">
+            <aside class="dm-sidebar">
+              <div class="field dm-partner-field">
+                <label id="dm-partner-label" for="dm-partner-select">相手</label>
+                <div class="dm-partner-controls">
+                  <select id="dm-partner-select" class="select-sm"></select>
+                  <button class="btn btn-ghost btn-xs" id="btn-dm-start" type="button">開く</button>
+                </div>
+              </div>
+              <div class="template-status" id="dm-thread-status"></div>
+              <div id="dm-thread-list" class="dm-thread-list"></div>
+            </aside>
+            <section class="dm-chat">
+              <div class="dm-chat-header">
+                <div class="dm-chat-title" id="dm-chat-title">会話を選択</div>
+              </div>
+              <div id="dm-message-list" class="dm-message-list"></div>
+              <form id="dm-form" class="dm-form">
+                <input
+                  id="dm-input"
+                  type="text"
+                  maxlength="600"
+                  placeholder="メッセージを入力"
+                  autocomplete="off"
+                />
+                <button class="btn btn-primary" id="btn-dm-send" type="submit">送信</button>
+              </form>
+              <div class="template-status" id="dm-send-status"></div>
+            </section>
+          </div>
+        </section>
+      </div>
+
       <!-- アカウント ページ -->
       <div class="page-view" data-page="account">
         <section id="panel-account" class="card side-panel account-shell">

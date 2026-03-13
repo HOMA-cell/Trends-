@@ -52,6 +52,12 @@ import {
   createSettingsController,
   defaultSettings,
 } from "./settings.js";
+import {
+  setDmContext,
+  setupDmControls,
+  renderDmPage,
+  handleDmPageChange,
+} from "./dm.js";
 
     // ---- 状態 ----
     let currentUser = null;
@@ -1868,6 +1874,7 @@ async function loadProfilePostCount() {
       setupAuthUI();
       setupPostForm();
       setupFeedControls();
+      setupDmControls();
       setupPageTabs();
       setupMiniHeader();
       setupPostDetailModal();
@@ -2052,6 +2059,19 @@ async function loadProfilePostCount() {
       loadFollowStats,
     });
 
+    setDmContext({
+      getCurrentUser: () => currentUser,
+      getCurrentLang: () => currentLang,
+      getProfilesForUsers: loadProfilesForUsers,
+      isMessagesPageActive: () => {
+        const activePage =
+          document.body?.dataset?.page ||
+          document.querySelector(".page-view.is-active")?.dataset.page ||
+          "";
+        return activePage === "messages";
+      },
+    });
+
 
 
 
@@ -2138,9 +2158,11 @@ async function loadProfilePostCount() {
       setText("btn-open-post", "newPost");
       setText("mini-header-title", "appTitle");
       setText("nav-feed", "navFeed");
+      setText("nav-messages", "navMessages");
       setText("nav-account", "navAccount");
       setText("nav-settings", "navSettings");
       setText("mini-nav-feed", "navFeed");
+      setText("mini-nav-messages", "navMessages");
       setText("mini-nav-account", "navAccount");
       setText("mini-nav-settings", "navSettings");
       setText("mini-btn-post", "newPost");
@@ -2208,6 +2230,15 @@ async function loadProfilePostCount() {
         feedMenuBtn.textContent = "⋯";
         feedMenuBtn.setAttribute("aria-label", tr.feedOptions || "Details");
       }
+
+      // DM
+      setText("messages-title", "messagesTitle");
+      setText("messages-sub", "messagesSub");
+      setText("btn-dm-refresh", "dmRefresh");
+      setText("dm-partner-label", "dmPartnerLabel");
+      setText("btn-dm-start", "dmOpen");
+      setText("btn-dm-send", "dmSend");
+      setPlaceholder("dm-input", "dmInputPlaceholder");
 
       // アカウント / Tips / Debug
       setText("account-title", "account");
@@ -2512,6 +2543,9 @@ async function loadProfilePostCount() {
       }
       if (typeof updateAuthUIState === "function") {
         updateAuthUIState();
+      }
+      if (typeof renderDmPage === "function") {
+        renderDmPage();
       }
       if (typeof renderBuildMeta === "function") {
         renderBuildMeta();
@@ -3353,6 +3387,7 @@ async function loadProfilePostCount() {
       if (profileSection) profileSection.classList.toggle("hidden", !loggedIn);
       if (profileEditSection) profileEditSection.classList.toggle("hidden", !loggedIn);
       renderAuthNetworkStatus();
+      renderDmPage();
     }
 
     async function restoreSession() {
@@ -3599,6 +3634,7 @@ async function loadProfilePostCount() {
             renderFeed({ forcePageRender: true });
           });
         }
+        handleDmPageChange(page);
         return true;
       };
       setActivePage = setPage;
