@@ -916,6 +916,14 @@
       flex: 0 0 auto;
       white-space: nowrap;
     }
+    .post-meta-right {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      min-width: 0;
+      flex-shrink: 0;
+    }
     .post-new-badge {
       display: inline-flex;
       align-items: center;
@@ -1016,6 +1024,14 @@
       color: var(--text-sub);
       margin-top: 0;
       white-space: nowrap;
+    }
+    .post-meta-right {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      min-width: 0;
+      flex-shrink: 0;
     }
     .post-actions {
       display: flex;
@@ -3327,8 +3343,14 @@
   gap: 8px;
   align-items: center;
 }
+.feed-list .post-meta-right {
+  gap: 4px;
+}
 .feed-list .post-sub {
   font-size: 10px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .feed-list .post-caption {
   font-size: 12px;
@@ -3338,6 +3360,25 @@
   gap: 5px;
 }
 @media (max-width: 520px) {
+  .feed-list .avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+  }
+  .feed-list .post-user .handle {
+    display: none;
+  }
+  .feed-list .post-new-badge,
+  .feed-list .post-reason-badge {
+    display: none;
+  }
+  .feed-list .post-pin-badge {
+    font-size: 8px;
+    padding: 1px 5px;
+  }
+  .feed-list .post-sub {
+    max-width: 84px;
+  }
   .feed-list .post-action-row-primary {
     gap: 4px;
   }

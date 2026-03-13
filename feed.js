@@ -5278,15 +5278,20 @@ export function renderFeed(options = {}) {
         .filter(Boolean)
         .join(" · ");
 
-      meta.appendChild(userRow);
-      meta.appendChild(subRow);
+      const metaRight = document.createElement("div");
+      metaRight.className = "post-meta-right";
+      metaRight.appendChild(subRow);
+
       const reasonLabel = getForYouReasonLabel(post);
       if (reasonLabel) {
         const reason = document.createElement("div");
         reason.className = "post-reason-badge";
         reason.textContent = reasonLabel;
-        userRow.appendChild(reason);
+        metaRight.appendChild(reason);
       }
+
+      meta.appendChild(userRow);
+      meta.appendChild(metaRight);
 
       const footer = document.createElement("div");
       footer.className = "post-footer";
