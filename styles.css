@@ -3316,8 +3316,14 @@
 }
 .feed-list .post-card {
   margin-bottom: 0;
-  padding: 8px;
+  padding: 7px;
   contain: layout style paint;
+}
+.feed-list .post-body {
+  gap: 2px;
+}
+.feed-list .post-media {
+  margin-bottom: 4px;
 }
 .feed-window-placeholder {
   border: 1px dashed var(--border);
@@ -3353,13 +3359,37 @@
   text-overflow: ellipsis;
 }
 .feed-list .post-caption {
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.35;
 }
 .feed-list .post-actions {
   gap: 5px;
 }
+@media (max-width: 700px) {
+  .feed-list .post-media {
+    aspect-ratio: 1 / 1;
+    min-height: 120px;
+  }
+  .feed-list .post-footer {
+    margin-top: 6px;
+    gap: 4px;
+  }
+}
 @media (max-width: 520px) {
+  .feed-list .post-card {
+    padding: 6px;
+    border-radius: 14px;
+  }
+  .feed-list .post-media {
+    margin-bottom: 3px;
+    min-height: 110px;
+  }
+  .feed-list .post-body {
+    gap: 1px;
+  }
+  .feed-list .post-caption {
+    font-size: 10px;
+  }
   .feed-list .avatar {
     width: 26px;
     height: 26px;
