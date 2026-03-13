@@ -3243,6 +3243,20 @@ export function setupFeedControls() {
           );
         });
       }
+      const filterShorts = $("filter-shorts");
+      const toggleFeedShortsMode = () => {
+        feedViewMode = feedViewMode === "shorts" ? "feed" : "shorts";
+        persistFeedUiState();
+        resetFeedPagination();
+        updateFilterButtons();
+        scheduleRenderFeed();
+      };
+      if (filterShorts && filterShorts.dataset.bound !== "true") {
+        filterShorts.dataset.bound = "true";
+        filterShorts.addEventListener("click", () => {
+          toggleFeedShortsMode();
+        });
+      }
       const filterSaved = $("filter-saved");
       if (filterSaved) {
         filterSaved.addEventListener("click", () => {
@@ -3694,10 +3708,7 @@ export function setupFeedControls() {
       if (shortsModeBtn && shortsModeBtn.dataset.bound !== "true") {
         shortsModeBtn.dataset.bound = "true";
         shortsModeBtn.addEventListener("click", () => {
-          feedViewMode = feedViewMode === "shorts" ? "feed" : "shorts";
-          persistFeedUiState();
-          resetFeedPagination();
-          scheduleRenderFeed();
+          toggleFeedShortsMode();
         });
       }
       if (!feedPageSizeResizeBound && typeof window !== "undefined") {
@@ -3955,6 +3966,12 @@ export function updateFilterButtons() {
       if (shortsModeBtn) {
         shortsModeBtn.classList.toggle("is-active", feedViewMode === "shorts");
       }
+      const shortsFilterBtn = $("filter-shorts");
+      if (shortsFilterBtn) {
+        const shortsActive = feedViewMode === "shorts";
+        shortsFilterBtn.classList.toggle("chip-active", shortsActive);
+        shortsFilterBtn.setAttribute("aria-pressed", shortsActive ? "true" : "false");
+      }
       const tuningButtons = [
         ["rank-fresh", "fresh"],
         ["rank-balanced", "balanced"],
@@ -4210,6 +4227,7 @@ export async function loadFeed(options = {}) {
 export function renderFeed(options = {}) {
     const container = document.getElementById("feed-list");
     const status = $("feed-status");
+    const refreshBtn = $("btn-feed-refresh");
     const retryBtn = $("btn-feed-retry");
     const moreWrap = $("feed-more-wrap");
     const moreHint = $("feed-more-hint");
@@ -4329,6 +4347,10 @@ export function renderFeed(options = {}) {
     if (savedBtn) savedBtn.classList.toggle("hidden", compactFilterViewport);
     const publicBtn = $("filter-public");
     if (publicBtn) publicBtn.classList.toggle("hidden", compactFilterViewport);
+    const shortsFilterBtn = $("filter-shorts");
+    if (shortsFilterBtn) {
+      shortsFilterBtn.classList.toggle("hidden", !compactFilterViewport);
+    }
     const restoreHiddenBtn = $("btn-feed-restore-hidden");
     const restoreMutedBtn = $("btn-feed-restore-muted");
     const restoreMutedTermsBtn = $("btn-feed-restore-muted-terms");
@@ -4504,10 +4526,17 @@ export function renderFeed(options = {}) {
       feedOptionsBtn.textContent = "⋯";
       feedOptionsBtn.setAttribute("aria-label", tr.feedOptions || "Details");
       feedOptionsBtn.classList.toggle("hidden", isShortsMode);
+      feedOptionsBtn.classList.toggle("is-icon-btn", compactFilterViewport);
       if (isShortsMode) {
         feedOptionsBtn.classList.remove("is-active");
         feedOptionsBtn.setAttribute("aria-expanded", "false");
       }
+    }
+    if (refreshBtn) {
+      const refreshLabel = tr.feedRefresh || "更新";
+      refreshBtn.textContent = compactFilterViewport ? "↻" : refreshLabel;
+      refreshBtn.setAttribute("aria-label", refreshLabel);
+      refreshBtn.classList.toggle("is-icon-btn", compactFilterViewport);
     }
     if (statsToggleBtn) {
       statsToggleBtn.classList.toggle("hidden", !canShowStats);
@@ -4699,6 +4728,7 @@ export function renderFeed(options = {}) {
     }
     if (shortsModeBtn) {
       shortsModeBtn.classList.toggle("is-active", isShortsMode);
+      shortsModeBtn.classList.toggle("hidden", compactFilterViewport);
       shortsModeBtn.textContent = compactFilterViewport
         ? isShortsMode
           ? tr.feedModeFeedCompact || "投稿"
