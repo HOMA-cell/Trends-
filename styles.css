@@ -1090,8 +1090,10 @@
       box-shadow: 0 6px 12px rgba(228, 87, 46, 0.16);
     }
     .post-action-menu {
-      margin: 0;
-      align-self: flex-start;
+      margin: 0 0 0 auto;
+      align-self: flex-end;
+      position: relative;
+      z-index: 2;
     }
     .post-action-menu > summary {
       list-style: none;
@@ -1100,9 +1102,9 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 28px;
-      min-width: 28px;
-      padding: 4px 8px;
+      min-height: 24px;
+      min-width: 24px;
+      padding: 3px 7px;
     }
     .post-action-menu > summary::-webkit-details-marker {
       display: none;
@@ -1113,20 +1115,31 @@
       color: var(--primary);
     }
     .post-action-menu-panel {
-      margin-top: 6px;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 4px);
+      margin-top: 0;
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background: #fff;
       padding: 6px;
       box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-      min-width: min(100%, 320px);
+      min-width: 160px;
+      max-width: min(92vw, 260px);
+    }
+    .post-action-menu-panel .post-action-row-secondary {
+      width: auto;
+      justify-content: flex-start;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
     }
     .post-action-row-secondary .chip-compact {
-      width: 100%;
-      justify-content: flex-start;
-      border-radius: 10px;
-      min-height: 30px;
-      padding-inline: 10px;
+      width: auto;
+      justify-content: center;
+      border-radius: 999px;
+      min-height: 24px;
+      padding-inline: 8px;
     }
     .post-media img,
     .post-media video {
@@ -3431,6 +3444,23 @@
     font-size: 10px;
   }
   .feed-list .post-action-row-primary .chip-action .chip-label {
+    font-size: 9px;
+  }
+  .feed-list .post-action-menu > summary {
+    min-height: 22px;
+    min-width: 22px;
+    padding: 2px 6px;
+  }
+  .feed-list .post-action-menu-panel {
+    max-width: min(86vw, 220px);
+    padding: 5px;
+  }
+  .feed-list .post-action-menu-panel .post-action-row-secondary {
+    gap: 5px;
+  }
+  .feed-list .post-action-menu-panel .post-action-row-secondary .chip-compact {
+    min-height: 22px;
+    padding: 2px 7px;
     font-size: 9px;
   }
 }

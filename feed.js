@@ -5340,6 +5340,7 @@ export function renderFeed(options = {}) {
         button.classList.add("chip-compact");
         secondaryActions.appendChild(button);
       };
+      const compactActionLayout = isCompactViewport();
 
       const likeBtn = document.createElement("button");
       likeBtn.className = "chip chip-like chip-action";
@@ -5366,7 +5367,11 @@ export function renderFeed(options = {}) {
       });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      appendSecondaryAction(saveBtn);
+      if (compactActionLayout) {
+        appendPrimaryAction(saveBtn);
+      } else {
+        appendSecondaryAction(saveBtn);
+      }
 
       const shareBtn = document.createElement("button");
       shareBtn.className = "chip chip-log chip-action";
@@ -5374,30 +5379,32 @@ export function renderFeed(options = {}) {
       setActionButtonContent(shareBtn, {
         kind: "share",
         icon: "↗",
-        label: tr.share || "Share",
+        label: compactActionLayout ? "" : tr.share || "Share",
       });
       appendSecondaryAction(shareBtn);
 
-      const repostBtn = document.createElement("button");
-      repostBtn.className = "chip chip-log chip-repost";
-      repostBtn.dataset.postAction = "toggle-repost";
-      const repostCount = repostCountsByPost.get(`${post.id || ""}`) || 0;
-      const repostedByMe = currentUserRepostedIds.has(`${post.id || ""}`);
-      repostBtn.textContent = repostedByMe
-        ? tr.reposted || "Reposted"
-        : tr.repost || "Repost";
-      if (repostCount > 0) {
-        repostBtn.textContent += ` (${repostCount})`;
-      }
-      repostBtn.classList.toggle("chip-active", repostedByMe);
-      repostBtn.setAttribute("aria-pressed", repostedByMe ? "true" : "false");
-      appendSecondaryAction(repostBtn);
+      if (!compactActionLayout) {
+        const repostBtn = document.createElement("button");
+        repostBtn.className = "chip chip-log chip-repost";
+        repostBtn.dataset.postAction = "toggle-repost";
+        const repostCount = repostCountsByPost.get(`${post.id || ""}`) || 0;
+        const repostedByMe = currentUserRepostedIds.has(`${post.id || ""}`);
+        repostBtn.textContent = repostedByMe
+          ? tr.reposted || "Reposted"
+          : tr.repost || "Repost";
+        if (repostCount > 0) {
+          repostBtn.textContent += ` (${repostCount})`;
+        }
+        repostBtn.classList.toggle("chip-active", repostedByMe);
+        repostBtn.setAttribute("aria-pressed", repostedByMe ? "true" : "false");
+        appendSecondaryAction(repostBtn);
 
-      const quoteBtn = document.createElement("button");
-      quoteBtn.className = "chip chip-log";
-      quoteBtn.dataset.postAction = "quote-post";
-      quoteBtn.textContent = tr.quote || "Quote";
-      appendSecondaryAction(quoteBtn);
+        const quoteBtn = document.createElement("button");
+        quoteBtn.className = "chip chip-log";
+        quoteBtn.dataset.postAction = "quote-post";
+        quoteBtn.textContent = tr.quote || "Quote";
+        appendSecondaryAction(quoteBtn);
+      }
 
       if (!currentUser || post.user_id !== currentUser.id) {
         const hideBtn = document.createElement("button");
@@ -5406,30 +5413,32 @@ export function renderFeed(options = {}) {
         hideBtn.textContent = tr.feedHidePost || "Not interested";
         appendSecondaryAction(hideBtn);
 
-        const isMutedUser = mutedUserIds.has(`${post.user_id || ""}`);
-        const muteBtn = document.createElement("button");
-        muteBtn.className = "chip chip-log chip-muted-user";
-        muteBtn.dataset.postAction = "toggle-mute-user";
-        muteBtn.textContent = isMutedUser
-          ? tr.feedMutedUser || "Muted"
-          : tr.feedMuteUser || "Mute";
-        muteBtn.classList.toggle("chip-active", isMutedUser);
-        muteBtn.setAttribute("aria-pressed", isMutedUser ? "true" : "false");
-        appendSecondaryAction(muteBtn);
+        if (!compactActionLayout) {
+          const isMutedUser = mutedUserIds.has(`${post.user_id || ""}`);
+          const muteBtn = document.createElement("button");
+          muteBtn.className = "chip chip-log chip-muted-user";
+          muteBtn.dataset.postAction = "toggle-mute-user";
+          muteBtn.textContent = isMutedUser
+            ? tr.feedMutedUser || "Muted"
+            : tr.feedMuteUser || "Mute";
+          muteBtn.classList.toggle("chip-active", isMutedUser);
+          muteBtn.setAttribute("aria-pressed", isMutedUser ? "true" : "false");
+          appendSecondaryAction(muteBtn);
 
-        const muteTermCandidate = getMuteTermCandidateForPost(post);
-        if (muteTermCandidate) {
-          const isMutedTerm = mutedTerms.has(muteTermCandidate);
-          const muteTermBtn = document.createElement("button");
-          muteTermBtn.className = "chip chip-log chip-muted-term";
-          muteTermBtn.dataset.postAction = "toggle-mute-term";
-          muteTermBtn.setAttribute("data-mute-term", muteTermCandidate);
-          muteTermBtn.textContent = isMutedTerm
-            ? tr.feedMutedTerm || "Muted word"
-            : tr.feedMuteTerm || "Mute word";
-          muteTermBtn.classList.toggle("chip-active", isMutedTerm);
-          muteTermBtn.setAttribute("aria-pressed", isMutedTerm ? "true" : "false");
-          appendSecondaryAction(muteTermBtn);
+          const muteTermCandidate = getMuteTermCandidateForPost(post);
+          if (muteTermCandidate) {
+            const isMutedTerm = mutedTerms.has(muteTermCandidate);
+            const muteTermBtn = document.createElement("button");
+            muteTermBtn.className = "chip chip-log chip-muted-term";
+            muteTermBtn.dataset.postAction = "toggle-mute-term";
+            muteTermBtn.setAttribute("data-mute-term", muteTermCandidate);
+            muteTermBtn.textContent = isMutedTerm
+              ? tr.feedMutedTerm || "Muted word"
+              : tr.feedMuteTerm || "Mute word";
+            muteTermBtn.classList.toggle("chip-active", isMutedTerm);
+            muteTermBtn.setAttribute("aria-pressed", isMutedTerm ? "true" : "false");
+            appendSecondaryAction(muteTermBtn);
+          }
         }
       }
 
@@ -5445,18 +5454,20 @@ export function renderFeed(options = {}) {
       }
 
       if (currentUser && post.user_id === currentUser.id) {
-        const isPinnedByMe =
-          `${post.user_id || ""}` === `${currentUser.id || ""}` &&
-          isPinnedPostForUser(post.id, currentUser.id);
-        const pinBtn = document.createElement("button");
-        pinBtn.className = "chip chip-log chip-pin";
-        pinBtn.dataset.postAction = "toggle-pin";
-        pinBtn.textContent = isPinnedByMe
-          ? tr.pinned || "Pinned"
-          : tr.pin || "Pin";
-        pinBtn.classList.toggle("chip-active", isPinnedByMe);
-        pinBtn.setAttribute("aria-pressed", isPinnedByMe ? "true" : "false");
-        appendSecondaryAction(pinBtn);
+        if (!compactActionLayout) {
+          const isPinnedByMe =
+            `${post.user_id || ""}` === `${currentUser.id || ""}` &&
+            isPinnedPostForUser(post.id, currentUser.id);
+          const pinBtn = document.createElement("button");
+          pinBtn.className = "chip chip-log chip-pin";
+          pinBtn.dataset.postAction = "toggle-pin";
+          pinBtn.textContent = isPinnedByMe
+            ? tr.pinned || "Pinned"
+            : tr.pin || "Pin";
+          pinBtn.classList.toggle("chip-active", isPinnedByMe);
+          pinBtn.setAttribute("aria-pressed", isPinnedByMe ? "true" : "false");
+          appendSecondaryAction(pinBtn);
+        }
 
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "chip chip-delete";
