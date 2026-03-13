@@ -4304,7 +4304,8 @@ export function renderFeed(options = {}) {
       currentUser?.id,
       repostState
     );
-    const allowedFilters = FEED_FILTERS;
+    const compactFilterViewport = isCompactViewport();
+    const allowedFilters = compactFilterViewport ? ["all", "mine"] : FEED_FILTERS;
     let normalizedFilter = currentFilter;
     if (!allowedFilters.includes(currentFilter)) {
       normalizedFilter = "all";
@@ -4320,6 +4321,14 @@ export function renderFeed(options = {}) {
       persistFeedUiState();
     }
     updateFilterButtons();
+    const forYouBtn = $("filter-foryou");
+    if (forYouBtn) forYouBtn.classList.toggle("hidden", compactFilterViewport);
+    const followingBtn = $("filter-following");
+    if (followingBtn) followingBtn.classList.toggle("hidden", compactFilterViewport);
+    const savedBtn = $("filter-saved");
+    if (savedBtn) savedBtn.classList.toggle("hidden", compactFilterViewport);
+    const publicBtn = $("filter-public");
+    if (publicBtn) publicBtn.classList.toggle("hidden", compactFilterViewport);
     const restoreHiddenBtn = $("btn-feed-restore-hidden");
     const restoreMutedBtn = $("btn-feed-restore-muted");
     const restoreMutedTermsBtn = $("btn-feed-restore-muted-terms");
@@ -4530,6 +4539,14 @@ export function renderFeed(options = {}) {
         canShowDiscovery && feedDiscoveryExpanded ? "true" : "false"
       );
     }
+    const rankControls = $("feed-rank-controls");
+    if (rankControls) {
+      rankControls.classList.toggle("hidden", compactFilterViewport);
+    }
+    const secondaryFilters = document.querySelector(".feed-secondary-filters");
+    if (secondaryFilters) {
+      secondaryFilters.classList.toggle("hidden", compactFilterViewport);
+    }
 
     const firstPostId = Array.isArray(allPosts) && allPosts.length ? allPosts[0]?.id || "" : "";
     const lastPostId = Array.isArray(allPosts) && allPosts.length
@@ -4682,9 +4699,13 @@ export function renderFeed(options = {}) {
     }
     if (shortsModeBtn) {
       shortsModeBtn.classList.toggle("is-active", isShortsMode);
-      shortsModeBtn.textContent = isShortsMode
-        ? tr.feedModeFeed || "Feed"
-        : tr.feedModeShorts || "Shorts";
+      shortsModeBtn.textContent = compactFilterViewport
+        ? isShortsMode
+          ? tr.feedModeFeedCompact || "投稿"
+          : tr.feedModeShortsCompact || "動画"
+        : isShortsMode
+          ? tr.feedModeFeed || "Feed"
+          : tr.feedModeShorts || "Shorts";
       shortsModeBtn.setAttribute("aria-pressed", isShortsMode ? "true" : "false");
     }
 

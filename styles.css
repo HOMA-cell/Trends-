@@ -656,21 +656,54 @@
         padding: 10px;
       }
       .feed-toolbar {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "search actions"
+          "filters filters";
         gap: 6px;
+        align-items: center;
+      }
+      #feed-search {
+        grid-area: search;
       }
       .feed-toolbar-actions {
-        width: 100%;
+        grid-area: actions;
+        width: auto;
         justify-content: flex-end;
+        gap: 4px;
       }
       .feed-inline-sort {
-        width: 100%;
-      }
-      .feed-inline-sort .select-sm {
-        width: 100%;
+        display: none;
       }
       .feed-primary-filters {
+        grid-area: filters;
         width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+      }
+      .feed-primary-filters::-webkit-scrollbar {
+        display: none;
+      }
+      #btn-feed-clear {
+        display: none !important;
+      }
+      #btn-feed-refresh,
+      #btn-feed-shorts-mode,
+      #btn-feed-options {
+        min-height: 30px;
+        padding: 5px 9px;
+        font-size: 11px;
+      }
+      .feed-primary-filters .chip {
+        min-height: 30px;
+        padding: 5px 10px;
+        font-size: 11px;
+      }
+      .feed-secondary-filters,
+      .feed-rank-controls {
+        display: none;
       }
       .feed-discovery {
         grid-template-columns: 1fr;
@@ -3541,58 +3574,76 @@ body.compact-mode .feed-toolbar {
   }
 
   .feed-toolbar {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "search actions"
+      "filters filters";
     margin-bottom: 8px;
     gap: 6px;
+    align-items: center;
   }
 
   #feed-search {
+    grid-area: search;
     max-width: none;
-    min-height: 36px;
-    padding: 8px 12px;
-    font-size: 15px;
+    min-height: 34px;
+    padding: 7px 11px;
+    font-size: 14px;
   }
 
   .feed-inline-sort {
-    width: 100%;
-  }
-
-  .feed-inline-sort .select-sm {
-    width: 100%;
-    min-height: 34px;
-    font-size: 12px;
+    display: none;
   }
 
   .feed-toolbar-actions {
-    width: 100%;
+    grid-area: actions;
+    width: auto;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 4px;
   }
 
   #btn-feed-refresh,
-  #btn-feed-clear,
-  #btn-feed-shorts-mode {
-    min-height: 32px;
-    padding: 6px 10px;
-    font-size: 12px;
+  #btn-feed-shorts-mode,
+  #btn-feed-options {
+    min-height: 30px;
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+
+  #btn-feed-clear {
+    display: none !important;
   }
 
   .feed-primary-filters {
+    grid-area: filters;
     padding-bottom: 0;
     min-width: 0;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .feed-primary-filters::-webkit-scrollbar {
+    display: none;
   }
 
   .feed-primary-filters .chip,
   .feed-toolbar-actions .btn {
-    min-height: 32px;
-    padding: 6px 10px;
-    font-size: 12px;
+    min-height: 30px;
+    padding: 5px 10px;
+    font-size: 11px;
   }
 
   #btn-feed-options {
     min-width: 32px;
     padding-inline: 8px;
-    font-size: 17px;
+    font-size: 11px;
+  }
+
+  .feed-secondary-filters,
+  .feed-rank-controls {
+    display: none;
   }
 
   .feed-advanced {
