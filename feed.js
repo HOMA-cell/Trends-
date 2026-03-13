@@ -4478,7 +4478,8 @@ export function renderFeed(options = {}) {
       tr,
     });
     const canShowStatsFromSettings = settings.showFeedStats !== false;
-    const canShowStats = !isShortsMode && canShowStatsFromSettings;
+    const canShowStats =
+      !isShortsMode && canShowStatsFromSettings && !isCompactViewport();
     if (statGrid) {
       statGrid.classList.toggle("hidden", !canShowStats || !feedStatsExpanded);
     }
@@ -5251,7 +5252,7 @@ export function renderFeed(options = {}) {
       const visibilityText =
         post.visibility === "private"
           ? tr.private || "Private"
-          : tr.public || "Public";
+          : "";
       subRow.textContent = [relativeText || dateText, visibilityText]
         .filter(Boolean)
         .join(" · ");
@@ -5263,7 +5264,7 @@ export function renderFeed(options = {}) {
         const reason = document.createElement("div");
         reason.className = "post-reason-badge";
         reason.textContent = reasonLabel;
-        meta.appendChild(reason);
+        userRow.appendChild(reason);
       }
 
       const footer = document.createElement("div");
@@ -5317,10 +5318,9 @@ export function renderFeed(options = {}) {
       setActionButtonContent(shareBtn, {
         kind: "share",
         icon: "↗",
-        label: "",
+        label: tr.share || "Share",
       });
-      shareBtn.setAttribute("aria-label", tr.share || "Share");
-      appendPrimaryAction(shareBtn);
+      appendSecondaryAction(shareBtn);
 
       const repostBtn = document.createElement("button");
       repostBtn.className = "chip chip-log chip-repost";
@@ -5615,7 +5615,7 @@ export function renderFeed(options = {}) {
         const baseHint = hasMore
           ? (tr.feedMoreHint || "あと{count}件").replace("{count}", remaining)
           : "";
-        if (hasMore && appendOnly && autoLoadMoreEnabled) {
+        if (hasMore && autoLoadMoreEnabled) {
           const autoHint = tr.feedAutoLoadHint || "スクロールで自動読み込み";
           moreHint.textContent = `${baseHint} · ${autoHint}`;
         } else {
@@ -5642,7 +5642,7 @@ export function renderFeed(options = {}) {
             renderFeed({ appendOnly: true });
           });
         }
-        observeFeedMoreButton(moreBtn, hasMore && appendOnly && autoLoadMoreEnabled);
+        observeFeedMoreButton(moreBtn, hasMore && autoLoadMoreEnabled);
         if (hasMore) {
           if (moreWrap.parentElement !== container) {
             container.appendChild(moreWrap);

@@ -470,25 +470,25 @@
       pointer-events: none;
     }
     .chip-compact {
-      min-height: 28px;
-      padding: 4px 9px;
+      min-height: 24px;
+      padding: 3px 8px;
       font-weight: 600;
       letter-spacing: 0.01em;
     }
     .chip-action {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
     .chip-action .chip-icon {
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1;
       flex: 0 0 auto;
     }
     .chip-action .chip-label {
       line-height: 1;
       white-space: nowrap;
-      font-size: 11px;
+      font-size: 10px;
       font-variant-numeric: tabular-nums;
     }
     .chip-icon-only {
@@ -797,7 +797,7 @@
       .post-action-row-primary {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 5px;
         padding-bottom: 2px;
       }
       .post-action-row-primary .chip-compact {
@@ -837,14 +837,16 @@
     }
     .post-header {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 8px;
       margin-bottom: 6px;
     }
     .post-meta {
       display: flex;
-      flex-direction: column;
-      gap: 2px;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
       flex: 1;
       min-width: 0;
     }
@@ -854,15 +856,32 @@
       gap: 6px;
       font-size: 13px;
       font-weight: 600;
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .post-user .profile-link {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .post-user .handle {
       font-weight: 500;
       color: var(--text-sub);
       font-size: 11px;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .post-sub {
       font-size: 11px;
       color: var(--text-sub);
+      margin-top: 0;
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
     .post-new-badge {
       display: inline-flex;
@@ -893,16 +912,16 @@
     }
     .post-reason-badge {
       display: inline-flex;
-      width: fit-content;
       border-radius: 999px;
       border: 1px solid #e7ddcd;
       background: #fbf7ef;
       color: #6f6558;
-      padding: 1px 8px;
-      font-size: 10px;
+      padding: 1px 6px;
+      font-size: 9px;
       font-weight: 600;
-      margin-top: 3px;
+      margin-top: 0;
       white-space: nowrap;
+      flex-shrink: 0;
     }
     .avatar {
       width: 30px;
@@ -939,20 +958,31 @@
       display: flex;
       gap: 6px;
       font-size: 13px;
-      align-items: baseline;
+      align-items: center;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
     }
     .profile-link {
       cursor: pointer;
       font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .post-user .handle {
       font-size: 11px;
       color: var(--text-sub);
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .post-sub {
       font-size: 11px;
       color: var(--text-sub);
-      margin-top: 2px;
+      margin-top: 0;
+      white-space: nowrap;
     }
     .post-actions {
       display: flex;
@@ -988,8 +1018,8 @@
       background: #fff;
       color: var(--text-main);
       font-size: 10px;
-      min-height: 28px;
-      padding-inline: 8px;
+      min-height: 24px;
+      padding-inline: 7px;
       border-radius: 999px;
       white-space: nowrap;
     }
@@ -3261,17 +3291,33 @@
       margin-bottom: 4px;
     }
 .feed-list .post-meta {
-  gap: 1px;
+  gap: 8px;
+  align-items: center;
 }
 .feed-list .post-sub {
-  font-size: 11px;
+  font-size: 10px;
 }
 .feed-list .post-caption {
   font-size: 12px;
   line-height: 1.4;
 }
 .feed-list .post-actions {
-  gap: 6px;
+  gap: 5px;
+}
+@media (max-width: 520px) {
+  .feed-list .post-action-row-primary {
+    gap: 4px;
+  }
+  .feed-list .post-action-row-primary .chip-compact {
+    min-height: 22px;
+    padding: 2px 7px;
+  }
+  .feed-list .post-action-row-primary .chip-action .chip-icon {
+    font-size: 10px;
+  }
+  .feed-list .post-action-row-primary .chip-action .chip-label {
+    font-size: 9px;
+  }
 }
 .public-profile-posts .post-card {
   padding: 7px;
