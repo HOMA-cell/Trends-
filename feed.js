@@ -1747,12 +1747,9 @@ function loadFeedUiState() {
         if (typeof parsed?.filterWorkout === "boolean") {
           filterWorkout = parsed.filterWorkout;
         }
-        if (typeof parsed?.discoveryExpanded === "boolean") {
-          feedDiscoveryExpanded = parsed.discoveryExpanded;
-        }
-        if (typeof parsed?.statsExpanded === "boolean") {
-          feedStatsExpanded = parsed.statsExpanded;
-        }
+        // Keep Feed clean on every launch.
+        feedDiscoveryExpanded = false;
+        feedStatsExpanded = false;
         feedLastCommittedSearch = nextSearch.slice(0, 120);
       } catch {
         // ignore persisted feed UI parse failures
@@ -4538,28 +4535,27 @@ export function renderFeed(options = {}) {
       statGrid.classList.toggle("hidden", !canShowStats || !feedStatsExpanded);
     }
     if (feedAdvanced) {
-      if (isShortsMode) {
-        feedAdvanced.classList.remove("is-open");
-        feedAdvanced.classList.add("hidden");
-      } else {
-        feedAdvanced.classList.remove("hidden");
-      }
+      feedAdvanced.classList.remove("hidden");
     }
     if (feedOptionsBtn) {
-      feedOptionsBtn.textContent = "⋯";
-      feedOptionsBtn.setAttribute("aria-label", tr.feedOptions || "Details");
-      feedOptionsBtn.classList.toggle("hidden", isShortsMode);
-      feedOptionsBtn.classList.toggle("is-icon-btn", compactFilterViewport);
-      if (isShortsMode) {
-        feedOptionsBtn.classList.remove("is-active");
-        feedOptionsBtn.setAttribute("aria-expanded", "false");
-      }
+      const filterMenuLabel = tr.feedFilterMenu || "フィルタ";
+      feedOptionsBtn.textContent = filterMenuLabel;
+      feedOptionsBtn.setAttribute("aria-label", filterMenuLabel);
+      feedOptionsBtn.classList.remove("hidden");
+      feedOptionsBtn.classList.remove("is-icon-btn");
     }
     if (refreshBtn) {
       const refreshLabel = tr.feedRefresh || "更新";
-      refreshBtn.textContent = compactFilterViewport ? "↻" : refreshLabel;
+      refreshBtn.textContent = refreshLabel;
       refreshBtn.setAttribute("aria-label", refreshLabel);
-      refreshBtn.classList.toggle("is-icon-btn", compactFilterViewport);
+      refreshBtn.classList.remove("is-icon-btn");
+    }
+    if (shortsModeBtn) {
+      const shortsLabel = isShortsMode
+        ? tr.feedModeFeed || "通常"
+        : tr.feedModeShorts || "ショート";
+      shortsModeBtn.textContent = shortsLabel;
+      shortsModeBtn.setAttribute("aria-pressed", isShortsMode ? "true" : "false");
     }
     if (statsToggleBtn) {
       statsToggleBtn.classList.toggle("hidden", !canShowStats);

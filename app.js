@@ -2235,11 +2235,7 @@ async function loadProfilePostCount() {
       setText("stat-streak-label", "statStreakLabel");
       setText("stat-total-label", "statTotalLabel");
       setPlaceholder("feed-search", "searchPlaceholder");
-      const feedMenuBtn = $("btn-feed-options");
-      if (feedMenuBtn) {
-        feedMenuBtn.textContent = "⋯";
-        feedMenuBtn.setAttribute("aria-label", tr.feedOptions || "Details");
-      }
+      setText("btn-feed-options", "feedFilterMenu");
 
       // DM
       setText("messages-title", "messagesTitle");
