@@ -103,11 +103,11 @@
       justify-content: space-between;
       align-items: center;
       position: sticky;
-      top: 10px;
+      top: 8px;
       z-index: 28;
-      margin-bottom: 10px;
-      gap: 12px;
-      padding: 10px 12px;
+      margin-bottom: 8px;
+      gap: 10px;
+      padding: 8px 10px;
       border-radius: var(--radius-lg);
       background: rgba(255, 255, 255, 0.94);
       border: 1px solid var(--border);
@@ -162,24 +162,45 @@
     }
     .title-block {
       display: flex;
-      flex-direction: column;
-      gap: 2px;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 auto;
     }
     #app-title {
       font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
       font-weight: 700;
-      font-size: 24px;
+      font-size: 21px;
       letter-spacing: 0.2px;
+      line-height: 1;
+      white-space: nowrap;
     }
     #app-sub {
-      font-size: 12px;
-      color: var(--text-sub);
-      white-space: nowrap;
+      display: none;
     }
     .top-controls {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
+      flex: 0 0 auto;
+    }
+    .title-block .mini-nav {
+      margin-left: 0;
+      gap: 6px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    #btn-open-post {
+      min-height: 32px;
+      padding: 6px 12px;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    #lang-select {
+      min-height: 32px;
+      padding: 5px 10px;
+      font-size: 12px;
     }
     select,
     input,
