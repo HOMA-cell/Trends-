@@ -4200,7 +4200,7 @@ body.compact-mode .feed-toolbar {
 }
 
 .page-view.account-page #profile-section {
-  grid-column: 1;
+  display: none !important;
 }
 
 .page-view.account-page #onboarding-section,
@@ -4347,6 +4347,11 @@ body.compact-mode .feed-toolbar {
   background: linear-gradient(180deg, #fff 0%, #fffcf8 100%);
 }
 
+.page-view.account-page #profile-edit-section .card-header {
+  margin-bottom: 6px;
+  align-items: center;
+}
+
 .page-view.account-page #profile-edit-section .card-title {
   font-size: 17px;
   margin-bottom: 3px;
@@ -4362,6 +4367,10 @@ body.compact-mode .feed-toolbar {
   border: 1px solid #ece3d6;
   border-radius: 14px;
   background: #fff;
+}
+
+.page-view.account-page #profile-edit-section .collapsible-content {
+  margin-top: 6px;
 }
 
 .page-view.account-page .profile-edit-group:first-of-type {

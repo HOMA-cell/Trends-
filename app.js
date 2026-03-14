@@ -4409,6 +4409,7 @@ async function loadProfilePostCount() {
           if (typeof setActivePage === "function") {
             setActivePage("account");
           }
+          setCollapsibleOpen("profile-edit-main", true);
           const editSection = $("profile-edit-section");
           if (editSection) {
             editSection.scrollIntoView({ behavior: "smooth", block: "start" });

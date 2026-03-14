@@ -304,40 +304,53 @@
           <div id="onboarding-status" class="template-status"></div>
         </section>
 
-        <section class="card hidden" id="profile-edit-section" style="margin-top: 12px;">
-          <div class="card-title" id="profile-edit-title">プロフィール編集</div>
-          <div class="card-sub" id="profile-edit-sub">
-            表示名や自己紹介を更新できます。
-          </div>
-          <div class="profile-edit-advanced-entry">
-            <button class="btn btn-ghost btn-xs" id="btn-open-profile-advanced">詳細プロフィールを編集</button>
-            <div class="profile-edit-advanced-note" id="profile-edit-advanced-note">
-              目標・ジム・身長などは「詳細プロフィール」で編集できます。
-            </div>
-          </div>
-
-          <div class="profile-edit-group">
-            <div class="profile-edit-group-title" id="profile-edit-basics-title">基本</div>
-            <div class="profile-editor">
-              <div class="field">
-                <label id="profile-display-label">表示名</label>
-                <input id="profile-display" type="text" placeholder="表示名を入力" />
-              </div>
-              <div class="field field-span">
-                <label id="profile-bio-label">自己紹介</label>
-                <textarea id="profile-bio-input" placeholder="筋トレのこだわりなど"></textarea>
+        <section
+          class="card hidden"
+          id="profile-edit-section"
+          style="margin-top: 12px;"
+          data-collapsible="profile-edit-main"
+          data-default-open="false"
+        >
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="profile-edit-title">プロフィール編集</div>
+              <div class="card-sub" id="profile-edit-sub">
+                表示名や自己紹介を更新できます。
               </div>
             </div>
+            <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
           </div>
+          <div class="collapsible-content" data-collapsible-content>
+            <div class="profile-edit-advanced-entry">
+              <button class="btn btn-ghost btn-xs" id="btn-open-profile-advanced">詳細プロフィールを編集</button>
+              <div class="profile-edit-advanced-note" id="profile-edit-advanced-note">
+                目標・ジム・身長などは「詳細プロフィール」で編集できます。
+              </div>
+            </div>
 
-          <div class="profile-edit-dirty hidden" id="profile-edit-dirty">
-            未保存の変更があります。
+            <div class="profile-edit-group">
+              <div class="profile-edit-group-title" id="profile-edit-basics-title">基本</div>
+              <div class="profile-editor">
+                <div class="field">
+                  <label id="profile-display-label">表示名</label>
+                  <input id="profile-display" type="text" placeholder="表示名を入力" />
+                </div>
+                <div class="field field-span">
+                  <label id="profile-bio-label">自己紹介</label>
+                  <textarea id="profile-bio-input" placeholder="筋トレのこだわりなど"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="profile-edit-dirty hidden" id="profile-edit-dirty">
+              未保存の変更があります。
+            </div>
+            <div class="form-actions profile-edit-actions">
+              <button class="btn btn-ghost" id="btn-reset-profile">リセット</button>
+              <button class="btn btn-primary" id="btn-save-profile">保存</button>
+            </div>
+            <div class="template-status" id="profile-edit-status"></div>
           </div>
-          <div class="form-actions profile-edit-actions">
-            <button class="btn btn-ghost" id="btn-reset-profile">リセット</button>
-            <button class="btn btn-primary" id="btn-save-profile">保存</button>
-          </div>
-          <div class="template-status" id="profile-edit-status"></div>
         </section>
 
         <section class="card extra-section hidden" id="notifications-section" style="margin-top: 12px;" data-collapsible="notifications-details" data-default-open="false">

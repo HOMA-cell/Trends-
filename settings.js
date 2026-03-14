@@ -91,7 +91,8 @@ const PRESET_TARGETS = {
 function shouldEnableLiteEffectsByDefault() {
   if (typeof window === "undefined") return false;
   const width = window.innerWidth || 1024;
-  if (width > 700) return false;
+  if (width <= 700) return true;
+  if (width > 900) return false;
   const nav = typeof navigator !== "undefined" ? navigator : null;
   const connection =
     nav?.connection || nav?.mozConnection || nav?.webkitConnection || null;
@@ -216,8 +217,30 @@ export function createSettingsController(options) {
       stored && typeof stored === "object"
         ? Object.prototype.hasOwnProperty.call(stored, "liteEffects")
         : false;
+    const hasCompactModePreference =
+      stored && typeof stored === "object"
+        ? Object.prototype.hasOwnProperty.call(stored, "compactMode")
+        : false;
+    const hasShowFeedStatsPreference =
+      stored && typeof stored === "object"
+        ? Object.prototype.hasOwnProperty.call(stored, "showFeedStats")
+        : false;
     if (!hasLiteEffectsPreference && shouldEnableLiteEffectsByDefault()) {
       merged.liteEffects = true;
+    }
+    if (
+      !hasCompactModePreference &&
+      typeof window !== "undefined" &&
+      (window.innerWidth || 1024) <= 700
+    ) {
+      merged.compactMode = true;
+    }
+    if (
+      !hasShowFeedStatsPreference &&
+      typeof window !== "undefined" &&
+      (window.innerWidth || 1024) <= 700
+    ) {
+      merged.showFeedStats = false;
     }
     if (legacyExtra !== null && stored.showExtraSections === undefined) {
       merged.showExtraSections = legacyExtra === "true";
