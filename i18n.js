@@ -16,9 +16,9 @@ export const t = {
         postSectionVisibility: "公開範囲",
         postShowAdvanced: "Step 2: 詳細設定",
         postShowSimple: "Step 1: かんたん投稿",
-        postSimpleHint: "Step 1: キャプションとメディア",
+        postSimpleHint: "Step 1: 本文 + 写真/動画だけで投稿できます",
         postAdvancedHint:
-          "Step 2: 体重・ワークアウト・公開範囲を追加できます。",
+          "Step 2: 体重・ワークアウト・公開範囲も設定できます。",
         public: "Public",
         private: "自分のみ",
         submit: "投稿",
@@ -671,9 +671,9 @@ export const t = {
         postSectionVisibility: "Visibility",
         postShowAdvanced: "Step 2: Details",
         postShowSimple: "Step 1: Quick post",
-        postSimpleHint: "Step 1: Caption and media",
+        postSimpleHint: "Step 1: Post with caption + media only",
         postAdvancedHint:
-          "Step 2: Add bodyweight, workout, and visibility.",
+          "Step 2: Add bodyweight, workout, and visibility settings.",
         public: "Public",
         private: "Private",
         submit: "Post",

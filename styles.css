@@ -3514,6 +3514,9 @@
     .modal-panel:not(.post-composer-advanced) .post-advanced-section {
       display: none;
     }
+    .modal-panel:not(.post-composer-advanced) .post-form-more {
+      display: none;
+    }
     .media-preview {
       border: 1px dashed var(--border);
       border-radius: var(--radius-md);

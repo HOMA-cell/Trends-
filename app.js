@@ -4059,22 +4059,6 @@ async function loadProfilePostCount() {
       );
     }
 
-    function hasAdvancedPostInputs() {
-      const weight = String($("post-weight")?.value || "").trim();
-      const templateId = String($("post-template")?.value || "").trim();
-      const visibility = String($("post-visibility")?.value || "public").trim();
-      const defaultVisibility = String(settings.defaultVisibility || "public").trim();
-      const date = String($("post-date")?.value || "").trim();
-      const today = new Date().toISOString().slice(0, 10);
-      return Boolean(
-        weight ||
-          templateId ||
-          hasWorkoutInputs() ||
-          (visibility && visibility !== defaultVisibility) ||
-          (date && date !== today)
-      );
-    }
-
     function persistPostComposerMode() {
       try {
         localStorage.setItem(
@@ -4087,12 +4071,8 @@ async function loadProfilePostCount() {
     }
 
     function loadPostComposerModePreference() {
-      try {
-        const raw = localStorage.getItem(POST_COMPOSER_ADVANCED_KEY);
-        postComposerAdvanced = raw === "true";
-      } catch {
-        postComposerAdvanced = false;
-      }
+      // Always start in quick mode to keep posting flow short.
+      postComposerAdvanced = false;
     }
 
     function renderPostComposerMode() {
@@ -4328,7 +4308,7 @@ async function loadProfilePostCount() {
           return;
         }
         const quoteSeed = String(options?.quoteSeed || "").trim();
-        renderPostComposerMode();
+        setPostComposerMode(false, { persist: false });
         setDraftStatus("");
         const draft = loadPostDraft();
         const tr = t[currentLang] || t.ja;
@@ -4362,10 +4342,13 @@ async function loadProfilePostCount() {
           setDraftStatus(tr.quoteReadyToast || "引用投稿の下書きを作成しました。", true);
           queueDraftSave();
         }
-        if (hasAdvancedPostInputs()) {
-          setPostComposerMode(true, { persist: false });
-        }
         openBackdrop(backdrop);
+        const captionEl = $("post-caption");
+        if (captionEl && !quoteSeed) {
+          setTimeout(() => {
+            captionEl.focus();
+          }, 60);
+        }
       };
       const closeModal = () => {
         closeBackdrop(backdrop);
