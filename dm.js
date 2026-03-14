@@ -208,9 +208,9 @@ function autoResizeDmInput() {
   const input = $("dm-input");
   if (!(input instanceof HTMLTextAreaElement)) return;
   input.style.height = "auto";
-  const nextHeight = Math.min(Math.max(input.scrollHeight, 34), 120);
+  const nextHeight = Math.min(Math.max(input.scrollHeight, 30), 96);
   input.style.height = `${nextHeight}px`;
-  input.style.overflowY = input.scrollHeight > 120 ? "auto" : "hidden";
+  input.style.overflowY = input.scrollHeight > 96 ? "auto" : "hidden";
 }
 
 function upsertThreadAfterLocalSend(partnerId, body, createdAt) {
@@ -815,23 +815,7 @@ export function setupDmControls() {
     });
   }
 
-  const startBtn = $("btn-dm-start");
   const partnerSelect = $("dm-partner-select");
-  if (startBtn && startBtn.dataset.bound !== "true") {
-    startBtn.dataset.bound = "true";
-    startBtn.addEventListener("click", () => {
-      const nextPartnerId = `${partnerSelect?.value || ""}`.trim();
-      if (!nextPartnerId) return;
-      dmActivePartnerId = nextPartnerId;
-      renderPartnerSelect();
-      renderThreadList();
-      renderConversationHeader();
-      setDmMobileChatOpen(true);
-      loadConversation(dmActivePartnerId, { forceBottom: true }).catch((error) => {
-        console.error("open conversation failed:", error);
-      });
-    });
-  }
 
   if (partnerSelect && partnerSelect.dataset.bound !== "true") {
     partnerSelect.dataset.bound = "true";
