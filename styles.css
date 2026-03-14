@@ -469,14 +469,14 @@
       justify-content: center;
       gap: 4px;
       border-radius: 999px;
-      min-height: 26px;
-      padding-inline: 8px;
+      min-height: 24px;
+      padding-inline: 6px;
       background: #fff;
       border-color: #e6ddcf;
       box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
     }
     .chip-action .chip-icon {
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1;
       flex: 0 0 auto;
     }
@@ -847,15 +847,20 @@
       }
       .post-action-row-primary {
         display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
+        flex-wrap: nowrap;
+        gap: 4px;
         padding-bottom: 2px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .post-action-row-primary::-webkit-scrollbar {
+        display: none;
       }
       .post-action-row-primary .chip-compact {
         flex: 0 0 auto;
         width: auto;
         min-width: 0;
-        justify-content: flex-start;
+        justify-content: center;
       }
       .post-action-menu {
         align-self: flex-start;
@@ -1074,7 +1079,7 @@
       justify-content: flex-start;
       width: 100%;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       flex-wrap: nowrap;
       overflow-x: auto;
       scrollbar-width: none;
@@ -1092,10 +1097,10 @@
       border: 1px solid var(--border);
       background: #fff;
       color: var(--text-main);
-      font-size: 9.5px;
-      min-height: 24px;
-      min-width: 30px;
-      padding-inline: 7px;
+      font-size: 9px;
+      min-height: 22px;
+      min-width: 24px;
+      padding-inline: 6px;
       border-radius: 999px;
       white-space: nowrap;
     }
@@ -1118,9 +1123,9 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 24px;
-      min-width: 24px;
-      padding: 2px 7px;
+      min-height: 22px;
+      min-width: 22px;
+      padding: 1px 6px;
       border-radius: 999px;
       border: 1px solid #e6ddcf;
       background: #fff;
@@ -1157,8 +1162,8 @@
       width: auto;
       justify-content: center;
       border-radius: 999px;
-      min-height: 24px;
-      padding-inline: 9px;
+      min-height: 22px;
+      padding-inline: 8px;
     }
     .post-media img,
     .post-media video {
@@ -3984,17 +3989,17 @@
     max-width: 84px;
   }
   .feed-list .post-action-row-primary {
-    gap: 4px;
+    gap: 3px;
   }
   .feed-list .post-action-row-primary .chip-compact {
-    min-height: 24px;
-    padding: 2px 8px;
+    min-height: 21px;
+    padding: 1px 6px;
   }
   .feed-list .post-action-row-primary .chip-action .chip-icon {
-    font-size: 11px;
+    font-size: 10px;
   }
   .feed-list .post-action-row-primary .chip-action .chip-label {
-    font-size: 9.5px;
+    font-size: 9px;
   }
   .feed-list .post-action-menu > summary {
     min-height: 22px;

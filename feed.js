@@ -5367,8 +5367,6 @@ export function renderFeed(options = {}) {
         button.classList.add("chip-compact");
         secondaryActions.appendChild(button);
       };
-      const isCompactActions = isCompactViewport();
-
       const likeBtn = document.createElement("button");
       likeBtn.className = "chip chip-like chip-action";
       likeBtn.dataset.postAction = "toggle-like";
@@ -5388,7 +5386,7 @@ export function renderFeed(options = {}) {
       setActionButtonContent(shareBtn, {
         kind: "share",
         icon: "↗",
-        label: isCompactActions ? "" : tr.share || "Share",
+        label: "",
       });
       shareBtn.setAttribute("aria-label", tr.share || "Share");
       appendPrimaryAction(shareBtn);
@@ -5397,15 +5395,15 @@ export function renderFeed(options = {}) {
       saveBtn.className = "chip chip-log chip-save chip-action";
       saveBtn.dataset.postAction = "toggle-save";
       const isSaved = savedPostIds.has(`${post.id || ""}`);
-      const saveLabel = isSaved ? tr.saved || "Saved" : tr.save || "Save";
       setActionButtonContent(saveBtn, {
         kind: "save",
         icon: "🔖",
-        label: saveLabel,
+        label: "",
       });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      appendSecondaryAction(saveBtn);
+      saveBtn.setAttribute("aria-label", isSaved ? tr.saved || "Saved" : tr.save || "Save");
+      appendPrimaryAction(saveBtn);
 
       if (currentUser && post.user_id && post.user_id !== currentUser.id) {
         const followBtn = document.createElement("button");
