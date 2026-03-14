@@ -1416,6 +1416,27 @@
       grid-template-columns: 1fr;
       gap: 8px;
     }
+    .auth-signed-out {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .auth-open-button {
+      width: 100%;
+      justify-content: center;
+    }
+    .auth-inline-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: #fff;
+      padding: 10px;
+    }
+    .auth-close-button {
+      align-self: flex-end;
+    }
     .auth-form input {
       width: 100%;
       min-height: 40px;
@@ -4404,6 +4425,21 @@ body.compact-mode .feed-toolbar {
 
 .page-view.account-page .auth-form {
   gap: 10px;
+}
+
+.page-view.account-page .auth-open-button {
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.page-view.account-page .auth-inline-form {
+  border-radius: 14px;
+  border-color: #eadfce;
+  background: #fff;
+  padding: 10px;
 }
 
 .page-view.account-page .auth-form input {

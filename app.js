@@ -126,6 +126,7 @@ import {
     let serviceWorkerBuildVersion = "dev-local";
     let serviceWorkerBuildResolved = false;
     let authRetryBlockedUntil = 0;
+    let authFormExpanded = false;
     let supabaseConnectivityState = {
       ok: null,
       restStatus: 0,
@@ -2257,6 +2258,8 @@ async function loadProfilePostCount() {
       setText("account-title", "account");
       setText("account-subtitle", "accountSignedOutHint");
       setText("account-session-chip", "accountSignedInBadge");
+      setText("btn-auth-open-form", "loginSignup");
+      setText("btn-auth-close-form", "accountHideLogin");
       setText("auth-email-label", "accountEmailLabel");
       setText("auth-password-label", "accountPasswordLabel");
       setText("btn-auth", "loginSignup");
@@ -2570,9 +2573,33 @@ async function loadProfilePostCount() {
     }
 
       // ------------------ Auth ------------------
+    function setAuthFormExpanded(expanded, options = {}) {
+      authFormExpanded = !!expanded;
+      const openBtn = $("btn-auth-open-form");
+      const inlineForm = $("auth-inline-form");
+      const signedOut = $("auth-signed-out");
+      if (openBtn) {
+        openBtn.classList.toggle("hidden", authFormExpanded);
+        openBtn.setAttribute("aria-expanded", authFormExpanded ? "true" : "false");
+      }
+      if (inlineForm) {
+        inlineForm.classList.toggle("hidden", !authFormExpanded);
+      }
+      if (signedOut) {
+        signedOut.classList.toggle("is-expanded", authFormExpanded);
+      }
+      if (authFormExpanded && options.focus === true) {
+        setTimeout(() => {
+          $("auth-email")?.focus();
+        }, 40);
+      }
+    }
+
     function setupAuthUI() {
       const authForm = $("auth-form");
       const authBtn = $("btn-auth");
+      const openAuthFormBtn = $("btn-auth-open-form");
+      const closeAuthFormBtn = $("btn-auth-close-form");
       const logoutBtn = $("btn-logout");
       const openPageSettingsBtn = $("btn-account-open-settings");
       const openSettingsBtn = $("btn-auth-open-settings");
@@ -2586,6 +2613,18 @@ async function loadProfilePostCount() {
       } else if (authBtn && authBtn.dataset.bound !== "true") {
         authBtn.dataset.bound = "true";
         authBtn.addEventListener("click", handleAuthSubmit);
+      }
+      if (openAuthFormBtn && openAuthFormBtn.dataset.bound !== "true") {
+        openAuthFormBtn.dataset.bound = "true";
+        openAuthFormBtn.addEventListener("click", () => {
+          setAuthFormExpanded(true, { focus: true });
+        });
+      }
+      if (closeAuthFormBtn && closeAuthFormBtn.dataset.bound !== "true") {
+        closeAuthFormBtn.dataset.bound = "true";
+        closeAuthFormBtn.addEventListener("click", () => {
+          setAuthFormExpanded(false);
+        });
       }
       if (logoutBtn && logoutBtn.dataset.bound !== "true") {
         logoutBtn.dataset.bound = "true";
@@ -3195,6 +3234,7 @@ async function loadProfilePostCount() {
       }
 
       setButtonLoading(authBtn, true, "Logging in...");
+      setAuthFormExpanded(true);
 
       try {
         let user = null;
@@ -3280,6 +3320,7 @@ async function loadProfilePostCount() {
         await loadFeed();
         await commentSync.flushQueue({ silent: true });
 
+        setAuthFormExpanded(false);
         showToast(tr.authLoginSuccess || "ログインしました！", "success");
       } finally {
         setButtonLoading(authBtn, false);
@@ -3363,6 +3404,11 @@ async function loadProfilePostCount() {
       if (authPassword) authPassword.disabled = loggedIn;
       if (authSignedOut) authSignedOut.classList.toggle("hidden", loggedIn);
       if (authSignedIn) authSignedIn.classList.toggle("hidden", !loggedIn);
+      if (loggedIn) {
+        setAuthFormExpanded(false);
+      } else {
+        setAuthFormExpanded(authFormExpanded);
+      }
       if (accountSessionChip) {
         accountSessionChip.classList.toggle("hidden", !loggedIn);
         accountSessionChip.textContent =

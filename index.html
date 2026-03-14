@@ -229,21 +229,29 @@
           </div>
 
           <div class="auth-signed-out" id="auth-signed-out">
-            <form id="auth-form" class="auth-form" autocomplete="on">
-              <label class="sr-only" id="auth-email-label" for="auth-email">メール</label>
-              <input id="auth-email" type="email" placeholder="email@example.com" autocomplete="email" />
-              <label class="sr-only" id="auth-password-label" for="auth-password">パスワード</label>
-              <input
-                id="auth-password"
-                type="password"
-                placeholder="Password"
-                autocomplete="current-password"
-              />
-              <button class="btn btn-primary auth-submit" id="btn-auth" type="submit">
-                ログイン / サインアップ
+            <button class="btn btn-primary auth-open-button" id="btn-auth-open-form" type="button">
+              ログイン / サインアップ
+            </button>
+            <div class="auth-inline-form hidden" id="auth-inline-form">
+              <form id="auth-form" class="auth-form" autocomplete="on">
+                <label class="sr-only" id="auth-email-label" for="auth-email">メール</label>
+                <input id="auth-email" type="email" placeholder="email@example.com" autocomplete="email" />
+                <label class="sr-only" id="auth-password-label" for="auth-password">パスワード</label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  placeholder="Password"
+                  autocomplete="current-password"
+                />
+                <button class="btn btn-primary auth-submit" id="btn-auth" type="submit">
+                  ログイン / サインアップ
+                </button>
+              </form>
+              <div class="auth-caption" id="auth-caption">初回は自動でアカウント作成されます。</div>
+              <button class="btn btn-ghost btn-xs auth-close-button" id="btn-auth-close-form" type="button">
+                閉じる
               </button>
-            </form>
-            <div class="auth-caption" id="auth-caption">初回は自動でアカウント作成されます。</div>
+            </div>
           </div>
 
           <div class="auth-signed-in hidden" id="auth-signed-in">
