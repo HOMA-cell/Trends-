@@ -2721,24 +2721,29 @@
       margin-top: 4px;
     }
     .dm-shell {
-      padding: 10px;
+      padding: 12px;
+      background: linear-gradient(180deg, #fff 0%, #fffcf7 100%);
+    }
+    .dm-shell-header {
+      margin-bottom: 6px;
     }
     .dm-layout {
       margin-top: 8px;
       display: grid;
       grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-      gap: 10px;
+      gap: 12px;
       align-items: stretch;
     }
     .dm-sidebar {
       border: 1px solid var(--border);
-      border-radius: var(--radius-md);
+      border-radius: 16px;
       background: #fff;
-      padding: 8px;
+      padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       min-height: 420px;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
     }
     .dm-partner-field {
       margin: 0;
@@ -2756,24 +2761,54 @@
       width: 100%;
       min-height: 32px;
     }
+    .dm-thread-toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+    }
+    #dm-thread-search {
+      width: 100%;
+      min-height: 34px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    .dm-thread-summary {
+      font-size: 11px;
+      color: #7f786d;
+      padding: 2px 2px 0;
+    }
     .dm-thread-list {
       border: 1px solid var(--border);
-      border-radius: var(--radius-md);
+      border-radius: 14px;
       background: #fff;
       overflow-y: auto;
       min-height: 280px;
       max-height: 420px;
-      padding: 4px;
+      padding: 5px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
+    }
+    .dm-empty-state {
+      margin: 8px;
+      border: 1px dashed #ded4c6;
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+      background: #fdf9f2;
+      color: #6e675c;
+      font-size: 12px;
     }
     .dm-thread-item {
       width: 100%;
       border: 1px solid transparent;
-      border-radius: 10px;
+      border-radius: 12px;
       background: #fff;
-      padding: 8px;
+      padding: 8px 9px;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
       gap: 8px;
@@ -2782,12 +2817,13 @@
       cursor: pointer;
     }
     .dm-thread-item:hover {
-      background: #f8f5ef;
+      background: #fbf7f1;
       border-color: #ece4d8;
     }
     .dm-thread-item.is-active {
-      background: #fff3ee;
-      border-color: #f3b6a4;
+      background: #fff2eb;
+      border-color: #eca58f;
+      box-shadow: 0 8px 16px rgba(228, 87, 46, 0.13);
     }
     .dm-thread-item.is-unread .dm-thread-name,
     .dm-thread-item.is-unread .dm-thread-preview {
@@ -2849,39 +2885,76 @@
     }
     .dm-chat {
       border: 1px solid var(--border);
-      border-radius: var(--radius-md);
+      border-radius: 16px;
       background: #fff;
-      padding: 8px;
+      padding: 10px;
       display: grid;
       grid-template-rows: auto 1fr auto auto;
       gap: 8px;
       min-height: 420px;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
     }
     .dm-chat-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      min-height: 24px;
+      min-height: 28px;
+    }
+    .dm-chat-header-main {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+    .dm-chat-header-texts {
+      min-width: 0;
+    }
+    .dm-chat-sub {
+      font-size: 11px;
+      color: #7b7468;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .dm-chat-title {
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    #btn-dm-mark-read {
+      min-height: 30px;
+      padding-inline: 10px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
     .dm-message-list {
       border: 1px solid var(--border);
-      border-radius: 10px;
-      background: #fcfaf6;
-      padding: 8px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fffdf8 0%, #f9f4ea 100%);
+      padding: 10px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 7px;
       min-height: 260px;
       max-height: 420px;
+    }
+    .dm-day-divider {
+      align-self: center;
+      border-radius: 999px;
+      border: 1px solid #e6ddcf;
+      background: rgba(255, 255, 255, 0.92);
+      color: #6f675d;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 9px;
+      margin: 4px 0 2px;
+      letter-spacing: 0.01em;
     }
     .dm-message-row {
       display: flex;
@@ -2897,11 +2970,17 @@
       align-self: flex-start;
       text-align: left;
     }
+    .dm-message-row.is-grouped {
+      margin-top: -2px;
+    }
+    .dm-message-row.is-pending {
+      opacity: 0.76;
+    }
     .dm-message-bubble {
       border-radius: 12px;
       border: 1px solid var(--border);
       background: #fff;
-      padding: 7px 10px;
+      padding: 8px 11px;
       font-size: 12px;
       line-height: 1.45;
       white-space: pre-wrap;
@@ -2924,20 +3003,33 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 6px;
-      align-items: center;
+      align-items: end;
     }
     #dm-input {
       width: 100%;
       min-height: 34px;
-      border-radius: 999px;
+      max-height: 120px;
+      resize: none;
+      border-radius: 14px;
       border: 1px solid var(--border);
       background: #fff;
-      padding: 6px 12px;
+      padding: 8px 11px;
       font-size: 13px;
+      line-height: 1.45;
     }
     #btn-dm-send {
       min-height: 34px;
       padding-inline: 14px;
+    }
+    .dm-form-meta {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: -2px;
+    }
+    .dm-input-count {
+      font-size: 10px;
+      color: #8e877d;
+      font-variant-numeric: tabular-nums;
     }
     #dm-login-required {
       margin-top: 8px;
@@ -2946,20 +3038,34 @@
       .dm-layout {
         grid-template-columns: 1fr;
       }
+      .dm-layout.dm-chat-open .dm-sidebar {
+        display: none;
+      }
+      .dm-layout:not(.dm-chat-open) .dm-chat {
+        display: none;
+      }
       .dm-sidebar,
       .dm-chat {
-        min-height: auto;
+        min-height: 60vh;
       }
       .dm-thread-list {
-        max-height: 260px;
+        max-height: none;
       }
       .dm-message-list {
-        max-height: 52vh;
+        max-height: 56vh;
       }
     }
     @media (max-width: 700px) {
       .dm-shell {
         padding: 10px;
+      }
+      .dm-shell-header {
+        margin-bottom: 4px;
+      }
+      .dm-sidebar,
+      .dm-chat {
+        padding: 9px;
+        border-radius: 14px;
       }
       .dm-message-row {
         max-width: 92%;
@@ -2968,8 +3074,13 @@
         grid-template-columns: 1fr;
       }
       #btn-dm-start,
-      #btn-dm-refresh {
+      #btn-dm-refresh,
+      #btn-dm-mark-read,
+      #btn-dm-back {
         min-height: 30px;
+      }
+      .dm-chat-sub {
+        font-size: 10px;
       }
     }
     .chip-repost {

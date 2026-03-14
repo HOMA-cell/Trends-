@@ -5,6 +5,7 @@ import {
   showToast,
   renderAvatar,
   formatHandle,
+  formatDateDisplay,
   formatDateTimeDisplay,
 } from "./utils.js";
 
@@ -23,6 +24,9 @@ let dmThreadsLoaded = false;
 let dmThreadsLoading = false;
 let dmMessagesLoading = false;
 let dmPollTimer = null;
+let dmThreadSearch = "";
+let dmMobileChatOpen = false;
+let dmViewportListenerBound = false;
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
@@ -48,6 +52,8 @@ function clearDmState() {
   dmMessages = [];
   dmActivePartnerId = "";
   dmThreadsLoaded = false;
+  dmThreadSearch = "";
+  dmMobileChatOpen = false;
 }
 
 function getPartnerId(row, userId) {
@@ -71,6 +77,166 @@ function getProfileDisplay(profile, fallbackId = "") {
 function formatMessageTime(value) {
   if (!value) return "";
   return formatDateTimeDisplay(value);
+}
+
+function formatMessageTimeOnly(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const lang = getCurrentLang();
+  const locale = lang === "ja" ? "ja-JP" : "en-US";
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getDateKey(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function isNearBottom(el, threshold = 56) {
+  if (!el) return true;
+  const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+  return remaining <= threshold;
+}
+
+function formatMessageDayLabel(value) {
+  const tr = getDmTranslations();
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatDateDisplay(value);
+  const now = new Date();
+  const oneDay = 24 * 60 * 60 * 1000;
+  const todayKey = getDateKey(now);
+  const valueKey = getDateKey(date);
+  if (valueKey === todayKey) {
+    return tr.dmToday || "Today";
+  }
+  const yesterday = new Date(now.getTime() - oneDay);
+  if (valueKey === getDateKey(yesterday)) {
+    return tr.dmYesterday || "Yesterday";
+  }
+  return formatDateDisplay(date);
+}
+
+function shouldUseDmStackLayout() {
+  if (typeof window === "undefined") return false;
+  return (window.innerWidth || 1024) <= 900;
+}
+
+function applyDmLayoutState() {
+  const layout = $("dm-layout");
+  const backBtn = $("btn-dm-back");
+  if (!layout) return;
+  const stackLayout = shouldUseDmStackLayout();
+  const showChatPane = stackLayout && dmMobileChatOpen;
+  layout.classList.toggle("dm-chat-open", showChatPane);
+  if (backBtn) {
+    backBtn.classList.toggle("hidden", !showChatPane);
+  }
+}
+
+function setDmMobileChatOpen(next) {
+  dmMobileChatOpen = !!next;
+  applyDmLayoutState();
+}
+
+function ensureDmViewportListener() {
+  if (dmViewportListenerBound || typeof window === "undefined") return;
+  dmViewportListenerBound = true;
+  window.addEventListener(
+    "resize",
+    () => {
+      if (!shouldUseDmStackLayout()) {
+        dmMobileChatOpen = false;
+      } else if (!dmActivePartnerId) {
+        dmMobileChatOpen = false;
+      }
+      applyDmLayoutState();
+    },
+    { passive: true }
+  );
+}
+
+function syncThreadSearchClearButton() {
+  const clearBtn = $("btn-dm-thread-search-clear");
+  if (!clearBtn) return;
+  clearBtn.classList.toggle("hidden", !dmThreadSearch);
+}
+
+function getFilteredThreads() {
+  const query = `${dmThreadSearch || ""}`.trim().toLowerCase();
+  if (!query) return dmThreads;
+  return dmThreads.filter((thread) => {
+    const label = getProfileDisplay(thread.profile, thread.partnerId).toLowerCase();
+    const preview = `${thread.lastBody || ""}`.toLowerCase();
+    return label.includes(query) || preview.includes(query);
+  });
+}
+
+function renderThreadSummary() {
+  const summary = $("dm-thread-summary");
+  if (!summary) return;
+  const tr = getDmTranslations();
+  const filtered = getFilteredThreads();
+  const unreadCount = filtered.reduce(
+    (acc, thread) => acc + Number(thread.unreadCount || 0),
+    0
+  );
+  const chatsLabel = tr.dmThreadSummaryChats || "chats";
+  const unreadLabel = tr.dmThreadSummaryUnread || "unread";
+  summary.textContent = `${filtered.length} ${chatsLabel} · ${unreadCount} ${unreadLabel}`;
+}
+
+function updateDmInputCounter() {
+  const input = $("dm-input");
+  const counter = $("dm-input-count");
+  if (!counter || !input) return;
+  const max = Number(input.getAttribute("maxlength") || 600);
+  const length = `${input.value || ""}`.length;
+  counter.textContent = `${length}/${max}`;
+}
+
+function autoResizeDmInput() {
+  const input = $("dm-input");
+  if (!(input instanceof HTMLTextAreaElement)) return;
+  input.style.height = "auto";
+  const nextHeight = Math.min(Math.max(input.scrollHeight, 34), 120);
+  input.style.height = `${nextHeight}px`;
+  input.style.overflowY = input.scrollHeight > 120 ? "auto" : "hidden";
+}
+
+function upsertThreadAfterLocalSend(partnerId, body, createdAt) {
+  if (!partnerId) return;
+  const previewBody = `${body || ""}`.trim();
+  const existing = dmThreads.find((thread) => thread.partnerId === partnerId);
+  if (existing) {
+    existing.lastBody = previewBody;
+    existing.lastAt = createdAt;
+    existing.lastFromMe = true;
+  } else {
+    const partner = dmPartners.find((item) => item.id === partnerId);
+    dmThreads.unshift({
+      partnerId,
+      lastBody: previewBody,
+      lastAt: createdAt,
+      lastFromMe: true,
+      unreadCount: 0,
+      profile: partner?.profile || null,
+    });
+  }
+  dmThreads.sort((a, b) => {
+    const aTime = new Date(a.lastAt || 0).getTime();
+    const bTime = new Date(b.lastAt || 0).getTime();
+    return bTime - aTime;
+  });
 }
 
 function setThreadStatus(message = "", tone = "") {
@@ -162,17 +328,29 @@ function renderThreadList() {
   const list = $("dm-thread-list");
   if (!list) return;
   const tr = getDmTranslations();
+  const filteredThreads = getFilteredThreads();
   list.innerHTML = "";
 
   if (!dmThreads.length) {
     const empty = document.createElement("div");
-    empty.className = "empty";
+    empty.className = "empty dm-empty-state";
     empty.textContent = tr.dmThreadsEmpty || "No conversations yet.";
     list.appendChild(empty);
+    renderThreadSummary();
     return;
   }
 
-  dmThreads.forEach((thread) => {
+  if (!filteredThreads.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty dm-empty-state";
+    empty.textContent =
+      tr.dmNoThreadMatch || "No matching conversations found.";
+    list.appendChild(empty);
+    renderThreadSummary();
+    return;
+  }
+
+  filteredThreads.forEach((thread) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "dm-thread-item";
@@ -226,30 +404,61 @@ function renderThreadList() {
     button.appendChild(body);
     list.appendChild(button);
   });
+  renderThreadSummary();
 }
 
 function renderConversationHeader() {
   const title = $("dm-chat-title");
+  const sub = $("dm-chat-sub");
+  const markReadBtn = $("btn-dm-mark-read");
   if (!title) return;
   const tr = getDmTranslations();
   const active = dmPartners.find((partner) => partner.id === dmActivePartnerId);
   if (!active) {
     title.textContent = tr.dmConversationIdle || "Select a chat";
+    if (sub) {
+      sub.textContent =
+        tr.dmChatSubIdle || "Select a partner to start chatting.";
+    }
+    if (markReadBtn) {
+      markReadBtn.disabled = true;
+    }
     return;
   }
   title.textContent = getProfileDisplay(active.profile, active.id);
+  const activeThread = dmThreads.find(
+    (thread) => thread.partnerId === dmActivePartnerId
+  );
+  const unread = Number(activeThread?.unreadCount || 0);
+  if (sub) {
+    if (unread > 0) {
+      const unreadLabel = tr.dmThreadSummaryUnread || "unread";
+      sub.textContent = `${unread} ${unreadLabel}`;
+    } else if (activeThread?.lastAt) {
+      sub.textContent = `${tr.dmChatSubLastMessage || "Last message"}: ${formatMessageTime(
+        activeThread.lastAt
+      )}`;
+    } else {
+      sub.textContent =
+        tr.dmChatSubIdle || "Select a partner to start chatting.";
+    }
+  }
+  if (markReadBtn) {
+    markReadBtn.disabled = unread <= 0;
+  }
 }
 
-function renderConversationMessages() {
+function renderConversationMessages(options = {}) {
   const list = $("dm-message-list");
   if (!list) return;
   const tr = getDmTranslations();
   const currentUser = getCurrentUser();
+  const shouldStickToBottom = !!options.forceBottom || isNearBottom(list);
   list.innerHTML = "";
 
   if (!dmActivePartnerId) {
     const empty = document.createElement("div");
-    empty.className = "empty";
+    empty.className = "empty dm-empty-state";
     empty.textContent =
       tr.dmSelectPartner || "Select a partner to start chatting.";
     list.appendChild(empty);
@@ -258,7 +467,7 @@ function renderConversationMessages() {
 
   if (!dmMessages.length) {
     const empty = document.createElement("div");
-    empty.className = "empty";
+    empty.className = "empty dm-empty-state";
     empty.textContent =
       tr.dmNoMessages || "No messages yet. Send the first one.";
     list.appendChild(empty);
@@ -270,11 +479,24 @@ function renderConversationMessages() {
     .find((message) => message?.sender_id === currentUser?.id);
   const lastSelfMessageId = `${lastSelfMessage?.id || ""}`.trim();
 
-  dmMessages.forEach((message) => {
+  let previousDayKey = "";
+  dmMessages.forEach((message, index) => {
+    const dayKey = getDateKey(message.created_at);
+    if (dayKey && dayKey !== previousDayKey) {
+      const divider = document.createElement("div");
+      divider.className = "dm-day-divider";
+      divider.textContent = formatMessageDayLabel(message.created_at);
+      list.appendChild(divider);
+      previousDayKey = dayKey;
+    }
+
     const row = document.createElement("div");
     row.className = "dm-message-row";
     const isMine = message.sender_id === currentUser?.id;
     row.classList.add(isMine ? "is-self" : "is-other");
+    if (message.pending) {
+      row.classList.add("is-pending");
+    }
 
     const bubble = document.createElement("div");
     bubble.className = "dm-message-bubble";
@@ -282,10 +504,18 @@ function renderConversationMessages() {
 
     const meta = document.createElement("div");
     meta.className = "dm-message-meta";
-    const messageTime = formatMessageTime(message.created_at);
+    const messageTime = formatMessageTimeOnly(message.created_at);
+    const nextMessage = dmMessages[index + 1];
+    const hasNextSameSender =
+      !!nextMessage &&
+      nextMessage.sender_id === message.sender_id &&
+      getDateKey(nextMessage.created_at) === dayKey;
+    const shouldShowMeta = !hasNextSameSender || !!message.pending;
     const isLastSelf =
       isMine && lastSelfMessageId && `${message.id || ""}`.trim() === lastSelfMessageId;
-    if (isLastSelf) {
+    if (message.pending) {
+      meta.textContent = tr.dmSending || "Sending...";
+    } else if (isLastSelf) {
       const stateLabel = message.read_at
         ? tr.dmSeen || "Seen"
         : tr.dmSent || "Sent";
@@ -295,13 +525,19 @@ function renderConversationMessages() {
     }
 
     row.appendChild(bubble);
-    row.appendChild(meta);
+    if (shouldShowMeta) {
+      row.appendChild(meta);
+    } else {
+      row.classList.add("is-grouped");
+    }
     list.appendChild(row);
   });
 
-  requestAnimationFrame(() => {
-    list.scrollTop = list.scrollHeight;
-  });
+  if (shouldStickToBottom) {
+    requestAnimationFrame(() => {
+      list.scrollTop = list.scrollHeight;
+    });
+  }
 }
 
 async function markConversationRead(partnerId) {
@@ -326,9 +562,10 @@ async function markConversationRead(partnerId) {
       : thread
   );
   renderThreadList();
+  renderConversationHeader();
 }
 
-async function loadConversation(partnerId) {
+async function loadConversation(partnerId, options = {}) {
   const currentUser = getCurrentUser();
   const tr = getDmTranslations();
   if (!currentUser || !partnerId || dmMessagesLoading) return;
@@ -352,7 +589,7 @@ async function loadConversation(partnerId) {
     }
 
     dmMessages = data || [];
-    renderConversationMessages();
+    renderConversationMessages({ forceBottom: !!options.forceBottom });
     await markConversationRead(partnerId);
     setSendStatus("", "");
   } finally {
@@ -461,7 +698,9 @@ export async function refreshDmData(options = {}) {
     renderPartnerSelect();
     renderThreadList();
     renderConversationHeader();
-    await loadConversation(dmActivePartnerId);
+    await loadConversation(dmActivePartnerId, { forceBottom: true });
+    setDmMobileChatOpen(!!dmActivePartnerId);
+    renderThreadSummary();
     setThreadStatus("", "");
   } finally {
     dmThreadsLoading = false;
@@ -495,7 +734,8 @@ async function handleSendMessage(event) {
   const sendBtn = $("btn-dm-send");
   const partnerSelect = $("dm-partner-select");
   const partnerId = `${dmActivePartnerId || partnerSelect?.value || ""}`.trim();
-  const body = `${input?.value || ""}`.trim();
+  const rawBody = `${input?.value || ""}`;
+  const body = rawBody.trim();
 
   if (!currentUser) {
     showToast(tr.dmLoginRequired || "Please log in first.", "warning");
@@ -513,6 +753,29 @@ async function handleSendMessage(event) {
     sendBtn.disabled = true;
     sendBtn.classList.add("is-loading");
   }
+  const pendingId = `pending-${Date.now()}`;
+  const pendingCreatedAt = new Date().toISOString();
+  dmMessages = [
+    ...dmMessages,
+    {
+      id: pendingId,
+      sender_id: currentUser.id,
+      recipient_id: partnerId,
+      body,
+      created_at: pendingCreatedAt,
+      read_at: null,
+      pending: true,
+    },
+  ];
+  upsertThreadAfterLocalSend(partnerId, body, pendingCreatedAt);
+  renderThreadList();
+  renderConversationHeader();
+  renderConversationMessages({ forceBottom: true });
+  if (input) {
+    input.value = "";
+    autoResizeDmInput();
+  }
+  updateDmInputCounter();
   setSendStatus(tr.dmSending || "Sending...", "loading");
   try {
     const { error } = await supabase.from("direct_messages").insert({
@@ -523,11 +786,12 @@ async function handleSendMessage(event) {
 
     if (error) {
       console.error("handleSendMessage error:", error);
+      dmMessages = dmMessages.filter((message) => `${message.id || ""}` !== pendingId);
+      renderConversationMessages({ forceBottom: true });
       setSendStatus(tr.dmSendError || "Failed to send message.", "error");
       return;
     }
 
-    if (input) input.value = "";
     dmActivePartnerId = partnerId;
     await refreshDmData({ preservePartner: true });
     setSendStatus("", "");
@@ -540,6 +804,7 @@ async function handleSendMessage(event) {
 }
 
 export function setupDmControls() {
+  ensureDmViewportListener();
   const refreshBtn = $("btn-dm-refresh");
   if (refreshBtn && refreshBtn.dataset.bound !== "true") {
     refreshBtn.dataset.bound = "true";
@@ -561,7 +826,8 @@ export function setupDmControls() {
       renderPartnerSelect();
       renderThreadList();
       renderConversationHeader();
-      loadConversation(dmActivePartnerId).catch((error) => {
+      setDmMobileChatOpen(true);
+      loadConversation(dmActivePartnerId, { forceBottom: true }).catch((error) => {
         console.error("open conversation failed:", error);
       });
     });
@@ -575,7 +841,8 @@ export function setupDmControls() {
       dmActivePartnerId = nextPartnerId;
       renderThreadList();
       renderConversationHeader();
-      loadConversation(dmActivePartnerId).catch((error) => {
+      setDmMobileChatOpen(true);
+      loadConversation(dmActivePartnerId, { forceBottom: true }).catch((error) => {
         console.error("partner change load conversation failed:", error);
       });
     });
@@ -593,9 +860,68 @@ export function setupDmControls() {
       renderPartnerSelect();
       renderThreadList();
       renderConversationHeader();
-      loadConversation(dmActivePartnerId).catch((error) => {
+      setDmMobileChatOpen(true);
+      loadConversation(dmActivePartnerId, { forceBottom: true }).catch((error) => {
         console.error("thread click load conversation failed:", error);
       });
+    });
+  }
+
+  const backBtn = $("btn-dm-back");
+  if (backBtn && backBtn.dataset.bound !== "true") {
+    backBtn.dataset.bound = "true";
+    backBtn.addEventListener("click", () => {
+      setDmMobileChatOpen(false);
+    });
+  }
+
+  const markReadBtn = $("btn-dm-mark-read");
+  if (markReadBtn && markReadBtn.dataset.bound !== "true") {
+    markReadBtn.dataset.bound = "true";
+    markReadBtn.addEventListener("click", async () => {
+      if (!dmActivePartnerId) return;
+      const tr = getDmTranslations();
+      setSendStatus(tr.dmLoading || "Loading...", "loading");
+      await markConversationRead(dmActivePartnerId);
+      await refreshDmData({ preservePartner: true });
+      setSendStatus(tr.dmMarkedRead || "Marked as read.", "success");
+      setTimeout(() => setSendStatus("", ""), 1200);
+    });
+  }
+
+  const searchInput = $("dm-thread-search");
+  if (searchInput && searchInput.dataset.bound !== "true") {
+    searchInput.dataset.bound = "true";
+    searchInput.addEventListener("input", () => {
+      dmThreadSearch = `${searchInput.value || ""}`.trim();
+      syncThreadSearchClearButton();
+      renderThreadList();
+    });
+  }
+
+  const clearSearchBtn = $("btn-dm-thread-search-clear");
+  if (clearSearchBtn && clearSearchBtn.dataset.bound !== "true") {
+    clearSearchBtn.dataset.bound = "true";
+    clearSearchBtn.addEventListener("click", () => {
+      dmThreadSearch = "";
+      if (searchInput) searchInput.value = "";
+      syncThreadSearchClearButton();
+      renderThreadList();
+      if (searchInput) searchInput.focus();
+    });
+  }
+
+  const input = $("dm-input");
+  if (input && input.dataset.bound !== "true") {
+    input.dataset.bound = "true";
+    input.addEventListener("input", () => {
+      autoResizeDmInput();
+      updateDmInputCounter();
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+      event.preventDefault();
+      handleSendMessage();
     });
   }
 
@@ -604,6 +930,10 @@ export function setupDmControls() {
     form.dataset.bound = "true";
     form.addEventListener("submit", handleSendMessage);
   }
+  autoResizeDmInput();
+  updateDmInputCounter();
+  syncThreadSearchClearButton();
+  renderThreadSummary();
 }
 
 export function handleDmPageChange(page) {
@@ -621,12 +951,15 @@ export function renderDmPage(options = {}) {
   const loginRequired = $("dm-login-required");
   const layout = $("dm-layout");
   const partnerSelect = $("dm-partner-select");
+  const threadSearchInput = $("dm-thread-search");
+  const threadSearchClearBtn = $("btn-dm-thread-search-clear");
   const input = $("dm-input");
   const sendBtn = $("btn-dm-send");
 
   if (!currentUser) {
     stopDmPolling();
     clearDmState();
+    setDmMobileChatOpen(false);
     if (loginRequired) {
       loginRequired.classList.remove("hidden");
       loginRequired.textContent =
@@ -634,6 +967,8 @@ export function renderDmPage(options = {}) {
     }
     if (layout) layout.classList.add("hidden");
     if (partnerSelect) partnerSelect.disabled = true;
+    if (threadSearchInput) threadSearchInput.disabled = true;
+    if (threadSearchClearBtn) threadSearchClearBtn.disabled = true;
     if (input) input.disabled = true;
     if (sendBtn) sendBtn.disabled = true;
     setThreadStatus("", "");
@@ -644,13 +979,28 @@ export function renderDmPage(options = {}) {
   if (loginRequired) loginRequired.classList.add("hidden");
   if (layout) layout.classList.remove("hidden");
   if (partnerSelect) partnerSelect.disabled = false;
+  if (threadSearchInput) {
+    threadSearchInput.disabled = false;
+    threadSearchInput.value = dmThreadSearch;
+  }
+  if (threadSearchClearBtn) {
+    threadSearchClearBtn.disabled = false;
+  }
   if (input) input.disabled = false;
   if (sendBtn && !sendBtn.classList.contains("is-loading")) sendBtn.disabled = false;
+  if (shouldUseDmStackLayout()) {
+    setDmMobileChatOpen(!!dmActivePartnerId);
+  } else {
+    setDmMobileChatOpen(false);
+  }
 
   renderPartnerSelect();
   renderThreadList();
   renderConversationHeader();
   renderConversationMessages();
+  syncThreadSearchClearButton();
+  updateDmInputCounter();
+  autoResizeDmInput();
 
   if (options.refreshIfNeeded && !dmThreadsLoaded) {
     refreshDmData({ preservePartner: true }).catch((error) => {

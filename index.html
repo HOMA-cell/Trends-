@@ -173,7 +173,7 @@
       <!-- DM ページ -->
       <div class="page-view" data-page="messages">
         <section class="card dm-shell">
-          <div class="card-header">
+          <div class="card-header dm-shell-header">
             <div>
               <div class="card-title" id="messages-title">ダイレクトメッセージ</div>
               <div class="card-sub" id="messages-sub">フォロー中ユーザーと会話できます。</div>
@@ -190,24 +190,48 @@
                   <button class="btn btn-ghost btn-xs" id="btn-dm-start" type="button">開く</button>
                 </div>
               </div>
+              <div class="dm-thread-toolbar">
+                <input
+                  id="dm-thread-search"
+                  type="text"
+                  placeholder="会話を検索"
+                  autocomplete="off"
+                />
+                <button class="btn btn-ghost btn-xs hidden" id="btn-dm-thread-search-clear" type="button">
+                  クリア
+                </button>
+              </div>
+              <div class="dm-thread-summary" id="dm-thread-summary">-</div>
               <div class="template-status" id="dm-thread-status"></div>
               <div id="dm-thread-list" class="dm-thread-list"></div>
             </aside>
             <section class="dm-chat">
               <div class="dm-chat-header">
-                <div class="dm-chat-title" id="dm-chat-title">会話を選択</div>
+                <div class="dm-chat-header-main">
+                  <button class="btn btn-ghost btn-xs dm-mobile-back hidden" id="btn-dm-back" type="button">
+                    一覧
+                  </button>
+                  <div class="dm-chat-header-texts">
+                    <div class="dm-chat-title" id="dm-chat-title">会話を選択</div>
+                    <div class="dm-chat-sub" id="dm-chat-sub">-</div>
+                  </div>
+                </div>
+                <button class="btn btn-ghost btn-xs" id="btn-dm-mark-read" type="button">既読にする</button>
               </div>
               <div id="dm-message-list" class="dm-message-list"></div>
               <form id="dm-form" class="dm-form">
-                <input
+                <textarea
                   id="dm-input"
-                  type="text"
                   maxlength="600"
+                  rows="1"
                   placeholder="メッセージを入力"
                   autocomplete="off"
-                />
+                ></textarea>
                 <button class="btn btn-primary" id="btn-dm-send" type="submit">送信</button>
               </form>
+              <div class="dm-form-meta">
+                <div class="dm-input-count" id="dm-input-count">0/600</div>
+              </div>
               <div class="template-status" id="dm-send-status"></div>
             </section>
           </div>

@@ -2238,8 +2238,12 @@ async function loadProfilePostCount() {
       setText("btn-dm-refresh", "dmRefresh");
       setText("dm-partner-label", "dmPartnerLabel");
       setText("btn-dm-start", "dmOpen");
+      setText("btn-dm-back", "dmBackToThreads");
+      setText("btn-dm-mark-read", "dmMarkRead");
+      setText("btn-dm-thread-search-clear", "dmSearchClear");
       setText("btn-dm-send", "dmSend");
       setPlaceholder("dm-input", "dmInputPlaceholder");
+      setPlaceholder("dm-thread-search", "dmSearchPlaceholder");
 
       // アカウント / Tips / Debug
       setText("account-title", "account");
