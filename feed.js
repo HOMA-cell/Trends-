@@ -3209,7 +3209,7 @@ export function setupFeedControls() {
         }
         const tr = t[getCurrentLang()] || t.ja;
         showToast(tr[fallbackKey] || fallbackText, "warning");
-        applyFilter("all");
+        applyFilter("foryou");
       };
       const filterForYou = $("filter-foryou");
       if (filterForYou) {
@@ -4323,7 +4323,7 @@ export function renderFeed(options = {}) {
       repostState
     );
     const compactFilterViewport = isCompactViewport();
-    const allowedFilters = compactFilterViewport ? ["all", "mine"] : FEED_FILTERS;
+    const allowedFilters = FEED_FILTERS;
     let normalizedFilter = currentFilter;
     if (!allowedFilters.includes(currentFilter)) {
       normalizedFilter = "all";
@@ -4332,7 +4332,7 @@ export function renderFeed(options = {}) {
       (normalizedFilter === "mine" || normalizedFilter === "following") &&
       !currentUser
     ) {
-      normalizedFilter = "all";
+      normalizedFilter = "foryou";
     }
     if (normalizedFilter !== currentFilter) {
       currentFilter = normalizedFilter;
@@ -4340,16 +4340,16 @@ export function renderFeed(options = {}) {
     }
     updateFilterButtons();
     const forYouBtn = $("filter-foryou");
-    if (forYouBtn) forYouBtn.classList.toggle("hidden", compactFilterViewport);
+    if (forYouBtn) forYouBtn.classList.remove("hidden");
     const followingBtn = $("filter-following");
-    if (followingBtn) followingBtn.classList.toggle("hidden", compactFilterViewport);
+    if (followingBtn) followingBtn.classList.remove("hidden");
     const savedBtn = $("filter-saved");
     if (savedBtn) savedBtn.classList.toggle("hidden", compactFilterViewport);
     const publicBtn = $("filter-public");
     if (publicBtn) publicBtn.classList.toggle("hidden", compactFilterViewport);
     const shortsFilterBtn = $("filter-shorts");
     if (shortsFilterBtn) {
-      shortsFilterBtn.classList.toggle("hidden", !compactFilterViewport);
+      shortsFilterBtn.classList.remove("hidden");
     }
     const restoreHiddenBtn = $("btn-feed-restore-hidden");
     const restoreMutedBtn = $("btn-feed-restore-muted");

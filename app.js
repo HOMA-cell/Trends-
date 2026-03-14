@@ -2254,6 +2254,7 @@ async function loadProfilePostCount() {
       setText("btn-auth", "loginSignup");
       setText("btn-logout", "logout");
       setText("auth-caption", "accountAutoCreateHint");
+      setText("btn-account-open-settings", "accountOpenSettings");
       setText("btn-auth-open-settings", "authOpenConnectionSettings");
       setText("btn-auth-reset-connection", "authResetConnection");
       setPlaceholder("auth-email", "accountEmailPlaceholder");
@@ -2565,6 +2566,7 @@ async function loadProfilePostCount() {
       const authForm = $("auth-form");
       const authBtn = $("btn-auth");
       const logoutBtn = $("btn-logout");
+      const openPageSettingsBtn = $("btn-account-open-settings");
       const openSettingsBtn = $("btn-auth-open-settings");
       const resetConnectionBtn = $("btn-auth-reset-connection");
       if (authForm && authForm.dataset.bound !== "true") {
@@ -2580,6 +2582,14 @@ async function loadProfilePostCount() {
       if (logoutBtn && logoutBtn.dataset.bound !== "true") {
         logoutBtn.dataset.bound = "true";
         logoutBtn.addEventListener("click", handleLogout);
+      }
+      if (openPageSettingsBtn && openPageSettingsBtn.dataset.bound !== "true") {
+        openPageSettingsBtn.dataset.bound = "true";
+        openPageSettingsBtn.addEventListener("click", () => {
+          if (typeof setActivePage === "function") {
+            setActivePage("settings", { scrollBehavior: "smooth" });
+          }
+        });
       }
       if (openSettingsBtn && openSettingsBtn.dataset.bound !== "true") {
         openSettingsBtn.dataset.bound = "true";
@@ -3686,16 +3696,26 @@ async function loadProfilePostCount() {
       const triggerFeedViewSwipe = (direction) => {
         if (swipeTargetPage !== "feed") return;
         const shortsBtn = $("btn-feed-shorts-mode");
-        if (!shortsBtn) return;
+        const shortsFilterChip = $("filter-shorts");
+        const toggleTarget =
+          shortsBtn instanceof HTMLElement
+            ? shortsBtn
+            : shortsFilterChip instanceof HTMLElement
+            ? shortsFilterChip
+            : null;
+        if (!toggleTarget) return;
+        const readStateEl =
+          shortsFilterChip instanceof HTMLElement ? shortsFilterChip : toggleTarget;
         const isShortsMode =
-          shortsBtn.classList.contains("is-active") ||
-          shortsBtn.getAttribute("aria-pressed") === "true";
+          readStateEl.classList.contains("is-active") ||
+          readStateEl.classList.contains("chip-active") ||
+          readStateEl.getAttribute("aria-pressed") === "true";
         if (direction === "to-shorts" && !isShortsMode) {
-          shortsBtn.click();
+          toggleTarget.click();
           return;
         }
         if (direction === "to-feed" && isShortsMode) {
-          shortsBtn.click();
+          toggleTarget.click();
         }
       };
       const endSwipe = ({ x, y }) => {

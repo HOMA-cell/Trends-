@@ -516,6 +516,12 @@
       gap: 6px;
       min-width: 0;
     }
+    .feed-inline-sort {
+      display: none !important;
+    }
+    #btn-feed-shorts-mode {
+      display: none !important;
+    }
     #feed-search {
       width: 100%;
       max-width: none;
@@ -4397,6 +4403,16 @@ body.compact-mode .feed-toolbar {
 
 .page-view.account-page .account-buttons {
   margin-top: 2px;
+}
+
+.page-view.account-page .account-quick-actions {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.page-view.account-page .account-quick-actions .btn {
+  min-height: 30px;
 }
 
 .page-view.account-page #auth-network-status {
