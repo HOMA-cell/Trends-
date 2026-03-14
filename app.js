@@ -2187,6 +2187,7 @@ async function loadProfilePostCount() {
       setText("btn-submit", "submit");
       setText("btn-reset", "reset");
       setText("btn-clear-draft", "draftClear");
+      setText("btn-post-more-actions", "postMoreActions");
       setText("draft-hint", "draftHint");
       setText("btn-remove-media", "mediaRemove");
       setText("btn-post-toggle-advanced", "postShowAdvanced");

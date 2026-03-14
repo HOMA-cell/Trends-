@@ -478,10 +478,17 @@
     .chip-action {
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      justify-content: center;
+      gap: 4px;
+      border-radius: 999px;
+      min-height: 26px;
+      padding-inline: 8px;
+      background: #fff;
+      border-color: #e6ddcf;
+      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
     }
     .chip-action .chip-icon {
-      font-size: 11px;
+      font-size: 12px;
       line-height: 1;
       flex: 0 0 auto;
     }
@@ -489,6 +496,8 @@
       line-height: 1;
       white-space: nowrap;
       font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
       font-variant-numeric: tabular-nums;
     }
     .chip-icon-only {
@@ -1066,6 +1075,8 @@
     .post-action-row-primary {
       justify-content: flex-start;
       width: 100%;
+      align-items: center;
+      gap: 6px;
     }
     .post-action-row-secondary {
       justify-content: flex-end;
@@ -1078,8 +1089,9 @@
       background: #fff;
       color: var(--text-main);
       font-size: 10px;
-      min-height: 24px;
-      padding-inline: 7px;
+      min-height: 26px;
+      min-width: 34px;
+      padding-inline: 8px;
       border-radius: 999px;
       white-space: nowrap;
     }
@@ -1102,9 +1114,12 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 24px;
-      min-width: 24px;
-      padding: 3px 7px;
+      min-height: 26px;
+      min-width: 28px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid #e6ddcf;
+      background: #fff;
     }
     .post-action-menu > summary::-webkit-details-marker {
       display: none;
@@ -1139,7 +1154,7 @@
       justify-content: center;
       border-radius: 999px;
       min-height: 24px;
-      padding-inline: 8px;
+      padding-inline: 9px;
     }
     .post-media img,
     .post-media video {
@@ -2774,6 +2789,11 @@
       background: #fff3ee;
       border-color: #f3b6a4;
     }
+    .dm-thread-item.is-unread .dm-thread-name,
+    .dm-thread-item.is-unread .dm-thread-preview {
+      color: #1f1a16;
+      font-weight: 700;
+    }
     .dm-thread-item .avatar {
       width: 34px;
       height: 34px;
@@ -2896,6 +2916,9 @@
       font-size: 10px;
       color: #8b857b;
       padding: 0 2px;
+    }
+    .dm-message-row.is-self .dm-message-meta {
+      color: #7a6d61;
     }
     .dm-form {
       display: grid;
@@ -3241,6 +3264,11 @@
       transform: translateY(12px) scale(0.98);
       transition: transform 0.2s ease, opacity 0.2s ease;
     }
+    #post-modal-backdrop .modal-panel {
+      max-width: 560px;
+      background: linear-gradient(180deg, #ffffff 0%, #fffaf3 100%);
+      border-color: #e7ddcd;
+    }
     .modal-backdrop.is-open .modal-panel,
     .modal-backdrop.is-open .media-modal-content {
       opacity: 1;
@@ -3350,6 +3378,10 @@
       justify-content: space-between;
       gap: 10px;
       flex-wrap: wrap;
+      padding: 8px 10px;
+      border: 1px solid #eadfcf;
+      border-radius: 12px;
+      background: #fff;
     }
     .post-composer-hint {
       font-size: 11px;
@@ -3391,6 +3423,90 @@
       color: var(--text-sub);
       margin-top: 6px;
       text-align: right;
+    }
+    #post-caption {
+      min-height: 112px;
+    }
+    .post-form-actions {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #e9dfcf;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .post-form-actions #btn-submit {
+      min-height: 40px;
+      min-width: 140px;
+      padding-inline: 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      box-shadow: 0 8px 16px rgba(228, 87, 46, 0.24);
+    }
+    .post-form-more {
+      position: relative;
+    }
+    .post-form-more > summary {
+      list-style: none;
+      min-height: 32px;
+      border-radius: 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    .post-form-more > summary::-webkit-details-marker {
+      display: none;
+    }
+    .post-form-more[open] > summary {
+      border-color: rgba(228, 87, 46, 0.45);
+      background: #fff3ee;
+      color: #b74a20;
+    }
+    .post-form-more-menu {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 8px);
+      border: 1px solid #e5dccd;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+      padding: 8px;
+      min-width: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 2;
+    }
+    .post-form-more-menu .btn {
+      width: 100%;
+      justify-content: flex-start;
+      min-height: 34px;
+      border-radius: 10px;
+    }
+    .post-form-more-menu #btn-clear-draft {
+      border-color: #efc5b7;
+      color: #b14a23;
+      background: #fff9f4;
+    }
+    @media (max-width: 700px) {
+      #post-modal-backdrop .modal-panel {
+        max-width: 100%;
+      }
+      .post-form-actions {
+        gap: 6px;
+      }
+      .post-form-actions #btn-submit {
+        flex: 1;
+        min-width: 0;
+      }
+      .post-form-more > summary {
+        min-height: 34px;
+      }
+      .post-form-more-menu {
+        min-width: 160px;
+      }
     }
     /* 右上の小さいナビボタン */
     
@@ -3681,14 +3797,14 @@
     gap: 4px;
   }
   .feed-list .post-action-row-primary .chip-compact {
-    min-height: 22px;
-    padding: 2px 7px;
+    min-height: 24px;
+    padding: 2px 8px;
   }
   .feed-list .post-action-row-primary .chip-action .chip-icon {
-    font-size: 10px;
+    font-size: 11px;
   }
   .feed-list .post-action-row-primary .chip-action .chip-label {
-    font-size: 9px;
+    font-size: 9.5px;
   }
   .feed-list .post-action-menu > summary {
     min-height: 22px;

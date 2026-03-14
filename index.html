@@ -1085,17 +1085,11 @@
         <span class="post-composer-hint" id="post-composer-hint">クイック投稿: キャプション・メディア中心</span>
         <button class="btn btn-ghost btn-xs" type="button" id="btn-post-toggle-advanced">項目を増やす</button>
       </div>
-      <div class="modal-section post-advanced-section">
-        <div class="modal-section-title" id="post-section-basic">基本</div>
-        <div class="grid-2">
-          <div class="field">
-            <label id="label-date">日付</label>
-            <input type="date" id="post-date" />
-          </div>
-          <div class="field">
-            <label id="label-weight">体重</label>
-            <input type="number" id="post-weight" step="0.1" placeholder="77.4" />
-          </div>
+      <div class="modal-section">
+        <div class="modal-section-title" id="post-section-caption">キャプション</div>
+        <div class="field">
+          <label id="label-caption">キャプション / トレメモ</label>
+          <textarea id="post-caption" placeholder="bench 100"></textarea>
         </div>
       </div>
       <div class="modal-section">
@@ -1113,6 +1107,19 @@
         </div>
       </div>
       <div class="modal-section post-advanced-section">
+        <div class="modal-section-title" id="post-section-basic">基本</div>
+        <div class="grid-2">
+          <div class="field">
+            <label id="label-date">日付</label>
+            <input type="date" id="post-date" />
+          </div>
+          <div class="field">
+            <label id="label-weight">体重</label>
+            <input type="number" id="post-weight" step="0.1" placeholder="77.4" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-section post-advanced-section">
         <div class="modal-section-title" id="post-section-workout">ワークアウト</div>
         <div class="field">
           <label id="label-log">ワークアウトログ</label>
@@ -1126,13 +1133,6 @@
             <button class="btn btn-ghost" id="btn-add-exercise">種目を追加</button>
             <div class="template-status" id="log-status"></div>
           </div>
-        </div>
-      </div>
-      <div class="modal-section">
-        <div class="modal-section-title" id="post-section-caption">キャプション</div>
-        <div class="field">
-          <label id="label-caption">キャプション / トレメモ</label>
-          <textarea id="post-caption" placeholder="bench 100"></textarea>
         </div>
       </div>
       <div class="modal-section post-advanced-section">
@@ -1154,10 +1154,15 @@
           </div>
         </div>
       </div>
-      <div class="form-actions">
-        <button class="btn btn-ghost" type="button" id="btn-clear-draft">下書きを削除</button>
+      <div class="form-actions post-form-actions">
         <button class="btn btn-primary" id="btn-submit">投稿</button>
-        <button class="btn btn-ghost" type="button" id="btn-reset">リセット</button>
+        <details class="post-form-more">
+          <summary class="btn btn-ghost btn-xs" id="btn-post-more-actions">その他</summary>
+          <div class="post-form-more-menu">
+            <button class="btn btn-ghost" type="button" id="btn-reset">リセット</button>
+            <button class="btn btn-ghost" type="button" id="btn-clear-draft">下書きを削除</button>
+          </div>
+        </details>
       </div>
       <div class="draft-hint" id="draft-hint">下書きは自動保存されます。</div>
       <div id="login-required">ログインしてください。</div>

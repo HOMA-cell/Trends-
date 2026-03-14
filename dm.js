@@ -208,7 +208,11 @@ function renderThreadList() {
 
     const preview = document.createElement("div");
     preview.className = "dm-thread-preview";
-    preview.textContent = `${thread.lastBody || ""}`.trim() || "…";
+    const previewBody = `${thread.lastBody || ""}`.trim() || "…";
+    const youPrefix = tr.dmYouPrefix || "You";
+    preview.textContent = thread.lastFromMe
+      ? `${youPrefix}: ${previewBody}`
+      : previewBody;
 
     const meta = document.createElement("div");
     meta.className = "dm-thread-meta";
@@ -261,6 +265,11 @@ function renderConversationMessages() {
     return;
   }
 
+  const lastSelfMessage = [...dmMessages]
+    .reverse()
+    .find((message) => message?.sender_id === currentUser?.id);
+  const lastSelfMessageId = `${lastSelfMessage?.id || ""}`.trim();
+
   dmMessages.forEach((message) => {
     const row = document.createElement("div");
     row.className = "dm-message-row";
@@ -273,7 +282,17 @@ function renderConversationMessages() {
 
     const meta = document.createElement("div");
     meta.className = "dm-message-meta";
-    meta.textContent = formatMessageTime(message.created_at);
+    const messageTime = formatMessageTime(message.created_at);
+    const isLastSelf =
+      isMine && lastSelfMessageId && `${message.id || ""}`.trim() === lastSelfMessageId;
+    if (isLastSelf) {
+      const stateLabel = message.read_at
+        ? tr.dmSeen || "Seen"
+        : tr.dmSent || "Sent";
+      meta.textContent = [messageTime, stateLabel].filter(Boolean).join(" · ");
+    } else {
+      meta.textContent = messageTime;
+    }
 
     row.appendChild(bubble);
     row.appendChild(meta);
@@ -384,6 +403,7 @@ export async function refreshDmData(options = {}) {
           partnerId,
           lastBody: `${row.body || ""}`.trim(),
           lastAt: row.created_at,
+          lastFromMe: row.sender_id === currentUser.id,
           unreadCount: 0,
           profile: null,
         });

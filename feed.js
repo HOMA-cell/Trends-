@@ -5367,11 +5367,7 @@ export function renderFeed(options = {}) {
       });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      if (compactActionLayout) {
-        appendPrimaryAction(saveBtn);
-      } else {
-        appendSecondaryAction(saveBtn);
-      }
+      appendSecondaryAction(saveBtn);
 
       const shareBtn = document.createElement("button");
       shareBtn.className = "chip chip-log chip-action";
