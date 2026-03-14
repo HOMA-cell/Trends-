@@ -52,22 +52,47 @@
       </div>
     </header>
     <div class="mini-header" id="mini-header">
-      <div class="mini-header-title" id="mini-header-title">Trends</div>
-      <div class="mini-nav">
-        <button class="mini-nav-btn" data-page-target="feed" id="mini-nav-feed">フィード</button>
-        <button class="mini-nav-btn" data-page-target="messages" id="mini-nav-messages">DM</button>
-        <button class="mini-nav-btn" data-page-target="account" id="mini-nav-account">アカウント</button>
-      </div>
-      <div class="mini-header-actions">
-        <select id="mini-lang-select" class="select-sm mini-lang-select" aria-label="Language">
-          <option value="ja">日本語</option>
-          <option value="en">English</option>
-        </select>
-        <button class="btn btn-primary" id="mini-btn-post">投稿</button>
-      </div>
-      <div class="mini-progress" aria-hidden="true">
-        <div class="mini-progress-bar" id="mini-progress-bar"></div>
-      </div>
+      <button
+        class="mini-nav-btn"
+        data-page-target="feed"
+        data-feed-view-target="feed"
+        data-mini-tab="feed"
+        id="mini-nav-feed"
+      >
+        フィード
+      </button>
+      <button
+        class="mini-nav-btn"
+        data-feed-view-target="shorts"
+        data-mini-tab="shorts"
+        id="mini-nav-shorts"
+      >
+        ショート
+      </button>
+      <button
+        class="mini-nav-btn mini-nav-post"
+        data-action="open-post"
+        data-mini-tab="post"
+        id="mini-nav-post"
+      >
+        +
+      </button>
+      <button
+        class="mini-nav-btn"
+        data-page-target="messages"
+        data-mini-tab="messages"
+        id="mini-nav-messages"
+      >
+        DM
+      </button>
+      <button
+        class="mini-nav-btn"
+        data-page-target="account"
+        data-mini-tab="account"
+        id="mini-nav-account"
+      >
+        アカウント
+      </button>
     </div>
 
     <div class="layout">

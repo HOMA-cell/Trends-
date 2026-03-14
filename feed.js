@@ -261,6 +261,21 @@ let adSenseScriptClient = "";
 let adSenseScriptLoading = false;
 let adSenseScriptLoaded = false;
 
+function emitFeedViewModeChanged() {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+    return;
+  }
+  try {
+    window.dispatchEvent(
+      new CustomEvent("trends-feed-view-mode-changed", {
+        detail: { mode: feedViewMode },
+      })
+    );
+  } catch {
+    // ignore custom event failures
+  }
+}
+
 function clampNumber(value, min, max, fallback) {
       const num = Number(value);
       if (!Number.isFinite(num)) return fallback;
@@ -3137,6 +3152,7 @@ function applyFeedSearchTerm(term = "") {
       scheduleRenderFeed();
     }
 export function setFeedState(next = {}) {
+      const previousViewMode = feedViewMode;
       let shouldPersistUi = false;
       if (typeof next.currentFilter === "string") {
         currentFilter = isAllowedFeedFilter(next.currentFilter)
@@ -3187,6 +3203,12 @@ export function setFeedState(next = {}) {
       if (shouldPersistUi) {
         persistFeedUiState();
       }
+      if (previousViewMode !== feedViewMode) {
+        emitFeedViewModeChanged();
+      }
+    }
+export function getFeedViewMode() {
+      return feedViewMode;
     }
 export function setupFeedControls() {
       loadFeedUiState();
@@ -3247,6 +3269,7 @@ export function setupFeedControls() {
       const toggleFeedShortsMode = () => {
         feedViewMode = feedViewMode === "shorts" ? "feed" : "shorts";
         persistFeedUiState();
+        emitFeedViewModeChanged();
         resetFeedPagination();
         updateFilterButtons();
         scheduleRenderFeed();
@@ -4715,6 +4738,10 @@ export function renderFeed(options = {}) {
     }
 
     const effectiveLayout = isShortsMode ? "list" : feedLayout;
+    const feedCard = container.closest(".page-view[data-page='feed'] .card");
+    if (feedCard) {
+      feedCard.classList.toggle("is-shorts-mode", isShortsMode);
+    }
     container.classList.toggle("shorts-view", isShortsMode);
     container.classList.toggle("grid-view", !isShortsMode && feedLayout === "grid");
     if (layoutBtn) {

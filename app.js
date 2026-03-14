@@ -27,6 +27,7 @@ import {
 import {
   setFeedContext,
   setFeedState,
+  getFeedViewMode,
   setupFeedControls,
   setupFollowButtons,
   setupPostDetailModal,
@@ -2162,9 +2163,16 @@ async function loadProfilePostCount() {
       setText("nav-account", "navAccount");
       setText("nav-settings", "navSettings");
       setText("mini-nav-feed", "navFeed");
+      setText("mini-nav-shorts", "navShorts");
+      setText("mini-nav-post", "navPost");
       setText("mini-nav-messages", "navMessages");
       setText("mini-nav-account", "navAccount");
       setText("mini-nav-settings", "navSettings");
+      const miniPostTab = $("mini-nav-post");
+      if (miniPostTab && tr.newPost) {
+        miniPostTab.setAttribute("aria-label", tr.newPost);
+        miniPostTab.setAttribute("title", tr.newPost);
+      }
       setText("mini-btn-post", "newPost");
 
       // 新規投稿まわり（要素がなければ自動的にスキップされる）
@@ -3371,7 +3379,7 @@ async function loadProfilePostCount() {
       if (postSubmitBtn) postSubmitBtn.disabled = !loggedIn;
       const topPostBtn = $("btn-open-post");
       if (topPostBtn) topPostBtn.disabled = !loggedIn;
-      const miniPostBtn = $("mini-btn-post");
+      const miniPostBtn = $("mini-btn-post") || $("mini-nav-post");
       if (miniPostBtn) miniPostBtn.disabled = !loggedIn;
       const fab = $("fab-open-post");
       if (fab) fab.disabled = !loggedIn;
@@ -3526,11 +3534,32 @@ async function loadProfilePostCount() {
       const pageScrollMap = new Map();
       const getVisiblePage = () =>
         document.querySelector(".page-view.is-active")?.dataset.page || "";
+      const syncMiniBottomTabState = (page = getVisiblePage()) => {
+        const mode = typeof getFeedViewMode === "function" ? getFeedViewMode() : "feed";
+        const isShorts = mode === "shorts";
+        const miniFeed = $("mini-nav-feed");
+        const miniShorts = $("mini-nav-shorts");
+        const miniMessages = $("mini-nav-messages");
+        const miniAccount = $("mini-nav-account");
+        if (miniFeed) {
+          miniFeed.classList.toggle("is-active", page === "feed" && !isShorts);
+        }
+        if (miniShorts) {
+          miniShorts.classList.toggle("is-active", page === "feed" && isShorts);
+        }
+        if (miniMessages) {
+          miniMessages.classList.toggle("is-active", page === "messages");
+        }
+        if (miniAccount) {
+          miniAccount.classList.toggle("is-active", page === "account");
+        }
+      };
       const updateTabState = (page) => {
         tabs.forEach((tab) => {
           const target = tab.getAttribute("data-page-target");
           tab.classList.toggle("is-active", target === page);
         });
+        syncMiniBottomTabState(page);
       };
       const getViewByPage = (page) =>
         viewList.find((view) => view.dataset.page === page) || null;
@@ -3663,11 +3692,44 @@ async function loadProfilePostCount() {
 
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
+          if (tab.hasAttribute("data-feed-view-target")) return;
           const targetPage = tab.getAttribute("data-page-target");
           if (!targetPage) return;
           setPage(targetPage, { scrollBehavior: "smooth" });
         });
       });
+
+      document.querySelectorAll("[data-feed-view-target]").forEach((tab) => {
+        if (tab.dataset.boundFeedMode === "true") return;
+        tab.dataset.boundFeedMode = "true";
+        tab.addEventListener("click", () => {
+          const targetMode = `${tab.getAttribute("data-feed-view-target") || "feed"}`.trim();
+          setPage("feed", { scrollBehavior: "smooth" });
+          setFeedState({
+            feedViewMode: targetMode === "shorts" ? "shorts" : "feed",
+          });
+          updateFilterButtons();
+          renderFeed({ forcePageRender: true });
+          syncMiniBottomTabState("feed");
+        });
+      });
+
+      document.querySelectorAll("[data-action='open-post']").forEach((btn) => {
+        if (btn.dataset.boundPostAction === "true") return;
+        btn.dataset.boundPostAction = "true";
+        btn.addEventListener("click", () => {
+          if (typeof openPostModal === "function") {
+            openPostModal();
+          }
+        });
+      });
+
+      if (typeof window !== "undefined" && !window.__trendsFeedViewSyncBound) {
+        window.__trendsFeedViewSyncBound = true;
+        window.addEventListener("trends-feed-view-mode-changed", () => {
+          syncMiniBottomTabState();
+        });
+      }
 
       // Mobile swipe navigation: feed <-> shorts
       let swipeActive = false;
