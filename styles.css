@@ -4054,3 +4054,312 @@ body.compact-mode .feed-toolbar {
     font-size: 14px;
   }
 }
+
+/* Account Tab UI Refresh */
+.page-view.account-page.is-active,
+.page-view.account-page.is-transitioning {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.page-view.account-page > section {
+  margin-top: 0 !important;
+}
+
+.page-view.account-page .card {
+  border-radius: 20px;
+  border-color: #e8e0d3;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.07);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.page-view.account-page #panel-account {
+  grid-column: 1;
+  position: sticky;
+  top: 78px;
+  padding: 14px;
+  background: linear-gradient(180deg, #fffefb 0%, #fff9f2 100%);
+}
+
+.page-view.account-page #profile-section {
+  grid-column: 1;
+}
+
+.page-view.account-page #onboarding-section,
+.page-view.account-page #profile-edit-section,
+.page-view.account-page #notifications-section,
+.page-view.account-page #history-section,
+.page-view.account-page #summary-section,
+.page-view.account-page #insights-section {
+  grid-column: 2;
+}
+
+.page-view.account-page .account-header {
+  align-items: center;
+  gap: 8px;
+}
+
+.page-view.account-page .account-header .card-title {
+  font-size: 19px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+
+.page-view.account-page .account-header .card-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #6f675d;
+}
+
+.page-view.account-page .account-session-chip {
+  border: none;
+  background: #111827;
+  color: #fff;
+  padding: 5px 10px;
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.16);
+}
+
+.page-view.account-page .auth-form {
+  gap: 10px;
+}
+
+.page-view.account-page .auth-form input {
+  min-height: 42px;
+  border-radius: 12px;
+  border-color: #e1d9cc;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.page-view.account-page .auth-form input:focus {
+  outline: none;
+  border-color: rgba(228, 87, 46, 0.6);
+  box-shadow: 0 0 0 3px rgba(228, 87, 46, 0.14);
+}
+
+.page-view.account-page .auth-submit {
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.page-view.account-page .auth-caption {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.page-view.account-page .account-session-row {
+  border-radius: 14px;
+  border-color: #eadfce;
+  background: #fff;
+  padding: 11px 12px;
+}
+
+.page-view.account-page .account-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.page-view.account-page .account-email {
+  font-size: 12px;
+}
+
+.page-view.account-page .account-buttons {
+  margin-top: 2px;
+}
+
+.page-view.account-page #auth-network-status {
+  margin-top: 0;
+  border: 1px solid #efe4d4;
+  border-radius: 12px;
+  background: #fff;
+  padding: 7px 10px;
+  min-height: 34px;
+}
+
+.page-view.account-page .profile-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.page-view.account-page .profile-card .card-header {
+  padding: 12px 14px 0;
+}
+
+.page-view.account-page .profile-body {
+  padding: 10px 14px 14px;
+}
+
+.page-view.account-page .profile-header {
+  margin-bottom: 10px;
+}
+
+.page-view.account-page .avatar-lg {
+  width: 64px;
+  height: 64px;
+  font-size: 22px;
+}
+
+.page-view.account-page .profile-name {
+  margin-bottom: 2px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.page-view.account-page .profile-email {
+  margin-bottom: 0;
+  font-size: 12px;
+  color: #7b7468;
+}
+
+.page-view.account-page .profile-meta {
+  gap: 8px;
+}
+
+.page-view.account-page .profile-meta span {
+  border: 1px solid #eadfce;
+  background: #fcf8f2;
+  padding: 5px 10px;
+}
+
+.page-view.account-page #profile-edit-section {
+  padding: 14px;
+  background: linear-gradient(180deg, #fff 0%, #fffcf8 100%);
+}
+
+.page-view.account-page #profile-edit-section .card-title {
+  font-size: 17px;
+  margin-bottom: 3px;
+}
+
+.page-view.account-page #profile-edit-section .card-sub {
+  font-size: 12px;
+}
+
+.page-view.account-page .profile-edit-group {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #ece3d6;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.page-view.account-page .profile-edit-group:first-of-type {
+  margin-top: 10px;
+}
+
+.page-view.account-page .profile-edit-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-view.account-page .profile-editor {
+  gap: 10px;
+}
+
+.page-view.account-page .profile-editor input,
+.page-view.account-page .profile-editor select,
+.page-view.account-page .profile-editor textarea {
+  border-radius: 12px;
+  border-color: #e3dbcf;
+  background: #fff;
+}
+
+.page-view.account-page .profile-editor textarea {
+  min-height: 110px;
+}
+
+.page-view.account-page .profile-edit-actions {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid #eee3d4;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.page-view.account-page .profile-edit-actions .btn {
+  min-height: 36px;
+  min-width: 96px;
+}
+
+.page-view.account-page .extra-section {
+  padding: 13px;
+  background: #fff;
+}
+
+.page-view.account-page .extra-section .card-header {
+  margin-bottom: 8px;
+}
+
+.page-view.account-page .extra-section .card-title {
+  font-size: 15px;
+}
+
+.page-view.account-page .extra-section .card-sub {
+  font-size: 12px;
+}
+
+.page-view.account-page [data-collapsible-btn] {
+  min-height: 28px;
+  padding: 3px 10px;
+  font-size: 11px;
+  border-color: #e5ddcf;
+  background: #fff;
+}
+
+@media (max-width: 980px) {
+  .page-view.account-page.is-active,
+  .page-view.account-page.is-transitioning {
+    grid-template-columns: 1fr;
+  }
+
+  .page-view.account-page #panel-account,
+  .page-view.account-page #profile-section,
+  .page-view.account-page #onboarding-section,
+  .page-view.account-page #profile-edit-section,
+  .page-view.account-page #notifications-section,
+  .page-view.account-page #history-section,
+  .page-view.account-page #summary-section,
+  .page-view.account-page #insights-section {
+    grid-column: 1;
+  }
+
+  .page-view.account-page #panel-account {
+    position: static;
+  }
+}
+
+@media (max-width: 700px) {
+  .page-view.account-page.is-active,
+  .page-view.account-page.is-transitioning {
+    gap: 10px;
+  }
+
+  .page-view.account-page .card {
+    border-radius: 16px;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  }
+
+  .page-view.account-page #panel-account,
+  .page-view.account-page #profile-edit-section,
+  .page-view.account-page .extra-section {
+    padding: 11px;
+  }
+
+  .page-view.account-page .profile-card .card-header,
+  .page-view.account-page .profile-body {
+    padding-inline: 11px;
+  }
+
+  .page-view.account-page .profile-edit-actions {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+}
