@@ -807,7 +807,7 @@
       border-radius: var(--radius-lg);
       border: 1px solid var(--border);
       background: #fff;
-      padding: 10px;
+      padding: 9px;
       margin-bottom: 8px;
       box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
       transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.2s ease;
@@ -869,7 +869,7 @@
         transform: none;
       }
       .post-footer {
-        gap: 8px;
+        gap: 6px;
       }
       .post-action-row-primary {
         display: flex;
@@ -1095,10 +1095,10 @@
       justify-content: flex-end;
     }
     .post-footer {
-      margin-top: 6px;
+      margin-top: 4px;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 4px;
     }
     .post-action-row {
       display: flex;
@@ -1205,12 +1205,12 @@
       transition: opacity 0.2s ease;
     }
     .post-media {
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       border-radius: var(--radius-md);
       overflow: hidden;
       background: #f4efe6;
       aspect-ratio: 4 / 5;
-      min-height: 140px;
+      min-height: 128px;
       position: relative;
     }
     .post-like-burst {
@@ -1288,11 +1288,11 @@
       color: #e5e7eb;
     }
     .post-body {
-      font-size: 12px;
+      font-size: 11.5px;
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      line-height: 1.4;
+      gap: 2px;
+      line-height: 1.35;
     }
     .post-weight {
       font-weight: 600;
@@ -3917,7 +3917,7 @@
 }
 .feed-list .post-card {
   margin-bottom: 0;
-  padding: 7px;
+  padding: 6px;
   contain: layout style paint;
 }
 .feed-list .post-new-badge,
@@ -3928,10 +3928,10 @@
   display: none !important;
 }
 .feed-list .post-body {
-  gap: 2px;
+  gap: 1px;
 }
 .feed-list .post-media {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .feed-window-placeholder {
   border: 1px dashed var(--border);
@@ -3951,10 +3951,10 @@
 }
     .feed-list .post-header {
       gap: 6px;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 .feed-list .post-meta {
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 .feed-list .post-meta-right {
@@ -3962,37 +3962,37 @@
 }
 .feed-list .post-sub {
   font-size: 10px;
-  max-width: 100px;
+  max-width: 92px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .feed-list .post-caption {
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 10.5px;
+  line-height: 1.3;
   -webkit-line-clamp: 2;
-  margin-top: 1px;
+  margin-top: 0;
 }
 .feed-list .post-actions {
   gap: 5px;
 }
 @media (max-width: 700px) {
   .feed-list .post-media {
-    aspect-ratio: 1 / 1;
-    min-height: 120px;
+    aspect-ratio: 5 / 4;
+    min-height: 96px;
   }
   .feed-list .post-footer {
-    margin-top: 6px;
-    gap: 4px;
+    margin-top: 4px;
+    gap: 3px;
   }
 }
 @media (max-width: 520px) {
   .feed-list .post-card {
-    padding: 6px;
+    padding: 5px;
     border-radius: 14px;
   }
   .feed-list .post-media {
-    margin-bottom: 3px;
-    min-height: 110px;
+    margin-bottom: 2px;
+    min-height: 92px;
   }
   .feed-list .post-body {
     gap: 1px;
