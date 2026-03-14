@@ -378,7 +378,10 @@
 
     .feed-toolbar {
       display: grid;
-      grid-template-columns: minmax(180px, 1.2fr) minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "search actions"
+        "filters filters";
       gap: 8px;
       align-items: center;
       margin-bottom: 8px;
@@ -510,6 +513,7 @@
     }
 
     .feed-toolbar-actions {
+      grid-area: actions;
       display: inline-flex;
       justify-self: end;
       align-items: center;
@@ -523,6 +527,7 @@
       display: none !important;
     }
     #feed-search {
+      grid-area: search;
       width: 100%;
       max-width: none;
       min-width: 0;
@@ -571,6 +576,7 @@
       color: var(--primary);
     }
     .feed-primary-filters {
+      grid-area: filters;
       flex: 1;
       flex-wrap: nowrap;
       overflow-x: auto;
@@ -662,9 +668,10 @@
     }
     .feed-advanced-top {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
       gap: 6px;
+      justify-content: flex-end;
     }
     @media (max-width: 700px) {
       body {
@@ -767,7 +774,7 @@
       transition: max-height 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
     }
     .feed-advanced.is-open {
-      max-height: 360px;
+      max-height: 220px;
       opacity: 1;
       transform: translateY(0);
       border-color: var(--border);
