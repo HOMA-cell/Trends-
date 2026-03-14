@@ -1067,10 +1067,10 @@
       justify-content: flex-end;
     }
     .post-footer {
-      margin-top: 8px;
+      margin-top: 6px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
     .post-action-row {
       display: flex;
@@ -1082,7 +1082,13 @@
       justify-content: flex-start;
       width: 100%;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .post-action-row-primary::-webkit-scrollbar {
+      display: none;
     }
     .post-action-row-secondary {
       justify-content: flex-end;
@@ -1094,10 +1100,10 @@
       border: 1px solid var(--border);
       background: #fff;
       color: var(--text-main);
-      font-size: 10px;
-      min-height: 26px;
-      min-width: 34px;
-      padding-inline: 8px;
+      font-size: 9.5px;
+      min-height: 24px;
+      min-width: 30px;
+      padding-inline: 7px;
       border-radius: 999px;
       white-space: nowrap;
     }
@@ -1120,9 +1126,9 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 26px;
-      min-width: 28px;
-      padding: 3px 8px;
+      min-height: 24px;
+      min-width: 24px;
+      padding: 2px 7px;
       border-radius: 999px;
       border: 1px solid #e6ddcf;
       background: #fff;
@@ -3495,14 +3501,23 @@
       justify-content: space-between;
       gap: 10px;
       flex-wrap: wrap;
-      padding: 8px 10px;
-      border: 1px solid #eadfcf;
-      border-radius: 12px;
-      background: #fff;
+      padding: 6px 10px;
+      border: 1px solid #efe2d2;
+      border-radius: 999px;
+      background: #fffaf5;
     }
     .post-composer-hint {
-      font-size: 11px;
-      color: var(--text-sub);
+      font-size: 10.5px;
+      color: #7d6a55;
+      font-weight: 600;
+    }
+    .post-composer-mode .btn {
+      min-height: 28px;
+      padding-inline: 10px;
+    }
+    .modal-panel.post-composer-advanced .post-composer-mode {
+      border-color: #f0d2bf;
+      background: #fff4ec;
     }
     .modal-panel:not(.post-composer-advanced) .post-advanced-section {
       display: none;
@@ -4292,9 +4307,10 @@ body.compact-mode .feed-toolbar {
 .page-view.account-page.is-active,
 .page-view.account-page.is-transitioning {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 320px) minmax(0, 720px);
   gap: 12px;
   align-items: start;
+  justify-content: space-between;
 }
 
 .page-view.account-page > section {
@@ -4470,6 +4486,7 @@ body.compact-mode .feed-toolbar {
 }
 
 .page-view.account-page #profile-edit-section {
+  max-width: 720px;
   padding: 14px;
   background: linear-gradient(180deg, #fff 0%, #fffcf8 100%);
 }
@@ -4496,7 +4513,7 @@ body.compact-mode .feed-toolbar {
   background: #fff;
 }
 
-.page-view.account-page #profile-edit-section .collapsible-content {
+.page-view.account-page #profile-edit-section .profile-edit-content {
   margin-top: 6px;
 }
 
@@ -4541,20 +4558,7 @@ body.compact-mode .feed-toolbar {
 }
 
 .page-view.account-page .extra-section {
-  padding: 13px;
-  background: #fff;
-}
-
-.page-view.account-page .extra-section .card-header {
-  margin-bottom: 8px;
-}
-
-.page-view.account-page .extra-section .card-title {
-  font-size: 15px;
-}
-
-.page-view.account-page .extra-section .card-sub {
-  font-size: 12px;
+  display: none !important;
 }
 
 .page-view.account-page [data-collapsible-btn] {
@@ -4599,8 +4603,7 @@ body.compact-mode .feed-toolbar {
   }
 
   .page-view.account-page #panel-account,
-  .page-view.account-page #profile-edit-section,
-  .page-view.account-page .extra-section {
+  .page-view.account-page #profile-edit-section {
     padding: 11px;
   }
 
