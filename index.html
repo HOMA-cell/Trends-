@@ -128,16 +128,18 @@
               <button class="chip" id="btn-feed-discovery-toggle">発見を表示</button>
               <button class="chip" id="btn-feed-stats-toggle">統計を表示</button>
             </div>
+            <div class="feed-advanced-tools">
+              <button class="btn btn-ghost btn-xs hidden" id="btn-feed-retry">再試行</button>
+              <button class="btn btn-ghost btn-xs hidden" id="btn-feed-restore-hidden">非表示を戻す</button>
+              <button class="btn btn-ghost btn-xs hidden" id="btn-feed-restore-muted">ミュート解除</button>
+              <button class="btn btn-ghost btn-xs hidden" id="btn-feed-restore-muted-terms">ミュート語を解除</button>
+            </div>
+            <div class="feed-muted-terms hidden" id="feed-muted-terms"></div>
           </div>
 
           <div class="feed-status-row">
             <div id="feed-status" class="template-status" role="status" aria-live="polite"></div>
-            <button class="btn btn-ghost btn-xs hidden" id="btn-feed-retry">再試行</button>
-            <button class="btn btn-ghost btn-xs hidden" id="btn-feed-restore-hidden">非表示を戻す</button>
-            <button class="btn btn-ghost btn-xs hidden" id="btn-feed-restore-muted">ミュート解除</button>
-            <button class="btn btn-ghost btn-xs hidden" id="btn-feed-restore-muted-terms">ミュート語を解除</button>
           </div>
-          <div class="feed-muted-terms hidden" id="feed-muted-terms"></div>
           <div id="feed-perf" class="template-status feed-perf hidden"></div>
 
           <!-- 投稿一覧 -->
