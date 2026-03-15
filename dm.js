@@ -37,6 +37,7 @@ let dmComposeSearchRaf = 0;
 let dmInputMetricsRaf = 0;
 let dmRenderedMessagePartnerId = "";
 let dmRenderedMessageKeys = [];
+let dmRenderedThreadListKey = "";
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
@@ -79,6 +80,7 @@ function clearDmState() {
   dmInputMetricsRaf = 0;
   dmRenderedMessagePartnerId = "";
   dmRenderedMessageKeys = [];
+  dmRenderedThreadListKey = "";
 }
 
 function getPartnerId(row, userId) {
@@ -664,43 +666,92 @@ function getThreadFilterKey(filteredThreads) {
   return `${query}::${filteredThreads.length}::${firstPartnerId}::${lastPartnerId}`;
 }
 
-function renderThreadItem(thread, tr, query = "") {
-  const button = document.createElement("button");
+function getThreadPreviewBody(thread) {
+  return `${thread?.lastBody || ""}`.trim() || "…";
+}
+
+function getThreadRenderSignature(thread, query = "", activePartnerId = "") {
+  const previewBody = getThreadPreviewBody(thread);
+  return [
+    `${thread?.partnerId || ""}`.trim(),
+    Number(thread?.unreadCount || 0),
+    thread?.partnerId === activePartnerId ? 1 : 0,
+    thread?.lastFromMe ? 1 : 0,
+    `${thread?.lastAt || ""}`.trim(),
+    `${previewBody.length}:${previewBody.slice(0, 48)}`,
+    normalizeDmSearchText(query),
+  ].join("|");
+}
+
+function getThreadListRenderKey(filteredThreads, visibleCount, query = "", activePartnerId = "") {
+  const normalizedQuery = normalizeDmSearchText(query);
+  const signatures = filteredThreads
+    .slice(0, visibleCount)
+    .map((thread) => getThreadRenderSignature(thread, normalizedQuery, activePartnerId));
+  const remaining = Math.max(0, filteredThreads.length - visibleCount);
+  return `${normalizedQuery}::${signatures.join("||")}::more:${remaining}`;
+}
+
+function updateThreadItem(button, thread, tr, query = "") {
+  if (!(button instanceof HTMLButtonElement)) return;
   button.type = "button";
   button.className = "dm-thread-item";
-  if (thread.partnerId === dmActivePartnerId) {
-    button.classList.add("is-active");
-  }
-  if (thread.unreadCount > 0) {
-    button.classList.add("is-unread");
-  }
   button.setAttribute("data-dm-thread-id", thread.partnerId);
+  button.classList.toggle("is-active", thread.partnerId === dmActivePartnerId);
+  button.classList.toggle("is-unread", Number(thread.unreadCount || 0) > 0);
 
-  const avatar = document.createElement("div");
-  avatar.className = "avatar";
+  let avatar = button.querySelector(".avatar");
+  if (!avatar) {
+    avatar = document.createElement("div");
+    avatar.className = "avatar";
+    button.appendChild(avatar);
+  }
   const label = getProfileDisplay(thread.profile, thread.partnerId);
   const initial = label.replace("@", "").charAt(0).toUpperCase() || "U";
   renderAvatar(avatar, thread.profile, initial);
 
-  const body = document.createElement("div");
-  body.className = "dm-thread-main";
-
-  const top = document.createElement("div");
-  top.className = "dm-thread-top";
-  const name = document.createElement("div");
-  name.className = "dm-thread-name";
-  applyHighlightedText(name, label, query);
-  top.appendChild(name);
-  if (thread.unreadCount > 0) {
-    const badge = document.createElement("span");
-    badge.className = "dm-thread-unread";
-    badge.textContent = `${thread.unreadCount}`;
-    top.appendChild(badge);
+  let body = button.querySelector(".dm-thread-main");
+  if (!body) {
+    body = document.createElement("div");
+    body.className = "dm-thread-main";
+    button.appendChild(body);
   }
 
-  const preview = document.createElement("div");
-  preview.className = "dm-thread-preview";
-  const previewBody = `${thread.lastBody || ""}`.trim() || "…";
+  let top = body.querySelector(".dm-thread-top");
+  if (!top) {
+    top = document.createElement("div");
+    top.className = "dm-thread-top";
+    body.appendChild(top);
+  }
+  let name = top.querySelector(".dm-thread-name");
+  if (!name) {
+    name = document.createElement("div");
+    name.className = "dm-thread-name";
+    top.appendChild(name);
+  }
+  applyHighlightedText(name, label, query);
+
+  const unreadCount = Number(thread.unreadCount || 0);
+  let badge = top.querySelector(".dm-thread-unread");
+  if (unreadCount > 0) {
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "dm-thread-unread";
+      top.appendChild(badge);
+    }
+    badge.textContent = `${unreadCount}`;
+  } else if (badge) {
+    badge.remove();
+  }
+
+  let preview = body.querySelector(".dm-thread-preview");
+  if (!preview) {
+    preview = document.createElement("div");
+    preview.className = "dm-thread-preview";
+    body.appendChild(preview);
+  }
+  preview.textContent = "";
+  const previewBody = getThreadPreviewBody(thread);
   const youPrefix = tr.dmYouPrefix || "You";
   if (thread.lastFromMe) {
     const prefix = document.createElement("span");
@@ -714,9 +765,35 @@ function renderThreadItem(thread, tr, query = "") {
     applyHighlightedText(preview, previewBody, query);
   }
 
+  let meta = body.querySelector(".dm-thread-meta");
+  if (!meta) {
+    meta = document.createElement("div");
+    meta.className = "dm-thread-meta";
+    body.appendChild(meta);
+  }
+  meta.textContent = formatMessageTime(thread.lastAt);
+
+  button.setAttribute(
+    "data-dm-thread-signature",
+    getThreadRenderSignature(thread, query, dmActivePartnerId)
+  );
+}
+
+function renderThreadItem(thread, tr, query = "") {
+  const button = document.createElement("button");
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  const body = document.createElement("div");
+  body.className = "dm-thread-main";
+  const top = document.createElement("div");
+  top.className = "dm-thread-top";
+  const name = document.createElement("div");
+  name.className = "dm-thread-name";
+  top.appendChild(name);
+  const preview = document.createElement("div");
+  preview.className = "dm-thread-preview";
   const meta = document.createElement("div");
   meta.className = "dm-thread-meta";
-  meta.textContent = formatMessageTime(thread.lastAt);
 
   body.appendChild(top);
   body.appendChild(preview);
@@ -724,6 +801,7 @@ function renderThreadItem(thread, tr, query = "") {
 
   button.appendChild(avatar);
   button.appendChild(body);
+  updateThreadItem(button, thread, tr, query);
   return button;
 }
 
@@ -772,13 +850,13 @@ function renderThreadList(options = {}) {
     dmThreadVisibleCount = DM_THREAD_BATCH;
   }
   dmThreadFilterKey = nextFilterKey;
-  list.innerHTML = "";
 
   if (!dmThreads.length) {
     const empty = document.createElement("div");
     empty.className = "empty dm-empty-state";
     empty.textContent = tr.dmThreadsEmpty || "No conversations yet.";
-    list.appendChild(empty);
+    list.replaceChildren(empty);
+    dmRenderedThreadListKey = `empty-all::${normalizeDmSearchText(searchQuery)}::${dmThreads.length}`;
     renderThreadSummary();
     return;
   }
@@ -788,7 +866,8 @@ function renderThreadList(options = {}) {
     empty.className = "empty dm-empty-state";
     empty.textContent =
       tr.dmNoThreadMatch || "No matching conversations found.";
-    list.appendChild(empty);
+    list.replaceChildren(empty);
+    dmRenderedThreadListKey = `empty-filter::${normalizeDmSearchText(searchQuery)}::${dmThreads.length}`;
     renderThreadSummary();
     return;
   }
@@ -804,20 +883,63 @@ function renderThreadList(options = {}) {
   }
 
   const visibleCount = Math.min(filteredThreads.length, dmThreadVisibleCount);
-  filteredThreads
-    .slice(0, visibleCount)
-    .forEach((thread) => list.appendChild(renderThreadItem(thread, tr, searchQuery)));
+  const nextRenderKey = getThreadListRenderKey(
+    filteredThreads,
+    visibleCount,
+    searchQuery,
+    dmActivePartnerId
+  );
+  if (!options.forceFull && nextRenderKey === dmRenderedThreadListKey) {
+    if (options.preserveScroll) {
+      list.scrollTop = prevScrollTop;
+    }
+    renderThreadSummary();
+    return;
+  }
+
+  const existingButtons = new Map();
+  list
+    .querySelectorAll("button.dm-thread-item[data-dm-thread-id]")
+    .forEach((button) => {
+      const partnerId = `${button.getAttribute("data-dm-thread-id") || ""}`.trim();
+      if (partnerId) existingButtons.set(partnerId, button);
+    });
+  const fragment = document.createDocumentFragment();
+  filteredThreads.slice(0, visibleCount).forEach((thread) => {
+    const partnerId = `${thread.partnerId || ""}`.trim();
+    const existingButton = existingButtons.get(partnerId);
+    if (existingButton) {
+      const nextSignature = getThreadRenderSignature(
+        thread,
+        searchQuery,
+        dmActivePartnerId
+      );
+      if (existingButton.getAttribute("data-dm-thread-signature") !== nextSignature) {
+        updateThreadItem(existingButton, thread, tr, searchQuery);
+      }
+      fragment.appendChild(existingButton);
+      return;
+    }
+    fragment.appendChild(renderThreadItem(thread, tr, searchQuery));
+  });
 
   if (visibleCount < filteredThreads.length) {
-    const loadMoreButton = document.createElement("button");
+    const existingLoadMore = list.querySelector("button[data-dm-thread-load-more]");
+    const loadMoreButton =
+      existingLoadMore instanceof HTMLButtonElement
+        ? existingLoadMore
+        : document.createElement("button");
     loadMoreButton.type = "button";
     loadMoreButton.className = "dm-thread-load-more";
     loadMoreButton.setAttribute("data-dm-thread-load-more", "true");
     const remaining = filteredThreads.length - visibleCount;
     const loadMoreLabel = tr.dmLoadMoreThreads || "Load more";
     loadMoreButton.textContent = `${loadMoreLabel} (${remaining})`;
-    list.appendChild(loadMoreButton);
+    fragment.appendChild(loadMoreButton);
   }
+
+  list.replaceChildren(fragment);
+  dmRenderedThreadListKey = nextRenderKey;
 
   if (options.preserveScroll) {
     list.scrollTop = prevScrollTop;
