@@ -35,6 +35,8 @@ let dmComposeEscBound = false;
 let dmThreadSearchRaf = 0;
 let dmComposeSearchRaf = 0;
 let dmInputMetricsRaf = 0;
+let dmRenderedMessagePartnerId = "";
+let dmRenderedMessageKeys = [];
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
@@ -75,6 +77,8 @@ function clearDmState() {
   dmThreadSearchRaf = 0;
   dmComposeSearchRaf = 0;
   dmInputMetricsRaf = 0;
+  dmRenderedMessagePartnerId = "";
+  dmRenderedMessageKeys = [];
 }
 
 function getPartnerId(row, userId) {
@@ -120,6 +124,15 @@ function getDateKey(value) {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function getDmMessageKey(message, index = 0) {
+  const stableId = `${message?.id || ""}`.trim();
+  if (stableId) return stableId;
+  const sender = `${message?.sender_id || ""}`.trim();
+  const createdAt = `${message?.created_at || ""}`.trim();
+  const length = `${message?.body || ""}`.length;
+  return `pending:${sender}:${createdAt}:${length}:${index}`;
 }
 
 function isNearBottom(el, threshold = 56) {
@@ -853,89 +866,167 @@ function renderConversationHeader() {
   }
 }
 
+function appendDmMessageNodes({
+  list,
+  message,
+  index,
+  messages,
+  previousDayKey,
+  currentUserId,
+  lastSelfMessageId,
+  tr,
+}) {
+  const dayKey = getDateKey(message.created_at);
+  if (dayKey && dayKey !== previousDayKey) {
+    const divider = document.createElement("div");
+    divider.className = "dm-day-divider";
+    divider.textContent = formatMessageDayLabel(message.created_at);
+    list.appendChild(divider);
+  }
+
+  const row = document.createElement("div");
+  row.className = "dm-message-row";
+  const isMine = message.sender_id === currentUserId;
+  row.classList.add(isMine ? "is-self" : "is-other");
+  if (message.pending) {
+    row.classList.add("is-pending");
+  }
+
+  const bubble = document.createElement("div");
+  bubble.className = "dm-message-bubble";
+  bubble.textContent = message.body || "";
+
+  const meta = document.createElement("div");
+  meta.className = "dm-message-meta";
+  const messageTime = formatMessageTimeOnly(message.created_at);
+  const nextMessage = messages[index + 1];
+  const hasNextSameSender =
+    !!nextMessage &&
+    nextMessage.sender_id === message.sender_id &&
+    getDateKey(nextMessage.created_at) === dayKey;
+  const shouldShowMeta = !hasNextSameSender || !!message.pending;
+  const isLastSelf =
+    isMine && lastSelfMessageId && `${message.id || ""}`.trim() === lastSelfMessageId;
+  if (message.pending) {
+    meta.textContent = tr.dmSending || "Sending...";
+  } else if (isLastSelf) {
+    const stateLabel = message.read_at
+      ? tr.dmSeen || "Seen"
+      : tr.dmSent || "Sent";
+    meta.textContent = [messageTime, stateLabel].filter(Boolean).join(" · ");
+  } else {
+    meta.textContent = messageTime;
+  }
+
+  row.appendChild(bubble);
+  if (shouldShowMeta) {
+    row.appendChild(meta);
+  } else {
+    row.classList.add("is-grouped");
+  }
+  list.appendChild(row);
+  return dayKey || previousDayKey;
+}
+
 function renderConversationMessages(options = {}) {
   const list = $("dm-message-list");
   if (!list) return;
   const tr = getDmTranslations();
   const currentUser = getCurrentUser();
+  const currentUserId = `${currentUser?.id || ""}`.trim();
   const shouldStickToBottom = !!options.forceBottom || isNearBottom(list);
-  list.innerHTML = "";
+  const nextMessageKeys = dmMessages.map((message, index) =>
+    getDmMessageKey(message, index)
+  );
 
   if (!dmActivePartnerId) {
+    list.innerHTML = "";
     const empty = document.createElement("div");
     empty.className = "empty dm-empty-state";
     empty.textContent =
       tr.dmSelectPartner || "Select a partner to start chatting.";
     list.appendChild(empty);
+    dmRenderedMessagePartnerId = "";
+    dmRenderedMessageKeys = [];
     return;
   }
 
   if (!dmMessages.length) {
+    list.innerHTML = "";
     const empty = document.createElement("div");
     empty.className = "empty dm-empty-state";
     empty.textContent =
       tr.dmNoMessages || "No messages yet. Send the first one.";
     list.appendChild(empty);
+    dmRenderedMessagePartnerId = dmActivePartnerId;
+    dmRenderedMessageKeys = [];
     return;
+  }
+
+  const canAppendIncrementally =
+    !options.forceFull &&
+    dmRenderedMessagePartnerId === dmActivePartnerId &&
+    dmRenderedMessageKeys.length > 0 &&
+    nextMessageKeys.length > dmRenderedMessageKeys.length &&
+    dmRenderedMessageKeys.every((key, idx) => key === nextMessageKeys[idx]);
+
+  let appendOnly = canAppendIncrementally;
+  if (appendOnly) {
+    const previousMessage = dmMessages[dmRenderedMessageKeys.length - 1];
+    const firstNewMessage = dmMessages[dmRenderedMessageKeys.length];
+    if (previousMessage && firstNewMessage) {
+      const sameSender = previousMessage.sender_id === firstNewMessage.sender_id;
+      const sameDay =
+        getDateKey(previousMessage.created_at) === getDateKey(firstNewMessage.created_at);
+      if (sameSender && sameDay) {
+        appendOnly = false;
+      }
+    }
   }
 
   const lastSelfMessage = [...dmMessages]
     .reverse()
-    .find((message) => message?.sender_id === currentUser?.id);
+    .find((message) => message?.sender_id === currentUserId);
   const lastSelfMessageId = `${lastSelfMessage?.id || ""}`.trim();
 
+  if (appendOnly) {
+    let previousDayKey =
+      getDateKey(dmMessages[dmRenderedMessageKeys.length - 1]?.created_at) || "";
+    for (let index = dmRenderedMessageKeys.length; index < dmMessages.length; index += 1) {
+      previousDayKey = appendDmMessageNodes({
+        list,
+        message: dmMessages[index],
+        index,
+        messages: dmMessages,
+        previousDayKey,
+        currentUserId,
+        lastSelfMessageId,
+        tr,
+      });
+    }
+    if (shouldStickToBottom) {
+      requestAnimationFrame(() => {
+        list.scrollTop = list.scrollHeight;
+      });
+    }
+    dmRenderedMessagePartnerId = dmActivePartnerId;
+    dmRenderedMessageKeys = nextMessageKeys;
+    return;
+  }
+
+  list.innerHTML = "";
   let previousDayKey = "";
   dmMessages.forEach((message, index) => {
-    const dayKey = getDateKey(message.created_at);
-    if (dayKey && dayKey !== previousDayKey) {
-      const divider = document.createElement("div");
-      divider.className = "dm-day-divider";
-      divider.textContent = formatMessageDayLabel(message.created_at);
-      list.appendChild(divider);
-      previousDayKey = dayKey;
-    }
-
-    const row = document.createElement("div");
-    row.className = "dm-message-row";
-    const isMine = message.sender_id === currentUser?.id;
-    row.classList.add(isMine ? "is-self" : "is-other");
-    if (message.pending) {
-      row.classList.add("is-pending");
-    }
-
-    const bubble = document.createElement("div");
-    bubble.className = "dm-message-bubble";
-    bubble.textContent = message.body || "";
-
-    const meta = document.createElement("div");
-    meta.className = "dm-message-meta";
-    const messageTime = formatMessageTimeOnly(message.created_at);
-    const nextMessage = dmMessages[index + 1];
-    const hasNextSameSender =
-      !!nextMessage &&
-      nextMessage.sender_id === message.sender_id &&
-      getDateKey(nextMessage.created_at) === dayKey;
-    const shouldShowMeta = !hasNextSameSender || !!message.pending;
-    const isLastSelf =
-      isMine && lastSelfMessageId && `${message.id || ""}`.trim() === lastSelfMessageId;
-    if (message.pending) {
-      meta.textContent = tr.dmSending || "Sending...";
-    } else if (isLastSelf) {
-      const stateLabel = message.read_at
-        ? tr.dmSeen || "Seen"
-        : tr.dmSent || "Sent";
-      meta.textContent = [messageTime, stateLabel].filter(Boolean).join(" · ");
-    } else {
-      meta.textContent = messageTime;
-    }
-
-    row.appendChild(bubble);
-    if (shouldShowMeta) {
-      row.appendChild(meta);
-    } else {
-      row.classList.add("is-grouped");
-    }
-    list.appendChild(row);
+    previousDayKey = appendDmMessageNodes({
+      list,
+      message,
+      index,
+      messages: dmMessages,
+      previousDayKey,
+      currentUserId,
+      lastSelfMessageId,
+      tr,
+    });
   });
 
   if (shouldStickToBottom) {
@@ -943,6 +1034,8 @@ function renderConversationMessages(options = {}) {
       list.scrollTop = list.scrollHeight;
     });
   }
+  dmRenderedMessagePartnerId = dmActivePartnerId;
+  dmRenderedMessageKeys = nextMessageKeys;
 }
 
 async function markConversationRead(partnerId) {
