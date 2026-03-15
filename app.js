@@ -2242,13 +2242,16 @@ async function loadProfilePostCount() {
       setText("messages-sub", "messagesSub");
       setText("btn-dm-refresh", "dmRefresh");
       setText("dm-partner-label", "dmPartnerLabel");
-      setText("btn-dm-start", "dmOpen");
+      setText("btn-dm-compose", "dmComposeButton");
+      setText("dm-compose-title", "dmComposeTitle");
+      setText("btn-dm-compose-close", "dmComposeClose");
       setText("btn-dm-back", "dmBackToThreads");
       setText("btn-dm-mark-read", "dmMarkRead");
       setText("btn-dm-thread-search-clear", "dmSearchClear");
       setText("btn-dm-send", "dmSend");
       setPlaceholder("dm-input", "dmInputPlaceholder");
       setPlaceholder("dm-thread-search", "dmSearchPlaceholder");
+      setPlaceholder("dm-compose-search", "dmComposeSearchPlaceholder");
 
       // アカウント / Tips / Debug
       setText("account-title", "account");

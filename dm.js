@@ -27,10 +27,16 @@ let dmPollTimer = null;
 let dmThreadSearch = "";
 let dmMobileChatOpen = false;
 let dmViewportListenerBound = false;
+let dmThreadVisibleCount = 24;
+let dmThreadFilterKey = "";
+let dmComposeQuery = "";
+let dmComposeOpen = false;
+let dmComposeEscBound = false;
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
 const DM_MESSAGE_LIMIT = 250;
+const DM_THREAD_BATCH = 24;
 
 export function setDmContext(next = {}) {
   dmContext = { ...dmContext, ...next };
@@ -54,6 +60,10 @@ function clearDmState() {
   dmThreadsLoaded = false;
   dmThreadSearch = "";
   dmMobileChatOpen = false;
+  dmThreadVisibleCount = DM_THREAD_BATCH;
+  dmThreadFilterKey = "";
+  dmComposeQuery = "";
+  dmComposeOpen = false;
 }
 
 function getPartnerId(row, userId) {
@@ -324,11 +334,224 @@ function renderPartnerSelect() {
   });
 }
 
-function renderThreadList() {
+function setDmComposeOpen(next) {
+  const modal = $("dm-compose-modal");
+  dmComposeOpen = !!next;
+  if (modal) {
+    modal.classList.toggle("hidden", !dmComposeOpen);
+    modal.setAttribute("aria-hidden", dmComposeOpen ? "false" : "true");
+  }
+  if (typeof document !== "undefined") {
+    document.body.classList.toggle("dm-compose-open", dmComposeOpen);
+  }
+}
+
+function closeDmComposeModal() {
+  setDmComposeOpen(false);
+}
+
+function getFilteredComposePartners() {
+  const query = `${dmComposeQuery || ""}`.trim().toLowerCase();
+  if (!query) return dmPartners;
+  return dmPartners.filter((partner) => {
+    const label = getProfileDisplay(partner.profile, partner.id).toLowerCase();
+    const bucket = [
+      label,
+      `${partner.profile?.display_name || ""}`.toLowerCase(),
+      `${partner.profile?.handle || ""}`.toLowerCase(),
+      `${partner.profile?.bio || ""}`.toLowerCase(),
+    ].join(" ");
+    return bucket.includes(query);
+  });
+}
+
+function renderComposeList() {
+  const list = $("dm-compose-list");
+  if (!list) return;
+  const tr = getDmTranslations();
+  list.innerHTML = "";
+
+  if (!dmPartners.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty dm-empty-state";
+    empty.textContent = tr.dmNoContacts || "No contacts yet.";
+    list.appendChild(empty);
+    return;
+  }
+
+  const filteredPartners = getFilteredComposePartners();
+  if (!filteredPartners.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty dm-empty-state";
+    empty.textContent = tr.dmNoComposeMatch || "No matching users found.";
+    list.appendChild(empty);
+    return;
+  }
+
+  const threadByPartner = new Map(dmThreads.map((thread) => [thread.partnerId, thread]));
+  filteredPartners.forEach((partner) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dm-compose-item";
+    button.setAttribute("data-dm-compose-id", partner.id);
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    const label = getProfileDisplay(partner.profile, partner.id);
+    const initial = label.replace("@", "").charAt(0).toUpperCase() || "U";
+    renderAvatar(avatar, partner.profile, initial);
+
+    const main = document.createElement("div");
+    main.className = "dm-compose-item-main";
+
+    const name = document.createElement("div");
+    name.className = "dm-compose-item-name";
+    name.textContent = label;
+
+    const thread = threadByPartner.get(partner.id);
+    const unread = Number(thread?.unreadCount || 0);
+    const sub = document.createElement("div");
+    sub.className = "dm-compose-item-sub";
+    if (unread > 0) {
+      const unreadLabel = tr.dmThreadSummaryUnread || "unread";
+      sub.textContent = `${unread} ${unreadLabel}`;
+    } else if (thread?.lastAt) {
+      sub.textContent = formatMessageTime(thread.lastAt);
+    } else {
+      sub.textContent = tr.dmComposeStartHint || "Tap to start chatting.";
+    }
+
+    main.appendChild(name);
+    main.appendChild(sub);
+    button.appendChild(avatar);
+    button.appendChild(main);
+    list.appendChild(button);
+  });
+}
+
+function openDmComposeModal() {
+  const currentUser = getCurrentUser();
+  const tr = getDmTranslations();
+  if (!currentUser) {
+    showToast(tr.dmLoginRequired || "Please log in first.", "warning");
+    return;
+  }
+  dmComposeQuery = "";
+  const input = $("dm-compose-search");
+  if (input) input.value = "";
+  renderComposeList();
+  setDmComposeOpen(true);
+  requestAnimationFrame(() => {
+    if (input) input.focus();
+  });
+}
+
+function getThreadFilterKey(filteredThreads) {
+  const query = `${dmThreadSearch || ""}`.trim().toLowerCase();
+  const firstPartnerId = filteredThreads[0]?.partnerId || "";
+  const lastPartnerId = filteredThreads[filteredThreads.length - 1]?.partnerId || "";
+  return `${query}::${filteredThreads.length}::${firstPartnerId}::${lastPartnerId}`;
+}
+
+function renderThreadItem(thread, tr) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "dm-thread-item";
+  if (thread.partnerId === dmActivePartnerId) {
+    button.classList.add("is-active");
+  }
+  if (thread.unreadCount > 0) {
+    button.classList.add("is-unread");
+  }
+  button.setAttribute("data-dm-thread-id", thread.partnerId);
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  const label = getProfileDisplay(thread.profile, thread.partnerId);
+  const initial = label.replace("@", "").charAt(0).toUpperCase() || "U";
+  renderAvatar(avatar, thread.profile, initial);
+
+  const body = document.createElement("div");
+  body.className = "dm-thread-main";
+
+  const top = document.createElement("div");
+  top.className = "dm-thread-top";
+  const name = document.createElement("div");
+  name.className = "dm-thread-name";
+  name.textContent = label;
+  top.appendChild(name);
+  if (thread.unreadCount > 0) {
+    const badge = document.createElement("span");
+    badge.className = "dm-thread-unread";
+    badge.textContent = `${thread.unreadCount}`;
+    top.appendChild(badge);
+  }
+
+  const preview = document.createElement("div");
+  preview.className = "dm-thread-preview";
+  const previewBody = `${thread.lastBody || ""}`.trim() || "…";
+  const youPrefix = tr.dmYouPrefix || "You";
+  preview.textContent = thread.lastFromMe
+    ? `${youPrefix}: ${previewBody}`
+    : previewBody;
+
+  const meta = document.createElement("div");
+  meta.className = "dm-thread-meta";
+  meta.textContent = formatMessageTime(thread.lastAt);
+
+  body.appendChild(top);
+  body.appendChild(preview);
+  body.appendChild(meta);
+
+  button.appendChild(avatar);
+  button.appendChild(body);
+  return button;
+}
+
+function expandThreadListWindow(options = {}) {
+  const filteredThreads = getFilteredThreads();
+  if (!filteredThreads.length || dmThreadVisibleCount >= filteredThreads.length) {
+    return false;
+  }
+  dmThreadVisibleCount = Math.min(
+    filteredThreads.length,
+    dmThreadVisibleCount + DM_THREAD_BATCH
+  );
+  renderThreadList({ preserveScroll: options.preserveScroll !== false, keepWindow: true });
+  return true;
+}
+
+function selectDmPartner(partnerId, options = {}) {
+  const nextPartnerId = `${partnerId || ""}`.trim();
+  if (!nextPartnerId) return;
+  if (dmComposeOpen) {
+    closeDmComposeModal();
+  }
+  dmActivePartnerId = nextPartnerId;
+  renderPartnerSelect();
+  renderThreadList();
+  renderConversationHeader();
+  if (options.openChat !== false) {
+    setDmMobileChatOpen(true);
+  }
+  loadConversation(dmActivePartnerId, { forceBottom: options.forceBottom !== false }).catch(
+    (error) => {
+      console.error("select partner load conversation failed:", error);
+    }
+  );
+}
+
+function renderThreadList(options = {}) {
   const list = $("dm-thread-list");
   if (!list) return;
   const tr = getDmTranslations();
+  const prevScrollTop = options.preserveScroll ? list.scrollTop : 0;
   const filteredThreads = getFilteredThreads();
+  const nextFilterKey = getThreadFilterKey(filteredThreads);
+  if (!options.keepWindow && nextFilterKey !== dmThreadFilterKey) {
+    dmThreadVisibleCount = DM_THREAD_BATCH;
+  }
+  dmThreadFilterKey = nextFilterKey;
   list.innerHTML = "";
 
   if (!dmThreads.length) {
@@ -350,60 +573,35 @@ function renderThreadList() {
     return;
   }
 
-  filteredThreads.forEach((thread) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "dm-thread-item";
-    if (thread.partnerId === dmActivePartnerId) {
-      button.classList.add("is-active");
-    }
-    if (thread.unreadCount > 0) {
-      button.classList.add("is-unread");
-    }
-    button.setAttribute("data-dm-thread-id", thread.partnerId);
+  if (dmThreadVisibleCount < DM_THREAD_BATCH) {
+    dmThreadVisibleCount = DM_THREAD_BATCH;
+  }
+  const activeThreadIndex = filteredThreads.findIndex(
+    (thread) => thread.partnerId === dmActivePartnerId
+  );
+  if (activeThreadIndex >= dmThreadVisibleCount) {
+    dmThreadVisibleCount = activeThreadIndex + 1;
+  }
 
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    const label = getProfileDisplay(thread.profile, thread.partnerId);
-    const initial = label.replace("@", "").charAt(0).toUpperCase() || "U";
-    renderAvatar(avatar, thread.profile, initial);
+  const visibleCount = Math.min(filteredThreads.length, dmThreadVisibleCount);
+  filteredThreads
+    .slice(0, visibleCount)
+    .forEach((thread) => list.appendChild(renderThreadItem(thread, tr)));
 
-    const body = document.createElement("div");
-    body.className = "dm-thread-main";
+  if (visibleCount < filteredThreads.length) {
+    const loadMoreButton = document.createElement("button");
+    loadMoreButton.type = "button";
+    loadMoreButton.className = "dm-thread-load-more";
+    loadMoreButton.setAttribute("data-dm-thread-load-more", "true");
+    const remaining = filteredThreads.length - visibleCount;
+    const loadMoreLabel = tr.dmLoadMoreThreads || "Load more";
+    loadMoreButton.textContent = `${loadMoreLabel} (${remaining})`;
+    list.appendChild(loadMoreButton);
+  }
 
-    const top = document.createElement("div");
-    top.className = "dm-thread-top";
-    const name = document.createElement("div");
-    name.className = "dm-thread-name";
-    name.textContent = label;
-    top.appendChild(name);
-    if (thread.unreadCount > 0) {
-      const badge = document.createElement("span");
-      badge.className = "dm-thread-unread";
-      badge.textContent = `${thread.unreadCount}`;
-      top.appendChild(badge);
-    }
-
-    const preview = document.createElement("div");
-    preview.className = "dm-thread-preview";
-    const previewBody = `${thread.lastBody || ""}`.trim() || "…";
-    const youPrefix = tr.dmYouPrefix || "You";
-    preview.textContent = thread.lastFromMe
-      ? `${youPrefix}: ${previewBody}`
-      : previewBody;
-
-    const meta = document.createElement("div");
-    meta.className = "dm-thread-meta";
-    meta.textContent = formatMessageTime(thread.lastAt);
-
-    body.appendChild(top);
-    body.appendChild(preview);
-    body.appendChild(meta);
-
-    button.appendChild(avatar);
-    button.appendChild(body);
-    list.appendChild(button);
-  });
+  if (options.preserveScroll) {
+    list.scrollTop = prevScrollTop;
+  }
   renderThreadSummary();
 }
 
@@ -697,6 +895,7 @@ export async function refreshDmData(options = {}) {
     dmThreadsLoaded = true;
     renderPartnerSelect();
     renderThreadList();
+    renderComposeList();
     renderConversationHeader();
     await loadConversation(dmActivePartnerId, { forceBottom: true });
     setDmMobileChatOpen(!!dmActivePartnerId);
@@ -805,6 +1004,15 @@ async function handleSendMessage(event) {
 
 export function setupDmControls() {
   ensureDmViewportListener();
+  if (!dmComposeEscBound && typeof document !== "undefined") {
+    dmComposeEscBound = true;
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && dmComposeOpen) {
+        closeDmComposeModal();
+      }
+    });
+  }
+
   const refreshBtn = $("btn-dm-refresh");
   if (refreshBtn && refreshBtn.dataset.bound !== "true") {
     refreshBtn.dataset.bound = "true";
@@ -822,13 +1030,47 @@ export function setupDmControls() {
     partnerSelect.addEventListener("change", () => {
       const nextPartnerId = `${partnerSelect.value || ""}`.trim();
       if (!nextPartnerId) return;
-      dmActivePartnerId = nextPartnerId;
-      renderThreadList();
-      renderConversationHeader();
-      setDmMobileChatOpen(true);
-      loadConversation(dmActivePartnerId, { forceBottom: true }).catch((error) => {
-        console.error("partner change load conversation failed:", error);
-      });
+      selectDmPartner(nextPartnerId);
+    });
+  }
+
+  const composeBtn = $("btn-dm-compose");
+  if (composeBtn && composeBtn.dataset.bound !== "true") {
+    composeBtn.dataset.bound = "true";
+    composeBtn.addEventListener("click", openDmComposeModal);
+  }
+
+  const composeCloseBtn = $("btn-dm-compose-close");
+  if (composeCloseBtn && composeCloseBtn.dataset.bound !== "true") {
+    composeCloseBtn.dataset.bound = "true";
+    composeCloseBtn.addEventListener("click", closeDmComposeModal);
+  }
+
+  const composeBackdropBtn = $("btn-dm-compose-backdrop");
+  if (composeBackdropBtn && composeBackdropBtn.dataset.bound !== "true") {
+    composeBackdropBtn.dataset.bound = "true";
+    composeBackdropBtn.addEventListener("click", closeDmComposeModal);
+  }
+
+  const composeSearchInput = $("dm-compose-search");
+  if (composeSearchInput && composeSearchInput.dataset.bound !== "true") {
+    composeSearchInput.dataset.bound = "true";
+    composeSearchInput.addEventListener("input", () => {
+      dmComposeQuery = `${composeSearchInput.value || ""}`.trim();
+      renderComposeList();
+    });
+  }
+
+  const composeList = $("dm-compose-list");
+  if (composeList && composeList.dataset.bound !== "true") {
+    composeList.dataset.bound = "true";
+    composeList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-dm-compose-id]");
+      if (!button) return;
+      const nextPartnerId = `${button.getAttribute("data-dm-compose-id") || ""}`.trim();
+      if (!nextPartnerId) return;
+      closeDmComposeModal();
+      selectDmPartner(nextPartnerId);
     });
   }
 
@@ -836,19 +1078,28 @@ export function setupDmControls() {
   if (threadList && threadList.dataset.bound !== "true") {
     threadList.dataset.bound = "true";
     threadList.addEventListener("click", (event) => {
+      const loadMoreButton = event.target.closest("button[data-dm-thread-load-more]");
+      if (loadMoreButton) {
+        expandThreadListWindow({ preserveScroll: true });
+        return;
+      }
       const button = event.target.closest("button[data-dm-thread-id]");
       if (!button) return;
       const nextPartnerId = `${button.getAttribute("data-dm-thread-id") || ""}`.trim();
       if (!nextPartnerId) return;
-      dmActivePartnerId = nextPartnerId;
-      renderPartnerSelect();
-      renderThreadList();
-      renderConversationHeader();
-      setDmMobileChatOpen(true);
-      loadConversation(dmActivePartnerId, { forceBottom: true }).catch((error) => {
-        console.error("thread click load conversation failed:", error);
-      });
+      selectDmPartner(nextPartnerId);
     });
+    threadList.addEventListener(
+      "scroll",
+      () => {
+        const nearBottom =
+          threadList.scrollTop + threadList.clientHeight >= threadList.scrollHeight - 24;
+        if (nearBottom) {
+          expandThreadListWindow({ preserveScroll: true });
+        }
+      },
+      { passive: true }
+    );
   }
 
   const backBtn = $("btn-dm-back");
@@ -918,6 +1169,7 @@ export function setupDmControls() {
   updateDmInputCounter();
   syncThreadSearchClearButton();
   renderThreadSummary();
+  renderComposeList();
 }
 
 export function handleDmPageChange(page) {
@@ -926,6 +1178,7 @@ export function handleDmPageChange(page) {
     renderDmPage({ refreshIfNeeded: true });
     return;
   }
+  closeDmComposeModal();
   stopDmPolling();
 }
 
@@ -943,6 +1196,7 @@ export function renderDmPage(options = {}) {
   if (!currentUser) {
     stopDmPolling();
     clearDmState();
+    closeDmComposeModal();
     setDmMobileChatOpen(false);
     if (loginRequired) {
       loginRequired.classList.remove("hidden");
@@ -982,6 +1236,7 @@ export function renderDmPage(options = {}) {
   renderThreadList();
   renderConversationHeader();
   renderConversationMessages();
+  renderComposeList();
   syncThreadSearchClearButton();
   updateDmInputCounter();
   autoResizeDmInput();

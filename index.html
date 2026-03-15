@@ -165,11 +165,12 @@
           <div class="template-status" id="dm-login-required"></div>
           <div id="dm-layout" class="dm-layout hidden">
             <aside class="dm-sidebar">
-              <div class="field dm-partner-field">
-                <label id="dm-partner-label" for="dm-partner-select">相手</label>
-                <div class="dm-partner-controls">
-                  <select id="dm-partner-select" class="select-sm"></select>
-                </div>
+              <div class="dm-sidebar-tools">
+                <button class="btn btn-primary btn-xs" id="btn-dm-compose" type="button">新規メッセージ</button>
+              </div>
+              <div class="field dm-partner-field dm-partner-field-hidden" aria-hidden="true">
+                <label id="dm-partner-label" class="sr-only" for="dm-partner-select">相手</label>
+                <select id="dm-partner-select" class="select-sm"></select>
               </div>
               <div class="dm-thread-toolbar">
                 <input
@@ -200,21 +201,39 @@
                 <button class="btn btn-ghost btn-xs" id="btn-dm-mark-read" type="button">既読にする</button>
               </div>
               <div id="dm-message-list" class="dm-message-list"></div>
-              <form id="dm-form" class="dm-form">
-                <textarea
-                  id="dm-input"
-                  maxlength="600"
-                  rows="1"
-                  placeholder="メッセージを入力"
-                  autocomplete="off"
-                ></textarea>
-                <button class="btn btn-primary" id="btn-dm-send" type="submit">送信</button>
-              </form>
-              <div class="dm-form-meta">
-                <div class="dm-input-count" id="dm-input-count">0/600</div>
+              <div class="dm-composer">
+                <form id="dm-form" class="dm-form">
+                  <textarea
+                    id="dm-input"
+                    maxlength="600"
+                    rows="1"
+                    placeholder="メッセージを入力"
+                    autocomplete="off"
+                  ></textarea>
+                  <button class="btn btn-primary" id="btn-dm-send" type="submit">送信</button>
+                </form>
+                <div class="dm-form-meta">
+                  <div class="dm-input-count" id="dm-input-count">0/600</div>
+                </div>
+                <div class="template-status" id="dm-send-status"></div>
               </div>
-              <div class="template-status" id="dm-send-status"></div>
             </section>
+          </div>
+          <div class="dm-compose-modal hidden" id="dm-compose-modal" aria-hidden="true">
+            <button class="dm-compose-backdrop" id="btn-dm-compose-backdrop" type="button" aria-label="閉じる"></button>
+            <div class="dm-compose-card" role="dialog" aria-modal="true" aria-labelledby="dm-compose-title">
+              <div class="dm-compose-header">
+                <div class="card-title" id="dm-compose-title">新しいメッセージ</div>
+                <button class="btn btn-ghost btn-xs" id="btn-dm-compose-close" type="button">閉じる</button>
+              </div>
+              <input
+                id="dm-compose-search"
+                type="text"
+                placeholder="相手を検索"
+                autocomplete="off"
+              />
+              <div id="dm-compose-list" class="dm-compose-list"></div>
+            </div>
           </div>
         </section>
       </div>
