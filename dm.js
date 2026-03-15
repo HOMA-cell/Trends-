@@ -181,14 +181,68 @@ function syncThreadSearchClearButton() {
   clearBtn.classList.toggle("hidden", !dmThreadSearch);
 }
 
+function normalizeDmSearchText(value) {
+  return `${value || ""}`.trim().toLowerCase();
+}
+
+function getDmSearchTokenScore(token, source) {
+  if (!token || !source) return 0;
+  if (source === token) return 130;
+  if (source.startsWith(token)) return 95;
+  const atWord = source.indexOf(` ${token}`);
+  if (atWord >= 0) return 78 - Math.min(atWord, 36);
+  const index = source.indexOf(token);
+  if (index < 0) return 0;
+  return 62 - Math.min(index, 46);
+}
+
+function getDmRecencyScore(value) {
+  const ts = new Date(value || 0).getTime();
+  if (!Number.isFinite(ts) || ts <= 0) return 0;
+  const ageMs = Date.now() - ts;
+  if (ageMs <= 0) return 26;
+  const ageHours = ageMs / (1000 * 60 * 60);
+  if (ageHours <= 6) return 24;
+  if (ageHours <= 24) return 18;
+  if (ageHours <= 72) return 11;
+  if (ageHours <= 168) return 7;
+  return 2;
+}
+
+function scoreThreadForQuery(thread, token) {
+  const profile = thread?.profile || {};
+  const label = normalizeDmSearchText(getProfileDisplay(profile, thread?.partnerId));
+  const displayName = normalizeDmSearchText(profile.display_name);
+  const handle = normalizeDmSearchText(profile.handle);
+  const preview = normalizeDmSearchText(thread?.lastBody);
+  const bio = normalizeDmSearchText(profile.bio);
+
+  const bestCore = Math.max(
+    getDmSearchTokenScore(token, handle) + 8,
+    getDmSearchTokenScore(token, displayName) + 5,
+    getDmSearchTokenScore(token, label),
+    getDmSearchTokenScore(token, preview) - 14,
+    getDmSearchTokenScore(token, bio) - 20
+  );
+  if (bestCore <= 0) return 0;
+
+  const unreadBoost = Math.min(Number(thread?.unreadCount || 0) * 4, 24);
+  return bestCore + unreadBoost + getDmRecencyScore(thread?.lastAt);
+}
+
 function getFilteredThreads() {
-  const query = `${dmThreadSearch || ""}`.trim().toLowerCase();
+  const query = normalizeDmSearchText(dmThreadSearch);
   if (!query) return dmThreads;
-  return dmThreads.filter((thread) => {
-    const label = getProfileDisplay(thread.profile, thread.partnerId).toLowerCase();
-    const preview = `${thread.lastBody || ""}`.toLowerCase();
-    return label.includes(query) || preview.includes(query);
-  });
+  return dmThreads
+    .map((thread) => ({ thread, score: scoreThreadForQuery(thread, query) }))
+    .filter((row) => row.score > 0)
+    .sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score;
+      const aTime = new Date(a.thread.lastAt || 0).getTime();
+      const bTime = new Date(b.thread.lastAt || 0).getTime();
+      return bTime - aTime;
+    })
+    .map((row) => row.thread);
 }
 
 function renderThreadSummary() {
@@ -350,19 +404,46 @@ function closeDmComposeModal() {
   setDmComposeOpen(false);
 }
 
+function scoreComposePartnerForQuery(partner, thread, token) {
+  const profile = partner?.profile || {};
+  const label = normalizeDmSearchText(getProfileDisplay(profile, partner?.id));
+  const displayName = normalizeDmSearchText(profile.display_name);
+  const handle = normalizeDmSearchText(profile.handle);
+  const bio = normalizeDmSearchText(profile.bio);
+  const threadPreview = normalizeDmSearchText(thread?.lastBody);
+
+  const bestCore = Math.max(
+    getDmSearchTokenScore(token, handle) + 8,
+    getDmSearchTokenScore(token, displayName) + 5,
+    getDmSearchTokenScore(token, label),
+    getDmSearchTokenScore(token, threadPreview) - 12,
+    getDmSearchTokenScore(token, bio) - 18
+  );
+  if (bestCore <= 0) return 0;
+
+  const unreadBoost = Math.min(Number(thread?.unreadCount || 0) * 4, 20);
+  return bestCore + unreadBoost + getDmRecencyScore(thread?.lastAt);
+}
+
 function getFilteredComposePartners() {
-  const query = `${dmComposeQuery || ""}`.trim().toLowerCase();
+  const query = normalizeDmSearchText(dmComposeQuery);
   if (!query) return dmPartners;
-  return dmPartners.filter((partner) => {
-    const label = getProfileDisplay(partner.profile, partner.id).toLowerCase();
-    const bucket = [
-      label,
-      `${partner.profile?.display_name || ""}`.toLowerCase(),
-      `${partner.profile?.handle || ""}`.toLowerCase(),
-      `${partner.profile?.bio || ""}`.toLowerCase(),
-    ].join(" ");
-    return bucket.includes(query);
-  });
+  const threadByPartner = new Map(dmThreads.map((thread) => [thread.partnerId, thread]));
+  return dmPartners
+    .map((partner) => ({
+      partner,
+      score: scoreComposePartnerForQuery(partner, threadByPartner.get(partner.id), query),
+    }))
+    .filter((row) => row.score > 0)
+    .sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score;
+      const aThread = threadByPartner.get(a.partner.id);
+      const bThread = threadByPartner.get(b.partner.id);
+      const aTime = new Date(aThread?.lastAt || 0).getTime();
+      const bTime = new Date(bThread?.lastAt || 0).getTime();
+      return bTime - aTime;
+    })
+    .map((row) => row.partner);
 }
 
 function renderComposeList() {
@@ -935,6 +1016,7 @@ async function handleSendMessage(event) {
   const partnerId = `${dmActivePartnerId || partnerSelect?.value || ""}`.trim();
   const rawBody = `${input?.value || ""}`;
   const body = rawBody.trim();
+  const restoreBody = rawBody;
 
   if (!currentUser) {
     showToast(tr.dmLoginRequired || "Please log in first.", "warning");
@@ -977,22 +1059,51 @@ async function handleSendMessage(event) {
   updateDmInputCounter();
   setSendStatus(tr.dmSending || "Sending...", "loading");
   try {
-    const { error } = await supabase.from("direct_messages").insert({
-      sender_id: currentUser.id,
-      recipient_id: partnerId,
-      body,
-    });
+    const { data: inserted, error } = await supabase
+      .from("direct_messages")
+      .insert({
+        sender_id: currentUser.id,
+        recipient_id: partnerId,
+        body,
+      })
+      .select("id,sender_id,recipient_id,body,created_at,read_at")
+      .single();
 
     if (error) {
       console.error("handleSendMessage error:", error);
       dmMessages = dmMessages.filter((message) => `${message.id || ""}` !== pendingId);
       renderConversationMessages({ forceBottom: true });
+      if (input) {
+        input.value = restoreBody;
+        autoResizeDmInput();
+        updateDmInputCounter();
+        input.focus();
+      }
       setSendStatus(tr.dmSendError || "Failed to send message.", "error");
       return;
     }
 
+    const confirmedMessage = inserted || {
+      id: pendingId,
+      sender_id: currentUser.id,
+      recipient_id: partnerId,
+      body,
+      created_at: pendingCreatedAt,
+      read_at: null,
+    };
+    dmMessages = dmMessages.map((message) =>
+      `${message.id || ""}` === pendingId
+        ? { ...confirmedMessage, pending: false }
+        : message
+    );
+    const confirmedCreatedAt = confirmedMessage.created_at || pendingCreatedAt;
+    upsertThreadAfterLocalSend(partnerId, body, confirmedCreatedAt);
     dmActivePartnerId = partnerId;
-    await refreshDmData({ preservePartner: true });
+    renderThreadList({ keepWindow: true });
+    renderComposeList();
+    renderConversationHeader();
+    renderConversationMessages({ forceBottom: true });
+    renderThreadSummary();
     setSendStatus("", "");
   } finally {
     if (sendBtn) {
