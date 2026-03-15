@@ -2965,6 +2965,15 @@
       white-space: nowrap;
       min-width: 0;
     }
+    .dm-preview-prefix {
+      color: #8f877b;
+    }
+    .dm-highlight {
+      background: rgba(239, 95, 52, 0.2);
+      color: inherit;
+      border-radius: 4px;
+      padding: 0 1px;
+    }
     .dm-thread-meta {
       font-size: 9.5px;
       color: #9b9489;

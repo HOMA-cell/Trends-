@@ -32,6 +32,9 @@ let dmThreadFilterKey = "";
 let dmComposeQuery = "";
 let dmComposeOpen = false;
 let dmComposeEscBound = false;
+let dmThreadSearchRaf = 0;
+let dmComposeSearchRaf = 0;
+let dmInputMetricsRaf = 0;
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
@@ -64,6 +67,14 @@ function clearDmState() {
   dmThreadFilterKey = "";
   dmComposeQuery = "";
   dmComposeOpen = false;
+  if (typeof window !== "undefined") {
+    if (dmThreadSearchRaf) window.cancelAnimationFrame(dmThreadSearchRaf);
+    if (dmComposeSearchRaf) window.cancelAnimationFrame(dmComposeSearchRaf);
+    if (dmInputMetricsRaf) window.cancelAnimationFrame(dmInputMetricsRaf);
+  }
+  dmThreadSearchRaf = 0;
+  dmComposeSearchRaf = 0;
+  dmInputMetricsRaf = 0;
 }
 
 function getPartnerId(row, userId) {
@@ -185,6 +196,54 @@ function normalizeDmSearchText(value) {
   return `${value || ""}`.trim().toLowerCase();
 }
 
+function getDmSearchTokens(query) {
+  return normalizeDmSearchText(query)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+function escapeDmRegex(value) {
+  return `${value || ""}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getHighlightRegex(query) {
+  const tokens = getDmSearchTokens(query);
+  if (!tokens.length) return null;
+  const pattern = tokens
+    .map(escapeDmRegex)
+    .sort((a, b) => b.length - a.length)
+    .join("|");
+  if (!pattern) return null;
+  return new RegExp(`(${pattern})`, "gi");
+}
+
+function applyHighlightedText(el, text, query) {
+  if (!el) return;
+  const raw = `${text || ""}`;
+  el.textContent = "";
+  const regex = getHighlightRegex(query);
+  if (!regex || !raw) {
+    el.textContent = raw;
+    return;
+  }
+  let cursor = 0;
+  for (const match of raw.matchAll(regex)) {
+    const index = Number(match.index || 0);
+    if (index > cursor) {
+      el.appendChild(document.createTextNode(raw.slice(cursor, index)));
+    }
+    const mark = document.createElement("mark");
+    mark.className = "dm-highlight";
+    mark.textContent = match[0] || "";
+    el.appendChild(mark);
+    cursor = index + `${match[0] || ""}`.length;
+  }
+  if (cursor < raw.length) {
+    el.appendChild(document.createTextNode(raw.slice(cursor)));
+  }
+}
+
 function getDmSearchTokenScore(token, source) {
   if (!token || !source) return 0;
   if (source === token) return 130;
@@ -209,7 +268,9 @@ function getDmRecencyScore(value) {
   return 2;
 }
 
-function scoreThreadForQuery(thread, token) {
+function scoreThreadForQuery(thread, query) {
+  const tokens = getDmSearchTokens(query);
+  if (!tokens.length) return 0;
   const profile = thread?.profile || {};
   const label = normalizeDmSearchText(getProfileDisplay(profile, thread?.partnerId));
   const displayName = normalizeDmSearchText(profile.display_name);
@@ -217,17 +278,21 @@ function scoreThreadForQuery(thread, token) {
   const preview = normalizeDmSearchText(thread?.lastBody);
   const bio = normalizeDmSearchText(profile.bio);
 
-  const bestCore = Math.max(
-    getDmSearchTokenScore(token, handle) + 8,
-    getDmSearchTokenScore(token, displayName) + 5,
-    getDmSearchTokenScore(token, label),
-    getDmSearchTokenScore(token, preview) - 14,
-    getDmSearchTokenScore(token, bio) - 20
-  );
-  if (bestCore <= 0) return 0;
+  let tokenScore = 0;
+  for (const token of tokens) {
+    const bestCore = Math.max(
+      getDmSearchTokenScore(token, handle) + 8,
+      getDmSearchTokenScore(token, displayName) + 5,
+      getDmSearchTokenScore(token, label),
+      getDmSearchTokenScore(token, preview) - 14,
+      getDmSearchTokenScore(token, bio) - 20
+    );
+    if (bestCore <= 0) return 0;
+    tokenScore += bestCore;
+  }
 
   const unreadBoost = Math.min(Number(thread?.unreadCount || 0) * 4, 24);
-  return bestCore + unreadBoost + getDmRecencyScore(thread?.lastAt);
+  return tokenScore + unreadBoost + getDmRecencyScore(thread?.lastAt);
 }
 
 function getFilteredThreads() {
@@ -275,6 +340,52 @@ function autoResizeDmInput() {
   const nextHeight = Math.min(Math.max(input.scrollHeight, 30), 96);
   input.style.height = `${nextHeight}px`;
   input.style.overflowY = input.scrollHeight > 96 ? "auto" : "hidden";
+}
+
+function scheduleThreadSearchRender() {
+  if (typeof window === "undefined") {
+    syncThreadSearchClearButton();
+    renderThreadList();
+    return;
+  }
+  if (dmThreadSearchRaf) {
+    window.cancelAnimationFrame(dmThreadSearchRaf);
+  }
+  dmThreadSearchRaf = window.requestAnimationFrame(() => {
+    dmThreadSearchRaf = 0;
+    syncThreadSearchClearButton();
+    renderThreadList();
+  });
+}
+
+function scheduleComposeSearchRender() {
+  if (typeof window === "undefined") {
+    renderComposeList();
+    return;
+  }
+  if (dmComposeSearchRaf) {
+    window.cancelAnimationFrame(dmComposeSearchRaf);
+  }
+  dmComposeSearchRaf = window.requestAnimationFrame(() => {
+    dmComposeSearchRaf = 0;
+    renderComposeList();
+  });
+}
+
+function scheduleDmInputMetricsUpdate() {
+  if (typeof window === "undefined") {
+    autoResizeDmInput();
+    updateDmInputCounter();
+    return;
+  }
+  if (dmInputMetricsRaf) {
+    window.cancelAnimationFrame(dmInputMetricsRaf);
+  }
+  dmInputMetricsRaf = window.requestAnimationFrame(() => {
+    dmInputMetricsRaf = 0;
+    autoResizeDmInput();
+    updateDmInputCounter();
+  });
 }
 
 function upsertThreadAfterLocalSend(partnerId, body, createdAt) {
@@ -404,7 +515,9 @@ function closeDmComposeModal() {
   setDmComposeOpen(false);
 }
 
-function scoreComposePartnerForQuery(partner, thread, token) {
+function scoreComposePartnerForQuery(partner, thread, query) {
+  const tokens = getDmSearchTokens(query);
+  if (!tokens.length) return 0;
   const profile = partner?.profile || {};
   const label = normalizeDmSearchText(getProfileDisplay(profile, partner?.id));
   const displayName = normalizeDmSearchText(profile.display_name);
@@ -412,17 +525,21 @@ function scoreComposePartnerForQuery(partner, thread, token) {
   const bio = normalizeDmSearchText(profile.bio);
   const threadPreview = normalizeDmSearchText(thread?.lastBody);
 
-  const bestCore = Math.max(
-    getDmSearchTokenScore(token, handle) + 8,
-    getDmSearchTokenScore(token, displayName) + 5,
-    getDmSearchTokenScore(token, label),
-    getDmSearchTokenScore(token, threadPreview) - 12,
-    getDmSearchTokenScore(token, bio) - 18
-  );
-  if (bestCore <= 0) return 0;
+  let tokenScore = 0;
+  for (const token of tokens) {
+    const bestCore = Math.max(
+      getDmSearchTokenScore(token, handle) + 8,
+      getDmSearchTokenScore(token, displayName) + 5,
+      getDmSearchTokenScore(token, label),
+      getDmSearchTokenScore(token, threadPreview) - 12,
+      getDmSearchTokenScore(token, bio) - 18
+    );
+    if (bestCore <= 0) return 0;
+    tokenScore += bestCore;
+  }
 
   const unreadBoost = Math.min(Number(thread?.unreadCount || 0) * 4, 20);
-  return bestCore + unreadBoost + getDmRecencyScore(thread?.lastAt);
+  return tokenScore + unreadBoost + getDmRecencyScore(thread?.lastAt);
 }
 
 function getFilteredComposePartners() {
@@ -487,7 +604,7 @@ function renderComposeList() {
 
     const name = document.createElement("div");
     name.className = "dm-compose-item-name";
-    name.textContent = label;
+    applyHighlightedText(name, label, dmComposeQuery);
 
     const thread = threadByPartner.get(partner.id);
     const unread = Number(thread?.unreadCount || 0);
@@ -534,7 +651,7 @@ function getThreadFilterKey(filteredThreads) {
   return `${query}::${filteredThreads.length}::${firstPartnerId}::${lastPartnerId}`;
 }
 
-function renderThreadItem(thread, tr) {
+function renderThreadItem(thread, tr, query = "") {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "dm-thread-item";
@@ -559,7 +676,7 @@ function renderThreadItem(thread, tr) {
   top.className = "dm-thread-top";
   const name = document.createElement("div");
   name.className = "dm-thread-name";
-  name.textContent = label;
+  applyHighlightedText(name, label, query);
   top.appendChild(name);
   if (thread.unreadCount > 0) {
     const badge = document.createElement("span");
@@ -572,9 +689,17 @@ function renderThreadItem(thread, tr) {
   preview.className = "dm-thread-preview";
   const previewBody = `${thread.lastBody || ""}`.trim() || "…";
   const youPrefix = tr.dmYouPrefix || "You";
-  preview.textContent = thread.lastFromMe
-    ? `${youPrefix}: ${previewBody}`
-    : previewBody;
+  if (thread.lastFromMe) {
+    const prefix = document.createElement("span");
+    prefix.className = "dm-preview-prefix";
+    prefix.textContent = `${youPrefix}: `;
+    preview.appendChild(prefix);
+    const content = document.createElement("span");
+    applyHighlightedText(content, previewBody, query);
+    preview.appendChild(content);
+  } else {
+    applyHighlightedText(preview, previewBody, query);
+  }
 
   const meta = document.createElement("div");
   meta.className = "dm-thread-meta";
@@ -627,6 +752,7 @@ function renderThreadList(options = {}) {
   if (!list) return;
   const tr = getDmTranslations();
   const prevScrollTop = options.preserveScroll ? list.scrollTop : 0;
+  const searchQuery = `${dmThreadSearch || ""}`;
   const filteredThreads = getFilteredThreads();
   const nextFilterKey = getThreadFilterKey(filteredThreads);
   if (!options.keepWindow && nextFilterKey !== dmThreadFilterKey) {
@@ -667,7 +793,7 @@ function renderThreadList(options = {}) {
   const visibleCount = Math.min(filteredThreads.length, dmThreadVisibleCount);
   filteredThreads
     .slice(0, visibleCount)
-    .forEach((thread) => list.appendChild(renderThreadItem(thread, tr)));
+    .forEach((thread) => list.appendChild(renderThreadItem(thread, tr, searchQuery)));
 
   if (visibleCount < filteredThreads.length) {
     const loadMoreButton = document.createElement("button");
@@ -1168,7 +1294,7 @@ export function setupDmControls() {
     composeSearchInput.dataset.bound = "true";
     composeSearchInput.addEventListener("input", () => {
       dmComposeQuery = `${composeSearchInput.value || ""}`.trim();
-      renderComposeList();
+      scheduleComposeSearchRender();
     });
   }
 
@@ -1240,8 +1366,7 @@ export function setupDmControls() {
     searchInput.dataset.bound = "true";
     searchInput.addEventListener("input", () => {
       dmThreadSearch = `${searchInput.value || ""}`.trim();
-      syncThreadSearchClearButton();
-      renderThreadList();
+      scheduleThreadSearchRender();
     });
   }
 
@@ -1251,8 +1376,7 @@ export function setupDmControls() {
     clearSearchBtn.addEventListener("click", () => {
       dmThreadSearch = "";
       if (searchInput) searchInput.value = "";
-      syncThreadSearchClearButton();
-      renderThreadList();
+      scheduleThreadSearchRender();
       if (searchInput) searchInput.focus();
     });
   }
@@ -1261,8 +1385,7 @@ export function setupDmControls() {
   if (input && input.dataset.bound !== "true") {
     input.dataset.bound = "true";
     input.addEventListener("input", () => {
-      autoResizeDmInput();
-      updateDmInputCounter();
+      scheduleDmInputMetricsUpdate();
     });
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
