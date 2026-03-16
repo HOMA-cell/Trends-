@@ -38,6 +38,7 @@ let dmInputMetricsRaf = 0;
 let dmRenderedMessagePartnerId = "";
 let dmRenderedMessageKeys = [];
 let dmRenderedThreadListKey = "";
+let dmRenderedConversationHeaderKey = "";
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
@@ -81,6 +82,7 @@ function clearDmState() {
   dmRenderedMessagePartnerId = "";
   dmRenderedMessageKeys = [];
   dmRenderedThreadListKey = "";
+  dmRenderedConversationHeaderKey = "";
 }
 
 function getPartnerId(row, userId) {
@@ -947,45 +949,51 @@ function renderThreadList(options = {}) {
   renderThreadSummary();
 }
 
-function renderConversationHeader() {
+function renderConversationHeader(options = {}) {
   const title = $("dm-chat-title");
   const sub = $("dm-chat-sub");
   const markReadBtn = $("btn-dm-mark-read");
   if (!title) return;
   const tr = getDmTranslations();
+  const force = !!options.force;
   const active = dmPartners.find((partner) => partner.id === dmActivePartnerId);
-  if (!active) {
-    title.textContent = tr.dmConversationIdle || "Select a chat";
-    if (sub) {
-      sub.textContent =
-        tr.dmChatSubIdle || "Select a partner to start chatting.";
-    }
-    if (markReadBtn) {
-      markReadBtn.disabled = true;
-    }
-    return;
-  }
-  title.textContent = getProfileDisplay(active.profile, active.id);
-  const activeThread = dmThreads.find(
-    (thread) => thread.partnerId === dmActivePartnerId
-  );
-  const unread = Number(activeThread?.unreadCount || 0);
-  if (sub) {
+  const languageKey = getCurrentLang();
+  let nextTitle = tr.dmConversationIdle || "Select a chat";
+  let nextSub = tr.dmChatSubIdle || "Select a partner to start chatting.";
+  let nextMarkReadDisabled = true;
+
+  if (active) {
+    nextTitle = getProfileDisplay(active.profile, active.id);
+    const activeThread = dmThreads.find(
+      (thread) => thread.partnerId === dmActivePartnerId
+    );
+    const unread = Number(activeThread?.unreadCount || 0);
     if (unread > 0) {
       const unreadLabel = tr.dmThreadSummaryUnread || "unread";
-      sub.textContent = `${unread} ${unreadLabel}`;
+      nextSub = `${unread} ${unreadLabel}`;
     } else if (activeThread?.lastAt) {
-      sub.textContent = `${tr.dmChatSubLastMessage || "Last message"}: ${formatMessageTime(
+      nextSub = `${tr.dmChatSubLastMessage || "Last message"}: ${formatMessageTime(
         activeThread.lastAt
       )}`;
-    } else {
-      sub.textContent =
-        tr.dmChatSubIdle || "Select a partner to start chatting.";
     }
+    nextMarkReadDisabled = unread <= 0;
   }
-  if (markReadBtn) {
-    markReadBtn.disabled = unread <= 0;
+
+  const nextHeaderKey = [
+    languageKey,
+    `${dmActivePartnerId || ""}`.trim(),
+    nextTitle,
+    nextSub,
+    nextMarkReadDisabled ? "1" : "0",
+  ].join("::");
+  if (!force && nextHeaderKey === dmRenderedConversationHeaderKey) {
+    return;
   }
+
+  title.textContent = nextTitle;
+  if (sub) sub.textContent = nextSub;
+  if (markReadBtn) markReadBtn.disabled = nextMarkReadDisabled;
+  dmRenderedConversationHeaderKey = nextHeaderKey;
 }
 
 function appendDmMessageNodes({
@@ -1162,27 +1170,58 @@ function renderConversationMessages(options = {}) {
 
 async function markConversationRead(partnerId) {
   const currentUser = getCurrentUser();
-  if (!currentUser || !partnerId) return;
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!currentUser || !targetPartnerId) return false;
+  const hasThreadUnread = dmThreads.some(
+    (thread) => thread.partnerId === targetPartnerId && Number(thread.unreadCount || 0) > 0
+  );
+  const hasMessageUnread =
+    targetPartnerId === dmActivePartnerId &&
+    dmMessages.some(
+      (message) =>
+        message.sender_id === targetPartnerId &&
+        message.recipient_id === currentUser.id &&
+        !message.read_at
+    );
+  if (!hasThreadUnread && !hasMessageUnread) {
+    renderConversationHeader();
+    return true;
+  }
   const nowIso = new Date().toISOString();
   const { error } = await supabase
     .from("direct_messages")
     .update({ read_at: nowIso })
-    .eq("sender_id", partnerId)
+    .eq("sender_id", targetPartnerId)
     .eq("recipient_id", currentUser.id)
     .is("read_at", null);
 
   if (error) {
     console.error("markConversationRead error:", error);
-    return;
+    return false;
   }
 
   dmThreads = dmThreads.map((thread) =>
-    thread.partnerId === partnerId
+    thread.partnerId === targetPartnerId
       ? { ...thread, unreadCount: 0 }
       : thread
   );
-  renderThreadList();
+  if (targetPartnerId === dmActivePartnerId) {
+    dmMessages = dmMessages.map((message) => {
+      if (
+        message.sender_id === targetPartnerId &&
+        message.recipient_id === currentUser.id &&
+        !message.read_at
+      ) {
+        return { ...message, read_at: nowIso };
+      }
+      return message;
+    });
+    renderConversationMessages({ forceFull: true });
+  }
+  renderThreadList({ keepWindow: true });
+  renderComposeList();
   renderConversationHeader();
+  return true;
 }
 
 async function loadConversation(partnerId, options = {}) {
@@ -1569,8 +1608,11 @@ export function setupDmControls() {
       if (!dmActivePartnerId) return;
       const tr = getDmTranslations();
       setSendStatus(tr.dmLoading || "Loading...", "loading");
-      await markConversationRead(dmActivePartnerId);
-      await refreshDmData({ preservePartner: true });
+      const marked = await markConversationRead(dmActivePartnerId);
+      if (!marked) {
+        setSendStatus(tr.dmMarkReadError || tr.dmLoadError || "Failed to mark read.", "error");
+        return;
+      }
       setSendStatus(tr.dmMarkedRead || "Marked as read.", "success");
       setTimeout(() => setSendStatus("", ""), 1200);
     });
