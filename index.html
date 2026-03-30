@@ -254,10 +254,33 @@
                   </div>
                 </div>
                 <div class="dm-chat-header-actions">
+                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-search" type="button">検索</button>
+                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-info" type="button">情報</button>
                   <button class="btn btn-ghost btn-xs hidden" id="btn-dm-pin" type="button">固定</button>
                   <button class="btn btn-ghost btn-xs hidden" id="btn-dm-mute" type="button">ミュート</button>
                   <button class="btn btn-ghost btn-xs" id="btn-dm-mark-read" type="button">既読</button>
                 </div>
+              </div>
+              <div class="dm-chat-search hidden" id="dm-chat-search">
+                <input
+                  id="dm-message-search"
+                  type="text"
+                  placeholder="会話内を検索"
+                  autocomplete="off"
+                />
+                <div class="dm-chat-search-actions">
+                  <div class="dm-chat-search-count" id="dm-message-search-count">-</div>
+                  <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-prev" type="button">↑</button>
+                  <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-next" type="button">↓</button>
+                  <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-close" type="button">閉じる</button>
+                </div>
+              </div>
+              <div class="dm-chat-context hidden" id="dm-chat-context">
+                <div class="dm-chat-context-copy">
+                  <div class="dm-chat-context-label" id="dm-chat-context-label">最近のメディア</div>
+                  <div class="dm-chat-context-meta" id="dm-chat-context-meta">-</div>
+                </div>
+                <div class="dm-chat-media-strip" id="dm-chat-media-strip"></div>
               </div>
               <div class="dm-chat-stage">
                 <div id="dm-message-list" class="dm-message-list"></div>
@@ -335,6 +358,75 @@
               />
               <div id="dm-compose-list" class="dm-compose-list"></div>
             </div>
+          </div>
+          <div class="dm-action-sheet hidden" id="dm-action-sheet" aria-hidden="true">
+            <button
+              class="dm-action-sheet-backdrop"
+              id="btn-dm-action-sheet-backdrop"
+              type="button"
+              aria-label="閉じる"
+            ></button>
+            <div
+              class="dm-action-sheet-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="dm-action-sheet-title"
+            >
+              <div class="dm-action-sheet-handle" aria-hidden="true"></div>
+              <div class="dm-action-sheet-preview">
+                <div class="dm-action-sheet-title" id="dm-action-sheet-title">メッセージ</div>
+                <div class="dm-action-sheet-text" id="dm-action-sheet-text">-</div>
+              </div>
+              <div class="dm-action-sheet-actions" id="dm-action-sheet-actions"></div>
+            </div>
+          </div>
+          <div class="dm-info-panel hidden" id="dm-info-panel" aria-hidden="true">
+            <button
+              class="dm-info-backdrop"
+              id="btn-dm-info-backdrop"
+              type="button"
+              aria-label="閉じる"
+            ></button>
+            <aside class="dm-info-card" role="dialog" aria-modal="true" aria-labelledby="dm-info-title">
+              <div class="dm-info-handle" aria-hidden="true"></div>
+              <div class="dm-info-head">
+                <div class="avatar dm-info-avatar" id="dm-info-avatar" aria-hidden="true">U</div>
+                <div class="dm-info-copy">
+                  <div class="dm-info-title" id="dm-info-title">会話情報</div>
+                  <div class="dm-info-sub" id="dm-info-sub">-</div>
+                </div>
+                <button class="btn btn-ghost btn-xs" id="btn-dm-info-close" type="button">閉じる</button>
+              </div>
+              <div class="dm-info-actions">
+                <button class="btn btn-ghost btn-sm" id="btn-dm-info-open-profile" type="button">プロフィール</button>
+                <button class="btn btn-ghost btn-sm" id="btn-dm-info-pin" type="button">固定</button>
+                <button class="btn btn-ghost btn-sm" id="btn-dm-info-mute" type="button">ミュート</button>
+              </div>
+              <div class="dm-info-stats" id="dm-info-stats"></div>
+              <section class="dm-info-section">
+                <div class="dm-info-section-head">
+                  <div class="dm-info-section-title" id="dm-info-profile-title">プロフィール情報</div>
+                  <div class="dm-info-section-meta" id="dm-info-profile-meta">-</div>
+                </div>
+                <div class="dm-info-profile-facts" id="dm-info-profile-facts"></div>
+              </section>
+              <section class="dm-info-section">
+                <div class="dm-info-section-head">
+                  <div class="dm-info-section-title" id="dm-info-media-title">共有メディア</div>
+                  <div class="dm-info-section-meta" id="dm-info-media-meta">-</div>
+                </div>
+                <div class="dm-info-media-grid" id="dm-info-media-grid"></div>
+              </section>
+              <section class="dm-info-section">
+                <div class="dm-info-section-head">
+                  <div class="dm-info-section-title" id="dm-info-search-title">会話内検索</div>
+                  <div class="dm-info-section-meta" id="dm-info-search-meta">-</div>
+                </div>
+                <button class="btn btn-ghost btn-sm dm-info-search-btn" id="btn-dm-info-open-search" type="button">
+                  検索を開く
+                </button>
+              </section>
+            </aside>
           </div>
         </section>
       </div>

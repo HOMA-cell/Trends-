@@ -2336,6 +2336,8 @@ async function loadProfilePostCount() {
       setText("dm-compose-share-note", "dmSharePreviewNote");
       setText("btn-dm-compose-copy-link", "dmCopyLink");
       setText("btn-dm-back", "dmBackToThreads");
+      setText("btn-dm-search", "dmSearchInChat");
+      setText("btn-dm-info", "dmConversationInfo");
       setText("btn-dm-pin", "dmPinThread");
       setText("btn-dm-mute", "dmMuteThread");
       setText("btn-dm-mark-read", "dmMarkRead");
@@ -2344,9 +2346,23 @@ async function loadProfilePostCount() {
       setText("btn-dm-thread-search-clear", "dmSearchClear");
       setText("btn-dm-jump-latest", "dmJumpLatest");
       setText("btn-dm-send", "dmSend");
+      setText("btn-dm-message-search-prev", "dmSearchPrev");
+      setText("btn-dm-message-search-next", "dmSearchNext");
+      setText("btn-dm-message-search-close", "dmSearchClose");
+      setText("dm-chat-context-label", "dmRecentMediaLabel");
+      setText("dm-info-title", "dmInfoTitle");
+      setText("btn-dm-info-close", "dmComposeClose");
+      setText("btn-dm-info-open-profile", "dmOpenProfile");
+      setText("btn-dm-info-pin", "dmPinThread");
+      setText("btn-dm-info-mute", "dmMuteThread");
+      setText("dm-info-profile-title", "dmInfoProfileTitle");
+      setText("dm-info-media-title", "dmInfoMediaTitle");
+      setText("dm-info-search-title", "dmInfoSearchTitle");
+      setText("btn-dm-info-open-search", "dmInfoOpenSearch");
       setPlaceholder("dm-input", "dmInputPlaceholder");
       setPlaceholder("dm-thread-search", "dmSearchPlaceholder");
       setPlaceholder("dm-compose-search", "dmComposeSearchPlaceholder");
+      setPlaceholder("dm-message-search", "dmSearchInConversationPlaceholder");
 
       // アカウント / Tips / Debug
       setText("account-title", "account");

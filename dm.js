@@ -59,6 +59,13 @@ let dmRealtimeChannelKey = "";
 let dmTypingPartnerId = "";
 let dmTypingClearTimer = null;
 let dmLastTypingSentAt = 0;
+let dmActionSheetMessageId = "";
+let dmMessagePressTimer = null;
+let dmMessageSearchOpen = false;
+let dmMessageSearchQuery = "";
+let dmMessageSearchMatchIds = [];
+let dmMessageSearchActiveIndex = -1;
+let dmInfoPanelOpen = false;
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
@@ -95,12 +102,84 @@ const openDmPartnerProfile = (...args) => dmContext.openPublicProfile?.(...args)
 const openDmMediaViewer = (...args) => dmContext.openMediaViewer?.(...args);
 const setActivePage = (...args) => dmContext.setActivePage?.(...args);
 
+function clearDmMessagePressTimer() {
+  if (typeof window === "undefined" || !dmMessagePressTimer) return;
+  window.clearTimeout(dmMessagePressTimer);
+  dmMessagePressTimer = null;
+}
+
+function closeDmInfoPanel() {
+  const panel = $("dm-info-panel");
+  if (panel) {
+    panel.classList.add("hidden");
+    panel.setAttribute("aria-hidden", "true");
+  }
+  if (typeof document !== "undefined") {
+    document.body.classList.remove("dm-info-panel-open");
+  }
+  dmInfoPanelOpen = false;
+}
+
+function setDmMessageSearchOpen(next) {
+  dmMessageSearchOpen = !!next;
+  const wrap = $("dm-chat-search");
+  if (wrap) {
+    wrap.classList.toggle("hidden", !dmMessageSearchOpen);
+  }
+  const searchBtn = $("btn-dm-search");
+  if (searchBtn) {
+    searchBtn.classList.toggle("is-active", dmMessageSearchOpen);
+  }
+  if (!dmMessageSearchOpen) {
+    dmMessageSearchQuery = "";
+    dmMessageSearchMatchIds = [];
+    dmMessageSearchActiveIndex = -1;
+    const input = $("dm-message-search");
+    if (input) input.value = "";
+  }
+}
+
 function getDmTranslations() {
   return t[getCurrentLang()] || t.ja;
 }
 
+function formatDmExperience(value, tr) {
+  if (!value) return "";
+  const map = {
+    beginner: tr.experienceBeginner || "Beginner",
+    intermediate: tr.experienceIntermediate || "Intermediate",
+    advanced: tr.experienceAdvanced || "Advanced",
+    pro: tr.experiencePro || "Competitive",
+  };
+  return map[value] || value;
+}
+
+function getDmInfoFacts(profile, tr) {
+  if (!profile) return [];
+  const facts = [
+    {
+      label: tr.profileExperience || "Experience",
+      value: formatDmExperience(profile.experience_level, tr),
+    },
+    { label: tr.profileGoal || "Goal", value: profile.training_goal },
+    { label: tr.profileGym || "Gym", value: profile.gym },
+    { label: tr.profileSplit || "Split", value: profile.training_split },
+    {
+      label: tr.profileFavoriteLifts || "Favorite lifts",
+      value: profile.favorite_lifts,
+    },
+  ];
+  return facts
+    .map((item) => ({
+      label: `${item.label || ""}`.trim(),
+      value: `${item.value || ""}`.trim(),
+    }))
+    .filter((item) => item.label && item.value);
+}
+
 function clearDmState() {
   cleanupDmRealtimeChannel();
+  closeDmActionSheet();
   dmThreads = [];
   dmPartners = [];
   dmMessages = [];
@@ -131,6 +210,12 @@ function clearDmState() {
   dmReactionPickerMessageId = "";
   dmTypingPartnerId = "";
   dmLastTypingSentAt = 0;
+  dmMessageSearchOpen = false;
+  dmMessageSearchQuery = "";
+  dmMessageSearchMatchIds = [];
+  dmMessageSearchActiveIndex = -1;
+  dmInfoPanelOpen = false;
+  clearDmMessagePressTimer();
   clearDmMediaSelection();
 }
 
@@ -413,6 +498,111 @@ function getDmMessageHasImage(message) {
     `${message?.media_type || ""}`.trim() === "image" &&
     `${message?.media_url || ""}`.trim().length > 0
   );
+}
+
+function getDmSearchableMessageText(message, tr = getDmTranslations()) {
+  if (!message) return "";
+  const parts = [];
+  const replyPayload = parseDmReplyMessage(message);
+  const reactionPayload = parseDmReactionMessage(message);
+  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const bodyText = getDmMessageDisplayBody(message);
+  if (replyPayload) {
+    parts.push(getDmReplyMessageDisplayBody(replyPayload));
+    parts.push(replyPayload.snippet);
+  }
+  if (reactionPayload) {
+    parts.push(reactionPayload.emoji);
+    parts.push((tr.dmReactionSummary || "Reacted with {emoji}").replace("{emoji}", reactionPayload.emoji));
+  }
+  if (sharePayload) {
+    parts.push(sharePayload.title, sharePayload.note, sharePayload.url, sharePayload.host);
+  }
+  if (getDmMessageHasImage(message)) {
+    parts.push(tr.dmPhotoMessage || "Photo");
+  }
+  parts.push(bodyText);
+  return parts
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getDmConversationMediaMessages(limit = 6) {
+  return [...dmMessages]
+    .filter((message) => !message?.pending && getDmMessageHasImage(message))
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, limit);
+}
+
+function getDmConversationShareCount() {
+  return dmMessages.filter((message) => !!parseDmSharedPostMessage(message)).length;
+}
+
+function openDmMediaMessage(message) {
+  const mediaUrl = `${message?.media_url || ""}`.trim();
+  if (!mediaUrl) return;
+  const tr = getDmTranslations();
+  const openViewer = openDmMediaViewer();
+  const caption = getDmMessageSnippet(message, tr) || "";
+  if (typeof openViewer === "function") {
+    openViewer(mediaUrl, "image", {
+      source: "dm",
+      alt: caption || tr.dmPhotoMessage || "Photo",
+      caption,
+      meta: formatDateTimeDisplay(message?.created_at),
+    });
+    return;
+  }
+  if (typeof window !== "undefined") {
+    window.open(mediaUrl, "_blank", "noopener,noreferrer");
+  }
+}
+
+async function copyDmMessageContent(message) {
+  const tr = getDmTranslations();
+  if (!message) return false;
+  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const replyPayload = parseDmReplyMessage(message);
+  const reactionPayload = parseDmReactionMessage(message);
+  let value = "";
+  if (sharePayload) {
+    value = [sharePayload.title, sharePayload.note, sharePayload.url].filter(Boolean).join("\n");
+  } else if (reactionPayload) {
+    value = (tr.dmReactionSummary || "Reacted with {emoji}").replace(
+      "{emoji}",
+      reactionPayload.emoji
+    );
+  } else if (replyPayload) {
+    value =
+      getDmReplyMessageDisplayBody(replyPayload) ||
+      replyPayload.snippet ||
+      tr.dmReplyFallback ||
+      "Reply";
+  } else {
+    value = getDmMessageDisplayBody(message);
+  }
+  if (!value && getDmMessageHasImage(message)) {
+    value = `${message.media_url || ""}`.trim();
+  }
+  value = `${value || ""}`.trim();
+  if (!value) return false;
+  try {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function"
+    ) {
+      await navigator.clipboard.writeText(value);
+      showToast(tr.dmMessageCopied || "Copied.", "success");
+      return true;
+    }
+  } catch (error) {
+    console.error("copy dm message failed", error);
+  }
+  showToast(value, "info");
+  return true;
 }
 
 function isDmMediaColumnError(error) {
@@ -2199,10 +2389,14 @@ function expandThreadListWindow(options = {}) {
 function selectDmPartner(partnerId, options = {}) {
   const nextPartnerId = `${partnerId || ""}`.trim();
   if (!nextPartnerId) return;
+  closeDmActionSheet();
   if (nextPartnerId !== dmActivePartnerId) {
     dmUnreadDividerMessageId = "";
     clearDmReplyTarget();
     dmReactionPickerMessageId = "";
+    setDmMessageSearchOpen(false);
+    dmMessages = [];
+    dmRenderedMessageKeys = [];
   }
   if (dmComposeOpen) {
     closeDmComposeModal();
@@ -2211,6 +2405,7 @@ function selectDmPartner(partnerId, options = {}) {
   renderPartnerSelect();
   renderThreadList();
   renderConversationHeader();
+  renderConversationMessages({ forceFull: true });
   updateDmComposerState();
   ensureDmRealtimeChannel(nextPartnerId);
   if (options.openChat !== false) {
@@ -2370,6 +2565,8 @@ function renderConversationHeader(options = {}) {
   const sub = $("dm-chat-sub");
   const headerMain = $("dm-chat-header-main");
   const markReadBtn = $("btn-dm-mark-read");
+  const searchBtn = $("btn-dm-search");
+  const infoBtn = $("btn-dm-info");
   const pinBtn = $("btn-dm-pin");
   const muteBtn = $("btn-dm-mute");
   const avatar = $("dm-chat-avatar");
@@ -2381,6 +2578,8 @@ function renderConversationHeader(options = {}) {
   let nextTitle = tr.dmConversationIdle || "Select a chat";
   let nextSub = tr.dmChatSubIdle || "Select a partner to start chatting.";
   let nextMarkReadDisabled = true;
+  let nextSearchHidden = true;
+  let nextInfoHidden = true;
   let nextPinHidden = true;
   let nextMuteHidden = true;
   let nextPinActive = false;
@@ -2411,6 +2610,8 @@ function renderConversationHeader(options = {}) {
         ? tr.dmTyping || "Typing…"
         : subParts.filter(Boolean).join(" · ");
     nextMarkReadDisabled = unread <= 0;
+    nextSearchHidden = false;
+    nextInfoHidden = false;
     nextPinHidden = false;
     nextMuteHidden = false;
     nextPinActive = isDmThreadPinned(active.id);
@@ -2426,6 +2627,10 @@ function renderConversationHeader(options = {}) {
     nextTitle,
     nextSub,
     nextMarkReadDisabled ? "1" : "0",
+    nextSearchHidden ? "1" : "0",
+    nextInfoHidden ? "1" : "0",
+    dmMessageSearchOpen ? "1" : "0",
+    dmInfoPanelOpen ? "1" : "0",
     nextPinHidden ? "1" : "0",
     nextMuteHidden ? "1" : "0",
     nextPinActive ? "1" : "0",
@@ -2467,6 +2672,16 @@ function renderConversationHeader(options = {}) {
     markReadBtn.disabled = nextMarkReadDisabled;
     markReadBtn.classList.toggle("hidden", nextMarkReadDisabled);
   }
+  if (searchBtn) {
+    searchBtn.disabled = nextSearchHidden;
+    searchBtn.classList.toggle("hidden", nextSearchHidden);
+    searchBtn.classList.toggle("is-active", dmMessageSearchOpen);
+  }
+  if (infoBtn) {
+    infoBtn.disabled = nextInfoHidden;
+    infoBtn.classList.toggle("hidden", nextInfoHidden);
+    infoBtn.classList.toggle("is-active", dmInfoPanelOpen);
+  }
   if (pinBtn) {
     pinBtn.disabled = nextPinHidden;
     pinBtn.classList.toggle("hidden", nextPinHidden);
@@ -2484,6 +2699,398 @@ function renderConversationHeader(options = {}) {
       : tr.dmMuteThread || "Mute";
   }
   dmRenderedConversationHeaderKey = nextHeaderKey;
+}
+
+function updateDmMessageSearchState() {
+  const tr = getDmTranslations();
+  const input = $("dm-message-search");
+  const countEl = $("dm-message-search-count");
+  const prevBtn = $("btn-dm-message-search-prev");
+  const nextBtn = $("btn-dm-message-search-next");
+  const query = normalizeDmSearchText(dmMessageSearchQuery);
+  if (!query || !dmActivePartnerId) {
+    dmMessageSearchMatchIds = [];
+    dmMessageSearchActiveIndex = -1;
+    if (countEl) {
+      countEl.textContent = dmMessageSearchOpen
+        ? tr.dmSearchHint || "Type to search"
+        : "-";
+    }
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (input && dmMessageSearchOpen && document.activeElement !== input) {
+      input.focus();
+    }
+    return;
+  }
+  dmMessageSearchMatchIds = dmMessages
+    .filter((message) => {
+      if (message?.pending) return false;
+      const text = normalizeDmSearchText(getDmSearchableMessageText(message, tr));
+      return !!text && text.includes(query);
+    })
+    .map((message) => `${message?.id || ""}`.trim())
+    .filter(Boolean);
+
+  if (!dmMessageSearchMatchIds.length) {
+    dmMessageSearchActiveIndex = -1;
+    if (countEl) {
+      countEl.textContent = tr.dmSearchEmptyState || "No matches";
+    }
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    return;
+  }
+
+  if (
+    dmMessageSearchActiveIndex < 0 ||
+    dmMessageSearchActiveIndex >= dmMessageSearchMatchIds.length
+  ) {
+    dmMessageSearchActiveIndex = 0;
+  }
+  if (countEl) {
+    countEl.textContent = (tr.dmSearchCounter || "{current}/{total}")
+      .replace("{current}", `${dmMessageSearchActiveIndex + 1}`)
+      .replace("{total}", `${dmMessageSearchMatchIds.length}`);
+  }
+  if (prevBtn) prevBtn.disabled = dmMessageSearchMatchIds.length <= 1;
+  if (nextBtn) nextBtn.disabled = dmMessageSearchMatchIds.length <= 1;
+}
+
+function goToDmSearchMatch(direction = 1) {
+  if (!dmMessageSearchMatchIds.length) return;
+  const total = dmMessageSearchMatchIds.length;
+  dmMessageSearchActiveIndex =
+    ((dmMessageSearchActiveIndex < 0 ? 0 : dmMessageSearchActiveIndex) + direction + total) %
+    total;
+  updateDmMessageSearchState();
+  const targetId = dmMessageSearchMatchIds[dmMessageSearchActiveIndex];
+  scrollToDmMessage(targetId, { block: "center" });
+  renderConversationMessages({ forceFull: true });
+}
+
+function renderDmInfoPanel() {
+  const panel = $("dm-info-panel");
+  const avatar = $("dm-info-avatar");
+  const title = $("dm-info-title");
+  const sub = $("dm-info-sub");
+  const stats = $("dm-info-stats");
+  const profileTitle = $("dm-info-profile-title");
+  const profileMeta = $("dm-info-profile-meta");
+  const profileFacts = $("dm-info-profile-facts");
+  const mediaTitle = $("dm-info-media-title");
+  const mediaMeta = $("dm-info-media-meta");
+  const mediaGrid = $("dm-info-media-grid");
+  const searchTitle = $("dm-info-search-title");
+  const searchMeta = $("dm-info-search-meta");
+  const openProfileBtn = $("btn-dm-info-open-profile");
+  const pinBtn = $("btn-dm-info-pin");
+  const muteBtn = $("btn-dm-info-mute");
+  const openSearchBtn = $("btn-dm-info-open-search");
+  if (
+    !panel ||
+    !avatar ||
+    !title ||
+    !sub ||
+    !stats ||
+    !profileTitle ||
+    !profileMeta ||
+    !profileFacts ||
+    !mediaTitle ||
+    !mediaMeta ||
+    !mediaGrid ||
+    !searchTitle ||
+    !searchMeta ||
+    !openProfileBtn ||
+    !pinBtn ||
+    !muteBtn ||
+    !openSearchBtn
+  ) {
+    return;
+  }
+
+  const tr = getDmTranslations();
+  profileTitle.textContent = tr.dmInfoProfileTitle || "Profile details";
+  mediaTitle.textContent = tr.dmInfoMediaTitle || "Shared media";
+  searchTitle.textContent = tr.dmInfoSearchTitle || "Search in conversation";
+  openProfileBtn.textContent = tr.dmOpenProfile || "Open profile";
+  openSearchBtn.textContent = tr.dmInfoOpenSearch || "Open search";
+
+  const active = dmPartners.find((partner) => partner.id === dmActivePartnerId);
+  if (!active) {
+    panel.classList.add("hidden");
+    panel.setAttribute("aria-hidden", "true");
+    dmInfoPanelOpen = false;
+    return;
+  }
+
+  const identity = getProfileIdentity(active.profile, active.id);
+  renderAvatar(avatar, active.profile, identity.initial);
+  title.textContent = identity.primary;
+  sub.textContent = identity.secondary || tr.dmChatSubIdle || "Conversation";
+
+  const thread = dmThreads.find((item) => item.partnerId === active.id);
+  const mediaMessages = getDmConversationMediaMessages(12);
+  const shareCount = getDmConversationShareCount();
+  const unreadCount = Number(thread?.unreadCount || 0);
+  const messageCount = dmMessages.filter((message) => !parseDmReactionMessage(message)).length;
+  const replyCount = dmMessages.filter((message) => !!parseDmReplyMessage(message)).length;
+  const facts = getDmInfoFacts(active.profile, tr);
+
+  const statItems = [
+    { label: tr.dmInfoMessages || "Messages", value: `${messageCount}` },
+    { label: tr.dmInfoMediaCount || "Media", value: `${mediaMessages.length}` },
+    { label: tr.dmInfoSharedCount || "Shared", value: `${shareCount}` },
+    { label: tr.dmInfoReplies || "Replies", value: `${replyCount}` },
+  ];
+  if (unreadCount > 0) {
+    statItems.push({ label: tr.dmFilterUnread || "Unread", value: `${unreadCount}` });
+  }
+  stats.replaceChildren(
+    ...statItems.map((item) => {
+      const card = document.createElement("div");
+      card.className = "dm-info-stat";
+      const value = document.createElement("div");
+      value.className = "dm-info-stat-value";
+      value.textContent = item.value;
+      const labelEl = document.createElement("div");
+      labelEl.className = "dm-info-stat-label";
+      labelEl.textContent = item.label;
+      card.append(value, labelEl);
+      return card;
+    })
+  );
+
+  profileMeta.textContent = facts.length
+    ? (tr.dmInfoProfileMeta || "{count} profile details").replace(
+        "{count}",
+        `${facts.length}`
+      )
+    : tr.dmInfoNoProfile || "No profile details yet";
+
+  if (facts.length) {
+    profileFacts.replaceChildren(
+      ...facts.map((item) => {
+        const card = document.createElement("div");
+        card.className = "dm-info-profile-fact";
+        const labelEl = document.createElement("div");
+        labelEl.className = "dm-info-profile-fact-label";
+        labelEl.textContent = item.label;
+        const valueEl = document.createElement("div");
+        valueEl.className = "dm-info-profile-fact-value";
+        valueEl.textContent = item.value;
+        card.append(labelEl, valueEl);
+        return card;
+      })
+    );
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "dm-info-empty";
+    empty.textContent = tr.dmInfoNoProfile || "No profile details yet";
+    profileFacts.replaceChildren(empty);
+  }
+
+  mediaMeta.textContent = mediaMessages.length
+    ? (tr.dmRecentMediaOnly || "{photos} photos in this chat").replace(
+        "{photos}",
+        `${mediaMessages.length}`
+      )
+    : tr.dmInfoNoMedia || "No photos yet";
+
+  if (mediaMessages.length) {
+    mediaGrid.replaceChildren(
+      ...mediaMessages.map((message) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "dm-info-media-thumb";
+        button.setAttribute("data-dm-info-media-id", `${message.id || ""}`);
+        const image = document.createElement("img");
+        image.src = message.media_url;
+        image.alt = getDmMessageSnippet(message, tr) || tr.dmPhotoMessage || "Photo";
+        image.loading = "lazy";
+        image.decoding = "async";
+        button.appendChild(image);
+        return button;
+      })
+    );
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "dm-info-empty";
+    empty.textContent = tr.dmInfoNoMedia || "No photos yet";
+    mediaGrid.replaceChildren(empty);
+  }
+
+  searchMeta.textContent = dmMessageSearchMatchIds.length
+    ? (tr.dmSearchCounter || "{current}/{total}")
+        .replace(
+          "{current}",
+          `${Math.max(1, dmMessageSearchActiveIndex + 1)}`
+        )
+        .replace("{total}", `${dmMessageSearchMatchIds.length}`)
+    : tr.dmInfoSearchMeta || "Jump to messages by keyword";
+
+  pinBtn.textContent = isDmThreadPinned(active.id)
+    ? tr.dmUnpinThread || "Unpin"
+    : tr.dmPinThread || "Pin";
+  pinBtn.classList.toggle("is-active", isDmThreadPinned(active.id));
+  muteBtn.textContent = isDmThreadMuted(active.id)
+    ? tr.dmUnmuteThread || "Unmute"
+    : tr.dmMuteThread || "Mute";
+  muteBtn.classList.toggle("is-active", isDmThreadMuted(active.id));
+
+  panel.classList.toggle("hidden", !dmInfoPanelOpen);
+  panel.setAttribute("aria-hidden", dmInfoPanelOpen ? "false" : "true");
+  if (typeof document !== "undefined") {
+    document.body.classList.toggle("dm-info-panel-open", dmInfoPanelOpen);
+  }
+}
+
+function renderDmChatContext() {
+  const wrap = $("dm-chat-context");
+  const label = $("dm-chat-context-label");
+  const meta = $("dm-chat-context-meta");
+  const strip = $("dm-chat-media-strip");
+  if (!wrap || !label || !meta || !strip) return;
+  const tr = getDmTranslations();
+  const active = dmPartners.find((partner) => partner.id === dmActivePartnerId);
+  const mediaMessages = active ? getDmConversationMediaMessages(6) : [];
+  const shareCount = active ? getDmConversationShareCount() : 0;
+  if (!active || (!mediaMessages.length && shareCount <= 0)) {
+    wrap.classList.add("hidden");
+    label.textContent = tr.dmRecentMediaLabel || "Recent media";
+    meta.textContent = "";
+    strip.replaceChildren();
+    return;
+  }
+
+  wrap.classList.remove("hidden");
+  label.textContent = tr.dmRecentMediaLabel || "Recent media";
+  if (mediaMessages.length > 0 && shareCount > 0) {
+    meta.textContent = (tr.dmRecentMediaMeta || "{photos} photos · {shares} shared")
+      .replace("{photos}", `${mediaMessages.length}`)
+      .replace("{shares}", `${shareCount}`);
+  } else if (mediaMessages.length > 0) {
+    meta.textContent = (tr.dmRecentMediaOnly || "{photos} photos in this chat").replace(
+      "{photos}",
+      `${mediaMessages.length}`
+    );
+  } else {
+    meta.textContent = (tr.dmRecentSharedOnly || "{shares} shared posts").replace(
+      "{shares}",
+      `${shareCount}`
+    );
+  }
+
+  const fragment = document.createDocumentFragment();
+  mediaMessages.forEach((message) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dm-chat-media-thumb";
+    button.setAttribute("data-dm-chat-media-id", `${message.id || ""}`);
+    button.setAttribute("aria-label", tr.dmOpenPhoto || "Open photo");
+    const image = document.createElement("img");
+    image.src = message.media_url;
+    image.alt = getDmMessageSnippet(message, tr) || tr.dmPhotoMessage || "Photo";
+    image.loading = "lazy";
+    image.decoding = "async";
+    button.appendChild(image);
+    fragment.appendChild(button);
+  });
+  strip.replaceChildren(fragment);
+}
+
+function closeDmActionSheet() {
+  const sheet = $("dm-action-sheet");
+  if (sheet) {
+    sheet.classList.add("hidden");
+    sheet.setAttribute("aria-hidden", "true");
+  }
+  if (typeof document !== "undefined") {
+    document.body.classList.remove("dm-action-sheet-open");
+  }
+  dmActionSheetMessageId = "";
+}
+
+function openDmActionSheet(messageId) {
+  const message = getDmMessageById(messageId);
+  if (!message || message.pending) return;
+  closeDmInfoPanel();
+  const sheet = $("dm-action-sheet");
+  const title = $("dm-action-sheet-title");
+  const text = $("dm-action-sheet-text");
+  const actions = $("dm-action-sheet-actions");
+  if (!sheet || !title || !text || !actions) return;
+
+  const tr = getDmTranslations();
+  dmActionSheetMessageId = `${messageId || ""}`.trim();
+  const senderLabel = getDmReplyAuthorLabel(message, tr);
+  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const snippet =
+    getDmMessageSnippet(message, tr) ||
+    sharePayload?.url ||
+    `${message.media_url || ""}`.trim() ||
+    tr.dmPhotoMessage ||
+    "";
+
+  title.textContent = senderLabel;
+  text.textContent = snippet;
+  actions.replaceChildren();
+
+  const addAction = (key, labelText, onClick, options = {}) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dm-action-sheet-btn";
+    if (options.tone) {
+      button.classList.add(`is-${options.tone}`);
+    }
+    button.setAttribute("data-dm-action-key", key);
+    button.textContent = labelText;
+    button.addEventListener("click", async () => {
+      closeDmActionSheet();
+      await onClick();
+    });
+    actions.appendChild(button);
+  };
+
+  addAction("reply", tr.dmReplyAction || "Reply", async () => {
+    setDmReplyTarget(message.id);
+  });
+
+  addAction("react", tr.dmReactAction || "React", async () => {
+    dmReactionPickerMessageId = `${message.id || ""}`.trim();
+    renderConversationMessages({ forceFull: true });
+    scrollToDmMessage(message.id, { block: "nearest" });
+  });
+
+  if (!hasDmReactionFromCurrentUser(message.id, DM_QUICK_LIKE_EMOJI)) {
+    addAction("like", tr.dmQuickLike || "Like", async () => {
+      await sendDmQuickReaction(message.id, DM_QUICK_LIKE_EMOJI);
+    });
+  }
+
+  addAction("copy", tr.dmCopyMessage || "Copy", async () => {
+    await copyDmMessageContent(message);
+  });
+
+  if (getDmMessageHasImage(message)) {
+    addAction("photo", tr.dmOpenPhoto || "Open photo", async () => {
+      openDmMediaMessage(message);
+    });
+  }
+
+  if (sharePayload?.url) {
+    addAction("post", tr.dmSharedPostOpen || "Open post", async () => {
+      if (typeof window !== "undefined") {
+        window.open(sharePayload.url, "_blank", "noopener,noreferrer");
+      }
+    });
+  }
+
+  sheet.classList.remove("hidden");
+  sheet.setAttribute("aria-hidden", "false");
+  if (typeof document !== "undefined") {
+    document.body.classList.add("dm-action-sheet-open");
+  }
 }
 
 function appendDmMessageNodes({
@@ -2538,6 +3145,14 @@ function appendDmMessageNodes({
   row.className = "dm-message-row";
   if (message?.id) {
     row.setAttribute("data-dm-message-id", `${message.id}`);
+  }
+  const messageId = `${message?.id || ""}`.trim();
+  const searchMatchIndex = dmMessageSearchMatchIds.indexOf(messageId);
+  if (searchMatchIndex >= 0) {
+    row.classList.add("is-search-match");
+    if (searchMatchIndex === dmMessageSearchActiveIndex) {
+      row.classList.add("is-search-active");
+    }
   }
   const isMine = message.sender_id === currentUserId;
   row.classList.add(isMine ? "is-self" : "is-other");
@@ -2621,21 +3236,7 @@ function appendDmMessageNodes({
     mediaButton.className = "dm-message-media";
     mediaButton.setAttribute("aria-label", tr.dmOpenPhoto || "Open photo");
     mediaButton.addEventListener("click", () => {
-      const mediaUrl = `${message.media_url || ""}`.trim();
-      if (!mediaUrl) return;
-      const openViewer = openDmMediaViewer();
-      if (typeof openViewer === "function") {
-        openViewer(mediaUrl, "image", {
-          source: "dm",
-          alt: messageText || tr.dmPhotoMessage || "Photo",
-          caption: messageText || "",
-          meta: formatDateTimeDisplay(message.created_at),
-        });
-        return;
-      }
-      if (typeof window !== "undefined") {
-        window.open(mediaUrl, "_blank", "noopener,noreferrer");
-      }
+      openDmMediaMessage(message);
     });
     const image = document.createElement("img");
     image.src = message.media_url;
@@ -2762,6 +3363,16 @@ function appendDmMessageNodes({
       await sendDmQuickReaction(message.id, DM_QUICK_LIKE_EMOJI);
     });
     tools.appendChild(likeBtn);
+
+    const moreBtn = document.createElement("button");
+    moreBtn.type = "button";
+    moreBtn.className = "dm-message-tool is-icon";
+    moreBtn.setAttribute("aria-label", tr.dmMessageMore || "More");
+    moreBtn.setAttribute("title", tr.dmMessageMore || "More");
+    moreBtn.setAttribute("data-dm-message-more", `${message?.id || ""}`);
+    moreBtn.textContent = "⋯";
+    tools.appendChild(moreBtn);
+
     stack.appendChild(tools);
 
     if (dmReactionPickerMessageId === `${message?.id || ""}`.trim()) {
@@ -2854,6 +3465,9 @@ function renderConversationMessages(options = {}) {
     dmRenderedMessagePartnerId = "";
     dmRenderedMessageKeys = [];
     dmReactionPickerMessageId = "";
+    renderDmChatContext();
+    updateDmMessageSearchState();
+    renderDmInfoPanel();
     syncDmJumpLatestButton();
     return;
   }
@@ -2863,6 +3477,9 @@ function renderConversationMessages(options = {}) {
     dmRenderedMessagePartnerId = dmActivePartnerId;
     dmRenderedMessageKeys = [];
     dmReactionPickerMessageId = "";
+    renderDmChatContext();
+    updateDmMessageSearchState();
+    renderDmInfoPanel();
     syncDmJumpLatestButton();
     return;
   }
@@ -2938,6 +3555,8 @@ function renderConversationMessages(options = {}) {
     }
     dmRenderedMessagePartnerId = dmActivePartnerId;
     dmRenderedMessageKeys = nextMessageKeys;
+    updateDmMessageSearchState();
+    renderDmInfoPanel();
     syncDmJumpLatestButton();
     return;
   }
@@ -2967,6 +3586,9 @@ function renderConversationMessages(options = {}) {
   }
   dmRenderedMessagePartnerId = dmActivePartnerId;
   dmRenderedMessageKeys = nextMessageKeys;
+  renderDmChatContext();
+  updateDmMessageSearchState();
+  renderDmInfoPanel();
   syncDmJumpLatestButton();
 }
 
@@ -3703,6 +4325,8 @@ export function setupDmControls() {
   }
 
   const markReadBtn = $("btn-dm-mark-read");
+  const searchBtn = $("btn-dm-search");
+  const infoBtn = $("btn-dm-info");
   if (markReadBtn && markReadBtn.dataset.bound !== "true") {
     markReadBtn.dataset.bound = "true";
     markReadBtn.addEventListener("click", async () => {
@@ -3755,11 +4379,161 @@ export function setupDmControls() {
     });
   }
 
-  const searchInput = $("dm-thread-search");
+  if (searchBtn && searchBtn.dataset.bound !== "true") {
+    searchBtn.dataset.bound = "true";
+    searchBtn.addEventListener("click", () => {
+      closeDmActionSheet();
+      closeDmInfoPanel();
+      setDmMessageSearchOpen(!dmMessageSearchOpen);
+      renderConversationHeader({ force: true });
+      updateDmMessageSearchState();
+      renderDmInfoPanel();
+      if (dmMessageSearchOpen) {
+        const inputEl = $("dm-message-search");
+        if (inputEl) inputEl.focus();
+      }
+    });
+  }
+
+  if (infoBtn && infoBtn.dataset.bound !== "true") {
+    infoBtn.dataset.bound = "true";
+    infoBtn.addEventListener("click", () => {
+      closeDmActionSheet();
+      dmInfoPanelOpen = !dmInfoPanelOpen;
+      renderConversationHeader({ force: true });
+      renderDmInfoPanel();
+    });
+  }
+
+  const searchInput = $("dm-message-search");
   if (searchInput && searchInput.dataset.bound !== "true") {
     searchInput.dataset.bound = "true";
     searchInput.addEventListener("input", () => {
-      dmThreadSearch = `${searchInput.value || ""}`.trim();
+      dmMessageSearchQuery = `${searchInput.value || ""}`.trim();
+      dmMessageSearchActiveIndex = 0;
+      updateDmMessageSearchState();
+      renderConversationMessages({ forceFull: true });
+      if (dmMessageSearchMatchIds.length) {
+        scrollToDmMessage(dmMessageSearchMatchIds[dmMessageSearchActiveIndex], {
+          block: "center",
+        });
+      }
+    });
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        goToDmSearchMatch(event.shiftKey ? -1 : 1);
+      }
+    });
+  }
+
+  const prevSearchBtn = $("btn-dm-message-search-prev");
+  if (prevSearchBtn && prevSearchBtn.dataset.bound !== "true") {
+    prevSearchBtn.dataset.bound = "true";
+    prevSearchBtn.addEventListener("click", () => {
+      goToDmSearchMatch(-1);
+    });
+  }
+
+  const nextSearchBtn = $("btn-dm-message-search-next");
+  if (nextSearchBtn && nextSearchBtn.dataset.bound !== "true") {
+    nextSearchBtn.dataset.bound = "true";
+    nextSearchBtn.addEventListener("click", () => {
+      goToDmSearchMatch(1);
+    });
+  }
+
+  const closeSearchBtn = $("btn-dm-message-search-close");
+  if (closeSearchBtn && closeSearchBtn.dataset.bound !== "true") {
+    closeSearchBtn.dataset.bound = "true";
+    closeSearchBtn.addEventListener("click", () => {
+      setDmMessageSearchOpen(false);
+      renderConversationHeader({ force: true });
+      renderConversationMessages({ forceFull: true });
+      renderDmInfoPanel();
+    });
+  }
+
+  const infoBackdrop = $("btn-dm-info-backdrop");
+  if (infoBackdrop && infoBackdrop.dataset.bound !== "true") {
+    infoBackdrop.dataset.bound = "true";
+    infoBackdrop.addEventListener("click", () => {
+      closeDmInfoPanel();
+      renderConversationHeader({ force: true });
+    });
+  }
+
+  const infoCloseBtn = $("btn-dm-info-close");
+  if (infoCloseBtn && infoCloseBtn.dataset.bound !== "true") {
+    infoCloseBtn.dataset.bound = "true";
+    infoCloseBtn.addEventListener("click", () => {
+      closeDmInfoPanel();
+      renderConversationHeader({ force: true });
+    });
+  }
+
+  const infoOpenProfileBtn = $("btn-dm-info-open-profile");
+  if (infoOpenProfileBtn && infoOpenProfileBtn.dataset.bound !== "true") {
+    infoOpenProfileBtn.dataset.bound = "true";
+    infoOpenProfileBtn.addEventListener("click", () => {
+      if (!dmActivePartnerId) return;
+      openDmPartnerProfile(dmActivePartnerId);
+      closeDmInfoPanel();
+      renderConversationHeader({ force: true });
+    });
+  }
+
+  const infoPinBtn = $("btn-dm-info-pin");
+  if (infoPinBtn && infoPinBtn.dataset.bound !== "true") {
+    infoPinBtn.dataset.bound = "true";
+    infoPinBtn.addEventListener("click", () => {
+      if (!dmActivePartnerId) return;
+      toggleDmThreadPinned(dmActivePartnerId);
+      renderDmInfoPanel();
+    });
+  }
+
+  const infoMuteBtn = $("btn-dm-info-mute");
+  if (infoMuteBtn && infoMuteBtn.dataset.bound !== "true") {
+    infoMuteBtn.dataset.bound = "true";
+    infoMuteBtn.addEventListener("click", () => {
+      if (!dmActivePartnerId) return;
+      toggleDmThreadMuted(dmActivePartnerId);
+      renderDmInfoPanel();
+    });
+  }
+
+  const infoOpenSearchBtn = $("btn-dm-info-open-search");
+  if (infoOpenSearchBtn && infoOpenSearchBtn.dataset.bound !== "true") {
+    infoOpenSearchBtn.dataset.bound = "true";
+    infoOpenSearchBtn.addEventListener("click", () => {
+      setDmMessageSearchOpen(true);
+      closeDmInfoPanel();
+      renderConversationHeader({ force: true });
+      renderDmInfoPanel();
+      const inputEl = $("dm-message-search");
+      if (inputEl) inputEl.focus();
+    });
+  }
+
+  const infoMediaGrid = $("dm-info-media-grid");
+  if (infoMediaGrid && infoMediaGrid.dataset.bound !== "true") {
+    infoMediaGrid.dataset.bound = "true";
+    infoMediaGrid.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-dm-info-media-id]");
+      if (!button) return;
+      const messageId = `${button.getAttribute("data-dm-info-media-id") || ""}`.trim();
+      const message = getDmMessageById(messageId);
+      if (!message) return;
+      openDmMediaMessage(message);
+    });
+  }
+
+  const threadSearchInput = $("dm-thread-search");
+  if (threadSearchInput && threadSearchInput.dataset.bound !== "true") {
+    threadSearchInput.dataset.bound = "true";
+    threadSearchInput.addEventListener("input", () => {
+      dmThreadSearch = `${threadSearchInput.value || ""}`.trim();
       scheduleThreadSearchRender();
     });
   }
@@ -3769,9 +4543,9 @@ export function setupDmControls() {
     clearSearchBtn.dataset.bound = "true";
     clearSearchBtn.addEventListener("click", () => {
       dmThreadSearch = "";
-      if (searchInput) searchInput.value = "";
+      if (threadSearchInput) threadSearchInput.value = "";
       scheduleThreadSearchRender();
-      if (searchInput) searchInput.focus();
+      if (threadSearchInput) threadSearchInput.focus();
     });
   }
 
@@ -3811,6 +4585,27 @@ export function setupDmControls() {
     });
   }
 
+  const chatMediaStrip = $("dm-chat-media-strip");
+  if (chatMediaStrip && chatMediaStrip.dataset.bound !== "true") {
+    chatMediaStrip.dataset.bound = "true";
+    chatMediaStrip.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-dm-chat-media-id]");
+      if (!button) return;
+      const messageId = `${button.getAttribute("data-dm-chat-media-id") || ""}`.trim();
+      const message = getDmMessageById(messageId);
+      if (!message) return;
+      openDmMediaMessage(message);
+    });
+  }
+
+  const actionSheetBackdrop = $("btn-dm-action-sheet-backdrop");
+  if (actionSheetBackdrop && actionSheetBackdrop.dataset.bound !== "true") {
+    actionSheetBackdrop.dataset.bound = "true";
+    actionSheetBackdrop.addEventListener("click", () => {
+      closeDmActionSheet();
+    });
+  }
+
   const input = $("dm-input");
   if (input && input.dataset.bound !== "true") {
     input.dataset.bound = "true";
@@ -3838,6 +4633,14 @@ export function setupDmControls() {
   if (messageList && messageList.dataset.bound !== "true") {
     messageList.dataset.bound = "true";
     messageList.addEventListener("click", (event) => {
+      const moreButton = event.target.closest("[data-dm-message-more]");
+      if (moreButton) {
+        const messageId = `${moreButton.getAttribute("data-dm-message-more") || ""}`.trim();
+        if (messageId) {
+          openDmActionSheet(messageId);
+        }
+        return;
+      }
       if (
         dmReactionPickerMessageId &&
         !event.target.closest(".dm-reaction-picker") &&
@@ -3872,6 +4675,46 @@ export function setupDmControls() {
         openDmPartnerProfile(dmActivePartnerId);
       }
     });
+    messageList.addEventListener("contextmenu", (event) => {
+      const row = event.target.closest(".dm-message-row[data-dm-message-id]");
+      if (!row) return;
+      if (event.target.closest("button, a, input, textarea")) return;
+      const messageId = `${row.getAttribute("data-dm-message-id") || ""}`.trim();
+      if (!messageId) return;
+      event.preventDefault();
+      openDmActionSheet(messageId);
+    });
+    messageList.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse") return;
+      const row = event.target.closest(".dm-message-row[data-dm-message-id]");
+      if (!row) return;
+      if (event.target.closest("button, a, input, textarea")) return;
+      const messageId = `${row.getAttribute("data-dm-message-id") || ""}`.trim();
+      if (!messageId) return;
+      clearDmMessagePressTimer();
+      dmMessagePressTimer = window.setTimeout(() => {
+        dmMessagePressTimer = null;
+        openDmActionSheet(messageId);
+      }, 420);
+    });
+    ["pointerup", "pointercancel", "pointerleave", "pointermove"].forEach((eventName) => {
+      messageList.addEventListener(eventName, () => {
+        clearDmMessagePressTimer();
+      });
+    });
+  }
+  if (typeof document !== "undefined" && document.body.dataset.dmActionSheetBound !== "true") {
+    document.body.dataset.dmActionSheetBound = "true";
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && dmActionSheetMessageId) {
+        closeDmActionSheet();
+        return;
+      }
+      if (event.key === "Escape" && dmInfoPanelOpen) {
+        closeDmInfoPanel();
+        renderConversationHeader({ force: true });
+      }
+    });
   }
   autoResizeDmInput();
   updateDmInputCounter();
@@ -3891,7 +4734,10 @@ export function handleDmPageChange(page) {
     renderDmPage({ refreshIfNeeded: true });
     return;
   }
+  setDmMessageSearchOpen(false);
+  closeDmActionSheet();
   closeDmComposeModal();
+  closeDmInfoPanel();
   cleanupDmRealtimeChannel();
   stopDmPolling();
 }
@@ -3913,6 +4759,7 @@ export function renderDmPage(options = {}) {
 
   if (!currentUser) {
     stopDmPolling();
+    setDmMessageSearchOpen(false);
     clearDmState();
     closeDmComposeModal();
     setDmMobileChatOpen(false);
@@ -3932,6 +4779,7 @@ export function renderDmPage(options = {}) {
     if (sendBtn) sendBtn.disabled = true;
     if (jumpLatestBtn) jumpLatestBtn.classList.add("hidden");
     renderDmReplyComposer();
+    renderDmChatContext();
     setThreadStatus("", "");
     setSendStatus("", "");
     return;
@@ -3967,6 +4815,8 @@ export function renderDmPage(options = {}) {
   renderDmMediaPreview();
   renderDmReplyComposer();
   updateDmComposerState();
+  updateDmMessageSearchState();
+  renderDmInfoPanel();
   syncDmJumpLatestButton();
 
   if (options.refreshIfNeeded && !dmThreadsLoaded) {

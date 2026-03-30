@@ -5019,6 +5019,144 @@
       font-size: 12px;
       line-height: 1;
     }
+    .dm-chat-header-actions #btn-dm-search,
+    .dm-chat-header-actions #btn-dm-info {
+      min-height: 28px;
+      min-width: 28px;
+      padding-inline: 0;
+      border-radius: 999px;
+      border: 0;
+      background: transparent;
+      color: transparent;
+      font-size: 0;
+      box-shadow: none;
+    }
+    .dm-chat-header-actions #btn-dm-search::before {
+      content: "⌕";
+      color: #8c8276;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .dm-chat-header-actions #btn-dm-info::before {
+      content: "i";
+      color: #8c8276;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      font-family: Georgia, serif;
+    }
+    .dm-chat-header-actions #btn-dm-search.is-active,
+    .dm-chat-header-actions #btn-dm-info.is-active {
+      background: #fff4ed;
+    }
+    .dm-chat-header-actions #btn-dm-search.is-active::before,
+    .dm-chat-header-actions #btn-dm-info.is-active::before {
+      color: #d0592f;
+    }
+    .dm-chat-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #f4eee6;
+      background: #fff;
+    }
+    #dm-message-search {
+      min-width: 0;
+      flex: 1;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid #ebe1d6;
+      background: #fbf8f4;
+      font-size: 11.5px;
+      color: #1f1a16;
+    }
+    #dm-message-search:focus {
+      outline: none;
+      border-color: #efc7b3;
+      background: #fff;
+    }
+    .dm-chat-search-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .dm-chat-search-count {
+      min-width: 44px;
+      text-align: center;
+      font-size: 10px;
+      color: #8d8378;
+      font-variant-numeric: tabular-nums;
+    }
+    .dm-chat-context {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px 11px;
+      border-bottom: 1px solid #f4eee6;
+      background: linear-gradient(180deg, #fff 0%, #fdf9f4 100%);
+    }
+    .dm-chat-context-copy {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+    .dm-chat-context-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7f7468;
+    }
+    .dm-chat-context-meta {
+      font-size: 10px;
+      color: #9a9084;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-chat-media-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .dm-chat-media-strip::-webkit-scrollbar {
+      display: none;
+    }
+    .dm-chat-media-thumb {
+      width: 52px;
+      height: 52px;
+      padding: 0;
+      border: 1px solid #eee3d7;
+      border-radius: 14px;
+      background: #fff;
+      overflow: hidden;
+      cursor: pointer;
+      flex: 0 0 auto;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+    .dm-chat-media-thumb:hover,
+    .dm-chat-media-thumb:focus-visible {
+      transform: translateY(-1px);
+      border-color: #f0c7b4;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+      outline: none;
+    }
+    .dm-chat-media-thumb img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      background: #f2ece4;
+    }
     .dm-chat-stage {
       min-height: 0;
       background: #fff;
@@ -5199,6 +5337,12 @@
     }
     .dm-message-row.is-highlighted .dm-message-bubble {
       box-shadow: 0 0 0 2px rgba(239, 91, 42, 0.16);
+    }
+    .dm-message-row.is-search-match .dm-message-bubble {
+      box-shadow: 0 0 0 1px rgba(239, 91, 42, 0.14);
+    }
+    .dm-message-row.is-search-active .dm-message-bubble {
+      box-shadow: 0 0 0 2px rgba(239, 91, 42, 0.24);
     }
     .dm-message-stack {
       min-width: 0;
@@ -5511,6 +5655,12 @@
       background: #fff1f6;
       color: #d14971;
     }
+    .dm-message-tool[data-dm-message-more] {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.08em;
+      color: #8c8176;
+    }
     .dm-reaction-picker {
       display: inline-flex;
       align-items: center;
@@ -5808,6 +5958,9 @@
     body.dm-compose-open {
       overflow: hidden;
     }
+    body.dm-action-sheet-open {
+      overflow: hidden;
+    }
     .dm-compose-backdrop {
       position: absolute;
       inset: 0;
@@ -5827,6 +5980,291 @@
       display: grid;
       grid-template-rows: auto auto auto minmax(0, 1fr);
       gap: 12px;
+    }
+    .dm-action-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 2250;
+      display: grid;
+      place-items: end center;
+      padding: 16px;
+    }
+    .dm-action-sheet-backdrop {
+      position: absolute;
+      inset: 0;
+      border: 0;
+      background: rgba(12, 17, 28, 0.34);
+      cursor: pointer;
+    }
+    .dm-action-sheet-card {
+      position: relative;
+      width: min(420px, 100%);
+      border: 1px solid #eadfce;
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dm-action-sheet-handle {
+      width: 42px;
+      height: 4px;
+      border-radius: 999px;
+      background: #ddd1c3;
+      align-self: center;
+    }
+    .dm-action-sheet-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px 6px 2px;
+      min-width: 0;
+    }
+    .dm-action-sheet-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #1f1a16;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-action-sheet-text {
+      font-size: 11px;
+      line-height: 1.5;
+      color: #7a7064;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .dm-action-sheet-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .dm-action-sheet-btn {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 16px;
+      border: 1px solid #ece1d4;
+      background: #fbf8f4;
+      color: #1f1a16;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+    }
+    .dm-action-sheet-btn:hover,
+    .dm-action-sheet-btn:focus-visible {
+      border-color: #efc9b5;
+      background: #fff4ed;
+      outline: none;
+      transform: translateY(-1px);
+    }
+    .dm-info-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 2240;
+      display: grid;
+      place-items: stretch end;
+      padding: 16px;
+    }
+    .dm-info-backdrop {
+      position: absolute;
+      inset: 0;
+      border: 0;
+      background: rgba(12, 17, 28, 0.28);
+      cursor: pointer;
+    }
+    .dm-info-card {
+      position: relative;
+      width: min(400px, 100%);
+      height: min(100%, 760px);
+      margin-left: auto;
+      border-radius: 28px;
+      border: 1px solid #eadfce;
+      background: #fff;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.16);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: auto;
+    }
+    .dm-info-handle {
+      width: 42px;
+      height: 4px;
+      border-radius: 999px;
+      background: #ddd1c3;
+      align-self: center;
+      display: none;
+    }
+    .dm-info-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+    }
+    .dm-info-avatar {
+      width: 44px;
+      height: 44px;
+      font-size: 14px;
+      border: 1px solid #efe4d8;
+      background: #f8f3ec;
+      box-shadow: none;
+    }
+    .dm-info-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .dm-info-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #1f1a16;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-info-sub {
+      font-size: 11px;
+      color: #8f857a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-info-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .dm-info-actions .btn.is-active {
+      border-color: #f1c5b2;
+      background: #fff4ed;
+      color: #cf582f;
+    }
+    .dm-info-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .dm-info-stat {
+      border: 1px solid #eee3d7;
+      border-radius: 18px;
+      background: #fbf8f4;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .dm-info-stat-value {
+      font-size: 18px;
+      font-weight: 800;
+      color: #1f1a16;
+    }
+    .dm-info-stat-label {
+      font-size: 10px;
+      color: #8c8277;
+    }
+    .dm-info-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid #eee4d8;
+      border-radius: 22px;
+      background: #fff;
+      padding: 12px;
+    }
+    .dm-info-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .dm-info-section-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #1f1a16;
+    }
+    .dm-info-section-meta {
+      font-size: 10px;
+      color: #8f8479;
+      white-space: nowrap;
+    }
+    .dm-info-profile-facts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .dm-info-profile-fact {
+      border: 1px solid #efe4d8;
+      border-radius: 16px;
+      background: #fbf8f4;
+      padding: 10px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .dm-info-profile-fact-label {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #9a8f83;
+    }
+    .dm-info-profile-fact-value {
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.45;
+      color: #1f1a16;
+      word-break: break-word;
+    }
+    .dm-info-media-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .dm-info-media-thumb {
+      aspect-ratio: 1 / 1;
+      border: 1px solid #ede1d4;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #f5efe7;
+      padding: 0;
+      cursor: pointer;
+      transition: transform 0.16s ease, border-color 0.16s ease;
+    }
+    .dm-info-media-thumb:hover,
+    .dm-info-media-thumb:focus-visible {
+      transform: translateY(-1px);
+      border-color: #efc9b5;
+      outline: none;
+    }
+    .dm-info-media-thumb img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+    .dm-info-empty {
+      min-height: 88px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: #faf7f2;
+      color: #8f8579;
+      font-size: 11px;
+      text-align: center;
+      padding: 12px;
+    }
+    .dm-info-search-btn {
+      align-self: flex-start;
     }
     .dm-compose-header {
       display: flex;
@@ -6095,6 +6533,32 @@
       .dm-chat-sub {
         font-size: 9px;
       }
+      .dm-chat-search {
+        gap: 6px;
+        padding: 7px 10px;
+      }
+      #dm-message-search {
+        min-height: 34px;
+        padding-inline: 11px;
+        font-size: 11px;
+      }
+      .dm-chat-search-count {
+        min-width: 38px;
+        font-size: 9px;
+      }
+      .dm-chat-context {
+        gap: 7px;
+        padding: 8px 10px 9px;
+      }
+      .dm-chat-context-label,
+      .dm-chat-context-meta {
+        font-size: 9px;
+      }
+      .dm-chat-media-thumb {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+      }
       .dm-message-list {
         padding: 12px 8px 10px;
       }
@@ -6186,6 +6650,9 @@
         min-width: 22px;
         padding-inline: 6px;
       }
+      .dm-message-tool[data-dm-message-more] {
+        font-size: 14px;
+      }
       .dm-message-reactions {
         gap: 4px;
       }
@@ -6263,6 +6730,67 @@
       .dm-compose-modal {
         align-items: end;
         padding: 0;
+      }
+      .dm-action-sheet {
+        align-items: end;
+        padding: 0;
+      }
+      .dm-action-sheet-card {
+        width: 100%;
+        border-radius: 24px 24px 0 0;
+        padding: 10px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+      }
+      .dm-action-sheet-actions {
+        grid-template-columns: 1fr;
+      }
+      .dm-info-panel {
+        align-items: end;
+        padding: 0;
+      }
+      .dm-info-card {
+        width: 100%;
+        height: min(82vh, 760px);
+        border-radius: 24px 24px 0 0;
+        padding: 10px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+      }
+      .dm-info-handle {
+        display: block;
+      }
+      .dm-info-head {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+      }
+      .dm-info-avatar {
+        width: 40px;
+        height: 40px;
+      }
+      .dm-info-title {
+        font-size: 13px;
+      }
+      .dm-info-sub {
+        font-size: 10px;
+      }
+      .dm-info-actions {
+        gap: 6px;
+      }
+      .dm-info-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .dm-info-stat {
+        padding: 10px;
+      }
+      .dm-info-stat-value {
+        font-size: 16px;
+      }
+      .dm-info-profile-facts {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      .dm-info-profile-fact {
+        padding: 9px 10px;
+      }
+      .dm-info-media-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
       }
       .dm-compose-card {
         width: 100%;
