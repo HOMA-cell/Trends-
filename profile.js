@@ -22,6 +22,8 @@ let profileContext = {
   getAllPosts: () => [],
   getUserPosts: () => [],
   getWorkoutLogsByPost: () => new Map(),
+  getLikesByPost: () => new Map(),
+  getCommentsByPost: () => new Map(),
   getProfilePostCount: () => 0,
   getFollowingCount: () => 0,
   getFollowersCount: () => 0,
@@ -38,6 +40,7 @@ let profileContext = {
   getProfile: async () => null,
   getFollowCounts: async () => ({ following: 0, followers: 0 }),
   setActivePage: () => {},
+  openDmConversation: async () => false,
   toggleFollowForUser: async () => {},
   loadFollowStats: async () => {},
 };
@@ -53,6 +56,8 @@ const getSettings = () => profileContext.getSettings?.() || {};
 const getAllPosts = () => profileContext.getAllPosts?.() || [];
 const getUserPosts = () => profileContext.getUserPosts?.() || [];
 const getWorkoutLogsByPost = () => profileContext.getWorkoutLogsByPost?.() || new Map();
+const getLikesByPost = () => profileContext.getLikesByPost?.() || new Map();
+const getCommentsByPost = () => profileContext.getCommentsByPost?.() || new Map();
 const getProfilePostCount = () => profileContext.getProfilePostCount?.() || 0;
 const getFollowingCount = () => profileContext.getFollowingCount?.() || 0;
 const getFollowersCount = () => profileContext.getFollowersCount?.() || 0;
@@ -69,6 +74,7 @@ const renderGalleryPage = () => profileContext.renderGalleryPage?.();
 const getProfile = (...args) => profileContext.getProfile?.(...args);
 const getFollowCounts = (...args) => profileContext.getFollowCounts?.(...args);
 const setActivePage = (page) => profileContext.setActivePage?.(page);
+const openDmConversation = (...args) => profileContext.openDmConversation?.(...args);
 const toggleFollowForUser = (...args) => profileContext.toggleFollowForUser?.(...args);
 const loadFollowStats = (...args) => profileContext.loadFollowStats?.(...args);
 const followCountCache = new Map();
@@ -79,6 +85,7 @@ const publicProfilePostsCache = {
   byUser: new Map(),
 };
 let publicProfileGallerySignature = "";
+let currentPublicProfileContentTab = "posts";
 const PROFILE_PINNED_POST_KEY = "trends_profile_pinned_post_v1";
 function getPinnedPostsMap() {
   try {
@@ -615,6 +622,183 @@ export function renderProfileQuickStats(targetEl, posts, tr) {
   targetEl.classList.toggle("hidden", quickItems.length === 0);
 }
 
+function renderProfileMetaStat(targetEl, label, value) {
+  if (!targetEl) return;
+  const labelText = `${label || ""}`.trim() || "-";
+  const valueText = `${value ?? "-"}`.trim() || "-";
+  targetEl.innerHTML = "";
+  targetEl.setAttribute("aria-label", `${labelText}: ${valueText}`);
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "profile-meta-value";
+  valueEl.textContent = valueText;
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "profile-meta-label";
+  labelEl.textContent = labelText;
+
+  targetEl.append(valueEl, labelEl);
+}
+
+function formatJoinedText(tr, createdAt) {
+  if (!createdAt) return "";
+  const prefix = tr.profileJoined || "Joined";
+  return `${prefix} ${formatDateDisplay(createdAt)}`.trim();
+}
+
+function buildProfilePostHeadline(post, logs = [], tr = t[getCurrentLang()] || t.ja) {
+  const rawText = (post?.note || post?.caption || "").toString().trim();
+  const firstLine = rawText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (firstLine) {
+    return firstLine.length > 78 ? `${firstLine.slice(0, 78)}…` : firstLine;
+  }
+
+  const names = logs
+    .map((item) => `${item?.exercise || ""}`.trim())
+    .filter(Boolean);
+  if (names.length) {
+    const title = names.slice(0, 2).join(" · ");
+    return names.length > 2 ? `${title} +${names.length - 2}` : title;
+  }
+
+  if (post?.media_url) {
+    return post.media_type === "video"
+      ? tr.mediaVideoLabel || "VIDEO"
+      : tr.mediaPhotoLabel || "PHOTO";
+  }
+
+  return tr.workoutLogTitle || "Workout log";
+}
+
+function buildProfilePostPreview(post, logs = [], tr = t[getCurrentLang()] || t.ja) {
+  const rawText = (post?.note || post?.caption || "")
+    .toString()
+    .replace(/\s*\n+\s*/g, " ")
+    .trim();
+  if (rawText) {
+    return rawText.length > 132 ? `${rawText.slice(0, 132)}…` : rawText;
+  }
+
+  if (logs.length) {
+    const names = logs
+      .map((item) => `${item?.exercise || ""}`.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const setCount = logs.reduce(
+      (sum, item) => sum + ((item?.sets || []).length || 0),
+      0
+    );
+    const segments = [];
+    if (names.length) {
+      segments.push(names.join(" · "));
+    }
+    if (setCount) {
+      segments.push(`${setCount}${tr.workoutSetCountLabel || "セット"}`);
+    }
+    return segments.join(" / ") || (tr.workoutLogTitle || "Workout log");
+  }
+
+  if (post?.media_url) {
+    return post.media_type === "video"
+      ? tr.mediaVideoLabel || "VIDEO"
+      : tr.mediaPhotoLabel || "PHOTO";
+  }
+
+  return "—";
+}
+
+function normalizePublicProfileContentTab(tab = "") {
+  const safeTab = `${tab || ""}`.trim().toLowerCase();
+  if (safeTab === "media" || safeTab === "workouts") return safeTab;
+  return "posts";
+}
+
+function setPublicProfileContentTab(tab = "posts") {
+  currentPublicProfileContentTab = normalizePublicProfileContentTab(tab);
+}
+
+function getPublicProfileContentTab() {
+  return normalizePublicProfileContentTab(currentPublicProfileContentTab);
+}
+
+function updatePublicProfileContentTabs(counts = {}, tr = t[getCurrentLang()] || t.ja) {
+  const activeTab = getPublicProfileContentTab();
+  [
+    {
+      key: "posts",
+      buttonId: "btn-public-tab-posts",
+      countId: "public-tab-posts-count",
+      count: counts.posts || 0,
+      label: tr.profileTabPosts || "Posts",
+    },
+    {
+      key: "media",
+      buttonId: "btn-public-tab-media",
+      countId: "public-tab-media-count",
+      count: counts.media || 0,
+      label: tr.profileTabMedia || "Media",
+    },
+    {
+      key: "workouts",
+      buttonId: "btn-public-tab-workouts",
+      countId: "public-tab-workouts-count",
+      count: counts.workouts || 0,
+      label: tr.profileTabWorkouts || "Workouts",
+    },
+  ].forEach((item) => {
+    const button = $(item.buttonId);
+    const countEl = $(item.countId);
+    if (countEl) {
+      countEl.textContent = formatCompactNumber(item.count || 0);
+    }
+    if (!button) return;
+    const isActive = activeTab === item.key;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    button.setAttribute("tabindex", isActive ? "0" : "-1");
+    button.setAttribute(
+      "aria-label",
+      `${item.label} ${formatCompactNumber(item.count || 0)}`
+    );
+  });
+}
+
+function updatePublicProfileContentSummary(
+  activeTab = "posts",
+  counts = {},
+  tr = t[getCurrentLang()] || t.ja
+) {
+  const titleEl = $("public-profile-content-summary-title");
+  const noteEl = $("public-profile-content-summary-note");
+  const countEl = $("public-profile-content-summary-count");
+  const normalizedTab = normalizePublicProfileContentTab(activeTab);
+  const configByTab = {
+    posts: {
+      label: tr.profileTabPosts || "Posts",
+      note: tr.profileContentPostsHint || "Latest posts",
+      count: counts.posts || 0,
+    },
+    media: {
+      label: tr.profileTabMedia || "Media",
+      note: tr.profileContentMediaHint || "Photos and videos",
+      count: counts.media || 0,
+    },
+    workouts: {
+      label: tr.profileTabWorkouts || "Workouts",
+      note: tr.profileContentWorkoutsHint || "Training logs only",
+      count: counts.workouts || 0,
+    },
+  };
+  const selected = configByTab[normalizedTab] || configByTab.posts;
+  if (titleEl) titleEl.textContent = selected.label;
+  if (noteEl) noteEl.textContent = selected.note;
+  if (countEl) countEl.textContent = formatCompactNumber(selected.count || 0);
+}
+
 export function updateProfileSummary() {
   const cardEl = $("profile-section");
   const bannerEl = $("profile-banner");
@@ -637,10 +821,33 @@ export function updateProfileSummary() {
   const statTodayEl = $("stat-today");
   const statStreakEl = $("stat-streak");
   const statTotalEl = $("stat-total");
+  const accountGlanceEl = $("account-glance");
+  const accountGlanceAvatarEl = $("account-glance-avatar");
+  const accountGlanceNameEl = $("account-glance-name");
+  const accountGlanceHandleEl = $("account-glance-handle");
+  const accountGlanceBioEl = $("account-glance-bio");
+  const accountMiniStatsEl = $("account-mini-stats");
+  const accountMiniPostsEl = $("account-mini-posts");
+  const accountMiniFollowersEl = $("account-mini-followers");
+  const accountMiniStreakEl = $("account-mini-streak");
+  const accountMiniPostsLabelEl = $("account-mini-posts-label");
+  const accountMiniFollowersLabelEl = $("account-mini-followers-label");
+  const accountMiniStreakLabelEl = $("account-mini-streak-label");
+  const accountShortcutsEl = $("account-shortcuts");
 
   const currentUser = getCurrentUser();
   const currentProfile = getCurrentProfile();
   const tr = t[getCurrentLang()] || t.ja;
+
+  if (accountMiniPostsLabelEl) {
+    accountMiniPostsLabelEl.textContent = tr.profilePosts || "Posts";
+  }
+  if (accountMiniFollowersLabelEl) {
+    accountMiniFollowersLabelEl.textContent = tr.profileFollowers || "Followers";
+  }
+  if (accountMiniStreakLabelEl) {
+    accountMiniStreakLabelEl.textContent = tr.profileStreak || "Streak";
+  }
 
   if (
     !cardEl &&
@@ -663,7 +870,10 @@ export function updateProfileSummary() {
     !streakEl &&
     !statTodayEl &&
     !statStreakEl &&
-    !statTotalEl
+    !statTotalEl &&
+    !accountGlanceEl &&
+    !accountMiniStatsEl &&
+    !accountShortcutsEl
   ) {
     return;
   }
@@ -704,30 +914,48 @@ export function updateProfileSummary() {
     }
     if (avatarEl) renderAvatar(avatarEl, null, "-");
     if (nameEl) nameEl.textContent = "-";
-    if (emailEl) emailEl.textContent = "-";
+    if (emailEl) {
+      emailEl.textContent = "-";
+      emailEl.classList.remove("is-handle", "is-email");
+    }
     if (bioEl) {
       bioEl.textContent = "";
       bioEl.classList.add("hidden");
     }
-    if (joinedEl) joinedEl.textContent = "-";
-    if (postsEl) postsEl.textContent = `${tr.profilePosts || "Posts"}: -`;
-    if (followingEl)
-      followingEl.textContent = `${tr.profileFollowing || "Following"}: -`;
-    if (followersEl)
-      followersEl.textContent = `${tr.profileFollowers || "Followers"}: -`;
-    if (streakEl) streakEl.textContent = `${tr.profileStreak || "Streak"}: -`;
+    if (joinedEl) {
+      joinedEl.textContent = "-";
+      joinedEl.classList.add("hidden");
+    }
+    renderProfileMetaStat(postsEl, tr.profilePosts || "Posts", "-");
+    renderProfileMetaStat(followingEl, tr.profileFollowing || "Following", "-");
+    renderProfileMetaStat(followersEl, tr.profileFollowers || "Followers", "-");
+    renderProfileMetaStat(streakEl, tr.profileStreak || "Streak", "-");
     if (statTodayEl) statTodayEl.textContent = "-";
     if (statStreakEl) statStreakEl.textContent = "-";
     if (statTotalEl) statTotalEl.textContent = "-";
+    if (accountGlanceEl) accountGlanceEl.classList.add("hidden");
+    if (accountMiniStatsEl) accountMiniStatsEl.classList.add("hidden");
+    if (accountShortcutsEl) accountShortcutsEl.classList.add("hidden");
+    if (accountGlanceAvatarEl) renderAvatar(accountGlanceAvatarEl, null, "U");
+    if (accountGlanceNameEl) accountGlanceNameEl.textContent = "-";
+    if (accountGlanceHandleEl) {
+      accountGlanceHandleEl.textContent = "";
+      accountGlanceHandleEl.classList.add("hidden");
+    }
+    if (accountGlanceBioEl) {
+      accountGlanceBioEl.textContent = "";
+      accountGlanceBioEl.classList.add("hidden");
+    }
+    if (accountMiniPostsEl) accountMiniPostsEl.textContent = "-";
+    if (accountMiniFollowersEl) accountMiniFollowersEl.textContent = "-";
+    if (accountMiniStreakEl) accountMiniStreakEl.textContent = "-";
     toggleSectionVisibility("profile-facts-title", factsEl);
     toggleSectionVisibility("profile-highlights-title", highlightsEl);
     toggleCollapsibleVisibility("profile-details", false);
     return;
   }
 
-  const joinedStr = currentProfile?.created_at
-    ? formatDateDisplay(currentProfile.created_at)
-    : "-";
+  const joinedText = formatJoinedText(tr, currentProfile?.created_at);
 
   const userPosts = getUserPosts();
   const postCount = userPosts.length || getProfilePostCount() || 0;
@@ -748,10 +976,7 @@ export function updateProfileSummary() {
 
   const displayName = getProfileDisplayName(currentProfile, currentUser.email || "-");
   const handleLabel = currentProfile?.handle ? formatHandle(currentProfile.handle) : "";
-  const nameText =
-    handleLabel && displayName !== handleLabel
-      ? `${displayName} (${handleLabel})`
-      : displayName;
+  const secondaryIdentity = handleLabel || currentUser.email || "-";
 
   if (avatarEl) {
     renderAvatar(
@@ -766,10 +991,12 @@ export function updateProfileSummary() {
     bannerEl.classList.toggle("hidden", !currentProfile?.banner_url);
   }
   if (nameEl) {
-    nameEl.textContent = nameText;
+    nameEl.textContent = displayName;
   }
   if (emailEl) {
-    emailEl.textContent = currentUser.email || "-";
+    emailEl.textContent = secondaryIdentity;
+    emailEl.classList.toggle("is-handle", Boolean(handleLabel));
+    emailEl.classList.toggle("is-email", !handleLabel && Boolean(currentUser.email));
   }
   if (bioEl) {
     const bioText = (currentProfile?.bio || "").trim();
@@ -803,23 +1030,56 @@ export function updateProfileSummary() {
   );
   renderPinnedPostPreview(pinnedEl, pinnedPost, tr);
   if (joinedEl) {
-    joinedEl.textContent = `${tr.profileJoined || "Joined"}: ${joinedStr}`;
+    joinedEl.textContent = joinedText || "-";
+    joinedEl.classList.toggle("hidden", !joinedText);
   }
-  if (postsEl) {
-    postsEl.textContent = `${tr.profilePosts || "Posts"}: ${postCount}`;
-  }
-  if (followingEl) {
-    followingEl.textContent = `${tr.profileFollowing || "Following"}: ${followingCount}`;
-  }
-  if (followersEl) {
-    followersEl.textContent = `${tr.profileFollowers || "Followers"}: ${followersCount}`;
-  }
-  if (streakEl) {
-    streakEl.textContent = `${tr.profileStreak || "Streak"}: ${streak}${tr.profileStreakUnit || ""}`;
-  }
+  renderProfileMetaStat(postsEl, tr.profilePosts || "Posts", postCount);
+  renderProfileMetaStat(
+    followingEl,
+    tr.profileFollowing || "Following",
+    followingCount
+  );
+  renderProfileMetaStat(
+    followersEl,
+    tr.profileFollowers || "Followers",
+    followersCount
+  );
+  renderProfileMetaStat(
+    streakEl,
+    tr.profileStreak || "Streak",
+    `${streak}${tr.profileStreakUnit || ""}`
+  );
   if (statTodayEl) statTodayEl.textContent = `${todayCount}`;
   if (statStreakEl) statStreakEl.textContent = `${streak}`;
   if (statTotalEl) statTotalEl.textContent = `${postCount}`;
+  if (accountGlanceEl) accountGlanceEl.classList.remove("hidden");
+  if (accountMiniStatsEl) accountMiniStatsEl.classList.remove("hidden");
+  if (accountShortcutsEl) accountShortcutsEl.classList.remove("hidden");
+  if (accountGlanceAvatarEl) {
+    renderAvatar(
+      accountGlanceAvatarEl,
+      currentProfile,
+      (displayName || handleLabel || "U").charAt(0).toUpperCase()
+    );
+  }
+  if (accountGlanceNameEl) accountGlanceNameEl.textContent = displayName;
+  if (accountGlanceHandleEl) {
+    const handleText = handleLabel || currentUser.email || "";
+    accountGlanceHandleEl.textContent = handleText;
+    accountGlanceHandleEl.classList.toggle("hidden", !handleText);
+  }
+  if (accountGlanceBioEl) {
+    const bioPreview = `${currentProfile?.bio || ""}`.trim();
+    accountGlanceBioEl.textContent = bioPreview;
+    accountGlanceBioEl.classList.toggle("hidden", !bioPreview);
+  }
+  if (accountMiniPostsEl) accountMiniPostsEl.textContent = formatCompactNumber(postCount);
+  if (accountMiniFollowersEl) {
+    accountMiniFollowersEl.textContent = formatCompactNumber(followersCount);
+  }
+  if (accountMiniStreakEl) {
+    accountMiniStreakEl.textContent = formatCompactNumber(streak);
+  }
 }
 
 export function setupProfileLinks() {
@@ -877,6 +1137,39 @@ export function setupProfileLinks() {
     });
   }
 
+  const messageBtn = $("btn-public-message");
+  if (messageBtn) {
+    messageBtn.addEventListener("click", async () => {
+      if (messageBtn.classList.contains("is-loading")) return;
+      const currentUser = getCurrentUser();
+      const currentPublicProfileId = getCurrentPublicProfileId();
+      if (!currentUser || !currentPublicProfileId || currentUser.id === currentPublicProfileId) {
+        return;
+      }
+      messageBtn.classList.add("is-loading");
+      try {
+        await openDmConversation(currentPublicProfileId);
+      } finally {
+        messageBtn.classList.remove("is-loading");
+      }
+    });
+  }
+
+  document
+    .querySelectorAll("[data-profile-content-tab]")
+    .forEach((button) => {
+      if (button.dataset.bound === "true") return;
+      button.dataset.bound = "true";
+      button.addEventListener("click", () => {
+        const nextTab = button.getAttribute("data-profile-content-tab") || "posts";
+        setPublicProfileContentTab(nextTab);
+        const currentPublicProfileId = getCurrentPublicProfileId();
+        if (currentPublicProfileId) {
+          openPublicProfile(currentPublicProfileId);
+        }
+      });
+    });
+
   const followBtn = $("btn-public-follow");
   if (followBtn) {
     followBtn.addEventListener("click", async () => {
@@ -908,6 +1201,7 @@ export async function openPublicProfile(userId, options = {}) {
   setCurrentPublicProfileId(userId);
   if (prevPublicId !== userId) {
     setPublicPostsVisibleCount(getPublicPostsPageSize());
+    setPublicProfileContentTab("posts");
     toggleCollapsibleVisibility("public-profile-details", false);
   }
 
@@ -932,6 +1226,7 @@ export async function openPublicProfile(userId, options = {}) {
   const followingEl = $("public-profile-following");
   const followersEl = $("public-profile-followers");
   const followBtn = $("btn-public-follow");
+  const messageBtn = $("btn-public-message");
 
   const handleText = formatHandle(handle) || "@user";
   const displayName = profile?.display_name || handleText.replace("@", "");
@@ -965,39 +1260,71 @@ export async function openPublicProfile(userId, options = {}) {
   );
   toggleCollapsibleVisibility("public-profile-details", hasPublicExtras);
   if (joinedEl) {
-    joinedEl.textContent = `${tr.profileJoined || "Joined"}: ${
-      profile?.created_at ? formatDateDisplay(profile.created_at) : "-"
-    }`;
+    const joinedText = formatJoinedText(tr, profile?.created_at);
+    joinedEl.textContent = joinedText || "-";
+    joinedEl.classList.toggle("hidden", !joinedText);
   }
 
   const currentUser = getCurrentUser();
   const allPosts = getAllPosts();
+  const workoutLogsByPost = getWorkoutLogsByPost();
+  const likesByPost = getLikesByPost();
+  const commentsByPost = getCommentsByPost();
   const { userPosts, mediaPosts } = getPublicProfilePostCollections(
     userId,
     allPosts,
     currentUser
   );
+  const workoutPosts = userPosts.filter(
+    (post) => (workoutLogsByPost.get(post.id) || []).length > 0
+  );
+  updatePublicProfileContentTabs(
+    {
+      posts: userPosts.length,
+      media: mediaPosts.length,
+      workouts: workoutPosts.length,
+    },
+    tr
+  );
+  updatePublicProfileContentSummary(
+    getPublicProfileContentTab(),
+    {
+      posts: userPosts.length,
+      media: mediaPosts.length,
+      workouts: workoutPosts.length,
+    },
+    tr
+  );
+  const activeContentTab = getPublicProfileContentTab();
+  const selectedPosts =
+    activeContentTab === "media"
+      ? mediaPosts
+      : activeContentTab === "workouts"
+        ? workoutPosts
+        : userPosts;
 
   renderProfileStatsGrid(statsGridEl, userPosts, tr);
   renderProfileQuickStats(quickStatsEl, userPosts, tr);
   const metrics = buildProfileMetrics(userPosts, getWorkoutLogsByPost());
 
-  if (postsEl) {
-    postsEl.textContent = `${tr.profilePosts || "Posts"}: ${userPosts.length}`;
-  }
-  if (streakEl) {
-    streakEl.textContent = `${tr.profileStreak || "Streak"}: ${
-      metrics.streak
-    }${tr.profileStreakUnit || ""}`;
-  }
+  renderProfileMetaStat(postsEl, tr.profilePosts || "Posts", userPosts.length);
+  renderProfileMetaStat(
+    streakEl,
+    tr.profileStreak || "Streak",
+    `${metrics.streak}${tr.profileStreakUnit || ""}`
+  );
 
   const counts = await loadFollowCountsCached(userId, { force: forceCounts });
-  if (followingEl) {
-    followingEl.textContent = `${tr.profileFollowing || "Following"}: ${counts.following}`;
-  }
-  if (followersEl) {
-    followersEl.textContent = `${tr.profileFollowers || "Followers"}: ${counts.followers}`;
-  }
+  renderProfileMetaStat(
+    followingEl,
+    tr.profileFollowing || "Following",
+    counts.following
+  );
+  renderProfileMetaStat(
+    followersEl,
+    tr.profileFollowers || "Followers",
+    counts.followers
+  );
   const badges = buildProfileBadges(metrics, profile, counts.followers, tr);
   renderProfileBadges(badgesEl, badges);
   const pinnedPostId = getPinnedPostIdForUser(userId);
@@ -1017,46 +1344,185 @@ export async function openPublicProfile(userId, options = {}) {
       followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
     }
   }
+  if (messageBtn) {
+    const canMessage = !!currentUser && currentUser.id !== userId;
+    messageBtn.classList.toggle("hidden", !canMessage);
+    messageBtn.disabled = !canMessage;
+    if (canMessage) {
+      messageBtn.textContent = tr.message || "Message";
+      messageBtn.setAttribute(
+        "aria-label",
+        `${tr.message || "Message"} ${displayName}`
+      );
+    } else {
+      messageBtn.removeAttribute("aria-label");
+    }
+  }
 
   const list = $("public-profile-posts-list");
   const moreWrap = $("public-posts-more");
   const moreHint = $("public-posts-hint");
   const moreBtn = $("btn-public-posts-more");
+  const gallerySection = $("public-profile-gallery-section");
   if (list) {
+    list.classList.toggle("hidden", activeContentTab === "media");
     list.innerHTML = "";
-    if (!userPosts.length) {
+    if (!selectedPosts.length && activeContentTab !== "media") {
       const empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = tr.emptyFeed || "No posts.";
+      empty.textContent =
+        activeContentTab === "workouts"
+          ? tr.profileWorkoutEmpty || "No workout posts yet."
+          : tr.emptyFeed || "No posts.";
       list.appendChild(empty);
-    } else {
-      const visiblePosts = userPosts.slice(0, getPublicPostsVisibleCount());
+    } else if (activeContentTab !== "media") {
+      const visiblePosts = selectedPosts.slice(0, getPublicPostsVisibleCount());
       visiblePosts.forEach((post) => {
+        const logs = workoutLogsByPost.get(post.id) || [];
+        const likeCount = Number(likesByPost.get(post.id) || 0);
+        const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
+        const setCount = logs.reduce(
+          (sum, item) => sum + ((item?.sets || []).length || 0),
+          0
+        );
+        const headlineText = buildProfilePostHeadline(post, logs, tr);
+        const previewText = buildProfilePostPreview(post, logs, tr);
         const clone = document.createElement("div");
-        clone.className = "post-card";
+        clone.className = "post-card public-profile-post-card";
         clone.setAttribute("data-post-id", post.id);
+        const shell = document.createElement("div");
+        shell.className = "public-profile-post-shell";
+        const copy = document.createElement("div");
+        copy.className = "public-profile-post-copy";
+        const titleRow = document.createElement("div");
+        titleRow.className = "public-profile-post-top";
         const title = document.createElement("div");
         title.className = "post-sub";
         title.textContent = formatDateDisplay(post.date || post.created_at || "");
-        const body = document.createElement("div");
-        body.className = "post-body";
-        const rawText = (post.note || post.caption || "").toString().trim();
-        const maxLen = 80;
-        let preview = rawText;
-        if (preview.length > maxLen) {
-          preview = `${preview.slice(0, maxLen)}…`;
+        titleRow.appendChild(title);
+
+        const badgeRow = document.createElement("div");
+        badgeRow.className = "public-profile-post-badges";
+        if (post.visibility === "private") {
+          const privateBadge = document.createElement("span");
+          privateBadge.className = "public-profile-post-badge is-private";
+          privateBadge.textContent = tr.privateOnly || "Private";
+          badgeRow.appendChild(privateBadge);
         }
-        body.textContent = preview || "—";
-        clone.appendChild(title);
-        clone.appendChild(body);
+        if (post.media_url) {
+          const mediaBadge = document.createElement("span");
+          mediaBadge.className = "public-profile-post-badge";
+          mediaBadge.textContent =
+            post.media_type === "video"
+              ? tr.mediaVideoLabel || "VIDEO"
+              : tr.mediaPhotoLabel || "PHOTO";
+          badgeRow.appendChild(mediaBadge);
+        }
+        if (logs.length) {
+          const workoutBadge = document.createElement("span");
+          workoutBadge.className = "public-profile-post-badge is-workout";
+          workoutBadge.textContent = `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`;
+          badgeRow.appendChild(workoutBadge);
+        }
+        if (badgeRow.childNodes.length) {
+          titleRow.appendChild(badgeRow);
+        }
+        const headline = document.createElement("div");
+        headline.className = "public-profile-post-title";
+        headline.textContent = headlineText;
+
+        const body = document.createElement("div");
+        body.className = "post-body public-profile-post-preview";
+        body.textContent = previewText;
+
+        const summary = document.createElement("div");
+        summary.className = "public-profile-post-summary";
+        [
+          logs.length
+            ? {
+                icon: "🏋",
+                text: `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`,
+              }
+            : null,
+          setCount
+            ? {
+                icon: "◎",
+                text: `${setCount}${tr.workoutSetCountLabel || "セット"}`,
+              }
+            : null,
+          likeCount
+            ? {
+                icon: "♡",
+                text: formatCompactNumber(likeCount),
+              }
+            : null,
+          commentCount
+            ? {
+                icon: "💬",
+                text: formatCompactNumber(commentCount),
+              }
+            : null,
+        ]
+          .filter(Boolean)
+          .slice(0, 4)
+          .forEach((item) => {
+            const chip = document.createElement("span");
+            chip.className = "public-profile-post-summary-chip";
+            const icon = document.createElement("span");
+            icon.className = "public-profile-post-summary-icon";
+            icon.textContent = item.icon;
+            const text = document.createElement("span");
+            text.className = "public-profile-post-summary-text";
+            text.textContent = item.text;
+            chip.append(icon, text);
+            summary.appendChild(chip);
+          });
+
+        copy.appendChild(titleRow);
+        copy.appendChild(headline);
+        copy.appendChild(body);
+        if (summary.childNodes.length) {
+          copy.appendChild(summary);
+        }
+        shell.appendChild(copy);
+        if (post.media_url) {
+          const thumb = document.createElement("div");
+          thumb.className = "public-profile-post-thumb";
+          const mediaLabel = document.createElement("span");
+          mediaLabel.className = "public-profile-post-thumb-badge";
+          mediaLabel.textContent =
+            post.media_type === "video"
+              ? tr.mediaVideoLabel || "VIDEO"
+              : tr.mediaPhotoLabel || "PHOTO";
+          thumb.appendChild(mediaLabel);
+          if (post.media_type === "video") {
+            const video = document.createElement("video");
+            video.src = post.media_url;
+            video.muted = true;
+            video.playsInline = true;
+            video.preload = "metadata";
+            thumb.appendChild(video);
+          } else {
+            const img = document.createElement("img");
+            img.src = post.media_url;
+            img.alt = displayName || handleText;
+            img.loading = "lazy";
+            img.decoding = "async";
+            img.referrerPolicy = "no-referrer";
+            thumb.appendChild(img);
+          }
+          shell.appendChild(thumb);
+        }
+        clone.appendChild(shell);
         list.appendChild(clone);
       });
     }
   }
 
   if (moreWrap && moreBtn && moreHint) {
-    const remaining = Math.max(0, userPosts.length - getPublicPostsVisibleCount());
-    moreWrap.classList.toggle("hidden", remaining === 0);
+    const remaining = Math.max(0, selectedPosts.length - getPublicPostsVisibleCount());
+    const shouldHideMore = activeContentTab === "media" || remaining === 0;
+    moreWrap.classList.toggle("hidden", shouldHideMore);
     moreHint.textContent = remaining
       ? (tr.feedMoreHint || "あと{count}件").replace("{count}", remaining)
       : "";
@@ -1077,6 +1543,9 @@ export async function openPublicProfile(userId, options = {}) {
     setCurrentGalleryPosts(mediaPosts);
     setGalleryPage(1);
     publicProfileGallerySignature = gallerySignature;
+  }
+  if (gallerySection) {
+    gallerySection.classList.toggle("hidden", activeContentTab !== "media");
   }
   renderGalleryPage();
 

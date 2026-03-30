@@ -50,6 +50,7 @@ let feedContext = {
   renderInsights: () => {},
   renderOnboardingChecklist: () => {},
   setActivePage: () => {},
+  openDmShareComposer: () => {},
   onFeedLayoutChange: null,
   openPostModal: () => {},
 };
@@ -78,6 +79,7 @@ const loadFollowStats = (...args) => feedContext.loadFollowStats?.(...args);
 const getFollowingIds = () => feedContext.getFollowingIds?.() || new Set();
 const getLikedPostIds = () => feedContext.getLikedPostIds?.() || new Set();
 const getLikesByPost = () => feedContext.getLikesByPost?.() || new Map();
+const openDmShareComposer = (...args) => feedContext.openDmShareComposer?.(...args);
 const getLikesEnabled = () => feedContext.getLikesEnabled?.() ?? true;
 const setLikesEnabled = (value) => feedContext.setLikesEnabled?.(value);
 const loadWorkoutLogs = (...args) => feedContext.loadWorkoutLogs?.(...args);
@@ -113,6 +115,9 @@ let feedNotice = "";
 let feedNoticeTone = "";
 let feedNoticeTimer = null;
 let deferredVideoObserver = null;
+let shortsCardObserver = null;
+let shortsObserverRoot = null;
+let activeShortsPostId = "";
 let feedMoreObserver = null;
 let feedAutoLoadingMore = false;
 let feedLastAutoLoadAt = 0;
@@ -192,6 +197,7 @@ const FEED_FOLLOWED_TOPICS_KEY = "trends_followed_topics_v1";
 const FEED_SEEN_POSTS_KEY = "trends_seen_posts_v1";
 const FEED_REPOST_STATE_KEY = "trends_repost_state_v1";
 const FEED_PINNED_POSTS_KEY = "trends_profile_pinned_post_v1";
+const SHORTS_SOUND_ENABLED_KEY = "trends_shorts_sound_enabled_v1";
 const LIKES_OFFLINE_QUEUE_KEY = "trends_likes_offline_queue_v1";
 const FEED_NETWORK_BACKOFF_KEY = "trends_feed_network_backoff_until_v1";
 const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
@@ -208,13 +214,15 @@ const FEED_PULL_MAX = 128;
 const FEED_PULL_COOLDOWN_MS = 1600;
 const FEED_SEARCH_DEBOUNCE_MS = 220;
 const FEED_WINDOW_MIN_ITEMS = 22;
+const FEED_WINDOW_MIN_ITEMS_MOBILE = 16;
+const FEED_WINDOW_MIN_ITEMS_MOBILE_LITE = 12;
 const FEED_WINDOW_MARGIN_PX = 820;
 const FEED_WINDOW_RUN_INTERVAL_MS = 110;
 const FEED_WINDOW_MIN_SCROLL_DELTA_PX = 28;
 const FEED_WINDOW_SCAN_LIMIT_DESKTOP = 120;
-const FEED_WINDOW_SCAN_LIMIT_MOBILE = 44;
+const FEED_WINDOW_SCAN_LIMIT_MOBILE = 28;
 const FEED_WINDOW_MUTATION_BUDGET_DESKTOP = 20;
-const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 6;
+const FEED_WINDOW_MUTATION_BUDGET_MOBILE = 4;
 const FEED_CACHE_POST_LIMIT = 240;
 const FEED_CACHE_TEXT_LIMIT = 600;
 const FEED_CACHE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
@@ -228,7 +236,8 @@ const FEED_SEARCH_CACHE_LIMIT_MOBILE = 1200;
 const FEED_SEARCH_TEXT_LIMIT = 280;
 const FEED_SEARCH_LOG_LIMIT = 8;
 const FEED_CHUNK_TARGET_MS_DESKTOP = 8;
-const FEED_CHUNK_TARGET_MS_MOBILE = 7;
+const FEED_CHUNK_TARGET_MS_MOBILE = 6;
+const FEED_CHUNK_HARD_MAX_MS_MOBILE = 12;
 const FEED_CHUNK_HARD_MAX_MS = 16;
 const FEED_META_BATCH_SIZE = 40;
 const FEED_META_PRELOAD_MULTIPLIER = 5;
@@ -243,6 +252,8 @@ const FEED_DISCOVERY_TAG_LIMIT = 8;
 const FEED_DISCOVERY_USER_LIMIT = 8;
 const FEED_SEEN_POSTS_LIMIT = 2000;
 const FEED_CAPTION_TRIM_LIMIT = 140;
+const shortsVisibilityRatios = new Map();
+let shortsSoundEnabled = false;
 const FEED_CAPTION_TAG_LIMIT = 5;
 const ADS_SETTINGS_KEY = "trends_ads_config_v1";
 const ADSENSE_SCRIPT_BASE =
@@ -260,6 +271,8 @@ let seenPostsObserver = null;
 let adSenseScriptClient = "";
 let adSenseScriptLoading = false;
 let adSenseScriptLoaded = false;
+
+shortsSoundEnabled = loadShortsSoundPreference();
 
 function emitFeedViewModeChanged() {
   if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
@@ -570,6 +583,92 @@ function isCompactViewport() {
       if (typeof window === "undefined") return false;
       return (window.innerWidth || 1024) <= 700;
     }
+function getFeedViewportTier() {
+      if (typeof window === "undefined") return "desktop";
+      const width = window.innerWidth || 1024;
+      if (width <= 700) return "mobile";
+      if (width <= 980) return "tablet";
+      return "desktop";
+    }
+function parseHttpUrl(rawUrl) {
+      const source = `${rawUrl || ""}`.trim();
+      if (!source || !/^https?:\/\//i.test(source)) return null;
+      try {
+        return new URL(source);
+      } catch {
+        return null;
+      }
+    }
+function buildFeedTransformedImageUrl(rawUrl, options = {}) {
+      const source = `${rawUrl || ""}`.trim();
+      if (!source) return "";
+      const url = parseHttpUrl(source);
+      if (!url) return source;
+      const host = `${url.hostname || ""}`.toLowerCase();
+      const isSupabaseStorage =
+        host.includes("supabase.co") &&
+        url.pathname.includes("/storage/v1/object/");
+      if (!isSupabaseStorage) return source;
+      const width = Number(options.width || 0);
+      const quality = Number(options.quality || 0);
+      if (width > 0) {
+        url.searchParams.set("width", `${Math.max(120, Math.round(width))}`);
+      }
+      if (quality > 0) {
+        const clamped = Math.max(35, Math.min(85, Math.round(quality)));
+        url.searchParams.set("quality", `${clamped}`);
+      }
+      if (!/\.gif(\?|#|$)/i.test(source)) {
+        url.searchParams.set("format", "webp");
+      }
+      return url.toString();
+    }
+function getFeedImageDelivery(rawUrl, options = {}) {
+      const source = `${rawUrl || ""}`.trim();
+      if (!source) return { src: "", srcSet: "", sizes: "" };
+      const layout = options.layout === "grid" ? "grid" : "list";
+      const shorts = options.shorts === true;
+      const compact = isCompactViewport();
+      const lowPower = isLiteEffectsEnabled() || isSaveDataEnabled();
+      const viewportWidth =
+        typeof window === "undefined" ? 1024 : Math.max(320, window.innerWidth || 1024);
+      let cssWidth = 320;
+      if (shorts) {
+        cssWidth = Math.min(viewportWidth, 560);
+      } else if (layout === "grid") {
+        const gutter = compact ? 28 : 44;
+        cssWidth = Math.max(160, Math.floor((viewportWidth - gutter) / 2));
+      } else {
+        cssWidth = compact
+          ? Math.max(220, viewportWidth - 40)
+          : Math.min(760, Math.max(320, viewportWidth - 110));
+      }
+      const dprRaw = typeof window === "undefined" ? 1 : Number(window.devicePixelRatio || 1);
+      const dprCap = lowPower ? 1.5 : 2;
+      const dpr = Math.max(1, Math.min(dprCap, dprRaw));
+      const width1x = Math.max(160, Math.round(cssWidth));
+      const width2x = Math.max(width1x, Math.round(cssWidth * dpr));
+      const quality = lowPower ? 50 : compact ? 60 : 68;
+      const src = buildFeedTransformedImageUrl(source, {
+        width: width1x,
+        quality,
+      });
+      const src2x = buildFeedTransformedImageUrl(source, {
+        width: width2x,
+        quality,
+      });
+      const srcSet = src2x && src2x !== src ? `${src} 1x, ${src2x} 2x` : "";
+      const sizes = shorts
+        ? "100vw"
+        : layout === "grid"
+        ? "(max-width: 700px) 48vw, (max-width: 980px) 32vw, 280px"
+        : "(max-width: 700px) 100vw, 760px";
+      return {
+        src: src || source,
+        srcSet,
+        sizes,
+      };
+    }
 function getFeedImageHydrationConcurrency() {
       if (isLiteEffectsEnabled()) return 1;
       if (isSaveDataEnabled()) return 1;
@@ -697,6 +796,217 @@ function clearMediaSkeleton(mediaWrap) {
       if (skeleton) {
         skeleton.remove();
       }
+    }
+function loadShortsSoundPreference() {
+      if (typeof localStorage === "undefined") return false;
+      try {
+        return localStorage.getItem(SHORTS_SOUND_ENABLED_KEY) === "true";
+      } catch {
+        return false;
+      }
+    }
+function persistShortsSoundPreference() {
+      if (typeof localStorage === "undefined") return;
+      try {
+        localStorage.setItem(
+          SHORTS_SOUND_ENABLED_KEY,
+          shortsSoundEnabled ? "true" : "false"
+        );
+      } catch {
+        // ignore localStorage write failures
+      }
+    }
+function getShortsVideoForCard(card) {
+      return card?.querySelector?.(".shorts-media video") || null;
+    }
+function getShortsButtonForCard(card, action) {
+      if (!card || !action) return null;
+      return card.querySelector(`button[data-post-action="${action}"]`);
+    }
+function syncShortsSoundButton(card) {
+      const button = getShortsButtonForCard(card, "toggle-shorts-sound");
+      if (!button) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      const isMuted = !shortsSoundEnabled;
+      button.classList.toggle("is-active", !isMuted);
+      button.textContent = isMuted ? "🔇" : "♪";
+      button.setAttribute(
+        "aria-label",
+        isMuted
+          ? tr.shortsUnmute || "Turn sound on"
+          : tr.shortsMute || "Mute"
+      );
+      button.title = isMuted
+        ? tr.shortsSoundOff || "Sound off"
+        : tr.shortsSoundOn || "Sound on";
+    }
+function syncShortsPlayButton(card, videoEl = null) {
+      const button = getShortsButtonForCard(card, "toggle-shorts-play");
+      if (!button) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      const targetVideo = videoEl || getShortsVideoForCard(card);
+      const isPlaying = !!targetVideo && !targetVideo.paused;
+      button.classList.toggle("is-active", isPlaying);
+      button.textContent = isPlaying ? "❚❚" : "▶";
+      button.setAttribute(
+        "aria-label",
+        isPlaying
+          ? tr.shortsPause || "Pause short"
+          : tr.shortsPlay || "Play short"
+      );
+      button.title = isPlaying
+        ? tr.shortsTapPause || "Tap to pause"
+        : tr.shortsTapPlay || "Tap to play";
+    }
+function syncShortsCardVideo(card, { shouldPlay = false } = {}) {
+      if (!card) return;
+      const videoEl = getShortsVideoForCard(card);
+      if (!videoEl) return;
+      videoEl.muted = !shortsSoundEnabled;
+      videoEl.defaultMuted = !shortsSoundEnabled;
+      card.classList.toggle("is-muted", !shortsSoundEnabled);
+      if (shouldPlay) {
+        hydrateDeferredVideo(videoEl);
+        const playPromise = videoEl.play?.();
+        if (playPromise?.catch) {
+          playPromise.catch(() => {
+            card.classList.add("is-paused");
+            syncShortsPlayButton(card, videoEl);
+          });
+        }
+      } else {
+        try {
+          videoEl.pause?.();
+        } catch {
+          // ignore pause errors
+        }
+      }
+      card.classList.toggle("is-paused", !!videoEl.paused);
+      syncShortsPlayButton(card, videoEl);
+      syncShortsSoundButton(card);
+    }
+function syncAllShortsCards(root = shortsObserverRoot) {
+      if (!root) return;
+      root.querySelectorAll(".shorts-card").forEach((card) => {
+        syncShortsCardVideo(card, {
+          shouldPlay: `${card.getAttribute("data-post-id") || ""}` === activeShortsPostId,
+        });
+      });
+    }
+function setActiveShortsCard(nextCard, root = shortsObserverRoot) {
+      const nextId = `${nextCard?.getAttribute?.("data-post-id") || ""}`;
+      if (activeShortsPostId === nextId) {
+        if (nextCard) {
+          nextCard.classList.add("is-active");
+          syncShortsCardVideo(nextCard, { shouldPlay: true });
+        }
+        return;
+      }
+      activeShortsPostId = nextId;
+      const cards = root?.querySelectorAll?.(".shorts-card") || [];
+      cards.forEach((card) => {
+        const isActive = `${card.getAttribute("data-post-id") || ""}` === nextId;
+        card.classList.toggle("is-active", isActive);
+        syncShortsCardVideo(card, { shouldPlay: isActive });
+      });
+    }
+function refreshActiveShortsCard(root = shortsObserverRoot) {
+      if (!root) return;
+      let bestCard = null;
+      let bestRatio = 0;
+      root.querySelectorAll(".shorts-card").forEach((card) => {
+        const postId = `${card.getAttribute("data-post-id") || ""}`;
+        const ratio = Number(shortsVisibilityRatios.get(postId) || 0);
+        if (ratio > bestRatio) {
+          bestRatio = ratio;
+          bestCard = card;
+        }
+      });
+      if (!bestCard) {
+        bestCard = root.querySelector(".shorts-card");
+      }
+      if (bestRatio < 0.4 && root.querySelector(".shorts-card.is-active")) {
+        return;
+      }
+      setActiveShortsCard(bestCard, root);
+    }
+function resetShortsCardObserver() {
+      if (shortsCardObserver) {
+        shortsCardObserver.disconnect();
+        shortsCardObserver = null;
+      }
+      shortsObserverRoot = null;
+      activeShortsPostId = "";
+      shortsVisibilityRatios.clear();
+    }
+function ensureShortsCardObserver(root) {
+      if (!root) return null;
+      if (shortsCardObserver && shortsObserverRoot === root) {
+        return shortsCardObserver;
+      }
+      resetShortsCardObserver();
+      if (typeof IntersectionObserver === "undefined") {
+        return null;
+      }
+      shortsObserverRoot = root;
+      shortsCardObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const card = entry.target;
+            const postId = `${card?.getAttribute?.("data-post-id") || ""}`;
+            if (!postId) return;
+            shortsVisibilityRatios.set(postId, entry.isIntersecting ? entry.intersectionRatio : 0);
+          });
+          refreshActiveShortsCard(root);
+        },
+        {
+          root,
+          threshold: [0.25, 0.5, 0.72, 0.9],
+        }
+      );
+      return shortsCardObserver;
+    }
+function observeShortsCard(card, root) {
+      if (!card) return;
+      const observer = ensureShortsCardObserver(root);
+      if (!observer) {
+        return;
+      }
+      observer.observe(card);
+    }
+function toggleShortsSoundPreference() {
+      shortsSoundEnabled = !shortsSoundEnabled;
+      persistShortsSoundPreference();
+      syncAllShortsCards();
+      const tr = t[getCurrentLang()] || t.ja;
+      showToast(
+        shortsSoundEnabled
+          ? tr.shortsSoundOn || "Sound on"
+          : tr.shortsSoundOff || "Sound off",
+        "info"
+      );
+    }
+function toggleShortsPlayback(card) {
+      const videoEl = getShortsVideoForCard(card);
+      if (!videoEl) return;
+      hydrateDeferredVideo(videoEl);
+      if (videoEl.paused) {
+        const playPromise = videoEl.play?.();
+        if (playPromise?.catch) {
+          playPromise.catch(() => {
+            card.classList.add("is-paused");
+            syncShortsPlayButton(card, videoEl);
+          });
+        }
+      } else {
+        try {
+          videoEl.pause?.();
+        } catch {
+          // ignore pause errors
+        }
+      }
+      card.classList.toggle("is-paused", !!videoEl.paused);
+      syncShortsPlayButton(card, videoEl);
     }
 function ensureFeedMoreObserver() {
       if (feedMoreObserver) {
@@ -1498,8 +1808,6 @@ function ensureSeenPostsObserver() {
             const changed = markPostAsSeen(postId);
             if (changed) {
               card.classList.add("post-card-seen");
-              const badge = card.querySelector(".post-new-badge");
-              if (badge) badge.remove();
             }
             seenPostsObserver?.unobserve(card);
           });
@@ -2036,10 +2344,10 @@ function getRecommendedFeedPageSize() {
       const medium = viewportWidth <= 980;
       const lite = isLiteEffectsEnabled();
       if (feedLayout === "grid") {
-        if (compact) return lite ? 4 : 6;
+        if (compact) return lite ? 4 : 5;
         return medium ? (lite ? 6 : 8) : lite ? 8 : 10;
       }
-      if (compact) return lite ? 4 : 5;
+      if (compact) return lite ? 3 : 4;
       return medium ? (lite ? 5 : 6) : lite ? 7 : 8;
     }
 function syncFeedPageSize(options = {}) {
@@ -2065,7 +2373,7 @@ function getFeedChunkBounds(layout = "list", compactViewport = false) {
         if (compactViewport) {
           return lowPower
             ? { min: 1, max: 3, defaultSize: 2 }
-            : { min: 2, max: 6, defaultSize: 4 };
+            : { min: 2, max: 5, defaultSize: 3 };
         }
         return lowPower
           ? { min: 2, max: 6, defaultSize: 4 }
@@ -2074,7 +2382,7 @@ function getFeedChunkBounds(layout = "list", compactViewport = false) {
       if (compactViewport) {
         return lowPower
           ? { min: 1, max: 2, defaultSize: 1 }
-          : { min: 1, max: 4, defaultSize: 2 };
+          : { min: 1, max: 3, defaultSize: 2 };
       }
       return lowPower
         ? { min: 2, max: 4, defaultSize: 3 }
@@ -2106,12 +2414,17 @@ function tuneAdaptiveFeedChunkSize(
       if (isLiteEffectsEnabled()) {
         targetMs = Math.max(4, targetMs - 2);
       }
+      const hardMaxMs = compactViewport
+        ? FEED_CHUNK_HARD_MAX_MS_MOBILE
+        : FEED_CHUNK_HARD_MAX_MS;
+      const slowThreshold = compactViewport ? targetMs * 1.22 : targetMs * 1.35;
+      const fastThreshold = compactViewport ? targetMs * 0.58 : targetMs * 0.52;
       let next = current;
-      if (chunkDurationMs > FEED_CHUNK_HARD_MAX_MS) {
+      if (chunkDurationMs > hardMaxMs) {
         next = current - 1;
-      } else if (chunkDurationMs > targetMs * 1.35) {
+      } else if (chunkDurationMs > slowThreshold) {
         next = current - 1;
-      } else if (chunkDurationMs < targetMs * 0.52 && renderedCount >= current) {
+      } else if (chunkDurationMs < fastThreshold && renderedCount >= current) {
         next = current + 1;
       }
       next = Math.max(bounds.min, Math.min(bounds.max, Math.round(next)));
@@ -2382,6 +2695,24 @@ function getCommentSheetBackdrop() {
 function getCommentSheetBody() {
       return $("comment-sheet-body");
     }
+function isShortsStylePost(post) {
+      return Boolean(post && post.media_type === "video");
+    }
+function syncCommentSheetContextClasses(post = null) {
+      const backdrop = getCommentSheetBackdrop();
+      const body = getCommentSheetBody();
+      const panel = backdrop?.querySelector(".comment-sheet-panel");
+      const isShortsContext = isShortsStylePost(post);
+      if (backdrop) {
+        backdrop.classList.toggle("is-shorts-context", isShortsContext);
+      }
+      if (panel) {
+        panel.classList.toggle("is-shorts-context", isShortsContext);
+      }
+      if (body) {
+        body.classList.toggle("is-shorts-context", isShortsContext);
+      }
+    }
 function isCommentSheetOpenForPost(postId) {
       const normalizedPostId = `${postId || ""}`.trim();
       if (!normalizedPostId) return false;
@@ -2395,6 +2726,7 @@ function isCommentSheetOpenForPost(postId) {
 function closeCommentSheet() {
       const previousPostId = activeCommentPostId;
       activeCommentPostId = "";
+      syncCommentSheetContextClasses(null);
       const backdrop = getCommentSheetBackdrop();
       if (backdrop) {
         closeBackdrop(backdrop);
@@ -2409,22 +2741,32 @@ function renderCommentSheetForPost(postId) {
       const post = getPostById(normalizedPostId);
       const bodyRoot = getCommentSheetBody();
       const titleEl = $("comment-sheet-title");
+      const subtitleEl = $("comment-sheet-subtitle");
       if (!bodyRoot) return;
       bodyRoot.innerHTML = "";
       if (!post) return;
+      syncCommentSheetContextClasses(post);
       const tr = t[getCurrentLang()] || t.ja;
       const currentUser = getCurrentUser();
       const commentsByPost = getCommentsByPost();
       const commentsLoading = getCommentsLoading();
       const commentsEnabled = isCommentsEnabled();
-      const handle = formatHandle(
-        post.profile?.handle || post.profile?.username || "user"
-      );
+      const comments = commentsByPost.get(post.id) || [];
       if (titleEl) {
         const commentsTitle = tr.comments || "Comments";
-        titleEl.textContent = handle
-          ? `${commentsTitle} · ${handle}`
+        titleEl.textContent = comments.length
+          ? `${commentsTitle} (${comments.length})`
           : commentsTitle;
+      }
+      if (subtitleEl) {
+        subtitleEl.textContent = getCommentSheetSubtitle(post, tr);
+      }
+      const context = buildCommentSheetContext(post, tr, {
+        commentCount: comments.length,
+      });
+      if (context) {
+        context.classList.toggle("is-shorts-context", isShortsStylePost(post));
+        bodyRoot.appendChild(context);
       }
       const section = buildFeedCommentSection(
         post,
@@ -2436,6 +2778,7 @@ function renderCommentSheetForPost(postId) {
       );
       if (section) {
         section.classList.add("comment-sheet-content");
+        section.classList.toggle("is-shorts-context", isShortsStylePost(post));
         bodyRoot.appendChild(section);
       }
     }
@@ -2523,6 +2866,14 @@ function setupFeedCardActionDelegation() {
         if (!post) return;
         if (action === "toggle-like") {
           await toggleLikeForPost(post);
+          return;
+        }
+        if (action === "toggle-shorts-sound") {
+          toggleShortsSoundPreference();
+          return;
+        }
+        if (action === "toggle-shorts-play") {
+          toggleShortsPlayback(card);
           return;
         }
         if (action === "toggle-save") {
@@ -2658,12 +3009,24 @@ function setupFeedCardActionDelegation() {
             typeof window !== "undefined" ? window.location.pathname : "";
           const shareUrl = `${origin}${path}#post=${post.id}`;
           const shareTextRaw = `${post?.note || post?.caption || ""}`.trim();
+          const shareTitle = shareTextRaw
+            ? shareTextRaw.slice(0, 80)
+            : post?.profile?.display_name ||
+              formatHandle(post?.profile?.handle || "") ||
+              tr.dmSharePreviewFallback ||
+              tr.detailTitle ||
+              "Trends post";
           const sharePayload = {
-            title: tr.detailTitle || "Post details",
+            title: shareTitle,
             text: shareTextRaw ? shareTextRaw.slice(0, 160) : "",
             url: shareUrl,
+            postId: post.id,
           };
           try {
+            if (getCurrentUser()) {
+              openDmShareComposer(sharePayload);
+              return;
+            }
             if (
               typeof navigator !== "undefined" &&
               typeof navigator.share === "function"
@@ -2786,12 +3149,25 @@ function restoreFeedMoreAnchor(moreWrap, preferredBehavior = "auto") {
 function getFeedWindowMinItems() {
       if (typeof window === "undefined") return FEED_WINDOW_MIN_ITEMS;
       const width = window.innerWidth || 1024;
-      return width <= 700 ? Math.max(30, FEED_WINDOW_MIN_ITEMS) : FEED_WINDOW_MIN_ITEMS;
+      if (width <= 700) {
+        const lowPower = isLiteEffectsEnabled() || isSaveDataEnabled();
+        return lowPower
+          ? FEED_WINDOW_MIN_ITEMS_MOBILE_LITE
+          : FEED_WINDOW_MIN_ITEMS_MOBILE;
+      }
+      if (width <= 980) {
+        return Math.max(24, FEED_WINDOW_MIN_ITEMS);
+      }
+      return FEED_WINDOW_MIN_ITEMS;
     }
 function isFeedWindowingAllowed() {
       if (typeof window === "undefined") return true;
       const width = window.innerWidth || 1024;
-      return width > 700;
+      if (width > 700) return true;
+      if (width <= 360) return false;
+      const settings = getSettings();
+      if (settings?.mobileFeedWindowing === false) return false;
+      return true;
     }
 function getFeedWindowRuntimeSettings() {
       if (typeof window === "undefined") {
@@ -2809,28 +3185,30 @@ function getFeedWindowRuntimeSettings() {
       const lowPower = isLiteEffectsEnabled() || isSaveDataEnabled();
       return {
         marginPx: mobile
-          ? lowPower ? 380 : 440
+          ? lowPower ? 260 : 320
           : compact
           ? lowPower ? 560 : 640
           : lowPower
           ? 760
           : FEED_WINDOW_MARGIN_PX,
         runIntervalMs: mobile
-          ? lowPower ? 240 : 180
+          ? lowPower ? 320 : 240
           : lowPower
           ? 150
           : FEED_WINDOW_RUN_INTERVAL_MS,
         minScrollDeltaPx: mobile
-          ? lowPower ? 88 : 70
+          ? lowPower ? 120 : 92
           : lowPower
           ? 36
           : FEED_WINDOW_MIN_SCROLL_DELTA_PX,
         scanLimit: mobile
-          ? FEED_WINDOW_SCAN_LIMIT_MOBILE
+          ? lowPower
+            ? Math.max(14, FEED_WINDOW_SCAN_LIMIT_MOBILE - 8)
+            : FEED_WINDOW_SCAN_LIMIT_MOBILE
           : FEED_WINDOW_SCAN_LIMIT_DESKTOP,
         mutationBudget: mobile
           ? lowPower
-            ? Math.max(3, FEED_WINDOW_MUTATION_BUDGET_MOBILE - 2)
+            ? Math.max(2, FEED_WINDOW_MUTATION_BUDGET_MOBILE - 1)
             : FEED_WINDOW_MUTATION_BUDGET_MOBILE
           : lowPower
           ? Math.max(10, FEED_WINDOW_MUTATION_BUDGET_DESKTOP - 4)
@@ -4343,6 +4721,7 @@ export function renderFeed(options = {}) {
       repostState
     );
     const compactFilterViewport = isCompactViewport();
+    const viewportTier = getFeedViewportTier();
     const allowedFilters = FEED_FILTERS;
     let normalizedFilter = currentFilter;
     if (!allowedFilters.includes(currentFilter)) {
@@ -4375,6 +4754,7 @@ export function renderFeed(options = {}) {
     const restoreMutedBtn = $("btn-feed-restore-muted");
     const restoreMutedTermsBtn = $("btn-feed-restore-muted-terms");
     const mutedTermsWrap = $("feed-muted-terms");
+    const advancedToolsGroup = document.querySelector(".feed-advanced-group-tools");
     if (restoreHiddenBtn) {
       const hasHidden = hiddenPostIds.size > 0;
       restoreHiddenBtn.classList.toggle("hidden", !hasHidden);
@@ -4399,6 +4779,14 @@ export function renderFeed(options = {}) {
         btn.textContent = `#${term}`;
         mutedTermsWrap.appendChild(btn);
       });
+      if (advancedToolsGroup) {
+        const hasManageActions =
+          hiddenPostIds.size > 0 ||
+          mutedUserIds.size > 0 ||
+          previewTerms.length > 0 ||
+          !(retryBtn?.classList.contains("hidden"));
+        advancedToolsGroup.classList.toggle("hidden", !hasManageActions);
+      }
     }
 
     const updateRetryButton = (show = false) => {
@@ -4407,6 +4795,14 @@ export function renderFeed(options = {}) {
       if (!show) {
         retryBtn.classList.remove("is-loading");
         retryBtn.disabled = false;
+      }
+      if (advancedToolsGroup) {
+        const hasManageActions =
+          show ||
+          hiddenPostIds.size > 0 ||
+          mutedUserIds.size > 0 ||
+          Array.from(mutedTerms).length > 0;
+        advancedToolsGroup.classList.toggle("hidden", !hasManageActions);
       }
     };
 
@@ -4539,16 +4935,30 @@ export function renderFeed(options = {}) {
     }
     if (feedOptionsBtn) {
       const filterMenuLabel = tr.feedFilterMenu || "フィルタ";
-      feedOptionsBtn.textContent = filterMenuLabel;
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "⋯";
+      const sr = document.createElement("span");
+      sr.className = "sr-only";
+      sr.textContent = filterMenuLabel;
+      feedOptionsBtn.replaceChildren(icon, sr);
       feedOptionsBtn.setAttribute("aria-label", filterMenuLabel);
+      feedOptionsBtn.setAttribute("title", filterMenuLabel);
       feedOptionsBtn.classList.remove("hidden");
-      feedOptionsBtn.classList.remove("is-icon-btn");
+      feedOptionsBtn.classList.add("is-icon-btn");
     }
     if (refreshBtn) {
       const refreshLabel = tr.feedRefresh || "更新";
-      refreshBtn.textContent = refreshLabel;
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "↻";
+      const sr = document.createElement("span");
+      sr.className = "sr-only";
+      sr.textContent = refreshLabel;
+      refreshBtn.replaceChildren(icon, sr);
       refreshBtn.setAttribute("aria-label", refreshLabel);
-      refreshBtn.classList.remove("is-icon-btn");
+      refreshBtn.setAttribute("title", refreshLabel);
+      refreshBtn.classList.add("is-icon-btn");
     }
     if (shortsModeBtn) {
       const shortsLabel = isShortsMode
@@ -4561,9 +4971,13 @@ export function renderFeed(options = {}) {
       statsToggleBtn.classList.toggle("hidden", !canShowStats);
       statsToggleBtn.disabled = !canShowStats;
       if (canShowStats) {
-        statsToggleBtn.textContent = feedStatsExpanded
-          ? tr.feedStatsHide || "統計を隠す"
-          : tr.feedStatsShow || "統計を表示";
+        statsToggleBtn.textContent = tr.feedStatsCompact || "統計";
+        statsToggleBtn.setAttribute(
+          "aria-label",
+          feedStatsExpanded
+            ? tr.feedStatsHide || "統計を隠す"
+            : tr.feedStatsShow || "統計を表示"
+        );
       }
       statsToggleBtn.classList.toggle("is-active", canShowStats && feedStatsExpanded);
       statsToggleBtn.setAttribute(
@@ -4577,9 +4991,13 @@ export function renderFeed(options = {}) {
       discoveryToggleBtn.classList.toggle("hidden", !canShowDiscovery);
       discoveryToggleBtn.disabled = !canShowDiscovery;
       if (canShowDiscovery) {
-        discoveryToggleBtn.textContent = feedDiscoveryExpanded
-          ? tr.feedDiscoveryHide || "発見を閉じる"
-          : tr.feedDiscoveryShow || "発見を表示";
+        discoveryToggleBtn.textContent = tr.feedDiscoveryCompact || "発見";
+        discoveryToggleBtn.setAttribute(
+          "aria-label",
+          feedDiscoveryExpanded
+            ? tr.feedDiscoveryHide || "発見を閉じる"
+            : tr.feedDiscoveryShow || "発見を表示"
+        );
       }
       discoveryToggleBtn.classList.toggle("is-active", canShowDiscovery && feedDiscoveryExpanded);
       discoveryToggleBtn.setAttribute(
@@ -4740,6 +5158,9 @@ export function renderFeed(options = {}) {
     }
     container.classList.toggle("shorts-view", isShortsMode);
     container.classList.toggle("grid-view", !isShortsMode && feedLayout === "grid");
+    if (!isShortsMode) {
+      resetShortsCardObserver();
+    }
     if (layoutBtn) {
       const label =
         feedLayout === "grid"
@@ -4794,6 +5215,7 @@ export function renderFeed(options = {}) {
           status.classList.add("feed-status-loading");
         }
         resetDeferredVideoObserver();
+        resetShortsCardObserver();
         container.innerHTML = "";
         delete container.dataset.feedSignature;
         feedWindowedCards.clear();
@@ -4859,6 +5281,7 @@ export function renderFeed(options = {}) {
     const renderSignature = [
       effectiveLayout,
       feedViewMode,
+      viewportTier,
       currentFilter,
       forYouTuning,
       filterMedia ? "1" : "0",
@@ -4870,6 +5293,15 @@ export function renderFeed(options = {}) {
       gridCandidates[0]?.id || "",
       gridCandidates[gridCandidates.length - 1]?.id || "",
     ].join("|");
+    const existingPostCards = Array.from(
+      container.querySelectorAll(".post-card[data-post-id]")
+    );
+    const existingPostIds = existingPostCards.map(
+      (card) => `${card.getAttribute("data-post-id") || ""}`
+    );
+    const nextPostIds = visibleSlice.map((post) => `${post?.id || ""}`);
+    const hasWindowPlaceholders =
+      container.querySelector(".feed-window-placeholder[data-post-id]") !== null;
     const existingCount = container.querySelectorAll(
       ".post-card[data-post-id], .feed-window-placeholder[data-post-id]"
     ).length;
@@ -4878,15 +5310,26 @@ export function renderFeed(options = {}) {
       container.dataset.feedSignature === renderSignature &&
       existingCount > 0 &&
       existingCount < visibleSlice.length;
+    const canPatchCards =
+      !canAppend &&
+      !isShortsMode &&
+      !feedAdsEnabled &&
+      !hasWindowPlaceholders &&
+      feedWindowedCards.size === 0 &&
+      container.dataset.feedSignature === renderSignature &&
+      existingPostIds.length > 0 &&
+      existingPostIds.length === nextPostIds.length &&
+      existingPostIds.every((postId, index) => postId === nextPostIds[index]);
     const existingAdCount = canAppend
       ? container.querySelectorAll(".feed-ad-card[data-ad-kind='in-feed']").length
       : 0;
-    const renderMode = canAppend ? "append" : "full";
+    const renderMode = canAppend ? "append" : canPatchCards ? "patch" : "full";
 
     if (!gridCandidates.length) {
       feedChunkRendering = false;
       clearFeedMoreLoadingState();
       resetDeferredVideoObserver();
+      resetShortsCardObserver();
       container.innerHTML = "";
       delete container.dataset.feedSignature;
       syncFeedWindowing(false);
@@ -5048,15 +5491,71 @@ export function renderFeed(options = {}) {
       return;
     }
 
-    if (!canAppend) {
+    if (!canAppend && !canPatchCards) {
       clearFeedMoreLoadingState();
       resetDeferredVideoObserver();
+      if (isShortsMode) {
+        resetShortsCardObserver();
+      }
       container.innerHTML = "";
       if (moreWrap) moreWrap.classList.add("hidden");
     }
     container.dataset.feedSignature = renderSignature;
 
     const localLikedIds = getLikedIds();
+    const buildPostRenderKey = (post) => {
+      if (!post) return "";
+      const postId = `${post?.id || ""}`;
+      const profile = post.profile || {};
+      const logs = workoutLogsByPost.get(post.id) || [];
+      const logsSignature = logs
+        .map((item) => {
+          const exercise = `${item?.exercise || ""}`;
+          const setsCount = Array.isArray(item?.sets) ? item.sets.length : 0;
+          return `${exercise}:${setsCount}`;
+        })
+        .join(",");
+      const likeState = getLikeUiState(post.id, localLikedIds);
+      const commentsCount = (commentsByPost.get(post.id) || []).length || 0;
+      const saved = savedPostIds.has(postId) ? "1" : "0";
+      const following =
+        currentUser && post.user_id && post.user_id !== currentUser.id
+          ? followingIds.has(post.user_id)
+            ? "1"
+            : "0"
+          : "x";
+      const seen = seenPostIds.has(postId) ? "1" : "0";
+      const pinned = isPinnedPostForUser(post.id, post.user_id) ? "1" : "0";
+      const commentSheetOpen = isCommentSheetOpenForPost(post.id) ? "1" : "0";
+      const reason = getForYouReasonLabel(post) || "";
+      return [
+        currentLang,
+        viewportTier,
+        `${post?.id || ""}`,
+        `${post?.user_id || ""}`,
+        `${post?.visibility || ""}`,
+        `${post?.date || ""}`,
+        `${post?.created_at || ""}`,
+        `${post?.updated_at || ""}`,
+        `${post?.note || ""}`,
+        `${post?.caption || ""}`,
+        `${post?.media_url || ""}`,
+        `${post?.media_type || ""}`,
+        `${post?.bodyweight ?? ""}`,
+        `${profile?.display_name || ""}`,
+        `${profile?.handle || ""}`,
+        `${profile?.username || ""}`,
+        `${profile?.avatar_url || ""}`,
+        logsSignature,
+        `${likeState?.isLiked ? "1" : "0"}:${Number(likeState?.likeCount || 0)}:${likeState?.isLoading ? "1" : "0"}`,
+        `${commentsCount}:${commentSheetOpen}`,
+        saved,
+        following,
+        seen,
+        pinned,
+        reason,
+      ].join("|");
+    };
     const shouldAnimateEntry = canAppend && shouldUseFeedEntryAnimation();
     const createShortsCard = (post, feedIndex = 0) => {
       const card = document.createElement("article");
@@ -5068,6 +5567,8 @@ export function renderFeed(options = {}) {
         });
       }
       card.setAttribute("data-post-id", post.id);
+      card.dataset.postRenderKey = buildPostRenderKey(post);
+      const logs = workoutLogsByPost.get(post.id) || [];
       const isSeen = seenPostIds.has(`${post.id || ""}`);
       if (isSeen) {
         card.classList.add("post-card-seen");
@@ -5075,6 +5576,8 @@ export function renderFeed(options = {}) {
 
       const mediaWrap = document.createElement("div");
       mediaWrap.className = "post-media shorts-media";
+      const isVideoMedia = isVideoPost(post);
+      let shortsVideoEl = null;
       mountMediaSkeleton(mediaWrap);
       const renderMediaFallback = () => {
         clearMediaSkeleton(mediaWrap);
@@ -5085,11 +5588,19 @@ export function renderFeed(options = {}) {
         fallback.textContent = tr.mediaUnavailable || "Media unavailable";
         mediaWrap.appendChild(fallback);
       };
+      const shortsImageDelivery = getFeedImageDelivery(post.media_url, {
+        layout: "list",
+        shorts: true,
+      });
       const prioritizeMedia = !appendOnly && feedIndex < 2;
-      if (isVideoPost(post)) {
+      if (isVideoMedia) {
+        mediaWrap.classList.add("is-video");
         const video = document.createElement("video");
         video.preload = prioritizeMedia ? "metadata" : "none";
-        video.controls = true;
+        video.controls = false;
+        video.loop = true;
+        video.muted = !shortsSoundEnabled;
+        video.defaultMuted = !shortsSoundEnabled;
         video.playsInline = true;
         video.classList.add("video-deferred");
         video.dataset.src = post.media_url;
@@ -5101,7 +5612,20 @@ export function renderFeed(options = {}) {
           { once: true }
         );
         video.addEventListener("error", renderMediaFallback, { once: true });
+        video.addEventListener("play", () => {
+          card.classList.remove("is-paused");
+          syncShortsPlayButton(card, video);
+        });
+        video.addEventListener("pause", () => {
+          card.classList.add("is-paused");
+          syncShortsPlayButton(card, video);
+        });
+        video.addEventListener("volumechange", () => {
+          card.classList.toggle("is-muted", video.muted);
+          syncShortsSoundButton(card);
+        });
         observeDeferredVideo(video);
+        shortsVideoEl = video;
         mediaWrap.appendChild(video);
       } else {
         const img = document.createElement("img");
@@ -5111,6 +5635,12 @@ export function renderFeed(options = {}) {
         img.referrerPolicy = "no-referrer";
         img.alt = "short media";
         img.classList.add("image-deferred");
+        if (shortsImageDelivery.srcSet) {
+          img.srcset = shortsImageDelivery.srcSet;
+        }
+        if (shortsImageDelivery.sizes) {
+          img.sizes = shortsImageDelivery.sizes;
+        }
         img.addEventListener(
           "load",
           () => {
@@ -5119,12 +5649,12 @@ export function renderFeed(options = {}) {
           { once: true }
         );
         img.addEventListener("error", renderMediaFallback, { once: true });
-        if (warmedImageUrlSet.has(post.media_url)) {
-          img.src = post.media_url;
+        if (warmedImageUrlSet.has(shortsImageDelivery.src)) {
+          img.src = shortsImageDelivery.src;
           img.dataset.deferredLoaded = "true";
           img.classList.remove("image-deferred");
         } else {
-          img.dataset.src = post.media_url;
+          img.dataset.src = shortsImageDelivery.src;
           observeDeferredImage(img);
         }
         mediaWrap.appendChild(img);
@@ -5141,59 +5671,209 @@ export function renderFeed(options = {}) {
 
       const overlay = document.createElement("div");
       overlay.className = "shorts-overlay";
+      const topBar = document.createElement("div");
+      topBar.className = "shorts-topbar";
+      const progress = document.createElement("div");
+      progress.className = "shorts-progress";
+      const progressTotal = Math.max(visibleSlice.length, 1);
+      const progressIndex = Math.min(feedIndex + 1, progressTotal);
+      const progressRail = document.createElement("div");
+      progressRail.className = "shorts-progress-segments";
+      const visibleSegmentCount = Math.min(progressTotal, 6);
+      const activeOffset = Math.floor(visibleSegmentCount / 2);
+      const segmentWindowStart = Math.max(
+        0,
+        Math.min(progressIndex - 1 - activeOffset, progressTotal - visibleSegmentCount)
+      );
+      for (let offset = 0; offset < visibleSegmentCount; offset += 1) {
+        const absoluteIndex = segmentWindowStart + offset + 1;
+        const segment = document.createElement("span");
+        segment.className = "shorts-progress-segment";
+        if (absoluteIndex < progressIndex) {
+          segment.classList.add("is-complete");
+        } else if (absoluteIndex === progressIndex) {
+          segment.classList.add("is-active");
+        }
+        progressRail.appendChild(segment);
+      }
+      const progressLabel = document.createElement("span");
+      progressLabel.className = "shorts-progress-count";
+      progressLabel.textContent = `${progressIndex} / ${progressTotal}`;
+      progress.append(progressRail, progressLabel);
+      topBar.appendChild(progress);
+      const topBadges = document.createElement("div");
+      topBadges.className = "shorts-topbar-badges";
+      if (isVideoMedia) {
+        const playToggle = document.createElement("button");
+        playToggle.type = "button";
+        playToggle.className = "shorts-top-toggle";
+        playToggle.dataset.postAction = "toggle-shorts-play";
+        topBadges.appendChild(playToggle);
+
+        const soundToggle = document.createElement("button");
+        soundToggle.type = "button";
+        soundToggle.className = "shorts-top-toggle";
+        soundToggle.dataset.postAction = "toggle-shorts-sound";
+        topBadges.appendChild(soundToggle);
+      }
+      const creatorRow = document.createElement("div");
+      creatorRow.className = "shorts-creator-row";
+      const displayName = post.profile?.display_name || "";
+      const content = document.createElement("div");
+      content.className = "shorts-copy shorts-copy-panel";
       const meta = document.createElement("div");
       meta.className = "shorts-meta";
       const rawHandle = post.profile?.handle || post.profile?.username || "user";
       const handleText = formatHandle(rawHandle) || "@user";
       const relativeText = formatRelative(post.date || post.created_at);
       const dateText = formatPostDate(post);
-      const metaLabel = document.createElement("span");
-      metaLabel.textContent = [handleText, relativeText || dateText].filter(Boolean).join(" · ");
-      meta.appendChild(metaLabel);
+      const authorButton = document.createElement("button");
+      authorButton.type = "button";
+      authorButton.className = "shorts-author profile-link";
+      authorButton.setAttribute("data-user-id", post.user_id || "");
+      const authorAvatar = document.createElement("div");
+      authorAvatar.className = "avatar shorts-author-avatar";
+      const authorFallbackInitial = (displayName || handleText || "U")
+        .replace("@", "")
+        .charAt(0)
+        .toUpperCase();
+      renderAvatar(authorAvatar, post.profile, authorFallbackInitial);
+      authorButton.appendChild(authorAvatar);
+      const authorText = document.createElement("div");
+      authorText.className = "shorts-author-text";
+      const authorName = document.createElement("div");
+      authorName.className = "shorts-author-name";
+      const handleBare = handleText.replace("@", "").toLowerCase();
+      const hasDistinctDisplayName =
+        !!displayName && displayName.toLowerCase() !== handleBare;
+      authorName.textContent = hasDistinctDisplayName ? displayName : handleText;
+      authorText.appendChild(authorName);
+      if (hasDistinctDisplayName) {
+        const authorHandle = document.createElement("div");
+        authorHandle.className = "shorts-author-handle";
+        authorHandle.textContent = handleText;
+        authorText.appendChild(authorHandle);
+      }
+      authorButton.appendChild(authorText);
+      creatorRow.appendChild(authorButton);
+      if (currentUser && post.user_id && post.user_id !== currentUser.id) {
+        const followBtn = document.createElement("button");
+        followBtn.className = "btn btn-follow shorts-follow-btn";
+        followBtn.setAttribute("data-user-id", post.user_id);
+        const isFollowing = followingIds.has(post.user_id);
+        followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
+        followBtn.classList.toggle("is-following", isFollowing);
+        followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
+        creatorRow.appendChild(followBtn);
+      }
+      content.appendChild(creatorRow);
       const shortsBadge = document.createElement("span");
-      shortsBadge.className = "shorts-badge";
+      shortsBadge.className = "shorts-badge shorts-meta-chip";
       shortsBadge.textContent = tr.shortsBadge || "SHORTS";
-      meta.appendChild(shortsBadge);
-      overlay.appendChild(meta);
+      topBadges.appendChild(shortsBadge);
+      const metaTime = document.createElement("span");
+      metaTime.className = "shorts-meta-time";
+      metaTime.textContent = relativeText || dateText;
+      meta.appendChild(metaTime);
+      if (post.visibility === "private") {
+        const visibility = document.createElement("span");
+        visibility.className = "shorts-meta-chip shorts-meta-visibility";
+        visibility.textContent = tr.privateOnly || "Private";
+        topBadges.appendChild(visibility);
+      }
+      const reasonLabel = getForYouReasonLabel(post);
+      if (reasonLabel) {
+        const reason = document.createElement("span");
+        reason.className = "shorts-meta-chip shorts-reason";
+        reason.textContent = reasonLabel;
+        topBadges.appendChild(reason);
+      }
+      topBar.appendChild(topBadges);
+      overlay.appendChild(topBar);
+      content.appendChild(meta);
 
       const captionText = `${post.note || post.caption || ""}`.trim();
       if (captionText) {
-        const caption = document.createElement("div");
-        caption.className = "shorts-caption";
-        caption.textContent = captionText;
-        overlay.appendChild(caption);
+        const { title: captionTitle, body: captionBody } = splitCaptionContent(captionText);
+        const captionWrap = document.createElement("div");
+        captionWrap.className = "shorts-caption-wrap";
+        if (captionTitle) {
+          const title = document.createElement("div");
+          title.className = "shorts-caption-title";
+          title.textContent = captionTitle;
+          captionWrap.appendChild(title);
+        }
+        if (captionBody) {
+          const caption = document.createElement("div");
+          caption.className = "shorts-caption";
+          caption.textContent = captionBody;
+          captionWrap.appendChild(caption);
+        }
+        content.appendChild(captionWrap);
       }
-
+      if (logs.length || post.bodyweight) {
+        const stats = document.createElement("div");
+        stats.className = "shorts-stats";
+        if (logs.length) {
+          const exerciseChip = document.createElement("span");
+          exerciseChip.className = "shorts-stat-chip";
+          exerciseChip.textContent = `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`;
+          stats.appendChild(exerciseChip);
+          const setCount = logs.reduce(
+            (sum, item) => sum + ((item?.sets || []).length || 0),
+            0
+          );
+          if (setCount > 0) {
+            const setChip = document.createElement("span");
+            setChip.className = "shorts-stat-chip";
+            setChip.textContent = `${setCount}${tr.workoutSetCountLabel || "セット"}`;
+            stats.appendChild(setChip);
+          }
+        }
+        if (
+          settings.showBodyweight &&
+          post.bodyweight !== null &&
+          post.bodyweight !== undefined &&
+          post.bodyweight !== ""
+        ) {
+          const weightChip = document.createElement("span");
+          weightChip.className = "shorts-stat-chip";
+          weightChip.textContent = `${tr.weight || "Weight"} ${formatWeight(post.bodyweight)}`;
+          stats.appendChild(weightChip);
+        }
+        if (stats.childNodes.length) {
+          content.appendChild(stats);
+        }
+      }
+      const commentTeaser = buildShortsCommentTeaser(post, tr, commentsByPost);
+      if (commentTeaser) {
+        content.appendChild(commentTeaser);
+      }
       const actions = document.createElement("div");
       actions.className = "shorts-actions";
-      const secondaryActions = document.createElement("div");
-      secondaryActions.className = "post-actions post-action-row post-action-row-secondary";
-      const appendShortPrimaryAction = (button) => {
+      const appendShortAction = (button) => {
         if (!button) return;
-        button.classList.add("chip-compact");
+        button.classList.add("shorts-action-btn");
         actions.appendChild(button);
-      };
-      const appendShortMenuAction = (button) => {
-        if (!button) return;
-        button.classList.add("chip-compact");
-        secondaryActions.appendChild(button);
       };
 
       const likeBtn = document.createElement("button");
-      likeBtn.className = "chip chip-like chip-action";
+      likeBtn.className =
+        "chip chip-like chip-action reaction-btn reaction-like chip-compact shorts-action-btn";
       likeBtn.dataset.postAction = "toggle-like";
       const likeState = getLikeUiState(post.id, localLikedIds);
       applyLikeButtonState(likeBtn, likeState, tr);
-      appendShortPrimaryAction(likeBtn);
+      appendShortAction(likeBtn);
 
       const commentBtn = document.createElement("button");
-      commentBtn.className = "chip chip-log chip-action";
+      commentBtn.className =
+        "chip chip-log chip-action reaction-btn reaction-comment chip-compact shorts-action-btn";
       commentBtn.dataset.postAction = "toggle-comments";
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost);
-      appendShortPrimaryAction(commentBtn);
+      appendShortAction(commentBtn);
 
       const shareBtn = document.createElement("button");
-      shareBtn.className = "chip chip-log chip-action";
+      shareBtn.className = "chip chip-log chip-action shorts-action-btn shorts-action-icon-only";
       shareBtn.dataset.postAction = "share-post";
       setActionButtonContent(shareBtn, {
         kind: "share",
@@ -5201,50 +5881,41 @@ export function renderFeed(options = {}) {
         label: "",
       });
       shareBtn.setAttribute("aria-label", tr.share || "Share");
-      appendShortPrimaryAction(shareBtn);
+      appendShortAction(shareBtn);
 
       const saveBtn = document.createElement("button");
-      saveBtn.className = "chip chip-log chip-save chip-action";
+      saveBtn.className =
+        "chip chip-log chip-save chip-action shorts-action-btn shorts-action-icon-only";
       saveBtn.dataset.postAction = "toggle-save";
       const isSaved = savedPostIds.has(`${post.id || ""}`);
-      const saveLabel = isSaved ? tr.saved || "Saved" : tr.save || "Save";
       setActionButtonContent(saveBtn, {
         kind: "save",
         icon: "🔖",
-        label: saveLabel,
+        label: "",
       });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      appendShortMenuAction(saveBtn);
+      saveBtn.setAttribute("aria-label", isSaved ? tr.saved || "Saved" : tr.save || "Save");
+      appendShortAction(saveBtn);
 
-      if (currentUser && post.user_id && post.user_id !== currentUser.id) {
-        const followBtn = document.createElement("button");
-        followBtn.className = "chip chip-log btn-follow";
-        followBtn.setAttribute("data-user-id", post.user_id);
-        const isFollowing = followingIds.has(post.user_id);
-        followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
-        followBtn.classList.toggle("is-following", isFollowing);
-        followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
-        appendShortMenuAction(followBtn);
+      const bottomRail = document.createElement("div");
+      bottomRail.className = "shorts-bottom";
+      bottomRail.append(content, actions);
+      overlay.appendChild(bottomRail);
+      if (feedIndex === 0) {
+        const swipeHint = document.createElement("div");
+        swipeHint.className = "shorts-swipe-hint";
+        swipeHint.textContent = tr.shortsSwipeHint || "Swipe up for next";
+        overlay.appendChild(swipeHint);
       }
-
-      if (secondaryActions.childNodes.length) {
-        const secondaryWrap = document.createElement("details");
-        secondaryWrap.className = "post-action-menu shorts-action-menu";
-        const summary = document.createElement("summary");
-        summary.className = "chip chip-log post-action-more";
-        summary.textContent = "⋯";
-        summary.setAttribute("aria-label", tr.feedOptions || "Details");
-        secondaryWrap.appendChild(summary);
-        const panel = document.createElement("div");
-        panel.className = "post-action-menu-panel";
-        panel.appendChild(secondaryActions);
-        secondaryWrap.appendChild(panel);
-        actions.appendChild(secondaryWrap);
-      }
-
-      overlay.appendChild(actions);
       card.appendChild(overlay);
+
+      if (shortsVideoEl) {
+        card.classList.toggle("is-muted", shortsVideoEl.muted);
+        card.classList.add("is-paused");
+        syncShortsPlayButton(card, shortsVideoEl);
+        syncShortsSoundButton(card);
+      }
 
       observeSeenPostCard(card, isSeen);
       return card;
@@ -5262,9 +5933,13 @@ export function renderFeed(options = {}) {
         card.classList.add("no-media");
       }
       card.setAttribute("data-post-id", post.id);
+      card.dataset.postRenderKey = buildPostRenderKey(post);
+      const logs = workoutLogsByPost.get(post.id) || [];
 
       const header = document.createElement("div");
       header.className = "post-header";
+      const headerActions = document.createElement("div");
+      headerActions.className = "post-header-actions";
 
       const avatar = document.createElement("div");
       avatar.className = "avatar";
@@ -5285,66 +5960,62 @@ export function renderFeed(options = {}) {
 
       const userRow = document.createElement("div");
       userRow.className = "post-user";
+      const userMain = document.createElement("div");
+      userMain.className = "post-user-main";
       const nameSpan = document.createElement("span");
       nameSpan.className = "profile-link";
       nameSpan.setAttribute("data-user-id", post.user_id);
       const handleBare = handleText.replace("@", "");
       if (displayName && displayName.toLowerCase() !== handleBare.toLowerCase()) {
         nameSpan.textContent = displayName;
-        userRow.appendChild(nameSpan);
-
-        const handleSpan = document.createElement("span");
-        handleSpan.className = "handle profile-link";
-        handleSpan.setAttribute("data-user-id", post.user_id);
-        handleSpan.textContent = handleText;
-        userRow.appendChild(handleSpan);
       } else {
         nameSpan.textContent = handleText;
-        userRow.appendChild(nameSpan);
       }
+      userMain.appendChild(nameSpan);
       const isSeen = seenPostIds.has(`${post.id || ""}`);
-      if (!isSeen) {
-        const newBadge = document.createElement("span");
-        newBadge.className = "post-new-badge";
-        newBadge.textContent = tr.feedNew || "NEW";
-        userRow.appendChild(newBadge);
-      }
       const isPinnedByOwner =
         `${post.user_id || ""}` &&
         isPinnedPostForUser(post.id, post.user_id);
+      userRow.appendChild(userMain);
+
+      const subRow = document.createElement("div");
+      subRow.className = "post-meta-line";
+      if (displayName && displayName.toLowerCase() !== handleBare.toLowerCase()) {
+        const handleSpan = document.createElement("span");
+        handleSpan.className = "handle profile-link post-handle-inline";
+        handleSpan.setAttribute("data-user-id", post.user_id);
+        handleSpan.textContent = handleText;
+        subRow.appendChild(handleSpan);
+      }
+      const relativeText = formatRelative(post.date || post.created_at);
+      const timeSpan = document.createElement("span");
+      timeSpan.className = "post-sub post-time";
+      timeSpan.textContent =
+        relativeText || formatPostDate(post);
+      subRow.appendChild(timeSpan);
+
+      if (post.visibility === "private") {
+        const visibilityBadge = document.createElement("span");
+        visibilityBadge.className = "post-visibility-badge is-private";
+        visibilityBadge.textContent = tr.privateOnly || "Private";
+        subRow.appendChild(visibilityBadge);
+      }
+
+      const reasonLabel = getForYouReasonLabel(post);
       if (isPinnedByOwner) {
         const pinBadge = document.createElement("span");
         pinBadge.className = "post-pin-badge";
         pinBadge.textContent = tr.postPinnedBadge || "Pinned";
-        userRow.appendChild(pinBadge);
+        subRow.appendChild(pinBadge);
       }
-
-      const subRow = document.createElement("div");
-      subRow.className = "post-sub";
-      const dateText = formatPostDate(post);
-      const relativeText = formatRelative(post.date || post.created_at);
-      const visibilityText =
-        post.visibility === "private"
-          ? tr.private || "Private"
-          : "";
-      subRow.textContent = [relativeText || dateText, visibilityText]
-        .filter(Boolean)
-        .join(" · ");
-
-      const metaRight = document.createElement("div");
-      metaRight.className = "post-meta-right";
-      metaRight.appendChild(subRow);
-
-      const reasonLabel = getForYouReasonLabel(post);
       if (reasonLabel) {
-        const reason = document.createElement("div");
+        const reason = document.createElement("span");
         reason.className = "post-reason-badge";
         reason.textContent = reasonLabel;
-        metaRight.appendChild(reason);
+        subRow.appendChild(reason);
       }
-
       meta.appendChild(userRow);
-      meta.appendChild(metaRight);
+      meta.appendChild(subRow);
 
       const footer = document.createElement("div");
       footer.className = "post-footer";
@@ -5364,14 +6035,14 @@ export function renderFeed(options = {}) {
         secondaryActions.appendChild(button);
       };
       const likeBtn = document.createElement("button");
-      likeBtn.className = "chip chip-like chip-action";
+      likeBtn.className = "chip chip-like chip-action reaction-btn reaction-like";
       likeBtn.dataset.postAction = "toggle-like";
       const likeState = getLikeUiState(post.id, localLikedIds);
       applyLikeButtonState(likeBtn, likeState, tr);
       appendPrimaryAction(likeBtn);
 
       const commentBtn = document.createElement("button");
-      commentBtn.className = "chip chip-log chip-action";
+      commentBtn.className = "chip chip-log chip-action reaction-btn reaction-comment";
       commentBtn.dataset.postAction = "toggle-comments";
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost);
       appendPrimaryAction(commentBtn);
@@ -5382,10 +6053,10 @@ export function renderFeed(options = {}) {
       setActionButtonContent(shareBtn, {
         kind: "share",
         icon: "↗",
-        label: "",
+        label: tr.share || "Share",
       });
       shareBtn.setAttribute("aria-label", tr.share || "Share");
-      appendPrimaryAction(shareBtn);
+      appendSecondaryAction(shareBtn);
 
       const saveBtn = document.createElement("button");
       saveBtn.className = "chip chip-log chip-save chip-action";
@@ -5394,23 +6065,12 @@ export function renderFeed(options = {}) {
       setActionButtonContent(saveBtn, {
         kind: "save",
         icon: "🔖",
-        label: "",
+        label: isSaved ? tr.saved || "Saved" : tr.save || "Save",
       });
       saveBtn.classList.toggle("chip-active", isSaved);
       saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
       saveBtn.setAttribute("aria-label", isSaved ? tr.saved || "Saved" : tr.save || "Save");
-      appendPrimaryAction(saveBtn);
-
-      if (currentUser && post.user_id && post.user_id !== currentUser.id) {
-        const followBtn = document.createElement("button");
-        followBtn.className = "chip chip-log btn-follow";
-        followBtn.setAttribute("data-user-id", post.user_id);
-        const isFollowing = followingIds.has(post.user_id);
-        followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
-        followBtn.classList.toggle("is-following", isFollowing);
-        followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
-        appendSecondaryAction(followBtn);
-      }
+      appendSecondaryAction(saveBtn);
 
       if (currentUser && post.user_id === currentUser.id) {
         const deleteBtn = document.createElement("button");
@@ -5420,8 +6080,40 @@ export function renderFeed(options = {}) {
         appendSecondaryAction(deleteBtn);
       }
 
+      if (currentUser && post.user_id && post.user_id !== currentUser.id) {
+        const followBtn = document.createElement("button");
+        followBtn.className = "chip chip-log btn-follow post-follow-inline";
+        followBtn.setAttribute("data-user-id", post.user_id);
+        const isFollowing = followingIds.has(post.user_id);
+        followBtn.textContent = isFollowing
+          ? tr.unfollow || "Following"
+          : tr.follow || "Follow";
+        followBtn.classList.toggle("is-following", isFollowing);
+        followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
+        headerActions.appendChild(followBtn);
+      }
+
       header.appendChild(avatar);
       header.appendChild(meta);
+
+      if (secondaryActions.childNodes.length) {
+        const secondaryWrap = document.createElement("details");
+        secondaryWrap.className = "post-action-menu";
+        const summary = document.createElement("summary");
+        summary.className = "chip chip-log post-action-more";
+        summary.textContent = "⋯";
+        summary.setAttribute("aria-label", tr.feedOptions || "Details");
+        secondaryWrap.appendChild(summary);
+        const panel = document.createElement("div");
+        panel.className = "post-action-menu-panel";
+        panel.appendChild(secondaryActions);
+        secondaryWrap.appendChild(panel);
+        headerActions.appendChild(secondaryWrap);
+      }
+
+      if (headerActions.childNodes.length) {
+        header.appendChild(headerActions);
+      }
 
       card.appendChild(header);
       if (isSeen) {
@@ -5432,6 +6124,10 @@ export function renderFeed(options = {}) {
       if (post.media_url) {
         const mediaWrap = document.createElement("div");
         mediaWrap.className = "post-media";
+        const postImageDelivery = getFeedImageDelivery(post.media_url, {
+          layout: feedLayout,
+          shorts: false,
+        });
         mountMediaSkeleton(mediaWrap);
         const renderMediaFallback = () => {
           clearMediaSkeleton(mediaWrap);
@@ -5468,20 +6164,44 @@ export function renderFeed(options = {}) {
           img.referrerPolicy = "no-referrer";
           img.alt = "post media";
           img.classList.add("image-deferred");
+          if (postImageDelivery.srcSet) {
+            img.srcset = postImageDelivery.srcSet;
+          }
+          if (postImageDelivery.sizes) {
+            img.sizes = postImageDelivery.sizes;
+          }
           img.addEventListener("load", () => {
             clearMediaSkeleton(mediaWrap);
           }, { once: true });
           img.addEventListener("error", renderMediaFallback, { once: true });
-          if (warmedImageUrlSet.has(post.media_url)) {
-            img.src = post.media_url;
+          if (warmedImageUrlSet.has(postImageDelivery.src)) {
+            img.src = postImageDelivery.src;
             img.dataset.deferredLoaded = "true";
             img.classList.remove("image-deferred");
           } else {
-            img.dataset.src = post.media_url;
+            img.dataset.src = postImageDelivery.src;
             observeDeferredImage(img);
           }
           mediaWrap.appendChild(img);
         }
+        const mediaMeta = document.createElement("div");
+        mediaMeta.className = "post-media-meta";
+        const mediaKind = document.createElement("span");
+        mediaKind.className = `post-media-chip ${
+          post.media_type === "video" ? "is-video" : "is-photo"
+        }`;
+        mediaKind.textContent =
+          post.media_type === "video"
+            ? tr.mediaVideoLabel || "Video"
+            : tr.mediaPhotoLabel || "Photo";
+        mediaMeta.appendChild(mediaKind);
+        if (logs.length) {
+          const workoutChip = document.createElement("span");
+          workoutChip.className = "post-media-chip is-workout";
+          workoutChip.textContent = tr.mediaWorkoutLabel || "Workout";
+          mediaMeta.appendChild(workoutChip);
+        }
+        mediaWrap.appendChild(mediaMeta);
         mediaWrap.addEventListener("dblclick", () => {
           if (!currentUser) return;
           const likeState = getLikeUiState(post.id, localLikedIds);
@@ -5500,6 +6220,9 @@ export function renderFeed(options = {}) {
 
       const body = document.createElement("div");
       body.className = "post-body";
+      const contextChips = document.createElement("div");
+      contextChips.className = "post-context-chips";
+      let captionBlock = null;
 
       if (
         settings.showBodyweight &&
@@ -5508,79 +6231,114 @@ export function renderFeed(options = {}) {
         post.bodyweight !== ""
       ) {
         const weight = document.createElement("div");
-        weight.className = "post-weight";
-        weight.textContent = `${tr.weight || "Weight"}: ${formatWeight(
+        weight.className = "post-context-chip";
+        weight.textContent = `${tr.weight || "Weight"} · ${formatWeight(
           post.bodyweight
         )}`;
-        body.appendChild(weight);
+        contextChips.appendChild(weight);
       }
 
       if (post.note || post.caption) {
-        const caption = document.createElement("div");
-        caption.className = "post-caption";
         const fullText = `${post.note || post.caption || ""}`.trim();
-        const previewText = getCaptionPreviewText(fullText);
-        caption.setAttribute("data-caption-text", "true");
-        caption.setAttribute("data-caption-full", fullText);
-        caption.setAttribute("data-caption-preview", previewText);
-        caption.textContent = previewText;
-        body.appendChild(caption);
+        captionBlock = createPostCaptionBlock(fullText, tr);
+        if (captionBlock) {
+          body.classList.add("has-caption");
+        }
+      }
+
+      if (logs.length) {
+        body.classList.add("has-workout-preview");
+        const exerciseCount = logs.length;
+        const setCount = logs.reduce(
+          (sum, item) => sum + ((item?.sets || []).length || 0),
+          0
+        );
+        const topWeight = logs.reduce((maxWeight, item) => {
+          const sets = Array.isArray(item?.sets) ? item.sets : [];
+          return sets.reduce((best, set) => {
+            const weight = Number(set?.weight || 0);
+            if (!Number.isFinite(weight) || weight <= 0) return best;
+            return Math.max(best, weight);
+          }, maxWeight);
+        }, 0);
+        const topNames = logs
+          .map((item) => String(item?.exercise || "").trim())
+          .filter(Boolean);
+        const workoutPreview = document.createElement("div");
+        workoutPreview.className = "post-workout-preview";
+        const workoutHead = document.createElement("div");
+        workoutHead.className = "post-workout-preview-head";
+        const workoutKicker = document.createElement("div");
+        workoutKicker.className = "post-workout-preview-kicker";
+        workoutKicker.textContent = tr.mediaWorkoutLabel || "Workout";
+        const workoutMeta = document.createElement("div");
+        workoutMeta.className = "post-workout-preview-meta";
+        workoutMeta.textContent = `${exerciseCount}${
+          tr.workoutExerciseCountLabel || "種目"
+        } · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
+        workoutHead.append(workoutKicker, workoutMeta);
+        workoutPreview.appendChild(workoutHead);
+
+        const workoutTitle = document.createElement("div");
+        workoutTitle.className = "post-workout-preview-title";
+        workoutTitle.textContent =
+          topNames.slice(0, 2).join(" · ") || (tr.workoutLogTitle || "Workout log");
+        if (topNames.length > 2) {
+          const more = document.createElement("span");
+          more.className = "post-workout-preview-title-more";
+          more.textContent = `+${topNames.length - 2}`;
+          workoutTitle.appendChild(more);
+        }
+        workoutPreview.appendChild(workoutTitle);
+
+        const workoutStats = document.createElement("div");
+        workoutStats.className = "post-workout-preview-stats";
+        const statItems = [
+          {
+            value: `${exerciseCount}`,
+            label: tr.workoutExerciseCountLabel || "種目",
+          },
+          {
+            value: `${setCount}`,
+            label: tr.workoutSetCountLabel || "セット",
+          },
+        ];
+        if (topWeight > 0) {
+          statItems.push({
+            value: formatWeight(topWeight),
+            label: tr.profileBestLift || "Best lift",
+          });
+        }
+        statItems.forEach((item) => {
+          const stat = document.createElement("div");
+          stat.className = "post-workout-preview-stat";
+          const value = document.createElement("span");
+          value.className = "post-workout-preview-stat-value";
+          value.textContent = item.value;
+          const label = document.createElement("span");
+          label.className = "post-workout-preview-stat-label";
+          label.textContent = item.label;
+          stat.append(value, label);
+          workoutStats.appendChild(stat);
+        });
+        workoutPreview.appendChild(workoutStats);
+        body.appendChild(workoutPreview);
+      }
+
+      if (captionBlock) {
+        body.appendChild(captionBlock);
+      }
+
+      if (contextChips.childNodes.length) {
+        body.appendChild(contextChips);
       }
 
       if (body.childNodes.length) {
         card.appendChild(body);
       }
 
-      const logs = workoutLogsByPost.get(post.id) || [];
-      if (logs.length) {
-        const logWrap = document.createElement("div");
-        logWrap.className = "post-body";
-        const logTitle = document.createElement("div");
-        logTitle.className = "post-weight";
-        logTitle.textContent = tr.workoutLogTitle || "Workout log";
-        logWrap.appendChild(logTitle);
-        const exerciseCount = logs.length;
-        const setCount = logs.reduce(
-          (sum, item) => sum + ((item?.sets || []).length || 0),
-          0
-        );
-        const compactRow = document.createElement("div");
-        compactRow.className = "post-sub";
-        compactRow.textContent = `${exerciseCount}${
-          tr.workoutExerciseCountLabel || "種目"
-        } · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
-        logWrap.appendChild(compactRow);
-
-        const topNames = logs
-          .slice(0, 2)
-          .map((item) => String(item?.exercise || "").trim())
-          .filter(Boolean)
-          .join(" / ");
-        if (topNames) {
-          const namesRow = document.createElement("div");
-          namesRow.className = "post-sub";
-          namesRow.textContent = topNames;
-          logWrap.appendChild(namesRow);
-        }
-        card.appendChild(logWrap);
-      }
-
       if (primaryActions.childNodes.length) {
         footer.appendChild(primaryActions);
-      }
-      if (secondaryActions.childNodes.length) {
-        const secondaryWrap = document.createElement("details");
-        secondaryWrap.className = "post-action-menu";
-        const summary = document.createElement("summary");
-        summary.className = "chip chip-log post-action-more";
-        summary.textContent = "⋯";
-        summary.setAttribute("aria-label", tr.feedOptions || "Details");
-        secondaryWrap.appendChild(summary);
-        const panel = document.createElement("div");
-        panel.className = "post-action-menu-panel";
-        panel.appendChild(secondaryActions);
-        secondaryWrap.appendChild(panel);
-        footer.appendChild(secondaryWrap);
       }
       if (footer.childNodes.length) {
         card.appendChild(footer);
@@ -5685,13 +6443,41 @@ export function renderFeed(options = {}) {
         effectiveLayout === "list" &&
         visibleSlice.length >= getFeedWindowMinItems();
       syncFeedWindowing(shouldWindow);
+      if (isShortsMode) {
+        refreshActiveShortsCard(container);
+        syncAllShortsCards(container);
+      }
     };
+
+    if (canPatchCards) {
+      let patchIndex = 0;
+      for (; patchIndex < visibleSlice.length; patchIndex += 1) {
+        const post = visibleSlice[patchIndex];
+        const existingCard = existingPostCards[patchIndex];
+        if (!existingCard) {
+          container.appendChild(createPostCard(post, patchIndex));
+          continue;
+        }
+        const nextRenderKey = buildPostRenderKey(post);
+        if (existingCard.dataset.postRenderKey !== nextRenderKey) {
+          const nextCard = createPostCard(post, patchIndex);
+          container.replaceChild(nextCard, existingCard);
+        } else {
+          const isSeen = seenPostIds.has(`${post.id || ""}`);
+          existingCard.classList.toggle("post-card-seen", isSeen);
+          observeSeenPostCard(existingCard, isSeen);
+        }
+      }
+      finalizeMore();
+      return;
+    }
 
     const renderChunk = () => {
       if (renderToken !== feedRenderToken) return;
       const chunkStartedAt = perfNow();
       const startIndex = index;
       const fragment = document.createDocumentFragment();
+      const appendedShortsCards = [];
       const end = Math.min(index + batchSize, visibleSlice.length);
       const cardBuilder = isShortsMode ? createShortsCard : createPostCard;
       for (; index < end; index += 1) {
@@ -5708,9 +6494,17 @@ export function renderFeed(options = {}) {
           fragment.appendChild(createFeedAdCard(adsSettings, tr));
           renderedAdCount += 1;
         }
-        fragment.appendChild(cardBuilder(visibleSlice[index], index));
+        const nextCard = cardBuilder(visibleSlice[index], index);
+        fragment.appendChild(nextCard);
+        if (isShortsMode) {
+          appendedShortsCards.push(nextCard);
+        }
       }
       container.appendChild(fragment);
+      if (isShortsMode) {
+        appendedShortsCards.forEach((card) => observeShortsCard(card, container));
+        refreshActiveShortsCard(container);
+      }
       tuneAdaptiveFeedChunkSize(
         effectiveLayout,
         compactViewport,
@@ -6056,12 +6850,16 @@ function applyLikeButtonState(likeBtn, state, tr) {
         const compactCount = Number.isFinite(Number(state.likeCount))
           ? Number(state.likeCount)
           : 0;
+        const compactLabel = compactCount > 0 ? `${compactCount}` : "";
         setActionButtonContent(likeBtn, {
           kind: "like",
           icon: state.isLiked ? "♥" : "♡",
-          label: `${compactCount}`,
+          label: compactLabel,
         });
-        likeBtn.setAttribute("aria-label", `${likeLabel} (${compactCount})`);
+        likeBtn.setAttribute(
+          "aria-label",
+          compactCount > 0 ? `${likeLabel} (${compactCount})` : likeLabel
+        );
         return;
       }
       setActionButtonContent(likeBtn, {
@@ -6119,7 +6917,8 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost) {
       const commentCount = commentsByPost.get(postId)?.length || 0;
       const commentsLabel = tr.comments || "Comments";
       const isCompact = commentBtn.classList.contains("chip-compact");
-      const compactLabel = `${Math.max(0, Number(commentCount || 0))}`;
+      const compactCount = Math.max(0, Number(commentCount || 0));
+      const compactLabel = compactCount > 0 ? `${compactCount}` : "";
       const isOpen = isCommentSheetOpenForPost(postId);
       commentBtn.classList.toggle("chip-active", !!isOpen);
       if (commentCount) {
@@ -6131,7 +6930,7 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost) {
             : `${commentsLabel} (${commentCount})`,
         });
         if (isCompact) {
-          commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactLabel})`);
+          commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactCount})`);
         }
       } else {
         setActionButtonContent(commentBtn, {
@@ -6140,15 +6939,453 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost) {
           label: isCompact ? compactLabel : commentsLabel,
         });
         if (isCompact) {
-          commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactLabel})`);
+          commentBtn.setAttribute("aria-label", commentsLabel);
         }
       }
+    }
+function splitCaptionContent(fullText = "") {
+      const normalizedText = `${fullText || ""}`.replace(/\r/g, "").trim();
+      if (!normalizedText) {
+        return { title: "", body: "" };
+      }
+      const lines = normalizedText
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (lines.length >= 2) {
+        const firstLine = lines[0];
+        const rest = lines.slice(1).join("\n").trim();
+        if (firstLine.length >= 8 && firstLine.length <= 72 && rest.length >= 18) {
+          return { title: firstLine, body: rest };
+        }
+      }
+      const sentenceMatch = normalizedText.match(/^(.{8,68}?[.!?。！？])\s+(.+)$/u);
+      if (sentenceMatch) {
+        return {
+          title: sentenceMatch[1].trim(),
+          body: sentenceMatch[2].trim(),
+        };
+      }
+      return { title: "", body: normalizedText };
     }
 function getCaptionPreviewText(fullText = "") {
       if (fullText.length <= FEED_CAPTION_TRIM_LIMIT) {
         return fullText;
       }
       return `${fullText.slice(0, FEED_CAPTION_TRIM_LIMIT)}…`;
+    }
+function createPostCaptionBlock(fullText = "", tr = t[getCurrentLang()] || t.ja) {
+      const { title, body } = splitCaptionContent(fullText);
+      const normalizedText = `${body || ""}`.trim();
+      if (!normalizedText && !title) return null;
+      const previewText = getCaptionPreviewText(normalizedText);
+      const isExpandable = previewText !== normalizedText;
+
+      const wrap = document.createElement("div");
+      wrap.className = "post-caption-block";
+
+      if (title) {
+        const titleEl = document.createElement("div");
+        titleEl.className = "post-caption-title";
+        titleEl.textContent = title;
+        wrap.appendChild(titleEl);
+      }
+
+      const caption = document.createElement("div");
+      caption.className = "post-caption";
+      caption.setAttribute("data-caption-text", "true");
+      caption.setAttribute("data-caption-full", normalizedText);
+      caption.setAttribute("data-caption-preview", previewText);
+      if (normalizedText) {
+        wrap.appendChild(caption);
+      }
+
+      const applyExpandedState = (expanded) => {
+        wrap.classList.toggle("is-expanded", expanded);
+        if (!normalizedText) return;
+        caption.textContent = expanded ? normalizedText : previewText;
+      };
+
+      applyExpandedState(false);
+
+      if (normalizedText && isExpandable) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "chip chip-caption-toggle";
+        const syncToggle = (expanded) => {
+          toggle.textContent = expanded
+            ? tr.showLess || "Hide"
+            : tr.showMore || "Show more";
+          toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+        };
+        syncToggle(false);
+        toggle.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const nextExpanded = !wrap.classList.contains("is-expanded");
+          applyExpandedState(nextExpanded);
+          syncToggle(nextExpanded);
+        });
+        wrap.appendChild(toggle);
+      }
+
+      return wrap;
+    }
+function buildViewerCommentProfile(user) {
+      if (!user) return null;
+      const rawHandle =
+        user.user_metadata?.handle ||
+        (user.email ? user.email.split("@")[0] : "user");
+      const handle = `${rawHandle || "user"}`.trim() || "user";
+      const displayName =
+        user.user_metadata?.display_name ||
+        user.user_metadata?.name ||
+        handle;
+      return {
+        handle,
+        display_name: displayName,
+        avatar_url:
+          user.user_metadata?.avatar_url ||
+          user.user_metadata?.picture ||
+          "",
+      };
+    }
+function buildCommentItemElement(comment, tr) {
+      if (!comment) return null;
+      const item = document.createElement("div");
+      item.className = "comment-item";
+      if (comment.pending) {
+        item.classList.add("is-pending");
+      }
+
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "avatar";
+      const rawHandle =
+        comment.profile?.handle ||
+        comment.profile?.username ||
+        "user";
+      const handleText = formatHandle(rawHandle) || "@user";
+      const displayName =
+        `${comment.profile?.display_name || ""}`.trim() || handleText;
+      const initial = (displayName || handleText || "U")
+        .replace("@", "")
+        .charAt(0)
+        .toUpperCase();
+      renderAvatar(avatarEl, comment.profile, initial);
+
+      const content = document.createElement("div");
+      content.className = "comment-content";
+
+      const bubble = document.createElement("div");
+      bubble.className = "comment-bubble";
+
+      const header = document.createElement("div");
+      header.className = "comment-header";
+
+      const author = document.createElement("span");
+      author.className = "comment-author";
+      author.textContent = displayName;
+      header.appendChild(author);
+
+      if (displayName !== handleText) {
+        const handle = document.createElement("span");
+        handle.className = "comment-handle";
+        handle.textContent = handleText;
+        header.appendChild(handle);
+      }
+
+      const time = document.createElement("span");
+      time.className = "comment-time";
+      time.textContent = comment.pending
+        ? tr.commentPending || "送信待ち"
+        : comment.created_at
+          ? formatDateDisplay(comment.created_at)
+          : "";
+      if (time.textContent) {
+        header.appendChild(time);
+      }
+
+      const text = document.createElement("div");
+      text.className = "comment-text";
+      text.textContent = comment.body || "";
+
+      bubble.appendChild(header);
+      bubble.appendChild(text);
+      content.appendChild(bubble);
+      item.appendChild(avatarEl);
+      item.appendChild(content);
+      return item;
+    }
+function getCommentSheetSubtitle(post, tr) {
+      if (!post) return tr.comments || "Comments";
+      const rawHandle =
+        post.profile?.handle ||
+        post.profile?.username ||
+        "user";
+      const handleText = formatHandle(rawHandle) || "@user";
+      const workoutLogCount = (getWorkoutLogsByPost().get(post.id) || []).length;
+      if (isShortsStylePost(post)) {
+        return `${handleText} · ${tr.mediaVideoLabel || "VIDEO"}`;
+      }
+      if (post.media_url && post.media_type === "video") {
+        return `${handleText} · ${tr.mediaVideoLabel || "VIDEO"}`;
+      }
+      if (post.media_url) {
+        return `${handleText} · ${tr.mediaPhotoLabel || "PHOTO"}`;
+      }
+      if (workoutLogCount > 0) {
+        return `${handleText} · ${tr.workoutLogTitle || "Workout log"}`;
+      }
+      return handleText;
+    }
+function getCommentSheetPreviewFallback(post, tr) {
+      if (!post) return tr.comments || "Comments";
+      if (post.media_type === "video") {
+        return tr.mediaVideoLabel || "VIDEO";
+      }
+      if (post.media_url) {
+        return tr.mediaPhotoLabel || "PHOTO";
+      }
+      const workoutLogCount = (getWorkoutLogsByPost().get(post.id) || []).length;
+      if (workoutLogCount > 0) {
+        return tr.workoutLogTitle || "Workout log";
+      }
+      return tr.comments || "Comments";
+    }
+function buildCommentSheetContext(post, tr, options = {}) {
+      if (!post) return null;
+      const { commentCount = 0 } = options;
+      const rawHandle =
+        post.profile?.handle ||
+        post.profile?.username ||
+        "user";
+      const handleText = formatHandle(rawHandle) || "@user";
+      const displayName =
+        `${post.profile?.display_name || ""}`.trim() || handleText;
+      const captionText = `${post.note || post.caption || ""}`.trim();
+      const snippet = captionText
+        ? getCaptionPreviewText(captionText)
+        : getCommentSheetPreviewFallback(post, tr);
+      const likeState = getLikeUiState(post.id);
+      const dateText = formatDateDisplay(post.date || post.created_at || "");
+
+      const wrap = document.createElement("div");
+      wrap.className = "comment-sheet-context";
+
+      const avatarEl = document.createElement("div");
+      avatarEl.className = "avatar comment-sheet-context-avatar";
+      const initial = (displayName || handleText || "U")
+        .replace("@", "")
+        .charAt(0)
+        .toUpperCase();
+      renderAvatar(avatarEl, post.profile, initial);
+      wrap.appendChild(avatarEl);
+
+      const body = document.createElement("div");
+      body.className = "comment-sheet-context-body";
+      const authorRow = document.createElement("div");
+      authorRow.className = "comment-sheet-context-author";
+      const nameEl = document.createElement("span");
+      nameEl.className = "comment-sheet-context-name";
+      nameEl.textContent = displayName;
+      authorRow.appendChild(nameEl);
+      if (displayName !== handleText) {
+        const handleEl = document.createElement("span");
+        handleEl.className = "comment-sheet-context-handle";
+        handleEl.textContent = handleText;
+        authorRow.appendChild(handleEl);
+      }
+      const metaChipRow = document.createElement("div");
+      metaChipRow.className = "comment-sheet-context-meta";
+      const timeChip = document.createElement("span");
+      timeChip.className = "comment-sheet-context-chip";
+      timeChip.textContent = dateText;
+      metaChipRow.appendChild(timeChip);
+      const commentChip = document.createElement("span");
+      commentChip.className = "comment-sheet-context-chip";
+      commentChip.textContent = `${commentCount} ${tr.comments || "Comments"}`;
+      metaChipRow.appendChild(commentChip);
+      if (Number(likeState?.likeCount || 0) > 0) {
+        const likeChip = document.createElement("span");
+        likeChip.className = "comment-sheet-context-chip";
+        likeChip.textContent = `${likeState.likeCount} ${tr.like || "Like"}`;
+        metaChipRow.appendChild(likeChip);
+      }
+      body.appendChild(authorRow);
+      body.appendChild(metaChipRow);
+      if (snippet) {
+        const captionEl = document.createElement("div");
+        captionEl.className = "comment-sheet-context-caption";
+        captionEl.textContent = snippet;
+        body.appendChild(captionEl);
+      } else {
+        const emptyEl = document.createElement("div");
+        emptyEl.className = "comment-sheet-context-caption is-empty";
+        emptyEl.textContent = getCommentSheetPreviewFallback(post, tr);
+        body.appendChild(emptyEl);
+      }
+      wrap.appendChild(body);
+      if (post.media_url) {
+        const mediaEl = document.createElement("div");
+        mediaEl.className = `comment-sheet-context-media${
+          post.media_type === "video" ? " is-video" : ""
+        }`;
+        if (post.media_type === "video") {
+          const videoBadge = document.createElement("span");
+          videoBadge.className = "comment-sheet-context-media-badge";
+          videoBadge.textContent = tr.mediaVideoLabel || "VIDEO";
+          mediaEl.appendChild(videoBadge);
+        } else {
+          const image = document.createElement("img");
+          const delivery = getFeedImageDelivery(post.media_url, {
+            layout: "list",
+            shorts: false,
+          });
+          image.src = delivery.src;
+          if (delivery.srcSet) {
+            image.srcset = delivery.srcSet;
+          }
+          if (delivery.sizes) {
+            image.sizes = delivery.sizes;
+          }
+          image.alt = `${displayName}`;
+          image.loading = "eager";
+          image.decoding = "async";
+          image.referrerPolicy = "no-referrer";
+          mediaEl.appendChild(image);
+        }
+        wrap.appendChild(mediaEl);
+      }
+      return wrap;
+    }
+function buildShortsCommentTeaser(post, tr, commentsByPost) {
+      if (!post) return null;
+      const comments = commentsByPost.get(post.id) || [];
+      const firstComment = comments[0] || null;
+      const teaser = document.createElement("button");
+      teaser.type = "button";
+      teaser.className = "shorts-comment-teaser";
+      teaser.dataset.postAction = "toggle-comments";
+      teaser.setAttribute("aria-label", tr.commentsShow || tr.comments || "Comments");
+      if (!comments.length) {
+        teaser.classList.add("is-empty");
+      }
+
+      const teaserLabel = document.createElement("span");
+      teaserLabel.className = "shorts-comment-teaser-label";
+      teaserLabel.textContent = tr.comments || "Comments";
+
+      const teaserText = document.createElement("span");
+      teaserText.className = "shorts-comment-teaser-text";
+      if (firstComment) {
+        const rawHandle =
+          firstComment.profile?.handle ||
+          firstComment.profile?.username ||
+          "user";
+        const commentHandle = formatHandle(rawHandle) || "@user";
+        const commentName =
+          `${firstComment.profile?.display_name || ""}`.trim() || commentHandle;
+        const commentPreview = getCaptionPreviewText(firstComment.body || "");
+        teaserText.textContent = commentPreview
+          ? `${commentName}: ${commentPreview}`
+          : `${commentName}`;
+      } else {
+        teaserText.textContent =
+          tr.commentEmpty || tr.commentPlaceholder || "Add a comment";
+      }
+
+      const teaserMeta = document.createElement("span");
+      teaserMeta.className = "shorts-comment-teaser-meta";
+      teaserMeta.textContent = comments.length
+        ? `${comments.length}`
+        : "→";
+
+      teaser.append(teaserLabel, teaserText, teaserMeta);
+      return teaser;
+    }
+function buildCommentComposer(post, tr, currentUser, options = {}) {
+      if (!post || !currentUser) return null;
+      const {
+        compact = false,
+        submitLabel,
+      } = options;
+
+      const form = document.createElement("div");
+      form.className = compact
+        ? "comment-form comment-form-inline"
+        : "comment-form";
+      if (!compact) {
+        form.classList.add("comment-form-sheet");
+      }
+
+      const viewerProfile = buildViewerCommentProfile(currentUser);
+      const avatar = document.createElement("div");
+      avatar.className = "avatar comment-form-avatar";
+      const viewerInitial = (
+        viewerProfile?.display_name ||
+        viewerProfile?.handle ||
+        "U"
+      )
+        .replace("@", "")
+        .charAt(0)
+        .toUpperCase();
+      renderAvatar(avatar, viewerProfile, viewerInitial);
+
+      const body = document.createElement("div");
+      body.className = "comment-form-body";
+
+      const field = document.createElement(compact ? "input" : "textarea");
+      field.className = compact
+        ? "comment-form-input is-inline"
+        : "comment-form-input";
+      field.placeholder = tr.commentPlaceholder || "Add a comment";
+      if (compact) {
+        field.type = "text";
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "comment-form-actions";
+
+      const send = document.createElement("button");
+      send.className = compact ? "btn btn-primary btn-xs" : "btn btn-primary";
+      const sendLabel =
+        submitLabel ||
+        tr.commentAdd ||
+        tr.commentSubmit ||
+        "Post";
+      send.textContent = sendLabel;
+      send.setAttribute("aria-label", sendLabel);
+      if (!compact) {
+        send.classList.add("comment-submit-btn");
+      }
+      send.addEventListener("click", async () => {
+        if (send.classList.contains("is-loading")) return;
+        send.classList.add("is-loading");
+        send.disabled = true;
+        try {
+          await submitComment(post, field);
+        } finally {
+          send.classList.remove("is-loading");
+          send.disabled = false;
+        }
+      });
+
+      field.addEventListener("keydown", (event) => {
+        if (event.isComposing) return;
+        const isSubmitShortcut = compact
+          ? event.key === "Enter"
+          : (event.metaKey || event.ctrlKey) && event.key === "Enter";
+        if (!isSubmitShortcut) return;
+        event.preventDefault();
+        send.click();
+      });
+
+      actions.appendChild(send);
+      body.appendChild(field);
+      body.appendChild(actions);
+      form.appendChild(avatar);
+      form.appendChild(body);
+      return form;
     }
 function buildFeedCommentSection(
       post,
@@ -6181,86 +7418,25 @@ function buildFeedCommentSection(
           empty.textContent = tr.commentEmpty || "No comments yet.";
           commentSection.appendChild(empty);
         } else {
+          const list = document.createElement("div");
+          list.className = "comment-list";
           comments.forEach((comment) => {
-            const item = document.createElement("div");
-            item.className = "comment-item";
-            if (comment.pending) {
-              item.classList.add("is-pending");
+            const item = buildCommentItemElement(comment, tr);
+            if (item) {
+              list.appendChild(item);
             }
-
-            const avatarEl = document.createElement("div");
-            avatarEl.className = "avatar";
-            const commentHandle =
-              comment.profile?.handle ||
-              comment.profile?.username ||
-              "user";
-            const commentHandleText = formatHandle(commentHandle) || "@user";
-            const commentDisplay = comment.profile?.display_name || "";
-            const commentInitial = (commentDisplay || commentHandleText || "U")
-              .replace("@", "")
-              .charAt(0)
-              .toUpperCase();
-            renderAvatar(avatarEl, comment.profile, commentInitial);
-
-            const bodyWrap = document.createElement("div");
-            bodyWrap.className = "comment-body";
-
-            const bodyText = document.createElement("div");
-            bodyText.textContent = comment.body;
-
-            const meta = document.createElement("div");
-            meta.className = "comment-meta";
-            const metaName = commentHandleText;
-            const metaDate = comment.pending
-              ? tr.commentPending || "送信待ち"
-              : comment.created_at
-                ? formatDateDisplay(comment.created_at)
-                : "";
-            meta.textContent = [metaName, metaDate].filter(Boolean).join(" · ");
-
-            bodyWrap.appendChild(bodyText);
-            bodyWrap.appendChild(meta);
-
-            item.appendChild(avatarEl);
-            item.appendChild(bodyWrap);
-            commentSection.appendChild(item);
           });
+          commentSection.appendChild(list);
         }
       }
 
       if (currentUser && commentsEnabled) {
-        const form = document.createElement("div");
-        form.className = "comment-form";
-
-        const input = document.createElement("textarea");
-        input.placeholder = tr.commentPlaceholder || "Add a comment";
-
-        const send = document.createElement("button");
-        send.className = "btn btn-primary";
-        send.textContent = tr.commentAdd || "Post";
-        send.addEventListener("click", async () => {
-          if (send.classList.contains("is-loading")) return;
-          send.classList.add("is-loading");
-          send.disabled = true;
-          try {
-            await submitComment(post, input);
-          } finally {
-            send.classList.remove("is-loading");
-            send.disabled = false;
-          }
+        const form = buildCommentComposer(post, tr, currentUser, {
+          submitLabel: tr.commentAdd || "Post",
         });
-        input.addEventListener("keydown", (event) => {
-          if (event.isComposing) return;
-          if (!((event.metaKey || event.ctrlKey) && event.key === "Enter")) {
-            return;
-          }
-          event.preventDefault();
-          send.click();
-        });
-
-        form.appendChild(input);
-        form.appendChild(send);
-        commentSection.appendChild(form);
+        if (form) {
+          commentSection.appendChild(form);
+        }
       }
 
       return commentSection;
@@ -6750,72 +7926,23 @@ export function renderPostDetail() {
           commentsEl.appendChild(loading);
         } else {
           comments.forEach((comment) => {
-            const row = document.createElement("div");
-            row.className = "comment-item";
-            if (comment.pending) {
-              row.classList.add("is-pending");
+            const row = buildCommentItemElement(comment, tr);
+            if (row) {
+              list.appendChild(row);
             }
-            const avatar = document.createElement("div");
-            avatar.className = "avatar";
-            renderAvatar(
-              avatar,
-              comment.profile,
-              (comment.profile?.display_name ||
-                comment.profile?.handle ||
-                "U")
-                .charAt(0)
-                .toUpperCase()
-            );
-            const text = document.createElement("div");
-            const name = document.createElement("div");
-            name.className = "comment-name";
-            name.textContent =
-              comment.profile?.display_name ||
-              formatHandle(comment.profile?.handle || "user");
-            if (comment.pending) {
-              name.textContent = `${name.textContent} · ${tr.commentPending || "送信待ち"}`;
-            }
-            const body = document.createElement("div");
-            body.className = "comment-body";
-            body.textContent = comment.body || "";
-            text.appendChild(name);
-            text.appendChild(body);
-            row.appendChild(avatar);
-            row.appendChild(text);
-            list.appendChild(row);
           });
           commentsEl.appendChild(list);
         }
 
         if (currentUser && commentsEnabled) {
-          const inputWrap = document.createElement("div");
-          inputWrap.className = "detail-comment-input";
-          const input = document.createElement("input");
-          input.type = "text";
-          input.placeholder = tr.commentPlaceholder || "コメントを書く";
-          const btn = document.createElement("button");
-          btn.className = "btn btn-primary btn-xs";
-          btn.textContent = tr.commentSubmit || "送信";
-          btn.addEventListener("click", async () => {
-            if (btn.classList.contains("is-loading")) return;
-            btn.classList.add("is-loading");
-            btn.disabled = true;
-            try {
-              await submitComment(post, input);
-            } finally {
-              btn.classList.remove("is-loading");
-              btn.disabled = false;
-            }
+          const inputWrap = buildCommentComposer(post, tr, currentUser, {
+            compact: true,
+            submitLabel: tr.commentSubmit || "送信",
           });
-          input.addEventListener("keydown", (event) => {
-            if (event.isComposing) return;
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            btn.click();
-          });
-          inputWrap.appendChild(input);
-          inputWrap.appendChild(btn);
-          commentsEl.appendChild(inputWrap);
+          if (inputWrap) {
+            inputWrap.classList.add("detail-comment-input");
+            commentsEl.appendChild(inputWrap);
+          }
         }
       }
     }

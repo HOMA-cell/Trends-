@@ -11,6 +11,7 @@ import {
   $,
   setButtonLoading,
   showToast,
+  renderAvatar,
   formatHandle,
   normalizeExerciseName,
   toDateKey,
@@ -58,6 +59,8 @@ import {
   setupDmControls,
   renderDmPage,
   handleDmPageChange,
+  openDmShareComposer,
+  openDmConversation,
 } from "./dm.js";
 
     // ---- 状態 ----
@@ -158,6 +161,8 @@ import {
     const ADS_SETTINGS_KEY = "trends_ads_config_v1";
     const FORCE_FRESH_PARAM = "fresh";
     const FORCE_FRESH_DONE_KEY = "trends_force_fresh_done_v1";
+    const LAST_SEEN_BUILD_KEY = "trends_last_seen_build_v1";
+    const BUILD_AUTO_REFRESH_DONE_KEY = "trends_build_auto_refresh_done_v1";
     const RUNTIME_ISSUES_LIMIT = 20;
     const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
     const SUPABASE_CONNECTIVITY_RETRY_MS = 120000;
@@ -1701,6 +1706,10 @@ async function loadProfilePostCount() {
       const alreadyDone = sessionStorage.getItem(FORCE_FRESH_DONE_KEY) === "1";
       if (alreadyDone) return false;
       sessionStorage.setItem(FORCE_FRESH_DONE_KEY, "1");
+      return runFreshReloadCleanupAndReplace(params);
+    }
+
+    async function runFreshReloadCleanupAndReplace(params = new URLSearchParams()) {
       try {
         if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
           const registrations = await navigator.serviceWorker.getRegistrations();
@@ -1725,6 +1734,56 @@ async function loadProfilePostCount() {
         // ignore storage cleanup failures
       }
       params.delete(FORCE_FRESH_PARAM);
+      const nextQuery = params.toString();
+      const nextUrl = `${window.location.pathname}${
+        nextQuery ? `?${nextQuery}` : ""
+      }${window.location.hash || ""}`;
+      window.location.replace(nextUrl);
+      return true;
+    }
+
+    function getCurrentBuildFingerprint() {
+      const version = sanitizeBuildVersion(appBuildMeta.version || "dev-local");
+      const builtAt =
+        typeof appBuildMeta.builtAt === "string" && appBuildMeta.builtAt
+          ? appBuildMeta.builtAt
+          : "";
+      return `${version}::${builtAt}`;
+    }
+
+    function loadLastSeenBuildFingerprint() {
+      try {
+        return String(localStorage.getItem(LAST_SEEN_BUILD_KEY) || "");
+      } catch {
+        return "";
+      }
+    }
+
+    function saveLastSeenBuildFingerprint(fingerprint = "") {
+      try {
+        if (!fingerprint) return;
+        localStorage.setItem(LAST_SEEN_BUILD_KEY, fingerprint);
+      } catch {
+        // ignore storage write failures
+      }
+    }
+
+    async function forceFreshReloadOnBuildChangeIfNeeded() {
+      if (typeof window === "undefined") return false;
+      const fingerprint = getCurrentBuildFingerprint();
+      if (!fingerprint) return false;
+      const lastSeen = loadLastSeenBuildFingerprint();
+      if (!lastSeen) {
+        saveLastSeenBuildFingerprint(fingerprint);
+        return false;
+      }
+      if (lastSeen === fingerprint) return false;
+      const doneFingerprint = sessionStorage.getItem(BUILD_AUTO_REFRESH_DONE_KEY) || "";
+      if (doneFingerprint === fingerprint) return false;
+      sessionStorage.setItem(BUILD_AUTO_REFRESH_DONE_KEY, fingerprint);
+      saveLastSeenBuildFingerprint(fingerprint);
+      const params = new URLSearchParams(window.location.search || "");
+      params.set(FORCE_FRESH_PARAM, "1");
       const nextQuery = params.toString();
       const nextUrl = `${window.location.pathname}${
         nextQuery ? `?${nextQuery}` : ""
@@ -1869,11 +1928,14 @@ async function loadProfilePostCount() {
       loadSupabaseConnectivityState();
       loadSettings();
       await loadBuildMeta();
+      const autoFreshTriggered = await forceFreshReloadOnBuildChangeIfNeeded();
+      if (autoFreshTriggered) return;
       setupServiceWorker();
       commentSync.loadQueue();
       commentSync.setupOnlineSync();
       setupLanguageSwitcher();
       setupAuthUI();
+      setupAccountPageUI();
       setupPostForm();
       setupFeedControls();
       setupDmControls();
@@ -2005,6 +2067,7 @@ async function loadProfilePostCount() {
       renderPrList,
       renderInsights,
       renderOnboardingChecklist,
+      openDmShareComposer,
       openPostModal: (options = {}) => {
         if (typeof openPostModal === "function") {
           openPostModal(options);
@@ -2029,6 +2092,8 @@ async function loadProfilePostCount() {
       getAllPosts: () => allPosts,
       getUserPosts,
       getWorkoutLogsByPost: () => workoutLogsByPost,
+      getLikesByPost: () => likesByPost,
+      getCommentsByPost: () => commentsByPost,
       getProfilePostCount: () => profilePostCount || 0,
       getFollowingCount: () => currentFollowingCount || 0,
       getFollowersCount: () => currentFollowersCount || 0,
@@ -2057,11 +2122,17 @@ async function loadProfilePostCount() {
           setActivePage(page);
         }
       },
+      openDmConversation,
       toggleFollowForUser,
       loadFollowStats,
     });
 
     setDmContext({
+      setActivePage: (page) => {
+        if (typeof setActivePage === "function") {
+          setActivePage(page);
+        }
+      },
       getCurrentUser: () => currentUser,
       getCurrentLang: () => currentLang,
       getProfilesForUsers: loadProfilesForUsers,
@@ -2072,6 +2143,13 @@ async function loadProfilePostCount() {
           "";
         return activePage === "messages";
       },
+      openPublicProfile: (userId) => {
+        if (typeof openPublicProfile === "function" && userId) {
+          openPublicProfile(userId);
+        }
+      },
+      openMediaViewer: (url, type = "image", options = {}) =>
+        openMediaModal(url, type, options),
     });
 
 
@@ -2199,14 +2277,16 @@ async function loadProfilePostCount() {
       setText("btn-post-more-actions", "postMoreActions");
       setText("draft-hint", "draftHint");
       setText("btn-remove-media", "mediaRemove");
-      setText("btn-post-toggle-advanced", "postShowAdvanced");
+      setText("btn-post-mode-simple", "postModeQuick");
+      setText("btn-post-toggle-advanced", "postModeWorkout");
       setText("post-composer-hint", "postSimpleHint");
+      setText("post-media-picker-title", "media");
+      setText("post-media-picker-sub", "postMediaPickerHint");
       setText("login-required", "pleaseLogin");
 
       // Feed
       setText("feed-title", "feed");
       setText("btn-feed-refresh", "feedRefresh");
-      setText("btn-feed-clear", "feedClear");
       setText("btn-feed-retry", "feedRetry");
       setText("btn-feed-discovery-toggle", "feedDiscoveryShow");
       setText("btn-feed-restore-hidden", "feedRestoreHidden");
@@ -2235,19 +2315,34 @@ async function loadProfilePostCount() {
       setText("stat-streak-label", "statStreakLabel");
       setText("stat-total-label", "statTotalLabel");
       setPlaceholder("feed-search", "searchPlaceholder");
-      setText("btn-feed-options", "feedFilterMenu");
+      setText("feed-advanced-view-label", "feedAdvancedViewLabel");
+      setText("feed-advanced-content-label", "feedAdvancedContentLabel");
+      setText("feed-advanced-tools-label", "feedAdvancedToolsLabel");
 
       // DM
       setText("messages-title", "messagesTitle");
       setText("messages-sub", "messagesSub");
+      setText("dm-sidebar-eyebrow", "dmInboxLabel");
+      setText("dm-tab-primary", "dmInboxPrimary");
+      setText("dm-tab-requests", "dmInboxRequests");
       setText("btn-dm-refresh", "dmRefresh");
       setText("dm-partner-label", "dmPartnerLabel");
       setText("btn-dm-compose", "dmComposeButton");
+      setText("dm-compose-eyebrow", "dmComposeEyebrow");
       setText("dm-compose-title", "dmComposeTitle");
+      setText("dm-compose-sub", "dmComposeSub");
       setText("btn-dm-compose-close", "dmComposeClose");
+      setText("dm-compose-share-kicker", "dmShareKicker");
+      setText("dm-compose-share-note", "dmSharePreviewNote");
+      setText("btn-dm-compose-copy-link", "dmCopyLink");
       setText("btn-dm-back", "dmBackToThreads");
+      setText("btn-dm-pin", "dmPinThread");
+      setText("btn-dm-mute", "dmMuteThread");
       setText("btn-dm-mark-read", "dmMarkRead");
+      setText("btn-dm-media", "dmAttachPhoto");
+      setText("btn-dm-media-remove", "dmRemovePhoto");
       setText("btn-dm-thread-search-clear", "dmSearchClear");
+      setText("btn-dm-jump-latest", "dmJumpLatest");
       setText("btn-dm-send", "dmSend");
       setPlaceholder("dm-input", "dmInputPlaceholder");
       setPlaceholder("dm-thread-search", "dmSearchPlaceholder");
@@ -2265,6 +2360,9 @@ async function loadProfilePostCount() {
       setText("btn-logout", "logout");
       setText("auth-caption", "accountAutoCreateHint");
       setText("btn-account-open-settings", "accountOpenSettings");
+      setText("account-jump-profile", "profileTitle");
+      setText("account-jump-edit", "profileEditTitle");
+      setText("account-jump-summary", "summaryTitle");
       setText("btn-auth-open-settings", "authOpenConnectionSettings");
       setText("btn-auth-reset-connection", "authResetConnection");
       setPlaceholder("auth-email", "accountEmailPlaceholder");
@@ -2273,6 +2371,19 @@ async function loadProfilePostCount() {
       setText("footer-terms-link", "footerTerms");
       setText("footer-contact-link", "footerContact");
       setText("footer-note", "footerAdNotice");
+
+      const feedOptionsBtn = $("btn-feed-options");
+      if (feedOptionsBtn) {
+        const filterMenuLabel = tr.feedFilterMenu || "Filters";
+        feedOptionsBtn.setAttribute("aria-label", filterMenuLabel);
+        feedOptionsBtn.setAttribute("title", filterMenuLabel);
+      }
+      const feedClearBtn = $("btn-feed-clear");
+      if (feedClearBtn) {
+        const clearLabel = tr.clear || "Clear";
+        feedClearBtn.setAttribute("aria-label", clearLabel);
+        feedClearBtn.setAttribute("title", clearLabel);
+      }
 
       setText("settings-title", "settingsTitle");
       setText("settings-sub", "settingsSub");
@@ -2418,9 +2529,15 @@ async function loadProfilePostCount() {
       setText("btn-mark-all-read", "notificationsMarkRead");
       setText("notification-filter-all", "all");
       setText("notification-filter-unread", "notificationsUnread");
+      setText("notification-filter-comment", "notificationsComments");
+      setText("notification-filter-follow", "notificationsFollows");
+      setText("notification-filter-like", "notificationsLikes");
       setText("public-profile-title", "publicProfile");
       setText("btn-back-to-feed", "back");
       setText("btn-share-profile", "shareProfile");
+      setText("public-tab-posts-label", "profileTabPosts");
+      setText("public-tab-media-label", "profileTabMedia");
+      setText("public-tab-workouts-label", "profileTabWorkouts");
       setText("history-title", "workoutHistoryTitle");
       setText("history-sub", "workoutHistorySub");
       setText("gallery-title", "galleryTitle");
@@ -2438,9 +2555,14 @@ async function loadProfilePostCount() {
       setText("public-profile-links-title", "profileLinksTitle");
       setText("profile-edit-title", "profileEditTitle");
       setText("profile-edit-sub", "profileEditSub");
+      setText("profile-edit-preview-kicker", "profileEditPreviewKicker");
+      setText("profile-edit-preview-note", "profileEditPreviewNote");
+      setText("profile-advanced-summary-kicker", "profileAdvancedSummaryKicker");
+      setText("profile-advanced-summary-note", "profileAdvancedSummaryNote");
       setText("profile-edit-basics-title", "profileEditBasicsTitle");
       setText("profile-edit-identity-title", "profileEditIdentityTitle");
       setText("profile-edit-training-title", "profileEditTrainingTitle");
+      setText("profile-edit-advanced-title", "profileEditAdvancedTitle");
       setText("profile-advanced-title", "profileEditTitle");
       setText("profile-edit-media-title", "profileEditMediaTitle");
       setText("profile-edit-links-title", "profileEditLinksTitle");
@@ -2592,6 +2714,21 @@ async function loadProfilePostCount() {
           $("auth-email")?.focus();
         }, 40);
       }
+    }
+
+    function setupAccountPageUI() {
+      const panel = $("panel-account");
+      if (!panel || panel.dataset.boundAccountUi === "true") return;
+      panel.dataset.boundAccountUi = "true";
+      panel.addEventListener("click", (event) => {
+        const trigger = event.target.closest("[data-account-jump]");
+        if (!(trigger instanceof HTMLElement)) return;
+        const targetId = `${trigger.getAttribute("data-account-jump") || ""}`.trim();
+        if (!targetId) return;
+        const target = $(targetId);
+        if (!target || target.classList.contains("hidden")) return;
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     }
 
     function setupAuthUI() {
@@ -2813,6 +2950,8 @@ async function loadProfilePostCount() {
           return;
         }
         if (target.matches("input, textarea, select")) {
+          updateProfileEditPreview();
+          updateProfileAdvancedSummary();
           refreshProfileEditDirtyState();
           scheduleProfileEditDraftSave();
         }
@@ -2854,6 +2993,156 @@ async function loadProfilePostCount() {
         option.textContent = opt.label;
         select.appendChild(option);
       });
+    }
+
+    function updateProfileEditPreview() {
+      const avatarEl = $("profile-edit-preview-avatar");
+      const nameEl = $("profile-edit-preview-name");
+      const handleEl = $("profile-edit-preview-handle");
+      const bioEl = $("profile-edit-preview-bio");
+      const displayInput = $("profile-display");
+      const handleInput = $("profile-handle");
+      const bioInput = $("profile-bio-input");
+      const tr = t[currentLang] || t.ja;
+
+      const displayName =
+        displayInput?.value.trim() ||
+        currentProfile?.display_name ||
+        (currentUser?.email ? currentUser.email.split("@")[0] : "") ||
+        "User";
+      let handleValue =
+        handleInput?.value.trim() ||
+        currentProfile?.handle ||
+        (currentUser?.email ? currentUser.email.split("@")[0] : "user");
+      if (handleValue.startsWith("@")) {
+        handleValue = handleValue.slice(1);
+      }
+      const bioValue =
+        bioInput?.value.trim() ||
+        currentProfile?.bio ||
+        tr.profileEditPreviewNote ||
+        "Add a short bio.";
+
+      if (nameEl) nameEl.textContent = displayName;
+      if (handleEl) handleEl.textContent = formatHandle(handleValue) || "@user";
+      if (bioEl) bioEl.textContent = bioValue;
+      if (avatarEl) {
+        const fallbackInitial =
+          `${displayName || "U"}`.replace("@", "").trim().charAt(0).toUpperCase() || "U";
+        renderAvatar(avatarEl, currentProfile, fallbackInitial);
+      }
+    }
+
+    function collectProfileAdvancedSummaryItems() {
+      const tr = t[currentLang] || t.ja;
+      const locationValue =
+        $("profile-location")?.value.trim() || currentProfile?.location || "";
+      const heightValue = $("profile-height")?.value.trim() || "";
+      const goalValue =
+        $("profile-goal")?.value.trim() || currentProfile?.training_goal || "";
+      const gymValue = $("profile-gym")?.value.trim() || currentProfile?.gym || "";
+      const splitValue =
+        $("profile-split")?.value.trim() || currentProfile?.training_split || "";
+
+      const summaryItems = [
+        locationValue
+          ? {
+              label: tr.profileLocation || "Location",
+              value: locationValue,
+            }
+          : null,
+        heightValue
+          ? {
+              label: tr.profileHeight || "Height",
+              value: `${heightValue}${tr.profileHeightUnit || "cm"}`,
+            }
+          : null,
+        goalValue
+          ? {
+              label: tr.profileGoal || "Goal",
+              value: goalValue,
+            }
+          : null,
+        gymValue
+          ? {
+              label: tr.profileGym || "Gym",
+              value: gymValue,
+            }
+          : null,
+        splitValue
+          ? {
+              label: tr.profileSplit || "Split",
+              value: splitValue,
+            }
+          : null,
+      ].filter(Boolean);
+      return summaryItems;
+    }
+
+    function renderProfileAdvancedSummary(target, summaryItems, options = {}) {
+      if (!target) return;
+      const tr = t[currentLang] || t.ja;
+      const { compact = false, limit = summaryItems.length } = options;
+      target.textContent = "";
+
+      if (!summaryItems.length) {
+        const empty = document.createElement("div");
+        empty.className = "profile-advanced-summary-empty";
+        if (compact) {
+          empty.classList.add("is-compact");
+        }
+        empty.textContent =
+          tr.profileAdvancedSummaryEmpty || "No extra profile details yet.";
+        target.appendChild(empty);
+        return;
+      }
+
+      const visibleItems = summaryItems.slice(0, limit);
+      visibleItems.forEach((item) => {
+        const chip = document.createElement("div");
+        chip.className = "profile-advanced-summary-chip";
+        if (compact) {
+          chip.classList.add("is-compact");
+        }
+        const label = document.createElement("span");
+        label.className = "profile-advanced-summary-chip-label";
+        label.textContent = item.label;
+        const value = document.createElement("span");
+        value.className = "profile-advanced-summary-chip-value";
+        value.textContent = item.value;
+        chip.append(label, value);
+        target.appendChild(chip);
+      });
+
+      if (compact && summaryItems.length > visibleItems.length) {
+        const overflow = document.createElement("div");
+        overflow.className = "profile-advanced-summary-chip is-compact is-overflow";
+        overflow.textContent = `+${summaryItems.length - visibleItems.length}`;
+        target.appendChild(overflow);
+      }
+    }
+
+    function updateProfileAdvancedSummary() {
+      const summaryEl = $("profile-advanced-summary");
+      const inlineSummaryEl = $("profile-edit-advanced-summary-inline");
+      const advancedEntry = $("profile-edit-advanced-entry");
+      if (!summaryEl && !inlineSummaryEl) return;
+      const summaryItems = collectProfileAdvancedSummaryItems();
+
+      if (advancedEntry) {
+        advancedEntry.classList.toggle("is-filled", summaryItems.length > 0);
+      }
+
+      if (summaryEl) {
+        renderProfileAdvancedSummary(summaryEl, summaryItems);
+      }
+
+      if (inlineSummaryEl) {
+        renderProfileAdvancedSummary(inlineSummaryEl, summaryItems, {
+          compact: true,
+          limit: 3,
+        });
+      }
     }
 
     function populateProfileEditor() {
@@ -2927,6 +3216,8 @@ async function loadProfilePostCount() {
         if (accentEl) accentEl.value = "#e4572e";
         pendingAvatarFile = null;
         pendingBannerFile = null;
+        updateProfileEditPreview();
+        updateProfileAdvancedSummary();
         captureProfileEditBaseline();
         return;
       }
@@ -2964,8 +3255,12 @@ async function loadProfilePostCount() {
       if (accentEl) accentEl.value = currentProfile?.accent_color || "#e4572e";
       pendingAvatarFile = null;
       pendingBannerFile = null;
+      updateProfileEditPreview();
+      updateProfileAdvancedSummary();
       captureProfileEditBaseline();
       applyProfileEditDraftIfAvailable();
+      updateProfileEditPreview();
+      updateProfileAdvancedSummary();
     }
 
     async function handleSaveProfile() {
@@ -3391,10 +3686,12 @@ async function loadProfilePostCount() {
       const authSignedIn = $("auth-signed-in");
       const accountSubtitle = $("account-subtitle");
       const accountSessionChip = $("account-session-chip");
+      const accountPanel = $("panel-account");
       const accountLabel = $("account-user");
       const accountEmail = $("account-user-email");
       const profileSection = $("profile-section");
       const profileEditSection = $("profile-edit-section");
+      const summarySection = $("summary-section");
       const openAdvancedBtn = $("btn-open-profile-advanced");
       const loginRequired = $("login-required");
       const postSubmitBtn = $("btn-submit");
@@ -3403,6 +3700,9 @@ async function loadProfilePostCount() {
       if (authPassword) authPassword.disabled = loggedIn;
       if (authSignedOut) authSignedOut.classList.toggle("hidden", loggedIn);
       if (authSignedIn) authSignedIn.classList.toggle("hidden", !loggedIn);
+      if (accountPanel) {
+        accountPanel.classList.toggle("is-signed-in", loggedIn);
+      }
       if (loggedIn) {
         setAuthFormExpanded(false);
       } else {
@@ -3440,20 +3740,28 @@ async function loadProfilePostCount() {
         const display = getProfileDisplayName(currentProfile, "user");
         const handle = currentProfile.handle ? formatHandle(currentProfile.handle) : "";
         if (accountLabel) {
-          accountLabel.textContent = handle ? `${display} ${handle}` : display;
+          accountLabel.textContent = display;
         }
         if (accountEmail) {
-          accountEmail.textContent = currentUser?.email || "-";
+          accountEmail.textContent = handle || currentUser?.email || "-";
+          accountEmail.classList.toggle("is-handle", !!handle);
         }
       } else if (loggedIn && currentUser?.email) {
         if (accountLabel) accountLabel.textContent = currentUser.email;
-        if (accountEmail) accountEmail.textContent = currentUser.email;
+        if (accountEmail) {
+          accountEmail.textContent = currentUser.email;
+          accountEmail.classList.remove("is-handle");
+        }
       } else {
         if (accountLabel) accountLabel.textContent = "-";
-        if (accountEmail) accountEmail.textContent = "-";
+        if (accountEmail) {
+          accountEmail.textContent = "-";
+          accountEmail.classList.remove("is-handle");
+        }
       }
       if (profileSection) profileSection.classList.toggle("hidden", !loggedIn);
       if (profileEditSection) profileEditSection.classList.toggle("hidden", !loggedIn);
+      if (summarySection) summarySection.classList.toggle("hidden", !loggedIn);
       renderAuthNetworkStatus();
       renderDmPage();
     }
@@ -4013,6 +4321,10 @@ async function loadProfilePostCount() {
       const preview = $("post-media-preview");
       const body = $("post-media-preview-body");
       const noteEl = $("post-media-preview-note");
+      const dropzone = $("post-media-dropzone");
+      const pickerTitle = $("post-media-picker-title");
+      const pickerSub = $("post-media-picker-sub");
+      const tr = t[currentLang] || t.ja;
       if (!preview || !body || !noteEl) return;
 
       if (currentMediaPreviewUrl) {
@@ -4024,6 +4336,8 @@ async function loadProfilePostCount() {
       if (file) {
         const url = URL.createObjectURL(file);
         currentMediaPreviewUrl = url;
+        dropzone?.classList.add("is-filled");
+        pickerTitle && (pickerTitle.textContent = tr.media || "Media");
         if (file.type.startsWith("video")) {
           const video = document.createElement("video");
           video.src = url;
@@ -4035,15 +4349,29 @@ async function loadProfilePostCount() {
           img.alt = "preview";
           body.appendChild(img);
         }
-        noteEl.textContent = file.name || note || "";
+        const fileLabel = file.name || note || "";
+        noteEl.textContent = fileLabel;
+        if (pickerSub) {
+          pickerSub.textContent = fileLabel || tr.postMediaPickerHint || "Add a photo or video";
+        }
         preview.classList.remove("hidden");
         return;
       }
 
       if (note) {
+        dropzone?.classList.remove("is-filled");
+        pickerTitle && (pickerTitle.textContent = tr.media || "Media");
+        if (pickerSub) {
+          pickerSub.textContent = note;
+        }
         noteEl.textContent = note;
         preview.classList.remove("hidden");
       } else {
+        dropzone?.classList.remove("is-filled");
+        pickerTitle && (pickerTitle.textContent = tr.media || "Media");
+        if (pickerSub) {
+          pickerSub.textContent = tr.postMediaPickerHint || "Add a photo or video";
+        }
         preview.classList.add("hidden");
         noteEl.textContent = "";
       }
@@ -4083,6 +4411,8 @@ async function loadProfilePostCount() {
         templateId,
         exercises,
         mediaName: currentMediaFile?.name || "",
+        composerAdvanced: !!postComposerAdvanced,
+        updatedAt: Date.now(),
       };
     }
 
@@ -4126,11 +4456,20 @@ async function loadProfilePostCount() {
         panel.classList.toggle("post-composer-advanced", postComposerAdvanced);
       }
       const tr = t[currentLang] || t.ja;
+      const simpleBtn = $("btn-post-mode-simple");
       const toggleBtn = $("btn-post-toggle-advanced");
+      if (simpleBtn) {
+        simpleBtn.textContent = tr.postModeQuick || "Quick";
+        simpleBtn.classList.toggle("is-active", !postComposerAdvanced);
+        simpleBtn.setAttribute("aria-selected", postComposerAdvanced ? "false" : "true");
+        simpleBtn.setAttribute("aria-pressed", postComposerAdvanced ? "false" : "true");
+      }
       if (toggleBtn) {
-        toggleBtn.textContent = postComposerAdvanced
-          ? tr.postShowSimple || "項目を減らす"
-          : tr.postShowAdvanced || "項目を増やす";
+        toggleBtn.textContent = tr.postModeWorkout || "Workout";
+        toggleBtn.classList.toggle("is-active", postComposerAdvanced);
+        toggleBtn.setAttribute("aria-selected", postComposerAdvanced ? "true" : "false");
+        toggleBtn.setAttribute("aria-pressed", postComposerAdvanced ? "true" : "false");
+        toggleBtn.setAttribute("aria-expanded", postComposerAdvanced ? "true" : "false");
       }
       const hint = $("post-composer-hint");
       if (hint) {
@@ -4139,6 +4478,12 @@ async function loadProfilePostCount() {
             "詳細投稿: 体重・ワークアウト・公開範囲まで編集できます。"
           : tr.postSimpleHint ||
             "クイック投稿: キャプション・メディア中心";
+      }
+      if (!postComposerAdvanced) {
+        const moreActions = document.querySelector("#post-modal-backdrop .post-form-more");
+        if (moreActions?.open) {
+          moreActions.open = false;
+        }
       }
     }
 
@@ -4176,7 +4521,21 @@ async function loadProfilePostCount() {
       try {
         const raw = localStorage.getItem(POST_DRAFT_KEY);
         if (!raw) return null;
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return null;
+        return {
+          date: `${parsed.date || ""}`,
+          weight: `${parsed.weight || ""}`,
+          caption: `${parsed.caption || ""}`,
+          visibility: `${parsed.visibility || "public"}`,
+          templateId: `${parsed.templateId || ""}`,
+          exercises: Array.isArray(parsed.exercises) ? parsed.exercises : [],
+          mediaName: `${parsed.mediaName || ""}`,
+          composerAdvanced: parsed.composerAdvanced === true,
+          updatedAt: Number.isFinite(Number(parsed.updatedAt))
+            ? Number(parsed.updatedAt)
+            : 0,
+        };
       } catch {
         return null;
       }
@@ -4231,6 +4590,9 @@ async function loadProfilePostCount() {
         const tr = t[currentLang] || t.ja;
         renderMediaPreview(null, (tr.mediaDraftNote || "前回のファイル") + `: ${draft.mediaName}`);
       }
+      if (typeof draft.composerAdvanced === "boolean") {
+        setPostComposerMode(draft.composerAdvanced, { persist: false });
+      }
     }
 
     function clearPostDraft() {
@@ -4250,30 +4612,76 @@ async function loadProfilePostCount() {
       renderPostComposerMode();
 
       const toggleComposerBtn = $("btn-post-toggle-advanced");
+      const quickComposerBtn = $("btn-post-mode-simple");
+      if (quickComposerBtn && quickComposerBtn.dataset.bound !== "true") {
+        quickComposerBtn.dataset.bound = "true";
+        quickComposerBtn.addEventListener("click", () => {
+          setPostComposerMode(false);
+        });
+      }
       if (toggleComposerBtn && toggleComposerBtn.dataset.bound !== "true") {
         toggleComposerBtn.dataset.bound = "true";
         toggleComposerBtn.addEventListener("click", () => {
-          setPostComposerMode(!postComposerAdvanced);
+          setPostComposerMode(true);
         });
       }
 
       const mediaInput = $("post-media");
+      const mediaDropzone = $("post-media-dropzone");
       const removeMediaBtn = $("btn-remove-media");
+      const applySelectedPostMediaFile = (file, inputEl = null) => {
+        const error = getFileValidationError(file, "post");
+        if (error) {
+          currentMediaFile = null;
+          if (inputEl) {
+            inputEl.value = "";
+          }
+          renderMediaPreview(null);
+          showToast(error, "warning");
+          return false;
+        }
+        currentMediaFile = file || null;
+        renderMediaPreview(currentMediaFile);
+        queueDraftSave();
+        return true;
+      };
       if (mediaInput) {
         mediaInput.addEventListener("change", (e) => {
           const file = e.target.files?.[0];
-          const error = getFileValidationError(file, "post");
-          if (error) {
-            currentMediaFile = null;
-            e.target.value = "";
-            renderMediaPreview(null);
-            showToast(error, "warning");
-            return;
-          }
-          currentMediaFile = file || null;
-          renderMediaPreview(currentMediaFile);
-          queueDraftSave();
+          applySelectedPostMediaFile(file, e.target);
         });
+      }
+      if (mediaDropzone && mediaDropzone.dataset.bound !== "true") {
+        mediaDropzone.dataset.bound = "true";
+        const clearDropzoneState = () => {
+          mediaDropzone.classList.remove("is-dragover");
+        };
+        mediaDropzone.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          mediaInput?.click();
+        });
+        mediaDropzone.addEventListener("dragenter", (event) => {
+          event.preventDefault();
+          mediaDropzone.classList.add("is-dragover");
+        });
+        mediaDropzone.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          mediaDropzone.classList.add("is-dragover");
+        });
+        mediaDropzone.addEventListener("dragleave", (event) => {
+          const nextTarget = event.relatedTarget;
+          if (nextTarget instanceof Node && mediaDropzone.contains(nextTarget)) return;
+          clearDropzoneState();
+        });
+        mediaDropzone.addEventListener("drop", (event) => {
+          event.preventDefault();
+          clearDropzoneState();
+          const file = event.dataTransfer?.files?.[0];
+          if (!file) return;
+          applySelectedPostMediaFile(file, mediaInput);
+        });
+        mediaDropzone.addEventListener("blur", clearDropzoneState);
       }
       if (removeMediaBtn && removeMediaBtn.dataset.bound !== "true") {
         removeMediaBtn.dataset.bound = "true";
@@ -4362,8 +4770,19 @@ async function loadProfilePostCount() {
           applyPostDraft(draft);
           setDraftStatus(tr.draftRestored || "下書きを復元しました", true);
         } else if (draft && hasPostInputs() && canApplyDraft) {
+          let draftUpdatedLabel = "";
+          if (Number.isFinite(draft.updatedAt) && draft.updatedAt > 0) {
+            try {
+              draftUpdatedLabel = formatDateTimeDisplay(new Date(draft.updatedAt).toISOString());
+            } catch {
+              draftUpdatedLabel = "";
+            }
+          }
+          const confirmMessage = draftUpdatedLabel
+            ? `${tr.draftRestoreConfirm || "保存済みの下書きを復元しますか？"}\n${draftUpdatedLabel}`
+            : tr.draftRestoreConfirm || "保存済みの下書きを復元しますか？";
           const ok = window.confirm(
-            tr.draftRestoreConfirm || "保存済みの下書きを復元しますか？"
+            confirmMessage
           );
           if (ok) {
             applyPostDraft(draft);
@@ -4418,6 +4837,7 @@ async function loadProfilePostCount() {
       if (!backdrop) return;
       const close = () => {
         closeBackdrop(backdrop);
+        backdrop.classList.remove("is-dm-viewer", "is-video");
         const body = $("media-modal-body");
         if (body) {
           setTimeout(() => {
@@ -4429,25 +4849,78 @@ async function loadProfilePostCount() {
       backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) close();
       });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (!backdrop.classList.contains("is-open")) return;
+        close();
+      });
     }
 
-    function openMediaModal(url, type = "image") {
+    function openMediaModal(url, type = "image", options = {}) {
       const backdrop = $("media-modal-backdrop");
       const body = $("media-modal-body");
       if (!backdrop || !body) return;
       body.innerHTML = "";
+      backdrop.classList.toggle("is-dm-viewer", options?.source === "dm");
+      backdrop.classList.toggle("is-video", type === "video");
+
+      const shell = document.createElement("div");
+      shell.className = "media-modal-shell";
+
+      if (options?.source === "dm") {
+        const info = document.createElement("div");
+        info.className = "media-modal-info";
+
+        const chip = document.createElement("div");
+        chip.className = "media-modal-chip";
+        chip.textContent = options?.label || "DM Photo";
+        info.appendChild(chip);
+
+        const meta = `${options?.meta || ""}`.trim();
+        if (meta) {
+          const metaEl = document.createElement("div");
+          metaEl.className = "media-modal-meta";
+          metaEl.textContent = meta;
+          info.appendChild(metaEl);
+        }
+
+        shell.appendChild(info);
+      }
+
+      const mediaWrap = document.createElement("div");
+      mediaWrap.className = "media-modal-frame";
+
       if (type === "video") {
         const video = document.createElement("video");
         video.src = url;
         video.controls = true;
-        body.appendChild(video);
+        video.autoplay = !!options?.autoplay;
+        video.playsInline = true;
+        mediaWrap.appendChild(video);
       } else {
         const img = document.createElement("img");
         img.src = url;
-        img.alt = "media";
-        body.appendChild(img);
+        img.alt = options?.alt || "media";
+        img.loading = "eager";
+        img.decoding = "async";
+        mediaWrap.appendChild(img);
       }
+      shell.appendChild(mediaWrap);
+
+      const caption = `${options?.caption || ""}`.trim();
+      if (caption) {
+        const captionEl = document.createElement("div");
+        captionEl.className = "media-modal-caption";
+        captionEl.textContent = caption;
+        shell.appendChild(captionEl);
+      }
+
+      body.appendChild(shell);
       openBackdrop(backdrop);
+      const closeBtn = $("btn-media-close");
+      if (closeBtn) {
+        requestAnimationFrame(() => closeBtn.focus());
+      }
     }
 
     function setupTemplates() {
@@ -4464,21 +4937,18 @@ async function loadProfilePostCount() {
       const refreshBtn = $("btn-refresh-notifications");
       const markAllBtn = $("btn-mark-all-read");
       const settingsMarkBtn = $("btn-settings-mark-read");
-      const filterAllBtn = $("notification-filter-all");
-      const filterUnreadBtn = $("notification-filter-unread");
+      const filterButtons = [
+        ["all", $("notification-filter-all")],
+        ["unread", $("notification-filter-unread")],
+        ["comment", $("notification-filter-comment")],
+        ["follow", $("notification-filter-follow")],
+        ["like", $("notification-filter-like")],
+      ];
       const syncFilterButtons = () => {
-        if (filterAllBtn) {
-          filterAllBtn.classList.toggle(
-            "chip-active",
-            notificationsViewFilter !== "unread"
-          );
-        }
-        if (filterUnreadBtn) {
-          filterUnreadBtn.classList.toggle(
-            "chip-active",
-            notificationsViewFilter === "unread"
-          );
-        }
+        filterButtons.forEach(([key, button]) => {
+          if (!button) return;
+          button.classList.toggle("chip-active", notificationsViewFilter === key);
+        });
       };
       if (refreshBtn) {
         refreshBtn.addEventListener("click", () => loadNotifications());
@@ -4489,22 +4959,15 @@ async function loadProfilePostCount() {
       if (settingsMarkBtn) {
         settingsMarkBtn.addEventListener("click", () => markAllNotificationsRead());
       }
-      if (filterAllBtn && filterAllBtn.dataset.bound !== "true") {
-        filterAllBtn.dataset.bound = "true";
-        filterAllBtn.addEventListener("click", () => {
-          notificationsViewFilter = "all";
+      filterButtons.forEach(([key, button]) => {
+        if (!button || button.dataset.bound === "true") return;
+        button.dataset.bound = "true";
+        button.addEventListener("click", () => {
+          notificationsViewFilter = key;
           syncFilterButtons();
           renderNotifications();
         });
-      }
-      if (filterUnreadBtn && filterUnreadBtn.dataset.bound !== "true") {
-        filterUnreadBtn.dataset.bound = "true";
-        filterUnreadBtn.addEventListener("click", () => {
-          notificationsViewFilter = "unread";
-          syncFilterButtons();
-          renderNotifications();
-        });
-      }
+      });
       syncFilterButtons();
       renderNotifications();
     }
@@ -5182,30 +5645,230 @@ async function loadProfilePostCount() {
       renderNotifications();
     }
 
+    function getNotificationActionText(type, tr) {
+      if (type === "comment") {
+        return tr.notificationActionComment || "commented on your post";
+      }
+      if (type === "follow") {
+        return tr.notificationActionFollow || "followed you";
+      }
+      if (type === "like") {
+        return tr.notificationActionLike || "liked your post";
+      }
+      return "updated";
+    }
+
+    function getNotificationTypeLabel(type, tr) {
+      if (type === "comment") {
+        return tr.notificationsComments || "Comments";
+      }
+      if (type === "follow") {
+        return tr.notificationsFollows || "Follows";
+      }
+      if (type === "like") {
+        return tr.notificationsLikes || "Likes";
+      }
+      return tr.notificationsTitle || "Notifications";
+    }
+
+    function getNotificationPreviewText(post, tr) {
+      if (!post) return "";
+      const noteText = `${post?.note || post?.caption || ""}`.trim().replace(/\s+/g, " ");
+      if (noteText) {
+        return noteText.slice(0, 120);
+      }
+      const workoutRows = workoutLogsByPost.get(`${post?.id || ""}`) || [];
+      if (workoutRows.length) {
+        const firstExercise = workoutRows[0]?.exercise || tr.mediaWorkoutLabel || "Workout";
+        const extraCount = Math.max(0, workoutRows.length - 1);
+        return extraCount > 0 ? `${firstExercise} +${extraCount}` : firstExercise;
+      }
+      if (`${post?.media_type || ""}` === "video") {
+        return tr.mediaVideoLabel || "VIDEO";
+      }
+      if (post?.media_url) {
+        return tr.mediaPhotoLabel || "PHOTO";
+      }
+      return tr.detailTitle || "Post";
+    }
+
+    function getNotificationEmptyState(filterKey, tr) {
+      if (filterKey === "unread") {
+        return tr.notificationsEmptyUnread || "No unread notifications.";
+      }
+      if (filterKey !== "all") {
+        return (
+          tr.notificationsCategoryEmpty ||
+          tr.notificationsFiltered ||
+          "Nothing in this category yet."
+        );
+      }
+      return tr.notificationsFiltered || "Notifications are hidden.";
+    }
+
+    function getNotificationSectionKey(note, filterKey = "all") {
+      if (!note) return "earlier";
+      if (filterKey === "unread") return "unread";
+      if (!note.read_at) return "unread";
+      const createdAt = new Date(note.created_at || 0);
+      if (Number.isNaN(createdAt.getTime())) return "earlier";
+      const now = new Date();
+      const diffMs = Math.max(0, now.getTime() - createdAt.getTime());
+      if (toDateKey(now) === toDateKey(createdAt)) return "today";
+      if (diffMs < 7 * 24 * 60 * 60 * 1000) return "week";
+      return "earlier";
+    }
+
+    function getNotificationSectionLabel(sectionKey, tr) {
+      if (sectionKey === "unread") {
+        return tr.notificationsSectionUnread || tr.notificationsUnread || "Unread";
+      }
+      if (sectionKey === "today") {
+        return tr.notificationsSectionToday || "Today";
+      }
+      if (sectionKey === "week") {
+        return tr.notificationsSectionWeek || "This week";
+      }
+      return tr.notificationsSectionEarlier || "Earlier";
+    }
+
+    function getNotificationFilterCount(filterKey, items = []) {
+      if (filterKey === "all") return items.length;
+      if (filterKey === "unread") return items.filter((note) => !note.read_at).length;
+      return items.filter((note) => note.type === filterKey).length;
+    }
+
+    function syncNotificationFilterButton(button, key, count, isActive) {
+      if (!button) return;
+      button.classList.toggle("chip-active", isActive);
+      if (!button.dataset.baseLabel) {
+        button.dataset.baseLabel = `${button.textContent || ""}`.trim();
+      }
+      const baseLabel = button.dataset.baseLabel || "";
+      if (count > 0) {
+        button.dataset.count = `${count}`;
+        button.classList.add("has-count");
+        button.setAttribute("aria-label", `${baseLabel} ${count}`);
+      } else {
+        delete button.dataset.count;
+        button.classList.remove("has-count");
+        button.setAttribute("aria-label", baseLabel);
+      }
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    }
+
+    function getNotificationPreviewKind(post, tr) {
+      if (!post) return tr.detailTitle || "Post";
+      const workoutRows = workoutLogsByPost.get(`${post?.id || ""}`) || [];
+      if (`${post?.media_type || ""}` === "video") {
+        return tr.mediaVideoLabel || "VIDEO";
+      }
+      if (workoutRows.length) {
+        return tr.mediaWorkoutLabel || "Workout";
+      }
+      if (post?.media_url) {
+        return tr.mediaPhotoLabel || "PHOTO";
+      }
+      return tr.detailTitle || "Post";
+    }
+
+    function openNotificationDestination(note, post) {
+      if (!note) return false;
+      if (note.post_id) {
+        if (typeof setActivePage === "function") {
+          setActivePage("feed");
+        }
+        requestAnimationFrame(() => {
+          if (post?.id) {
+            openPostDetail(`${post.id}`);
+            return;
+          }
+          const postEl = document.querySelector(
+            `[data-post-id="${note.post_id}"]`
+          );
+          if (postEl) {
+            postEl.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        });
+        if (!note.read_at) {
+          void markNotificationRead(note.id);
+        }
+        return true;
+      }
+      if (note.actor_id) {
+        openPublicProfile(note.actor_id);
+        if (!note.read_at) {
+          void markNotificationRead(note.id);
+        }
+        return true;
+      }
+      return false;
+    }
+
+    function createNotificationPreviewElement(note, post, previewText, tr) {
+      if (!previewText && !post) return null;
+      if (!post || note.type === "follow") {
+        const preview = document.createElement("div");
+        preview.className = "notification-preview";
+        preview.textContent = previewText;
+        return preview;
+      }
+
+      const preview = document.createElement("div");
+      preview.className = "notification-preview-card";
+
+      const media = document.createElement("div");
+      media.className = "notification-preview-media";
+      if (post.media_url && post.media_type !== "video") {
+        const img = document.createElement("img");
+        img.src = post.media_url;
+        img.alt = previewText || tr.detailTitle || "Post";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+        media.appendChild(img);
+      } else {
+        media.classList.add("is-placeholder");
+        const mediaLabel = document.createElement("span");
+        mediaLabel.className = "notification-preview-media-label";
+        mediaLabel.textContent = getNotificationPreviewKind(post, tr);
+        media.appendChild(mediaLabel);
+      }
+
+      const copy = document.createElement("div");
+      copy.className = "notification-preview-copy";
+      const kicker = document.createElement("div");
+      kicker.className = "notification-preview-kicker";
+      kicker.textContent = getNotificationPreviewKind(post, tr);
+      const text = document.createElement("div");
+      text.className = "notification-preview-text";
+      text.textContent = previewText;
+      copy.append(kicker, text);
+
+      preview.append(media, copy);
+      return preview;
+    }
+
     function renderNotifications() {
       const list = $("notification-list");
       const status = $("notification-status");
       const unreadCountEl = $("notification-unread-count");
-      const filterAllBtn = $("notification-filter-all");
-      const filterUnreadBtn = $("notification-filter-unread");
       const markAllBtn = $("btn-mark-all-read");
       if (!list || !status) return;
       const tr = t[currentLang] || t.ja;
+      const filterButtons = [
+        ["all", $("notification-filter-all")],
+        ["unread", $("notification-filter-unread")],
+        ["comment", $("notification-filter-comment")],
+        ["follow", $("notification-filter-follow")],
+        ["like", $("notification-filter-like")],
+      ];
+      const postsById = new Map(
+        (Array.isArray(allPosts) ? allPosts : []).map((post) => [`${post?.id || ""}`, post])
+      );
 
       list.innerHTML = "";
       status.textContent = "";
-      if (filterAllBtn) {
-        filterAllBtn.classList.toggle(
-          "chip-active",
-          notificationsViewFilter !== "unread"
-        );
-      }
-      if (filterUnreadBtn) {
-        filterUnreadBtn.classList.toggle(
-          "chip-active",
-          notificationsViewFilter === "unread"
-        );
-      }
 
       if (!currentUser) {
         status.textContent =
@@ -5215,6 +5878,9 @@ async function loadProfilePostCount() {
           unreadCountEl.classList.add("hidden");
           unreadCountEl.textContent = "";
         }
+        filterButtons.forEach(([key, button]) =>
+          syncNotificationFilterButton(button, key, 0, notificationsViewFilter === key)
+        );
         return;
       }
       if (!notificationsEnabled) {
@@ -5225,6 +5891,9 @@ async function loadProfilePostCount() {
           unreadCountEl.classList.add("hidden");
           unreadCountEl.textContent = "";
         }
+        filterButtons.forEach(([key, button]) =>
+          syncNotificationFilterButton(button, key, 0, notificationsViewFilter === key)
+        );
         return;
       }
       if (!notifications.length) {
@@ -5234,6 +5903,9 @@ async function loadProfilePostCount() {
           unreadCountEl.classList.add("hidden");
           unreadCountEl.textContent = "";
         }
+        filterButtons.forEach(([key, button]) =>
+          syncNotificationFilterButton(button, key, 0, notificationsViewFilter === key)
+        );
         return;
       }
 
@@ -5242,6 +5914,14 @@ async function loadProfilePostCount() {
         if (flag === undefined) return true;
         return flag;
       });
+      filterButtons.forEach(([key, button]) =>
+        syncNotificationFilterButton(
+          button,
+          key,
+          getNotificationFilterCount(key, visibleBySetting),
+          notificationsViewFilter === key
+        )
+      );
       const unreadCount = visibleBySetting.filter((note) => !note.read_at).length;
       if (unreadCountEl) {
         if (unreadCount > 0) {
@@ -5262,7 +5942,9 @@ async function loadProfilePostCount() {
       const filtered =
         notificationsViewFilter === "unread"
           ? visibleBySetting.filter((note) => !note.read_at)
-          : visibleBySetting;
+          : notificationsViewFilter === "all"
+          ? visibleBySetting
+          : visibleBySetting.filter((note) => note.type === notificationsViewFilter);
       filtered.sort((a, b) => {
         const unreadA = a.read_at ? 1 : 0;
         const unreadB = b.read_at ? 1 : 0;
@@ -5271,74 +5953,219 @@ async function loadProfilePostCount() {
       });
 
       if (!filtered.length) {
-        status.textContent =
-          notificationsViewFilter === "unread"
-            ? tr.notificationsEmptyUnread || "No unread notifications."
-            : tr.notificationsFiltered || "Notifications are hidden.";
+        status.textContent = getNotificationEmptyState(notificationsViewFilter, tr);
         return;
       }
 
+      const sectionOrder = ["unread", "today", "week", "earlier"];
+      const sectioned = new Map();
       filtered.forEach((note) => {
+        const sectionKey = getNotificationSectionKey(note, notificationsViewFilter);
+        if (!sectioned.has(sectionKey)) {
+          sectioned.set(sectionKey, []);
+        }
+        sectioned.get(sectionKey).push(note);
+      });
+
+      sectionOrder.forEach((sectionKey) => {
+        const items = sectioned.get(sectionKey) || [];
+        if (!items.length) return;
+
+        const section = document.createElement("section");
+        section.className = "notification-section";
+
+        const sectionHead = document.createElement("div");
+        sectionHead.className = "notification-section-head";
+        const sectionTitle = document.createElement("div");
+        sectionTitle.className = "notification-section-title";
+        sectionTitle.textContent = getNotificationSectionLabel(sectionKey, tr);
+        const sectionCount = document.createElement("div");
+        sectionCount.className = "notification-section-count";
+        sectionCount.textContent = `${items.length}`;
+        sectionHead.append(sectionTitle, sectionCount);
+        section.appendChild(sectionHead);
+
+        const sectionList = document.createElement("div");
+        sectionList.className = "notification-section-list";
+
+        items.forEach((note) => {
         const item = document.createElement("div");
         item.className = `notification-item${note.read_at ? "" : " unread"}`;
+        item.setAttribute("data-notification-type", `${note?.type || ""}`.trim());
 
-        let actorName =
-          note.actor?.handle ||
+        const actorName =
+          getProfileDisplayName(note.actor, note.actor_id) ||
           note.actor?.display_name ||
+          note.actor?.handle ||
           note.actor?.username ||
           "user";
-        if (!actorName.startsWith("@")) {
-          actorName = `@${actorName}`;
-        }
-        const actionText =
-          note.type === "comment"
-            ? tr.notificationActionComment || "commented on your post"
-            : note.type === "follow"
-            ? tr.notificationActionFollow || "followed you"
-            : note.type === "like"
-            ? tr.notificationActionLike || "liked your post"
-            : "updated";
+        const actorHandleValue =
+          note.actor?.handle || note.actor?.username || note.actor?.display_name || "";
+        const actorHandle = formatHandle(actorHandleValue);
+        const actionText = getNotificationActionText(note.type, tr);
+        const typeLabel = getNotificationTypeLabel(note.type, tr);
+        const post = note.post_id ? postsById.get(`${note.post_id}`) || null : null;
+        const previewText =
+          note.type === "follow"
+            ? actorHandle && actorHandle !== actorName
+              ? actorHandle
+              : ""
+            : getNotificationPreviewText(post, tr);
 
-        const text = document.createElement("div");
-        text.textContent = `${actorName} ${actionText}`;
+        const head = document.createElement("div");
+        head.className = "notification-item-head";
+
+        if (note.post_id || note.actor_id) {
+          item.classList.add("is-clickable");
+          item.tabIndex = 0;
+          item.setAttribute("role", "button");
+          item.setAttribute(
+            "aria-label",
+            note.post_id
+              ? tr.notificationViewPost || "View post"
+              : tr.notificationViewProfile || "View profile"
+          );
+          item.addEventListener("click", (event) => {
+            if (event.target.closest("button, a, input, textarea, select")) return;
+            openNotificationDestination(note, post);
+          });
+          item.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            openNotificationDestination(note, post);
+          });
+        }
+
+        const avatarEl = document.createElement(note.actor_id ? "button" : "div");
+        avatarEl.className = "avatar notification-avatar";
+        if (avatarEl instanceof HTMLButtonElement) {
+          avatarEl.type = "button";
+          avatarEl.classList.add("is-button");
+          avatarEl.setAttribute(
+            "aria-label",
+            actorHandle
+              ? `${actorName} ${actorHandle}`
+              : `${actorName}`
+          );
+          avatarEl.addEventListener("click", () => {
+            openPublicProfile(note.actor_id);
+          });
+        }
+        const actorInitial =
+          `${actorName || "U"}`.replace("@", "").trim().charAt(0).toUpperCase() || "U";
+        renderAvatar(avatarEl, note.actor, actorInitial);
+
+        const copy = document.createElement("div");
+        copy.className = "notification-copy";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "notification-title-row";
+
+        const title = document.createElement("div");
+        title.className = "notification-title";
+        const strong = document.createElement("strong");
+        strong.textContent = actorName;
+        title.appendChild(strong);
+        title.append(` ${actionText}`);
+
+        const typeChip = document.createElement("span");
+        typeChip.className = `notification-type-chip is-${note.type || "default"}`;
+        typeChip.textContent = typeLabel;
+
+        titleRow.appendChild(title);
+        titleRow.appendChild(typeChip);
+
+        copy.appendChild(titleRow);
+
+        if (previewText || post) {
+          const preview = createNotificationPreviewElement(note, post, previewText, tr);
+          if (preview) {
+            copy.appendChild(preview);
+          }
+        }
 
         const meta = document.createElement("div");
         meta.className = "notification-meta";
-        meta.textContent = note.created_at
-          ? formatDateTimeDisplay(note.created_at)
-          : "";
+        if (note.created_at) {
+          const time = document.createElement("span");
+          time.textContent = formatDateTimeDisplay(note.created_at);
+          meta.appendChild(time);
+        }
+        if (!note.read_at) {
+          const dot = document.createElement("span");
+          dot.className = "notification-dot";
+          dot.setAttribute("aria-hidden", "true");
+          meta.appendChild(dot);
+        }
+        copy.appendChild(meta);
+
+        head.appendChild(avatarEl);
+        head.appendChild(copy);
 
         const actions = document.createElement("div");
-        actions.className = "notification-actions";
-
-        if (!note.read_at) {
-          const markBtn = document.createElement("button");
-          markBtn.className = "btn btn-ghost";
-          markBtn.textContent = tr.notificationRead || "Mark read";
-          markBtn.addEventListener("click", () => markNotificationRead(note.id));
-          actions.appendChild(markBtn);
-        }
+        actions.className = "notification-item-actions";
 
         if (note.post_id) {
           const viewBtn = document.createElement("button");
-          viewBtn.className = "btn btn-ghost";
+          viewBtn.className = "btn btn-ghost btn-xs";
           viewBtn.textContent = tr.notificationViewPost || "View post";
           viewBtn.addEventListener("click", () => {
             if (typeof setActivePage === "function") {
               setActivePage("feed");
-              const el = document.querySelector(`[data-post-id="${note.post_id}"]`);
-              if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "center" });
-              }
+            }
+            if (post?.id) {
+              requestAnimationFrame(() => {
+                openPostDetail(`${post.id}`);
+              });
+            } else {
+              requestAnimationFrame(() => {
+                const el = document.querySelector(`[data-post-id="${note.post_id}"]`);
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+              });
             }
           });
           actions.appendChild(viewBtn);
         }
 
-        item.appendChild(text);
-        item.appendChild(meta);
+        if (note.actor_id && note.actor_id !== currentUser?.id) {
+          const messageBtn = document.createElement("button");
+          messageBtn.className = "btn btn-ghost btn-xs";
+          messageBtn.textContent = tr.message || "Message";
+          messageBtn.addEventListener("click", async () => {
+            await openDmConversation(note.actor_id, {
+              profile: note.actor || null,
+            });
+          });
+          actions.appendChild(messageBtn);
+        }
+
+        if (note.type === "follow" && note.actor_id) {
+          const profileBtn = document.createElement("button");
+          profileBtn.className = "btn btn-ghost btn-xs";
+          profileBtn.textContent = tr.notificationViewProfile || "View profile";
+          profileBtn.addEventListener("click", () => {
+            openPublicProfile(note.actor_id);
+          });
+          actions.appendChild(profileBtn);
+        }
+
+        if (!note.read_at) {
+          const markBtn = document.createElement("button");
+          markBtn.className = "btn btn-ghost btn-xs";
+          markBtn.textContent = tr.notificationRead || "Mark read";
+          markBtn.addEventListener("click", () => markNotificationRead(note.id));
+          actions.appendChild(markBtn);
+        }
+
+        item.appendChild(head);
         if (actions.childNodes.length) item.appendChild(actions);
-        list.appendChild(item);
+        sectionList.appendChild(item);
+        });
+
+        section.appendChild(sectionList);
+        list.appendChild(section);
       });
     }
 
@@ -6296,6 +7123,102 @@ async function loadProfilePostCount() {
       workoutExercises = [];
       addExercise();
       stopRestTimer();
+      const moreActions = document.querySelector("#post-modal-backdrop .post-form-more");
+      if (moreActions?.open) {
+        moreActions.open = false;
+      }
+    }
+
+    function buildCurrentUserFeedProfile() {
+      const profile = currentProfile && typeof currentProfile === "object" ? currentProfile : {};
+      const fallbackHandle = `${currentUser?.email || ""}`.split("@")[0] || "";
+      return {
+        id: currentUser?.id || profile.id || null,
+        handle: profile.handle || fallbackHandle,
+        display_name: profile.display_name || "",
+        avatar_url: profile.avatar_url || "",
+        accent_color: profile.accent_color || "",
+      };
+    }
+
+    function buildWorkoutSummaryFromLogs(logs = []) {
+      if (!Array.isArray(logs) || !logs.length) return [];
+      const grouped = new Map();
+      logs.forEach((log) => {
+        const exerciseName = `${log?.exercise || ""}`.trim();
+        if (!exerciseName) return;
+        if (!grouped.has(exerciseName)) {
+          grouped.set(exerciseName, {
+            exercise: exerciseName,
+            rest_seconds: log?.rest_seconds ?? null,
+            note: log?.exercise_note || "",
+            sets: [],
+          });
+        }
+        const exercise = grouped.get(exerciseName);
+        if (!exercise.note && log?.exercise_note) {
+          exercise.note = log.exercise_note;
+        }
+        exercise.sets.push({
+          set_index: Number(log?.set_index) || exercise.sets.length + 1,
+          reps: log?.reps ?? null,
+          weight: log?.weight ?? null,
+          pr_type: log?.pr_type || null,
+        });
+      });
+      return Array.from(grouped.values()).map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets
+          .slice()
+          .sort((a, b) => (a.set_index || 0) - (b.set_index || 0)),
+      }));
+    }
+
+    function applyOptimisticPost(postId, payload, logs = []) {
+      if (!postId || !payload) return;
+      const nowIso = new Date().toISOString();
+      const optimisticPost = {
+        id: postId,
+        user_id: payload.user_id || currentUser?.id || null,
+        created_at: nowIso,
+        date: payload.date || nowIso,
+        visibility: payload.visibility || "public",
+        note: payload.note || "",
+        caption: payload.note || "",
+        bodyweight:
+          payload.bodyweight === null || payload.bodyweight === undefined
+            ? null
+            : payload.bodyweight,
+        media_url: payload.media_url || "",
+        media_type: payload.media_type || "",
+        profile: buildCurrentUserFeedProfile(),
+      };
+      const currentPosts = Array.isArray(allPosts) ? allPosts : [];
+      allPosts = [
+        optimisticPost,
+        ...currentPosts.filter((post) => `${post?.id || ""}` !== `${postId}`),
+      ];
+      const workoutSummary = buildWorkoutSummaryFromLogs(logs);
+      if (workoutSummary.length) {
+        workoutLogsByPost.set(postId, workoutSummary);
+      } else {
+        workoutLogsByPost.delete(postId);
+      }
+      loadedWorkoutLogPostIds.add(postId);
+      if (
+        currentUser &&
+        optimisticPost.user_id === currentUser.id &&
+        Number.isFinite(profilePostCount)
+      ) {
+        profilePostCount += 1;
+      }
+      renderFeed({ forcePageRender: true });
+      updateProfileSummary();
+      renderWorkoutHistory();
+      renderTrainingSummary();
+      renderPrList();
+      renderInsights();
+      renderOnboardingChecklist();
     }
 
     async function handleSubmitPost() {
@@ -6403,11 +7326,14 @@ async function loadProfilePostCount() {
           }
         }
 
+        applyOptimisticPost(insertedPost.id, payload, logsWithPr);
         resetPostForm();
         clearPostDraft();
         const backdrop = $("post-modal-backdrop");
         if (backdrop) backdrop.classList.add("hidden");
-        await loadFeed();
+        loadFeed({ softRefresh: true, forceNetwork: true }).catch((feedError) => {
+          console.error("post refresh error:", feedError);
+        });
         showToast("投稿しました！", "success");
       } finally {
         setButtonLoading(submitBtn, false);
