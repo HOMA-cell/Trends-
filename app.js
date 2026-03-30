@@ -2350,6 +2350,7 @@ async function loadProfilePostCount() {
       setText("btn-dm-message-search-next", "dmSearchNext");
       setText("btn-dm-message-search-close", "dmSearchClose");
       setText("dm-chat-context-label", "dmRecentMediaLabel");
+      setText("dm-pinned-message-label", "dmPinnedMessageLabel");
       setText("dm-info-title", "dmInfoTitle");
       setText("btn-dm-info-close", "dmComposeClose");
       setText("btn-dm-info-open-profile", "dmOpenProfile");

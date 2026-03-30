@@ -4730,10 +4730,33 @@
       border: 1px solid #ece7df;
       background: #f8f4ed;
       box-shadow: none;
+      position: relative;
     }
     .dm-thread-item.is-unread .avatar {
       border-color: #f1d7ca;
       box-shadow: 0 0 0 3px rgba(255, 244, 238, 0.94);
+    }
+    .dm-thread-item .avatar.is-online::after,
+    .dm-thread-item .avatar.is-recent::after,
+    .dm-chat-avatar.is-online::after,
+    .dm-chat-avatar.is-recent::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      bottom: -1px;
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px rgba(31, 26, 22, 0.03);
+    }
+    .dm-thread-item .avatar.is-online::after,
+    .dm-chat-avatar.is-online::after {
+      background: #34c46a;
+    }
+    .dm-thread-item .avatar.is-recent::after,
+    .dm-chat-avatar.is-recent::after {
+      background: #cabfb2;
     }
     .dm-thread-main {
       min-width: 0;
@@ -4943,6 +4966,7 @@
       background: #f5f1ea;
       box-shadow: none;
       flex-shrink: 0;
+      position: relative;
     }
     .dm-chat-avatar.is-idle {
       background: #f4efe8;
@@ -5200,6 +5224,54 @@
       object-fit: cover;
       background: #f2ece4;
     }
+    .dm-pinned-message {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 9px 12px 10px;
+      border-bottom: 1px solid #f4eee6;
+      background: #fff;
+    }
+    .dm-pinned-message-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .dm-pinned-message-label {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #d05c31;
+    }
+    .dm-pinned-message-body {
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #5f564b;
+      font-size: 10.5px;
+      font-weight: 700;
+      line-height: 1.45;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .dm-pinned-message-body:hover,
+    .dm-pinned-message-body:focus-visible {
+      color: #1f1a16;
+      outline: none;
+    }
+    .dm-pinned-message-clear {
+      min-height: 26px;
+      padding-inline: 9px;
+      border-radius: 999px;
+      font-size: 9px;
+    }
     .dm-chat-stage {
       min-height: 0;
       background: #fff;
@@ -5381,6 +5453,9 @@
     .dm-message-row.is-highlighted .dm-message-bubble {
       box-shadow: 0 0 0 2px rgba(239, 91, 42, 0.16);
     }
+    .dm-message-row.is-pinned .dm-message-bubble {
+      box-shadow: 0 0 0 1px rgba(239, 91, 42, 0.18);
+    }
     .dm-message-row.is-search-match .dm-message-bubble {
       box-shadow: 0 0 0 1px rgba(239, 91, 42, 0.14);
     }
@@ -5424,6 +5499,21 @@
     }
     .dm-message-bubble.has-reply {
       gap: 6px;
+    }
+    .dm-message-pin-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 7px;
+      margin-bottom: 5px;
+      border-radius: 999px;
+      background: rgba(239, 91, 42, 0.1);
+      color: #cf592f;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      width: fit-content;
     }
     .dm-message-bubble.has-media .dm-message-text {
       padding: 8px 8px 4px;
@@ -5529,6 +5619,15 @@
       opacity: 0.72;
       animation: dm-message-status-pulse 1.1s ease-in-out infinite;
     }
+    .dm-message-seen-avatar {
+      width: 14px;
+      height: 14px;
+      min-width: 14px;
+      font-size: 7px;
+      border: 1px solid rgba(239, 91, 42, 0.12);
+      background: #fff8f4;
+      box-shadow: none;
+    }
     .dm-message-media {
       display: block;
       width: 100%;
@@ -5620,6 +5719,10 @@
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
+    }
+    .dm-message-share-kicker.is-link {
+      background: #eef8f1;
+      color: #2f8155;
     }
     .dm-message-share-title {
       font-size: 12px;
@@ -6680,6 +6783,20 @@
         width: 46px;
         height: 46px;
         border-radius: 12px;
+      }
+      .dm-pinned-message {
+        gap: 8px;
+        padding: 8px 10px 9px;
+      }
+      .dm-pinned-message-label {
+        font-size: 8px;
+      }
+      .dm-pinned-message-body {
+        font-size: 10px;
+      }
+      .dm-pinned-message-clear {
+        min-height: 24px;
+        padding-inline: 8px;
       }
       .dm-message-list {
         padding: 12px 8px 10px;

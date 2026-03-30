@@ -50,6 +50,7 @@ let dmPendingMediaPreviewUrl = "";
 let dmMediaSchemaState = "unknown";
 let dmPinnedThreadIds = new Set();
 let dmMutedThreadIds = new Set();
+let dmPinnedMessageIdsByPartner = {};
 let dmPreferenceUserId = "";
 let dmUnreadDividerMessageId = "";
 let dmReplyTargetId = "";
@@ -73,6 +74,7 @@ const DM_MESSAGE_LIMIT = 250;
 const DM_THREAD_BATCH = 24;
 const DM_PINNED_THREADS_KEY = "trends_dm_pinned_threads_v1";
 const DM_MUTED_THREADS_KEY = "trends_dm_muted_threads_v1";
+const DM_PINNED_MESSAGES_KEY = "trends_dm_pinned_messages_v1";
 const DM_MEDIA_ONLY_BODY = "__TRENDS_DM_MEDIA_ONLY__";
 const DM_REPLY_PREFIX = "__TRENDS_DM_REPLY__";
 const DM_REPLY_BODY_BREAK = "__TRENDS_DM_REPLY_BODY__";
@@ -208,6 +210,7 @@ function clearDmState() {
   dmUnreadDividerMessageId = "";
   dmReplyTargetId = "";
   dmReactionPickerMessageId = "";
+  dmPinnedMessageIdsByPartner = {};
   dmTypingPartnerId = "";
   dmLastTypingSentAt = 0;
   dmMessageSearchOpen = false;
@@ -255,23 +258,62 @@ function writeDmPreferenceSet(baseKey, ids) {
   }
 }
 
+function readDmPreferenceMap(baseKey) {
+  if (typeof window === "undefined") return {};
+  const storageKey = getDmPreferenceStorageKey(baseKey);
+  if (!storageKey) return {};
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, value]) => [`${key || ""}`.trim(), `${value || ""}`.trim()])
+        .filter(([key, value]) => key && value)
+    );
+  } catch (error) {
+    console.error("readDmPreferenceMap error:", error);
+    return {};
+  }
+}
+
+function writeDmPreferenceMap(baseKey, record) {
+  if (typeof window === "undefined") return;
+  const storageKey = getDmPreferenceStorageKey(baseKey);
+  if (!storageKey) return;
+  try {
+    const normalized = Object.fromEntries(
+      Object.entries(record || {})
+        .map(([key, value]) => [`${key || ""}`.trim(), `${value || ""}`.trim()])
+        .filter(([key, value]) => key && value)
+    );
+    window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+  } catch (error) {
+    console.error("writeDmPreferenceMap error:", error);
+  }
+}
+
 function syncDmPreferenceSets(force = false) {
   const userId = `${getCurrentUser()?.id || ""}`.trim();
   if (!userId) {
     dmPreferenceUserId = "";
     dmPinnedThreadIds = new Set();
     dmMutedThreadIds = new Set();
+    dmPinnedMessageIdsByPartner = {};
     return;
   }
   if (!force && dmPreferenceUserId === userId) return;
   dmPreferenceUserId = userId;
   dmPinnedThreadIds = readDmPreferenceSet(DM_PINNED_THREADS_KEY);
   dmMutedThreadIds = readDmPreferenceSet(DM_MUTED_THREADS_KEY);
+  dmPinnedMessageIdsByPartner = readDmPreferenceMap(DM_PINNED_MESSAGES_KEY);
 }
 
 function persistDmPreferenceSets() {
   writeDmPreferenceSet(DM_PINNED_THREADS_KEY, dmPinnedThreadIds);
   writeDmPreferenceSet(DM_MUTED_THREADS_KEY, dmMutedThreadIds);
+  writeDmPreferenceMap(DM_PINNED_MESSAGES_KEY, dmPinnedMessageIdsByPartner);
 }
 
 function isDmThreadPinned(partnerId) {
@@ -280,6 +322,41 @@ function isDmThreadPinned(partnerId) {
 
 function isDmThreadMuted(partnerId) {
   return dmMutedThreadIds.has(`${partnerId || ""}`.trim());
+}
+
+function getDmPinnedMessageId(partnerId = dmActivePartnerId) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!targetPartnerId) return "";
+  return `${dmPinnedMessageIdsByPartner?.[targetPartnerId] || ""}`.trim();
+}
+
+function getDmPinnedMessage(partnerId = dmActivePartnerId) {
+  const messageId = getDmPinnedMessageId(partnerId);
+  if (!messageId) return null;
+  const message = getDmMessageById(messageId);
+  if (message) return message;
+  if (dmPinnedMessageIdsByPartner?.[partnerId]) {
+    delete dmPinnedMessageIdsByPartner[partnerId];
+    persistDmPreferenceSets();
+  }
+  return null;
+}
+
+function setDmPinnedMessage(partnerId, messageId) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  const targetMessageId = `${messageId || ""}`.trim();
+  if (!targetPartnerId || !targetMessageId) return;
+  syncDmPreferenceSets();
+  dmPinnedMessageIdsByPartner[targetPartnerId] = targetMessageId;
+  persistDmPreferenceSets();
+}
+
+function clearDmPinnedMessage(partnerId) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!targetPartnerId || !dmPinnedMessageIdsByPartner?.[targetPartnerId]) return false;
+  delete dmPinnedMessageIdsByPartner[targetPartnerId];
+  persistDmPreferenceSets();
+  return true;
 }
 
 function getPartnerId(row, userId) {
@@ -430,7 +507,7 @@ function getDmMessageSnippet(message, tr = getDmTranslations()) {
       "返信"
     );
   }
-  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const sharePayload = parseDmLinkedMessage(message, tr);
   if (sharePayload) {
     return (
       normalizeDmSnippet(sharePayload.title) ||
@@ -740,6 +817,86 @@ function formatThreadTimestamp(value) {
     }).format(date);
   }
   return formatDateDisplay(date);
+}
+
+function getDmPartnerPresence(partnerId = dmActivePartnerId, tr = getDmTranslations()) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!targetPartnerId) {
+    return {
+      kind: "",
+      label: "",
+      title: "",
+      isOnline: false,
+    };
+  }
+  if (dmTypingPartnerId === targetPartnerId) {
+    return {
+      kind: "typing",
+      label: tr.dmTyping || "Typing…",
+      title: tr.dmTyping || "Typing…",
+      isOnline: true,
+    };
+  }
+  const thread = dmThreads.find((item) => item.partnerId === targetPartnerId);
+  const rawRecentAt = `${thread?.partnerLastAt || ""}`.trim();
+  if (!rawRecentAt) {
+    return {
+      kind: "",
+      label: "",
+      title: "",
+      isOnline: false,
+    };
+  }
+  const recentAt = new Date(rawRecentAt);
+  if (Number.isNaN(recentAt.getTime())) {
+    return {
+      kind: "",
+      label: "",
+      title: "",
+      isOnline: false,
+    };
+  }
+  const diffMs = Date.now() - recentAt.getTime();
+  if (diffMs <= 5 * 60 * 1000) {
+    return {
+      kind: "active",
+      label: tr.dmActiveNow || "Active now",
+      title: tr.dmActiveNow || "Active now",
+      isOnline: true,
+    };
+  }
+  if (diffMs <= 60 * 60 * 1000) {
+    const minutes = Math.max(1, Math.round(diffMs / (60 * 1000)));
+    const label = (tr.dmActiveMinutesAgo || "{minutes}m ago").replace(
+      "{minutes}",
+      `${minutes}`
+    );
+    return {
+      kind: "recent",
+      label,
+      title: label,
+      isOnline: false,
+    };
+  }
+  if (diffMs <= 24 * 60 * 60 * 1000) {
+    const hours = Math.max(1, Math.round(diffMs / (60 * 60 * 1000)));
+    const label = (tr.dmActiveHoursAgo || "{hours}h ago").replace(
+      "{hours}",
+      `${hours}`
+    );
+    return {
+      kind: "recent",
+      label,
+      title: label,
+      isOnline: false,
+    };
+  }
+  return {
+    kind: "",
+    label: "",
+    title: "",
+    isOnline: false,
+  };
 }
 
 function getDateKey(value) {
@@ -1260,6 +1417,25 @@ function toggleDmThreadMuted(partnerId) {
   renderConversationHeader({ force: true });
 }
 
+function toggleDmMessagePinned(messageId) {
+  const targetMessageId = `${messageId || ""}`.trim();
+  const targetPartnerId = `${dmActivePartnerId || ""}`.trim();
+  if (!targetMessageId || !targetPartnerId) return false;
+  syncDmPreferenceSets();
+  const tr = getDmTranslations();
+  const currentPinnedId = getDmPinnedMessageId(targetPartnerId);
+  if (currentPinnedId && currentPinnedId === targetMessageId) {
+    clearDmPinnedMessage(targetPartnerId);
+    showToast(tr.dmMessageUnpinned || "Pinned message cleared.", "success");
+  } else {
+    setDmPinnedMessage(targetPartnerId, targetMessageId);
+    showToast(tr.dmMessagePinned || "Message pinned.", "success");
+  }
+  renderConversationMessages({ forceFull: true });
+  renderDmInfoPanel();
+  return true;
+}
+
 function renderDmMediaPreview() {
   const preview = $("dm-media-preview");
   const image = $("dm-media-preview-image");
@@ -1694,6 +1870,7 @@ function upsertThreadAfterLocalSend(
     existing.lastBody = previewBody;
     existing.lastAt = createdAt;
     existing.lastFromMe = true;
+    existing.partnerLastAt = existing.partnerLastAt || "";
     existing.lastMediaUrl = mediaUrl || "";
     existing.lastMediaType = mediaType || "";
   } else {
@@ -1703,6 +1880,7 @@ function upsertThreadAfterLocalSend(
       lastBody: previewBody,
       lastAt: createdAt,
       lastFromMe: true,
+      partnerLastAt: "",
       lastMediaUrl: mediaUrl || "",
       lastMediaType: mediaType || "",
       unreadCount: 0,
@@ -2228,6 +2406,7 @@ function getThreadPreviewState(thread) {
 function getThreadRenderSignature(thread, query = "", activePartnerId = "") {
   const previewState = getThreadPreviewState(thread);
   const previewBody = previewState.fallbackText;
+  const presence = getDmPartnerPresence(thread?.partnerId);
   return [
     `${thread?.partnerId || ""}`.trim(),
     Number(thread?.unreadCount || 0),
@@ -2236,9 +2415,11 @@ function getThreadRenderSignature(thread, query = "", activePartnerId = "") {
     isDmThreadMuted(thread?.partnerId) ? 1 : 0,
     thread?.lastFromMe ? 1 : 0,
     `${thread?.lastAt || ""}`.trim(),
+    `${thread?.partnerLastAt || ""}`.trim(),
     `${thread?.lastMediaType || ""}`.trim(),
     `${previewState.kind || ""}`.trim(),
     `${previewBody.length}:${previewBody.slice(0, 48)}`,
+    `${presence.kind || ""}:${presence.label || ""}`,
     normalizeDmSearchText(query),
     dmThreadView,
   ].join("|");
@@ -2275,7 +2456,17 @@ function updateThreadItem(button, thread, tr, query = "") {
     button.appendChild(avatar);
   }
   const identity = getProfileIdentity(thread.profile, thread.partnerId);
+  const presence = getDmPartnerPresence(thread.partnerId, tr);
   renderAvatar(avatar, thread.profile, identity.initial);
+  avatar.classList.toggle("is-online", presence.isOnline);
+  avatar.classList.toggle("is-recent", presence.kind === "recent");
+  if (presence.title) {
+    avatar.setAttribute("title", presence.title);
+    avatar.setAttribute("aria-label", `${identity.primary} · ${presence.title}`);
+  } else {
+    avatar.removeAttribute("title");
+    avatar.removeAttribute("aria-label");
+  }
   button.title = [identity.primary, identity.secondary].filter(Boolean).join(" ");
 
   let body = button.querySelector(".dm-thread-main");
@@ -2653,18 +2844,26 @@ function renderConversationHeader(options = {}) {
   let avatarProfile = null;
   let avatarFallback = "U";
   let avatarIdle = true;
+  let avatarOnline = false;
+  let avatarRecent = false;
 
   if (active) {
     const identity = getProfileIdentity(active.profile, active.id);
+    const presence = getDmPartnerPresence(active.id, tr);
     nextTitle = identity.primary;
     avatarProfile = active.profile || null;
     avatarFallback = identity.initial;
     avatarIdle = false;
+    avatarOnline = presence.isOnline;
+    avatarRecent = presence.kind === "recent";
     const activeThread = dmThreads.find(
       (thread) => thread.partnerId === dmActivePartnerId
     );
     const unread = Number(activeThread?.unreadCount || 0);
     const subParts = [];
+    if (presence.label) {
+      subParts.push(presence.label);
+    }
     if (identity.secondary) {
       subParts.push(identity.secondary);
     }
@@ -2702,6 +2901,8 @@ function renderConversationHeader(options = {}) {
     nextPinActive ? "1" : "0",
     nextMuteActive ? "1" : "0",
     avatarIdle ? "1" : "0",
+    avatarOnline ? "1" : "0",
+    avatarRecent ? "1" : "0",
     `${avatarProfile?.avatar_url || ""}`.trim(),
   ].join("::");
   if (!force && nextHeaderKey === dmRenderedConversationHeaderKey) {
@@ -2718,6 +2919,8 @@ function renderConversationHeader(options = {}) {
   }
   if (avatar) {
     avatar.classList.toggle("is-idle", avatarIdle);
+    avatar.classList.toggle("is-online", avatarOnline);
+    avatar.classList.toggle("is-recent", avatarRecent);
     renderAvatar(avatar, avatarProfile, avatarFallback);
   }
   if (headerMain) {
@@ -3190,6 +3393,40 @@ function renderDmChatContext() {
   strip.replaceChildren(fragment);
 }
 
+function renderDmPinnedMessageBar() {
+  const wrap = $("dm-pinned-message");
+  const label = $("dm-pinned-message-label");
+  const openBtn = $("btn-dm-pinned-message-open");
+  const clearBtn = $("btn-dm-pinned-message-clear");
+  if (!wrap || !label || !openBtn || !clearBtn) return;
+  const tr = getDmTranslations();
+  label.textContent = tr.dmPinnedMessageLabel || "Pinned message";
+  clearBtn.textContent = tr.dmUnpinMessage || "Unpin";
+
+  const active = dmPartners.find((partner) => partner.id === dmActivePartnerId);
+  const pinnedMessage = active ? getDmPinnedMessage(active.id) : null;
+  if (!active || !pinnedMessage) {
+    wrap.classList.add("hidden");
+    openBtn.textContent = "-";
+    openBtn.removeAttribute("title");
+    clearBtn.classList.add("hidden");
+    return;
+  }
+
+  const author = getDmReplyAuthorLabel(pinnedMessage, tr);
+  const snippet =
+    getDmMessageSnippet(pinnedMessage, tr) ||
+    tr.dmPinnedMessageFallback ||
+    tr.dmPhotoMessage ||
+    "Message";
+  const timestamp = formatThreadTimestamp(pinnedMessage.created_at);
+  const line = [author, snippet, timestamp].filter(Boolean).join(" · ");
+  openBtn.textContent = line;
+  openBtn.title = line;
+  wrap.classList.remove("hidden");
+  clearBtn.classList.remove("hidden");
+}
+
 function closeDmActionSheet() {
   const sheet = $("dm-action-sheet");
   if (sheet) {
@@ -3215,7 +3452,7 @@ function openDmActionSheet(messageId) {
   const tr = getDmTranslations();
   dmActionSheetMessageId = `${messageId || ""}`.trim();
   const senderLabel = getDmReplyAuthorLabel(message, tr);
-  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const sharePayload = parseDmLinkedMessage(message, tr);
   const snippet =
     getDmMessageSnippet(message, tr) ||
     sharePayload?.url ||
@@ -3247,6 +3484,16 @@ function openDmActionSheet(messageId) {
     setDmReplyTarget(message.id);
   });
 
+  addAction(
+    "pin",
+    getDmPinnedMessageId(dmActivePartnerId) === `${message.id || ""}`.trim()
+      ? tr.dmUnpinMessage || "Unpin"
+      : tr.dmPinMessage || "Pin message",
+    async () => {
+      toggleDmMessagePinned(message.id);
+    }
+  );
+
   addAction("react", tr.dmReactAction || "React", async () => {
     dmReactionPickerMessageId = `${message.id || ""}`.trim();
     renderConversationMessages({ forceFull: true });
@@ -3270,11 +3517,17 @@ function openDmActionSheet(messageId) {
   }
 
   if (sharePayload?.url) {
-    addAction("post", tr.dmSharedPostOpen || "Open post", async () => {
+    addAction(
+      "post",
+      sharePayload.kind === "post"
+        ? tr.dmSharedPostOpen || "Open post"
+        : tr.dmOpenLink || "Open link",
+      async () => {
       if (typeof window !== "undefined") {
         window.open(sharePayload.url, "_blank", "noopener,noreferrer");
       }
-    });
+      }
+    );
   }
 
   sheet.classList.remove("hidden");
@@ -3337,6 +3590,9 @@ function appendDmMessageNodes({
   if (message?.id) {
     row.setAttribute("data-dm-message-id", `${message.id}`);
   }
+  const isPinnedMessage =
+    !!message?.id && getDmPinnedMessageId(dmActivePartnerId) === `${message.id || ""}`.trim();
+  row.classList.toggle("is-pinned", isPinnedMessage);
   const messageId = `${message?.id || ""}`.trim();
   const searchMatchIndex = dmMessageSearchMatchIds.indexOf(messageId);
   if (searchMatchIndex >= 0) {
@@ -3384,12 +3640,18 @@ function appendDmMessageNodes({
     : replyPayload
       ? getDmReplyMessageDisplayBody(replyPayload)
       : getDmMessageDisplayBody(message);
-  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const sharePayload = parseDmLinkedMessage(message, tr);
   const hasImage = getDmMessageHasImage(message);
   bubble.classList.toggle("has-media", hasImage);
   bubble.classList.toggle("is-media-only", hasImage && !messageText && !sharePayload);
   bubble.classList.toggle("has-share", !!sharePayload);
   bubble.classList.toggle("has-reply", !!replyPayload);
+  if (isPinnedMessage) {
+    const pinnedBadge = document.createElement("div");
+    pinnedBadge.className = "dm-message-pin-badge";
+    pinnedBadge.textContent = tr.dmPinnedMessageLabel || "Pinned message";
+    bubble.appendChild(pinnedBadge);
+  }
   if (!message.pending && message?.id) {
     bubble.addEventListener("dblclick", async () => {
       if (hasDmReactionFromCurrentUser(message.id, DM_QUICK_LIKE_EMOJI)) return;
@@ -3453,7 +3715,13 @@ function appendDmMessageNodes({
 
     const shareKicker = document.createElement("div");
     shareKicker.className = "dm-message-share-kicker";
-    shareKicker.textContent = tr.dmSharedPostBadge || "Post";
+    if (sharePayload.kind === "link") {
+      shareKicker.classList.add("is-link");
+    }
+    shareKicker.textContent =
+      sharePayload.kind === "post"
+        ? tr.dmSharedPostBadge || "Post"
+        : tr.dmInfoLinkBadge || "Link";
     shareCard.appendChild(shareKicker);
 
     const shareTitle = document.createElement("div");
@@ -3475,7 +3743,10 @@ function appendDmMessageNodes({
     shareMeta.appendChild(host);
     const cta = document.createElement("span");
     cta.className = "dm-message-share-cta";
-    cta.textContent = tr.dmSharedPostOpen || "Open post";
+    cta.textContent =
+      sharePayload.kind === "post"
+        ? tr.dmSharedPostOpen || "Open post"
+        : tr.dmOpenLink || "Open link";
     shareMeta.appendChild(cta);
     shareCard.appendChild(shareMeta);
     bubble.appendChild(shareCard);
@@ -3616,7 +3887,18 @@ function appendDmMessageNodes({
       ? `${tr.dmSeen || "Seen"}${stateTime ? ` · ${stateTime}` : ""}`
       : `${tr.dmSent || "Sent"}${stateTime ? ` · ${stateTime}` : ""}`;
     meta.classList.add("is-status-only", message.read_at ? "is-seen" : "is-sent");
-    meta.textContent = stateLabel;
+    if (message.read_at && partnerProfile) {
+      const seenAvatar = document.createElement("span");
+      seenAvatar.className = "avatar dm-message-seen-avatar";
+      const partnerIdentity = getProfileIdentity(partnerProfile, message.recipient_id);
+      renderAvatar(seenAvatar, partnerProfile, partnerIdentity.initial);
+      seenAvatar.setAttribute("aria-hidden", "true");
+      const seenLabel = document.createElement("span");
+      seenLabel.textContent = stateLabel;
+      meta.append(seenAvatar, seenLabel);
+    } else {
+      meta.textContent = stateLabel;
+    }
   } else {
     meta.textContent = messageTime;
   }
@@ -3657,6 +3939,7 @@ function renderConversationMessages(options = {}) {
     dmRenderedMessageKeys = [];
     dmReactionPickerMessageId = "";
     renderDmChatContext();
+    renderDmPinnedMessageBar();
     updateDmMessageSearchState();
     renderDmInfoPanel();
     syncDmJumpLatestButton();
@@ -3669,6 +3952,7 @@ function renderConversationMessages(options = {}) {
     dmRenderedMessageKeys = [];
     dmReactionPickerMessageId = "";
     renderDmChatContext();
+    renderDmPinnedMessageBar();
     updateDmMessageSearchState();
     renderDmInfoPanel();
     syncDmJumpLatestButton();
@@ -3778,6 +4062,7 @@ function renderConversationMessages(options = {}) {
   dmRenderedMessagePartnerId = dmActivePartnerId;
   dmRenderedMessageKeys = nextMessageKeys;
   renderDmChatContext();
+  renderDmPinnedMessageBar();
   updateDmMessageSearchState();
   renderDmInfoPanel();
   syncDmJumpLatestButton();
@@ -3928,11 +4213,17 @@ export async function refreshDmData(options = {}) {
           lastBody: `${row.body || ""}`.trim(),
           lastAt: row.created_at,
           lastFromMe: row.sender_id === currentUser.id,
+          partnerLastAt: row.sender_id === partnerId ? row.created_at : "",
           lastMediaUrl: `${row.media_url || ""}`.trim(),
           lastMediaType: `${row.media_type || ""}`.trim(),
           unreadCount: 0,
           profile: null,
         });
+      } else if (row.sender_id === partnerId) {
+        const current = threadByPartner.get(partnerId);
+        if (current && !current.partnerLastAt) {
+          current.partnerLastAt = row.created_at;
+        }
       }
       if (row.recipient_id === currentUser.id && !row.read_at) {
         const current = threadByPartner.get(partnerId);
@@ -4507,6 +4798,33 @@ export function setupDmControls() {
     });
   }
 
+  const pinnedMessageOpenBtn = $("btn-dm-pinned-message-open");
+  if (pinnedMessageOpenBtn && pinnedMessageOpenBtn.dataset.bound !== "true") {
+    pinnedMessageOpenBtn.dataset.bound = "true";
+    pinnedMessageOpenBtn.addEventListener("click", () => {
+      const messageId = getDmPinnedMessageId(dmActivePartnerId);
+      if (!messageId) return;
+      if (!scrollToDmMessage(messageId, { block: "center" })) {
+        showToast(getDmTranslations().dmReplyJumpUnavailable || "Message not found.", "info");
+      }
+    });
+  }
+
+  const pinnedMessageClearBtn = $("btn-dm-pinned-message-clear");
+  if (pinnedMessageClearBtn && pinnedMessageClearBtn.dataset.bound !== "true") {
+    pinnedMessageClearBtn.dataset.bound = "true";
+    pinnedMessageClearBtn.addEventListener("click", () => {
+      if (!dmActivePartnerId) return;
+      if (!clearDmPinnedMessage(dmActivePartnerId)) return;
+      showToast(
+        getDmTranslations().dmMessageUnpinned || "Pinned message cleared.",
+        "success"
+      );
+      renderConversationMessages({ forceFull: true });
+      renderDmInfoPanel();
+    });
+  }
+
   const backBtn = $("btn-dm-back");
   if (backBtn && backBtn.dataset.bound !== "true") {
     backBtn.dataset.bound = "true";
@@ -5023,6 +5341,7 @@ export function renderDmPage(options = {}) {
     if (jumpLatestBtn) jumpLatestBtn.classList.add("hidden");
     renderDmReplyComposer();
     renderDmChatContext();
+    renderDmPinnedMessageBar();
     setThreadStatus("", "");
     setSendStatus("", "");
     return;
@@ -5057,6 +5376,7 @@ export function renderDmPage(options = {}) {
   autoResizeDmInput();
   renderDmMediaPreview();
   renderDmReplyComposer();
+  renderDmPinnedMessageBar();
   updateDmComposerState();
   updateDmMessageSearchState();
   renderDmInfoPanel();

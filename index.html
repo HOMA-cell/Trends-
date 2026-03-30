@@ -283,6 +283,21 @@
                 </div>
                 <div class="dm-chat-media-strip" id="dm-chat-media-strip"></div>
               </div>
+              <div class="dm-pinned-message hidden" id="dm-pinned-message">
+                <div class="dm-pinned-message-copy">
+                  <div class="dm-pinned-message-label" id="dm-pinned-message-label">固定メッセージ</div>
+                  <button
+                    class="dm-pinned-message-body"
+                    id="btn-dm-pinned-message-open"
+                    type="button"
+                  >-</button>
+                </div>
+                <button
+                  class="btn btn-ghost btn-xs dm-pinned-message-clear"
+                  id="btn-dm-pinned-message-clear"
+                  type="button"
+                >解除</button>
+              </div>
               <div class="dm-chat-stage">
                 <div id="dm-message-list" class="dm-message-list"></div>
                 <button class="btn btn-primary btn-xs hidden dm-jump-latest" id="btn-dm-jump-latest" type="button">
