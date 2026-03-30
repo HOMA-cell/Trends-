@@ -486,7 +486,42 @@ function parseDmSharedPostMessage(message, tr = getDmTranslations()) {
     host = "";
   }
   return {
+    kind: "post",
     title: title || tr.dmSharePreviewFallback || "Trends post",
+    note,
+    url,
+    host,
+  };
+}
+
+function extractFirstDmUrl(text = "") {
+  const match = `${text || ""}`.match(/https?:\/\/[^\s]+/i);
+  return match ? `${match[0] || ""}`.trim() : "";
+}
+
+function parseDmLinkedMessage(message, tr = getDmTranslations()) {
+  const shared = parseDmSharedPostMessage(message, tr);
+  if (shared) return shared;
+  const body = getDmMessageDisplayBody(message);
+  if (!body) return null;
+  const url = extractFirstDmUrl(body);
+  if (!url) return null;
+  let host = "";
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    host = "";
+  }
+  const lines = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => line !== url);
+  const title = lines[0] || host || tr.dmCopyLink || "Link";
+  const note = lines.slice(1).join("\n");
+  return {
+    kind: "link",
+    title,
     note,
     url,
     host,
@@ -505,7 +540,7 @@ function getDmSearchableMessageText(message, tr = getDmTranslations()) {
   const parts = [];
   const replyPayload = parseDmReplyMessage(message);
   const reactionPayload = parseDmReactionMessage(message);
-  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const sharePayload = parseDmLinkedMessage(message, tr);
   const bodyText = getDmMessageDisplayBody(message);
   if (replyPayload) {
     parts.push(getDmReplyMessageDisplayBody(replyPayload));
@@ -537,7 +572,31 @@ function getDmConversationMediaMessages(limit = 6) {
 }
 
 function getDmConversationShareCount() {
-  return dmMessages.filter((message) => !!parseDmSharedPostMessage(message)).length;
+  return dmMessages.filter((message) => !!parseDmLinkedMessage(message)).length;
+}
+
+function getDmConversationSharedItems(limit = 8) {
+  const items = [];
+  const seen = new Set();
+  [...dmMessages]
+    .filter((message) => !message?.pending)
+    .sort(
+      (a, b) =>
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    )
+    .forEach((message) => {
+      const payload = parseDmLinkedMessage(message);
+      if (!payload?.url) return;
+      const key = `${payload.kind || "link"}::${payload.url}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      items.push({
+        ...payload,
+        messageId: `${message?.id || ""}`.trim(),
+        createdAt: message?.created_at || "",
+      });
+    });
+  return items.slice(0, limit);
 }
 
 function openDmMediaMessage(message) {
@@ -563,7 +622,7 @@ function openDmMediaMessage(message) {
 async function copyDmMessageContent(message) {
   const tr = getDmTranslations();
   if (!message) return false;
-  const sharePayload = parseDmSharedPostMessage(message, tr);
+  const sharePayload = parseDmLinkedMessage(message, tr);
   const replyPayload = parseDmReplyMessage(message);
   const reactionPayload = parseDmReactionMessage(message);
   let value = "";
@@ -2107,7 +2166,7 @@ function getThreadPreviewState(thread) {
   const tr = getDmTranslations();
   const reactionPayload = parseDmReactionMessage({ body: thread?.lastBody });
   const replyPayload = parseDmReplyMessage({ body: thread?.lastBody });
-  const sharePayload = parseDmSharedPostMessage({ body: thread?.lastBody }, tr);
+  const sharePayload = parseDmLinkedMessage({ body: thread?.lastBody }, tr);
   const text = `${getDmMessageDisplayBody({ body: thread?.lastBody }) || ""}`.trim();
   const hasPhoto = !!thread?.lastMediaUrl && thread?.lastMediaType === "image";
   if (reactionPayload) {
@@ -2144,8 +2203,11 @@ function getThreadPreviewState(thread) {
   }
   if (sharePayload) {
     return {
-      kind: "share",
-      kindLabel: tr.dmSharedPostBadge || "Post",
+      kind: sharePayload.kind === "post" ? "share" : "link",
+      kindLabel:
+        sharePayload.kind === "post"
+          ? tr.dmSharedPostBadge || "Post"
+          : tr.dmInfoLinkBadge || "Link",
       text: sharePayload.title || sharePayload.note || sharePayload.host || "",
       fallbackText:
         sharePayload.title ||
@@ -2293,13 +2355,17 @@ function updateThreadItem(button, thread, tr, query = "") {
   if (isPinned) {
     const pinnedFlag = document.createElement("span");
     pinnedFlag.className = "dm-thread-flag is-pinned";
-    pinnedFlag.textContent = tr.dmPinnedBadge || "Pinned";
+    pinnedFlag.textContent = "";
+    pinnedFlag.setAttribute("title", tr.dmPinnedBadge || "Pinned");
+    pinnedFlag.setAttribute("aria-label", tr.dmPinnedBadge || "Pinned");
     flags.appendChild(pinnedFlag);
   }
   if (isMuted) {
     const mutedFlag = document.createElement("span");
     mutedFlag.className = "dm-thread-flag is-muted";
-    mutedFlag.textContent = tr.dmMutedBadge || "Muted";
+    mutedFlag.textContent = "";
+    mutedFlag.setAttribute("title", tr.dmMutedBadge || "Muted");
+    mutedFlag.setAttribute("aria-label", tr.dmMutedBadge || "Muted");
     flags.appendChild(mutedFlag);
   }
   flags.classList.toggle("hidden", flags.childNodes.length === 0);
@@ -2718,6 +2784,7 @@ function updateDmMessageSearchState() {
     }
     if (prevBtn) prevBtn.disabled = true;
     if (nextBtn) nextBtn.disabled = true;
+    renderDmSearchDayChips();
     if (input && dmMessageSearchOpen && document.activeElement !== input) {
       input.focus();
     }
@@ -2739,6 +2806,7 @@ function updateDmMessageSearchState() {
     }
     if (prevBtn) prevBtn.disabled = true;
     if (nextBtn) nextBtn.disabled = true;
+    renderDmSearchDayChips();
     return;
   }
 
@@ -2755,6 +2823,7 @@ function updateDmMessageSearchState() {
   }
   if (prevBtn) prevBtn.disabled = dmMessageSearchMatchIds.length <= 1;
   if (nextBtn) nextBtn.disabled = dmMessageSearchMatchIds.length <= 1;
+  renderDmSearchDayChips();
 }
 
 function goToDmSearchMatch(direction = 1) {
@@ -2769,6 +2838,65 @@ function goToDmSearchMatch(direction = 1) {
   renderConversationMessages({ forceFull: true });
 }
 
+function getDmSearchMatchDays() {
+  if (!dmMessageSearchMatchIds.length) return [];
+  const groups = [];
+  const seen = new Map();
+  dmMessageSearchMatchIds.forEach((messageId, index) => {
+    const label = formatDateDisplay(getDmMessageById(messageId)?.created_at) || "—";
+    if (!seen.has(label)) {
+      seen.set(label, groups.length);
+      groups.push({ label, count: 1, firstIndex: index });
+      return;
+    }
+    const groupIndex = seen.get(label);
+    if (typeof groupIndex === "number" && groups[groupIndex]) {
+      groups[groupIndex].count += 1;
+    }
+  });
+  return groups;
+}
+
+function renderDmSearchDayChips() {
+  const wrap = $("dm-message-search-days");
+  if (!wrap) return;
+  if (!dmMessageSearchOpen || !dmMessageSearchMatchIds.length) {
+    wrap.classList.add("hidden");
+    wrap.replaceChildren();
+    return;
+  }
+  const groups = getDmSearchMatchDays();
+  if (!groups.length) {
+    wrap.classList.add("hidden");
+    wrap.replaceChildren();
+    return;
+  }
+  const activeId =
+    dmMessageSearchActiveIndex >= 0
+      ? dmMessageSearchMatchIds[dmMessageSearchActiveIndex]
+      : "";
+  const activeLabel = formatDateDisplay(getDmMessageById(activeId)?.created_at) || "";
+  wrap.classList.remove("hidden");
+  wrap.replaceChildren(
+    ...groups.map((group) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "dm-chat-search-day";
+      if (group.label === activeLabel) button.classList.add("is-active");
+      button.setAttribute("data-dm-search-day-index", `${group.firstIndex}`);
+      button.title = `${group.label} (${group.count})`;
+      const label = document.createElement("span");
+      label.className = "dm-chat-search-day-label";
+      label.textContent = group.label;
+      const count = document.createElement("span");
+      count.className = "dm-chat-search-day-count";
+      count.textContent = `${group.count}`;
+      button.append(label, count);
+      return button;
+    })
+  );
+}
+
 function renderDmInfoPanel() {
   const panel = $("dm-info-panel");
   const avatar = $("dm-info-avatar");
@@ -2781,6 +2909,9 @@ function renderDmInfoPanel() {
   const mediaTitle = $("dm-info-media-title");
   const mediaMeta = $("dm-info-media-meta");
   const mediaGrid = $("dm-info-media-grid");
+  const linksTitle = $("dm-info-links-title");
+  const linksMeta = $("dm-info-links-meta");
+  const linksList = $("dm-info-links-list");
   const searchTitle = $("dm-info-search-title");
   const searchMeta = $("dm-info-search-meta");
   const openProfileBtn = $("btn-dm-info-open-profile");
@@ -2799,6 +2930,9 @@ function renderDmInfoPanel() {
     !mediaTitle ||
     !mediaMeta ||
     !mediaGrid ||
+    !linksTitle ||
+    !linksMeta ||
+    !linksList ||
     !searchTitle ||
     !searchMeta ||
     !openProfileBtn ||
@@ -2812,6 +2946,7 @@ function renderDmInfoPanel() {
   const tr = getDmTranslations();
   profileTitle.textContent = tr.dmInfoProfileTitle || "Profile details";
   mediaTitle.textContent = tr.dmInfoMediaTitle || "Shared media";
+  linksTitle.textContent = tr.dmInfoLinksTitle || "Shared links";
   searchTitle.textContent = tr.dmInfoSearchTitle || "Search in conversation";
   openProfileBtn.textContent = tr.dmOpenProfile || "Open profile";
   openSearchBtn.textContent = tr.dmInfoOpenSearch || "Open search";
@@ -2832,6 +2967,7 @@ function renderDmInfoPanel() {
   const thread = dmThreads.find((item) => item.partnerId === active.id);
   const mediaMessages = getDmConversationMediaMessages(12);
   const shareCount = getDmConversationShareCount();
+  const sharedItems = getDmConversationSharedItems(8);
   const unreadCount = Number(thread?.unreadCount || 0);
   const messageCount = dmMessages.filter((message) => !parseDmReactionMessage(message)).length;
   const replyCount = dmMessages.filter((message) => !!parseDmReplyMessage(message)).length;
@@ -2918,6 +3054,61 @@ function renderDmInfoPanel() {
     empty.className = "dm-info-empty";
     empty.textContent = tr.dmInfoNoMedia || "No photos yet";
     mediaGrid.replaceChildren(empty);
+  }
+
+  linksMeta.textContent = sharedItems.length
+    ? (tr.dmInfoLinksMeta || "{count} shared items").replace(
+        "{count}",
+        `${sharedItems.length}`
+      )
+    : tr.dmInfoNoLinks || "No shared links yet";
+
+  if (sharedItems.length) {
+    linksList.replaceChildren(
+      ...sharedItems.map((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "dm-info-link-card";
+        button.setAttribute("data-dm-info-link-url", item.url);
+        button.setAttribute("data-dm-info-link-kind", item.kind || "link");
+
+        const kicker = document.createElement("div");
+        kicker.className = `dm-info-link-kicker is-${item.kind || "link"}`;
+        kicker.textContent =
+          item.kind === "post"
+            ? tr.dmSharedPostBadge || "Shared post"
+            : tr.dmInfoLinkBadge || "Link";
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "dm-info-link-title";
+        titleEl.textContent = item.title || item.host || item.url;
+
+        const noteEl = document.createElement("div");
+        noteEl.className = "dm-info-link-note";
+        noteEl.textContent =
+          item.note || item.host || formatDateDisplay(item.createdAt) || item.url;
+
+        const metaRow = document.createElement("div");
+        metaRow.className = "dm-info-link-meta";
+        const hostEl = document.createElement("span");
+        hostEl.textContent = item.host || formatDateDisplay(item.createdAt) || "link";
+        const ctaEl = document.createElement("span");
+        ctaEl.className = "dm-info-link-cta";
+        ctaEl.textContent =
+          item.kind === "post"
+            ? tr.dmSharedPostOpen || "Open post"
+            : tr.dmCopyLink || "Copy link";
+        metaRow.append(hostEl, ctaEl);
+
+        button.append(kicker, titleEl, noteEl, metaRow);
+        return button;
+      })
+    );
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "dm-info-empty";
+    empty.textContent = tr.dmInfoNoLinks || "No shared links yet";
+    linksList.replaceChildren(empty);
   }
 
   searchMeta.textContent = dmMessageSearchMatchIds.length
@@ -4454,6 +4645,27 @@ export function setupDmControls() {
     });
   }
 
+  const searchDays = $("dm-message-search-days");
+  if (searchDays && searchDays.dataset.bound !== "true") {
+    searchDays.dataset.bound = "true";
+    searchDays.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-dm-search-day-index]");
+      if (!button) return;
+      const nextIndex = Number(button.getAttribute("data-dm-search-day-index") || "-1");
+      if (!Number.isFinite(nextIndex) || nextIndex < 0) return;
+      dmMessageSearchActiveIndex = Math.min(
+        nextIndex,
+        Math.max(0, dmMessageSearchMatchIds.length - 1)
+      );
+      updateDmMessageSearchState();
+      renderConversationMessages({ forceFull: true });
+      const messageId = dmMessageSearchMatchIds[dmMessageSearchActiveIndex];
+      if (messageId) {
+        scrollToDmMessage(messageId, { block: "center" });
+      }
+    });
+  }
+
   const infoBackdrop = $("btn-dm-info-backdrop");
   if (infoBackdrop && infoBackdrop.dataset.bound !== "true") {
     infoBackdrop.dataset.bound = "true";
@@ -4526,6 +4738,37 @@ export function setupDmControls() {
       const message = getDmMessageById(messageId);
       if (!message) return;
       openDmMediaMessage(message);
+    });
+  }
+
+  const infoLinksList = $("dm-info-links-list");
+  if (infoLinksList && infoLinksList.dataset.bound !== "true") {
+    infoLinksList.dataset.bound = "true";
+    infoLinksList.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-dm-info-link-url]");
+      if (!button) return;
+      const url = `${button.getAttribute("data-dm-info-link-url") || ""}`.trim();
+      const kind = `${button.getAttribute("data-dm-info-link-kind") || "link"}`.trim();
+      if (!url) return;
+      const target = event.target;
+      const isCta = target instanceof HTMLElement && target.classList.contains("dm-info-link-cta");
+      if (
+        isCta &&
+        kind !== "post" &&
+        typeof navigator !== "undefined" &&
+        navigator.clipboard?.writeText
+      ) {
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast(getDmTranslations().dmMessageCopied || "Copied.", "success");
+          return;
+        } catch (error) {
+          console.error("copy dm info link failed", error);
+        }
+      }
+      if (typeof window !== "undefined") {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     });
   }
 

@@ -2357,6 +2357,7 @@ async function loadProfilePostCount() {
       setText("btn-dm-info-mute", "dmMuteThread");
       setText("dm-info-profile-title", "dmInfoProfileTitle");
       setText("dm-info-media-title", "dmInfoMediaTitle");
+      setText("dm-info-links-title", "dmInfoLinksTitle");
       setText("dm-info-search-title", "dmInfoSearchTitle");
       setText("btn-dm-info-open-search", "dmInfoOpenSearch");
       setPlaceholder("dm-input", "dmInputPlaceholder");
