@@ -4903,6 +4903,14 @@
       background: #fff0f4;
       color: #d1537a;
     }
+    .dm-thread-preview-pill.is-draft {
+      background: #fff1eb;
+      color: #d2572e;
+    }
+    .dm-thread-preview-text.is-draft {
+      color: #d2572e;
+      font-weight: 700;
+    }
     .dm-preview-prefix {
       color: #93897c;
       flex-shrink: 0;
@@ -5686,6 +5694,27 @@
       box-shadow: 0 12px 24px rgba(239, 91, 42, 0.22);
       font-size: 10px;
       z-index: 3;
+    }
+    .dm-jump-unread {
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      min-height: 34px;
+      padding-inline: 12px;
+      border-radius: 999px;
+      border: 1px solid #eddccf;
+      background: rgba(255, 255, 255, 0.96);
+      color: #6f675c;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+      font-size: 10px;
+      z-index: 3;
+    }
+    .dm-jump-unread:hover,
+    .dm-jump-unread:focus-visible {
+      background: #fff8f3;
+      border-color: #efcdb9;
+      color: #d05b31;
+      outline: none;
     }
     .dm-message-share-card {
       width: 100%;
@@ -6721,6 +6750,9 @@
         padding-inline: 5px;
         font-size: 8px;
       }
+      .dm-thread-preview-text.is-draft {
+        font-size: 9px;
+      }
       .dm-chat-header {
         min-height: 42px;
         padding: 5px 8px;
@@ -6872,6 +6904,13 @@
       }
       .dm-jump-latest {
         right: 12px;
+        bottom: 12px;
+        min-height: 32px;
+        padding-inline: 11px;
+        font-size: 9px;
+      }
+      .dm-jump-unread {
+        left: 12px;
         bottom: 12px;
         min-height: 32px;
         padding-inline: 11px;

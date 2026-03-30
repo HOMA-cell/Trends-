@@ -2344,6 +2344,7 @@ async function loadProfilePostCount() {
       setText("btn-dm-media", "dmAttachPhoto");
       setText("btn-dm-media-remove", "dmRemovePhoto");
       setText("btn-dm-thread-search-clear", "dmSearchClear");
+      setText("btn-dm-jump-unread", "dmJumpUnread");
       setText("btn-dm-jump-latest", "dmJumpLatest");
       setText("btn-dm-send", "dmSend");
       setText("btn-dm-message-search-prev", "dmSearchPrev");

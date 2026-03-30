@@ -51,6 +51,7 @@ let dmMediaSchemaState = "unknown";
 let dmPinnedThreadIds = new Set();
 let dmMutedThreadIds = new Set();
 let dmPinnedMessageIdsByPartner = {};
+let dmDraftsByPartner = {};
 let dmPreferenceUserId = "";
 let dmUnreadDividerMessageId = "";
 let dmReplyTargetId = "";
@@ -75,6 +76,7 @@ const DM_THREAD_BATCH = 24;
 const DM_PINNED_THREADS_KEY = "trends_dm_pinned_threads_v1";
 const DM_MUTED_THREADS_KEY = "trends_dm_muted_threads_v1";
 const DM_PINNED_MESSAGES_KEY = "trends_dm_pinned_messages_v1";
+const DM_DRAFTS_KEY = "trends_dm_drafts_v1";
 const DM_MEDIA_ONLY_BODY = "__TRENDS_DM_MEDIA_ONLY__";
 const DM_REPLY_PREFIX = "__TRENDS_DM_REPLY__";
 const DM_REPLY_BODY_BREAK = "__TRENDS_DM_REPLY_BODY__";
@@ -211,6 +213,7 @@ function clearDmState() {
   dmReplyTargetId = "";
   dmReactionPickerMessageId = "";
   dmPinnedMessageIdsByPartner = {};
+  dmDraftsByPartner = {};
   dmTypingPartnerId = "";
   dmLastTypingSentAt = 0;
   dmMessageSearchOpen = false;
@@ -294,6 +297,53 @@ function writeDmPreferenceMap(baseKey, record) {
   }
 }
 
+function normalizeDmDraftRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const body = `${value.body || ""}`.slice(0, 600);
+  const updatedAt = `${value.updatedAt || ""}`.trim();
+  if (!body.trim()) return null;
+  return {
+    body,
+    updatedAt: updatedAt || new Date().toISOString(),
+  };
+}
+
+function readDmDraftMap(baseKey) {
+  if (typeof window === "undefined") return {};
+  const storageKey = getDmPreferenceStorageKey(baseKey);
+  if (!storageKey) return {};
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, value]) => [`${key || ""}`.trim(), normalizeDmDraftRecord(value)])
+        .filter(([key, value]) => key && value)
+    );
+  } catch (error) {
+    console.error("readDmDraftMap error:", error);
+    return {};
+  }
+}
+
+function writeDmDraftMap(baseKey, record) {
+  if (typeof window === "undefined") return;
+  const storageKey = getDmPreferenceStorageKey(baseKey);
+  if (!storageKey) return;
+  try {
+    const normalized = Object.fromEntries(
+      Object.entries(record || {})
+        .map(([key, value]) => [`${key || ""}`.trim(), normalizeDmDraftRecord(value)])
+        .filter(([key, value]) => key && value)
+    );
+    window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+  } catch (error) {
+    console.error("writeDmDraftMap error:", error);
+  }
+}
+
 function syncDmPreferenceSets(force = false) {
   const userId = `${getCurrentUser()?.id || ""}`.trim();
   if (!userId) {
@@ -301,6 +351,7 @@ function syncDmPreferenceSets(force = false) {
     dmPinnedThreadIds = new Set();
     dmMutedThreadIds = new Set();
     dmPinnedMessageIdsByPartner = {};
+    dmDraftsByPartner = {};
     return;
   }
   if (!force && dmPreferenceUserId === userId) return;
@@ -308,12 +359,14 @@ function syncDmPreferenceSets(force = false) {
   dmPinnedThreadIds = readDmPreferenceSet(DM_PINNED_THREADS_KEY);
   dmMutedThreadIds = readDmPreferenceSet(DM_MUTED_THREADS_KEY);
   dmPinnedMessageIdsByPartner = readDmPreferenceMap(DM_PINNED_MESSAGES_KEY);
+  dmDraftsByPartner = readDmDraftMap(DM_DRAFTS_KEY);
 }
 
 function persistDmPreferenceSets() {
   writeDmPreferenceSet(DM_PINNED_THREADS_KEY, dmPinnedThreadIds);
   writeDmPreferenceSet(DM_MUTED_THREADS_KEY, dmMutedThreadIds);
   writeDmPreferenceMap(DM_PINNED_MESSAGES_KEY, dmPinnedMessageIdsByPartner);
+  writeDmDraftMap(DM_DRAFTS_KEY, dmDraftsByPartner);
 }
 
 function isDmThreadPinned(partnerId) {
@@ -819,6 +872,75 @@ function formatThreadTimestamp(value) {
   return formatDateDisplay(date);
 }
 
+function getDmDraft(partnerId = dmActivePartnerId) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!targetPartnerId) return null;
+  return normalizeDmDraftRecord(dmDraftsByPartner?.[targetPartnerId]) || null;
+}
+
+function hasDmDraft(partnerId = dmActivePartnerId) {
+  return !!getDmDraft(partnerId);
+}
+
+function persistDmDraft(partnerId = dmActivePartnerId, options = {}) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!targetPartnerId) return false;
+  syncDmPreferenceSets();
+  const input = $("dm-input");
+  const rawBody =
+    typeof options.body === "string" ? options.body : `${input?.value || ""}`;
+  const normalized = normalizeDmDraftRecord({
+    body: rawBody,
+    updatedAt: new Date().toISOString(),
+  });
+  const previous = getDmDraft(targetPartnerId);
+  const previousBody = `${previous?.body || ""}`;
+  const nextBody = `${normalized?.body || ""}`;
+  const changed = previousBody !== nextBody;
+
+  if (normalized) {
+    dmDraftsByPartner[targetPartnerId] = normalized;
+  } else if (dmDraftsByPartner?.[targetPartnerId]) {
+    delete dmDraftsByPartner[targetPartnerId];
+  }
+
+  if (changed) {
+    persistDmPreferenceSets();
+    if (options.refreshList) {
+      renderThreadList({ preserveScroll: true, keepWindow: true });
+      renderThreadSummary();
+    }
+  }
+  return changed;
+}
+
+function clearDmDraft(partnerId = dmActivePartnerId, options = {}) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!targetPartnerId || !dmDraftsByPartner?.[targetPartnerId]) return false;
+  delete dmDraftsByPartner[targetPartnerId];
+  persistDmPreferenceSets();
+  if (options.refreshList) {
+    renderThreadList({ preserveScroll: true, keepWindow: true });
+    renderThreadSummary();
+  }
+  return true;
+}
+
+function restoreDmDraft(partnerId = dmActivePartnerId, options = {}) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  const input = $("dm-input");
+  if (!targetPartnerId || !(input instanceof HTMLTextAreaElement)) return false;
+  const hasActiveComposerState =
+    !!`${input.value || ""}`.trim() || !!dmPendingMediaFile || !!dmReplyTargetId;
+  if (!options.force && hasActiveComposerState) return false;
+  const draft = getDmDraft(targetPartnerId);
+  input.value = draft?.body || "";
+  autoResizeDmInput();
+  updateDmInputCounter();
+  updateDmComposerState();
+  return !!draft;
+}
+
 function getDmPartnerPresence(partnerId = dmActivePartnerId, tr = getDmTranslations()) {
   const targetPartnerId = `${partnerId || ""}`.trim();
   if (!targetPartnerId) {
@@ -923,6 +1045,17 @@ function isNearBottom(el, threshold = 56) {
   if (!el) return true;
   const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
   return remaining <= threshold;
+}
+
+function isElementMostlyVisibleInContainer(container, element, threshold = 0.8) {
+  if (!container || !element) return false;
+  const containerRect = container.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  const visibleTop = Math.max(containerRect.top, elementRect.top);
+  const visibleBottom = Math.min(containerRect.bottom, elementRect.bottom);
+  const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+  const totalHeight = Math.max(1, elementRect.height || 1);
+  return visibleHeight / totalHeight >= threshold;
 }
 
 function clearDmTypingState(options = {}) {
@@ -1042,13 +1175,25 @@ async function sendDmTypingState(isTyping) {
 
 function syncDmJumpLatestButton() {
   const list = $("dm-message-list");
-  const button = $("btn-dm-jump-latest");
-  if (!list || !button) return;
-  const shouldShow =
-    !!dmActivePartnerId &&
-    dmMessages.length > 0 &&
-    !isNearBottom(list, 96);
-  button.classList.toggle("hidden", !shouldShow);
+  const latestButton = $("btn-dm-jump-latest");
+  const unreadButton = $("btn-dm-jump-unread");
+  if (!list) return;
+  if (latestButton) {
+    const shouldShowLatest =
+      !!dmActivePartnerId &&
+      dmMessages.length > 0 &&
+      !isNearBottom(list, 96);
+    latestButton.classList.toggle("hidden", !shouldShowLatest);
+  }
+  if (unreadButton) {
+    const unreadDivider = list.querySelector(".dm-unread-divider");
+    const shouldShowUnread =
+      !!dmActivePartnerId &&
+      !!dmUnreadDividerMessageId &&
+      unreadDivider instanceof HTMLElement &&
+      !isElementMostlyVisibleInContainer(list, unreadDivider, 0.92);
+    unreadButton.classList.toggle("hidden", !shouldShowUnread);
+  }
 }
 
 function formatMessageDayLabel(value) {
@@ -2342,6 +2487,16 @@ function getThreadFilterKey(filteredThreads) {
 
 function getThreadPreviewState(thread) {
   const tr = getDmTranslations();
+  const draft = getDmDraft(thread?.partnerId);
+  if (draft) {
+    return {
+      kind: "draft",
+      kindLabel: tr.dmDraftBadge || "Draft",
+      text: draft.body,
+      fallbackText: draft.body,
+      draftAt: draft.updatedAt || "",
+    };
+  }
   const reactionPayload = parseDmReactionMessage({ body: thread?.lastBody });
   const replyPayload = parseDmReplyMessage({ body: thread?.lastBody });
   const sharePayload = parseDmLinkedMessage({ body: thread?.lastBody }, tr);
@@ -2418,6 +2573,7 @@ function getThreadRenderSignature(thread, query = "", activePartnerId = "") {
     `${thread?.partnerLastAt || ""}`.trim(),
     `${thread?.lastMediaType || ""}`.trim(),
     `${previewState.kind || ""}`.trim(),
+    `${previewState.draftAt || ""}`.trim(),
     `${previewBody.length}:${previewBody.slice(0, 48)}`,
     `${presence.kind || ""}:${presence.label || ""}`,
     normalizeDmSearchText(query),
@@ -2443,10 +2599,12 @@ function updateThreadItem(button, thread, tr, query = "") {
   const normalizedQuery = normalizeDmSearchText(query);
   const isPinned = isDmThreadPinned(thread.partnerId);
   const isMuted = isDmThreadMuted(thread.partnerId);
+  const draft = getDmDraft(thread.partnerId);
   button.classList.toggle("is-active", isActive);
   button.classList.toggle("is-unread", Number(thread.unreadCount || 0) > 0);
   button.classList.toggle("is-pinned", isPinned);
   button.classList.toggle("is-muted", isMuted);
+  button.classList.toggle("has-draft", !!draft);
   button.setAttribute("aria-pressed", isActive ? "true" : "false");
 
   let avatar = button.querySelector(".avatar");
@@ -2534,7 +2692,7 @@ function updateThreadItem(button, thread, tr, query = "") {
     time.className = "dm-thread-time";
     metaWrap.appendChild(time);
   }
-  time.textContent = formatThreadTimestamp(thread.lastAt);
+  time.textContent = formatThreadTimestamp(draft?.updatedAt || thread.lastAt);
 
   let flags = metaWrap.querySelector(".dm-thread-flags");
   if (!flags) {
@@ -2578,7 +2736,7 @@ function updateThreadItem(button, thread, tr, query = "") {
   preview.classList.toggle("has-kind", !!thread?.lastMediaUrl && thread?.lastMediaType === "image");
   const previewState = getThreadPreviewState(thread);
   const youPrefix = tr.dmYouPrefix || "You";
-  if (thread.lastFromMe) {
+  if (thread.lastFromMe && previewState.kind !== "draft") {
     const prefix = document.createElement("span");
     prefix.className = "dm-preview-prefix";
     prefix.textContent = `${youPrefix}: `;
@@ -2593,6 +2751,9 @@ function updateThreadItem(button, thread, tr, query = "") {
   if (previewState.text || !previewState.kind) {
     const previewText = document.createElement("span");
     previewText.className = "dm-thread-preview-text";
+    if (previewState.kind === "draft") {
+      previewText.classList.add("is-draft");
+    }
     applyHighlightedText(previewText, previewState.text || previewState.fallbackText, query);
     preview.appendChild(previewText);
   }
@@ -2648,6 +2809,7 @@ function selectDmPartner(partnerId, options = {}) {
   if (!nextPartnerId) return;
   closeDmActionSheet();
   if (nextPartnerId !== dmActivePartnerId) {
+    persistDmDraft(dmActivePartnerId, { refreshList: true });
     dmUnreadDividerMessageId = "";
     clearDmReplyTarget();
     dmReactionPickerMessageId = "";
@@ -2663,6 +2825,7 @@ function selectDmPartner(partnerId, options = {}) {
   renderThreadList();
   renderConversationHeader();
   renderConversationMessages({ forceFull: true });
+  restoreDmDraft(nextPartnerId, { force: true });
   updateDmComposerState();
   ensureDmRealtimeChannel(nextPartnerId);
   if (options.openChat !== false) {
@@ -2777,17 +2940,31 @@ function renderThreadList(options = {}) {
   if (!hasSearch && dmThreadView === "all") {
     const pinnedThreads = visibleThreads.filter((thread) => isDmThreadPinned(thread.partnerId));
     const regularThreads = visibleThreads.filter((thread) => !isDmThreadPinned(thread.partnerId));
+    const draftThreads = regularThreads
+      .filter((thread) => hasDmDraft(thread.partnerId))
+      .sort((a, b) => {
+        const aTime = new Date(getDmDraft(a.partnerId)?.updatedAt || 0).getTime();
+        const bTime = new Date(getDmDraft(b.partnerId)?.updatedAt || 0).getTime();
+        return bTime - aTime;
+      });
+    const regularOnlyThreads = regularThreads.filter((thread) => !hasDmDraft(thread.partnerId));
     if (pinnedThreads.length) {
       fragment.appendChild(
         createDmThreadSectionLabel(tr.dmSectionPinned || "Pinned")
       );
       appendThreadItems(pinnedThreads);
     }
-    if (regularThreads.length) {
+    if (draftThreads.length) {
+      fragment.appendChild(
+        createDmThreadSectionLabel(tr.dmSectionDrafts || "Drafts")
+      );
+      appendThreadItems(draftThreads);
+    }
+    if (regularOnlyThreads.length) {
       fragment.appendChild(
         createDmThreadSectionLabel(tr.dmSectionMessages || "Messages")
       );
-      appendThreadItems(regularThreads);
+      appendThreadItems(regularOnlyThreads);
     }
   } else {
     appendThreadItems(visibleThreads);
@@ -4504,6 +4681,7 @@ async function handleSendMessage(event) {
       confirmedMessage.media_type || ""
     );
     dmActivePartnerId = partnerId;
+    clearDmDraft(partnerId);
     clearDmReplyTarget();
     clearDmMediaSelection();
     renderThreadList({ keepWindow: true });
@@ -4779,6 +4957,7 @@ export function setupDmControls() {
   });
 
   const jumpLatestBtn = $("btn-dm-jump-latest");
+  const jumpUnreadBtn = $("btn-dm-jump-unread");
   const messageList = $("dm-message-list");
   if (messageList && messageList.dataset.scrollBound !== "true") {
     messageList.dataset.scrollBound = "true";
@@ -4795,6 +4974,21 @@ export function setupDmControls() {
     jumpLatestBtn.addEventListener("click", () => {
       if (!messageList) return;
       messageList.scrollTo({ top: messageList.scrollHeight, behavior: "smooth" });
+    });
+  }
+  if (jumpUnreadBtn && jumpUnreadBtn.dataset.bound !== "true") {
+    jumpUnreadBtn.dataset.bound = "true";
+    jumpUnreadBtn.addEventListener("click", () => {
+      if (!messageList) return;
+      const unreadDivider = messageList.querySelector(".dm-unread-divider");
+      if (unreadDivider instanceof HTMLElement) {
+        unreadDivider.scrollIntoView({ block: "center", behavior: "smooth" });
+        return;
+      }
+      const targetId = `${dmUnreadDividerMessageId || ""}`.trim();
+      if (targetId) {
+        scrollToDmMessage(targetId, { block: "center" });
+      }
     });
   }
 
@@ -5172,10 +5366,12 @@ export function setupDmControls() {
     input.dataset.bound = "true";
     input.addEventListener("input", () => {
       scheduleDmInputMetricsUpdate();
+      persistDmDraft(dmActivePartnerId);
       const hasDraft = `${input.value || ""}`.trim().length > 0;
       sendDmTypingState(hasDraft);
     });
     input.addEventListener("blur", () => {
+      persistDmDraft(dmActivePartnerId, { refreshList: true });
       sendDmTypingState(false);
     });
     input.addEventListener("keydown", (event) => {
@@ -5217,6 +5413,7 @@ export function setupDmControls() {
         if (inputElement instanceof HTMLTextAreaElement && !inputElement.disabled) {
           inputElement.value = prompt;
           scheduleDmInputMetricsUpdate();
+          persistDmDraft(dmActivePartnerId);
           inputElement.focus();
           inputElement.setSelectionRange(prompt.length, prompt.length);
         }
@@ -5295,6 +5492,7 @@ export function handleDmPageChange(page) {
     renderDmPage({ refreshIfNeeded: true });
     return;
   }
+  persistDmDraft(dmActivePartnerId, { refreshList: true });
   setDmMessageSearchOpen(false);
   closeDmActionSheet();
   closeDmComposeModal();
@@ -5316,6 +5514,7 @@ export function renderDmPage(options = {}) {
   const mediaBtn = $("btn-dm-media");
   const mediaInput = $("dm-media-input");
   const mediaRemoveBtn = $("btn-dm-media-remove");
+  const jumpUnreadBtn = $("btn-dm-jump-unread");
   const jumpLatestBtn = $("btn-dm-jump-latest");
 
   if (!currentUser) {
@@ -5338,6 +5537,7 @@ export function renderDmPage(options = {}) {
     if (mediaInput) mediaInput.disabled = true;
     if (mediaRemoveBtn) mediaRemoveBtn.disabled = true;
     if (sendBtn) sendBtn.disabled = true;
+    if (jumpUnreadBtn) jumpUnreadBtn.classList.add("hidden");
     if (jumpLatestBtn) jumpLatestBtn.classList.add("hidden");
     renderDmReplyComposer();
     renderDmChatContext();
@@ -5377,6 +5577,7 @@ export function renderDmPage(options = {}) {
   renderDmMediaPreview();
   renderDmReplyComposer();
   renderDmPinnedMessageBar();
+  restoreDmDraft(dmActivePartnerId);
   updateDmComposerState();
   updateDmMessageSearchState();
   renderDmInfoPanel();
