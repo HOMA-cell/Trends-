@@ -263,9 +263,6 @@
                 <div class="dm-chat-header-actions">
                   <button class="btn btn-ghost btn-xs hidden" id="btn-dm-search" type="button">検索</button>
                   <button class="btn btn-ghost btn-xs hidden" id="btn-dm-info" type="button">情報</button>
-                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-pin" type="button">固定</button>
-                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-mute" type="button">ミュート</button>
-                  <button class="btn btn-ghost btn-xs" id="btn-dm-mark-read" type="button">既読</button>
                 </div>
               </div>
               <div class="dm-chat-search hidden" id="dm-chat-search">
@@ -444,9 +441,11 @@
                 <div class="dm-info-summary-pills" id="dm-info-summary-pills"></div>
               </div>
               <div class="dm-info-actions">
-                <button class="btn btn-ghost btn-sm" id="btn-dm-info-open-profile" type="button">プロフィール</button>
-                <button class="btn btn-ghost btn-sm" id="btn-dm-info-pin" type="button">固定</button>
-                <button class="btn btn-ghost btn-sm" id="btn-dm-info-mute" type="button">ミュート</button>
+                <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-open-profile" type="button">プロフィール</button>
+                <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-open-search" type="button">検索を開く</button>
+                <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-mark-read" type="button">既読にする</button>
+                <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-pin" type="button">固定</button>
+                <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-mute" type="button">ミュート</button>
               </div>
               <div class="dm-info-tabs" id="dm-info-tabs" role="tablist" aria-label="Conversation info tabs">
                 <button class="chip chip-active" id="dm-info-tab-overview" type="button" data-dm-info-tab="overview">概要</button>
@@ -487,9 +486,6 @@
                   <div class="dm-info-section-title" id="dm-info-search-title">会話内検索</div>
                   <div class="dm-info-section-meta" id="dm-info-search-meta">-</div>
                 </div>
-                <button class="btn btn-ghost btn-sm dm-info-search-btn" id="btn-dm-info-open-search" type="button">
-                  検索を開く
-                </button>
                 <div class="dm-info-search-hits hidden" id="dm-info-search-hits"></div>
               </section>
             </aside>

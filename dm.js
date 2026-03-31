@@ -3346,11 +3346,8 @@ function renderConversationHeader(options = {}) {
   const title = $("dm-chat-title");
   const sub = $("dm-chat-sub");
   const headerMain = $("dm-chat-header-main");
-  const markReadBtn = $("btn-dm-mark-read");
   const searchBtn = $("btn-dm-search");
   const infoBtn = $("btn-dm-info");
-  const pinBtn = $("btn-dm-pin");
-  const muteBtn = $("btn-dm-mute");
   const avatar = $("dm-chat-avatar");
   if (!title) return;
   const tr = getDmTranslations();
@@ -3359,13 +3356,8 @@ function renderConversationHeader(options = {}) {
   const languageKey = getCurrentLang();
   let nextTitle = tr.dmConversationIdle || "Select a chat";
   let nextSub = tr.dmChatSubIdle || "Select a partner to start chatting.";
-  let nextMarkReadDisabled = true;
   let nextSearchHidden = true;
   let nextInfoHidden = true;
-  let nextPinHidden = true;
-  let nextMuteHidden = true;
-  let nextPinActive = false;
-  let nextMuteActive = false;
   let avatarProfile = null;
   let avatarFallback = "U";
   let avatarIdle = true;
@@ -3381,10 +3373,6 @@ function renderConversationHeader(options = {}) {
     avatarIdle = false;
     avatarOnline = presence.isOnline;
     avatarRecent = presence.kind === "recent";
-    const activeThread = dmThreads.find(
-      (thread) => thread.partnerId === dmActivePartnerId
-    );
-    const unread = Number(activeThread?.unreadCount || 0);
     const subParts = [];
     if (presence.label) {
       subParts.push(presence.label);
@@ -3392,20 +3380,12 @@ function renderConversationHeader(options = {}) {
     if (identity.secondary) {
       subParts.push(identity.secondary);
     }
-    if (isDmThreadMuted(active.id)) {
-      subParts.push(tr.dmMutedBadge || "Muted");
-    }
     nextSub =
       dmTypingPartnerId === active.id
         ? tr.dmTyping || "Typing…"
         : subParts.filter(Boolean).join(" · ");
-    nextMarkReadDisabled = unread <= 0;
     nextSearchHidden = false;
     nextInfoHidden = false;
-    nextPinHidden = false;
-    nextMuteHidden = false;
-    nextPinActive = isDmThreadPinned(active.id);
-    nextMuteActive = isDmThreadMuted(active.id);
   } else {
     nextSub = "";
     avatarFallback = "…";
@@ -3416,15 +3396,10 @@ function renderConversationHeader(options = {}) {
     `${dmActivePartnerId || ""}`.trim(),
     nextTitle,
     nextSub,
-    nextMarkReadDisabled ? "1" : "0",
     nextSearchHidden ? "1" : "0",
     nextInfoHidden ? "1" : "0",
     dmMessageSearchOpen ? "1" : "0",
     dmInfoPanelOpen ? "1" : "0",
-    nextPinHidden ? "1" : "0",
-    nextMuteHidden ? "1" : "0",
-    nextPinActive ? "1" : "0",
-    nextMuteActive ? "1" : "0",
     avatarIdle ? "1" : "0",
     avatarOnline ? "1" : "0",
     avatarRecent ? "1" : "0",
@@ -3462,10 +3437,6 @@ function renderConversationHeader(options = {}) {
       headerMain.removeAttribute("aria-label");
     }
   }
-  if (markReadBtn) {
-    markReadBtn.disabled = nextMarkReadDisabled;
-    markReadBtn.classList.toggle("hidden", nextMarkReadDisabled);
-  }
   if (searchBtn) {
     searchBtn.disabled = nextSearchHidden;
     searchBtn.classList.toggle("hidden", nextSearchHidden);
@@ -3475,22 +3446,6 @@ function renderConversationHeader(options = {}) {
     infoBtn.disabled = nextInfoHidden;
     infoBtn.classList.toggle("hidden", nextInfoHidden);
     infoBtn.classList.toggle("is-active", dmInfoPanelOpen);
-  }
-  if (pinBtn) {
-    pinBtn.disabled = nextPinHidden;
-    pinBtn.classList.toggle("hidden", nextPinHidden);
-    pinBtn.classList.toggle("is-active", nextPinActive);
-    pinBtn.textContent = nextPinActive
-      ? tr.dmUnpinThread || "Unpin"
-      : tr.dmPinThread || "Pin";
-  }
-  if (muteBtn) {
-    muteBtn.disabled = nextMuteHidden;
-    muteBtn.classList.toggle("hidden", nextMuteHidden);
-    muteBtn.classList.toggle("is-active", nextMuteActive);
-    muteBtn.textContent = nextMuteActive
-      ? tr.dmUnmuteThread || "Unmute"
-      : tr.dmMuteThread || "Mute";
   }
   dmRenderedConversationHeaderKey = nextHeaderKey;
 }
@@ -3837,6 +3792,7 @@ function renderDmInfoPanel() {
   const searchMeta = $("dm-info-search-meta");
   const searchHits = $("dm-info-search-hits");
   const openProfileBtn = $("btn-dm-info-open-profile");
+  const markReadBtn = $("btn-dm-info-mark-read");
   const pinBtn = $("btn-dm-info-pin");
   const muteBtn = $("btn-dm-info-mute");
   const openSearchBtn = $("btn-dm-info-open-search");
@@ -3866,6 +3822,7 @@ function renderDmInfoPanel() {
     !searchMeta ||
     !searchHits ||
     !openProfileBtn ||
+    !markReadBtn ||
     !pinBtn ||
     !muteBtn ||
     !openSearchBtn
@@ -3880,7 +3837,9 @@ function renderDmInfoPanel() {
   linksTitle.textContent = tr.dmInfoLinksTitle || "Shared links";
   searchTitle.textContent = tr.dmInfoSearchTitle || "Search in conversation";
   openProfileBtn.textContent = tr.dmOpenProfile || "Open profile";
+  markReadBtn.textContent = tr.dmMarkRead || "Mark read";
   openSearchBtn.textContent = tr.dmInfoOpenSearch || "Open search";
+  openSearchBtn.classList.toggle("is-active", dmMessageSearchOpen);
 
   const active = dmPartners.find((partner) => partner.id === dmActivePartnerId);
   if (!active) {
@@ -4082,6 +4041,9 @@ function renderDmInfoPanel() {
     ? tr.dmUnmuteThread || "Unmute"
     : tr.dmMuteThread || "Mute";
   muteBtn.classList.toggle("is-active", isDmThreadMuted(active.id));
+  markReadBtn.disabled = unreadCount <= 0;
+  markReadBtn.classList.toggle("is-disabled", unreadCount <= 0);
+  markReadBtn.setAttribute("aria-disabled", unreadCount <= 0 ? "true" : "false");
 
   panel.classList.toggle("hidden", !dmInfoPanelOpen);
   panel.setAttribute("aria-hidden", dmInfoPanelOpen ? "false" : "true");
@@ -5802,43 +5764,8 @@ export function setupDmControls() {
     });
   }
 
-  const markReadBtn = $("btn-dm-mark-read");
   const searchBtn = $("btn-dm-search");
   const infoBtn = $("btn-dm-info");
-  if (markReadBtn && markReadBtn.dataset.bound !== "true") {
-    markReadBtn.dataset.bound = "true";
-    markReadBtn.addEventListener("click", async () => {
-      if (!dmActivePartnerId) return;
-      const tr = getDmTranslations();
-      setSendStatus(tr.dmLoading || "Loading...", "loading");
-      const marked = await markConversationRead(dmActivePartnerId);
-      if (!marked) {
-        setSendStatus(tr.dmMarkReadError || tr.dmLoadError || "Failed to mark read.", "error");
-        return;
-      }
-      setSendStatus(tr.dmMarkedRead || "Marked as read.", "success");
-      setTimeout(() => setSendStatus("", ""), 1200);
-    });
-  }
-
-  const pinBtn = $("btn-dm-pin");
-  if (pinBtn && pinBtn.dataset.bound !== "true") {
-    pinBtn.dataset.bound = "true";
-    pinBtn.addEventListener("click", () => {
-      if (!dmActivePartnerId) return;
-      toggleDmThreadPinned(dmActivePartnerId);
-    });
-  }
-
-  const muteBtn = $("btn-dm-mute");
-  if (muteBtn && muteBtn.dataset.bound !== "true") {
-    muteBtn.dataset.bound = "true";
-    muteBtn.addEventListener("click", () => {
-      if (!dmActivePartnerId) return;
-      toggleDmThreadMuted(dmActivePartnerId);
-    });
-  }
-
   const chatHeaderMain = $("dm-chat-header-main");
   if (chatHeaderMain && chatHeaderMain.dataset.bound !== "true") {
     chatHeaderMain.dataset.bound = "true";
@@ -6023,6 +5950,24 @@ export function setupDmControls() {
       openDmPartnerProfile(dmActivePartnerId);
       closeDmInfoPanel();
       renderConversationHeader({ force: true });
+    });
+  }
+
+  const infoMarkReadBtn = $("btn-dm-info-mark-read");
+  if (infoMarkReadBtn && infoMarkReadBtn.dataset.bound !== "true") {
+    infoMarkReadBtn.dataset.bound = "true";
+    infoMarkReadBtn.addEventListener("click", async () => {
+      if (!dmActivePartnerId) return;
+      const tr = getDmTranslations();
+      setSendStatus(tr.dmLoading || "Loading...", "loading");
+      const marked = await markConversationRead(dmActivePartnerId);
+      if (!marked) {
+        setSendStatus(tr.dmMarkReadError || tr.dmLoadError || "Failed to mark read.", "error");
+        return;
+      }
+      renderDmInfoPanel();
+      setSendStatus(tr.dmMarkedRead || "Marked as read.", "success");
+      setTimeout(() => setSendStatus("", ""), 1200);
     });
   }
 
