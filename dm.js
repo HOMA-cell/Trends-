@@ -2917,6 +2917,8 @@ function updateThreadItem(button, thread, tr, query = "") {
   button.classList.toggle("is-pinned", isPinned);
   button.classList.toggle("is-muted", isMuted);
   button.classList.toggle("has-draft", !!draft);
+  button.classList.toggle("is-typing", presence.kind === "typing");
+  button.classList.toggle("is-live", presence.kind === "active" || presence.kind === "typing");
   button.setAttribute("aria-pressed", isActive ? "true" : "false");
 
   let avatar = button.querySelector(".avatar");
@@ -3011,36 +3013,14 @@ function updateThreadItem(button, thread, tr, query = "") {
     metaWrap.insertBefore(status, time);
   }
   time.textContent = formatThreadTimestamp(draft?.updatedAt || thread.lastAt);
-  const showStatus = !draft && (presence.kind === "typing" || presence.kind === "active");
+  const showStatus = !draft && presence.kind === "typing";
   status.textContent = showStatus ? presence.label : "";
   status.classList.toggle("hidden", !showStatus);
   status.classList.toggle("is-typing", presence.kind === "typing");
-  status.classList.toggle("is-active", presence.kind === "active");
-
-  let flags = metaWrap.querySelector(".dm-thread-flags");
-  if (!flags) {
-    flags = document.createElement("div");
-    flags.className = "dm-thread-flags";
-    metaWrap.insertBefore(flags, time);
+  const flags = metaWrap.querySelector(".dm-thread-flags");
+  if (flags) {
+    flags.remove();
   }
-  flags.textContent = "";
-  if (isPinned) {
-    const pinnedFlag = document.createElement("span");
-    pinnedFlag.className = "dm-thread-flag is-pinned";
-    pinnedFlag.textContent = "";
-    pinnedFlag.setAttribute("title", tr.dmPinnedBadge || "Pinned");
-    pinnedFlag.setAttribute("aria-label", tr.dmPinnedBadge || "Pinned");
-    flags.appendChild(pinnedFlag);
-  }
-  if (isMuted) {
-    const mutedFlag = document.createElement("span");
-    mutedFlag.className = "dm-thread-flag is-muted";
-    mutedFlag.textContent = "";
-    mutedFlag.setAttribute("title", tr.dmMutedBadge || "Muted");
-    mutedFlag.setAttribute("aria-label", tr.dmMutedBadge || "Muted");
-    flags.appendChild(mutedFlag);
-  }
-  flags.classList.toggle("hidden", flags.childNodes.length === 0);
 
   let bottom = body.querySelector(".dm-thread-bottom");
   if (!bottom) {
