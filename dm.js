@@ -3004,7 +3004,18 @@ function updateThreadItem(button, thread, tr, query = "") {
     time.className = "dm-thread-time";
     metaWrap.appendChild(time);
   }
+  let status = metaWrap.querySelector(".dm-thread-status");
+  if (!status) {
+    status = document.createElement("div");
+    status.className = "dm-thread-status";
+    metaWrap.insertBefore(status, time);
+  }
   time.textContent = formatThreadTimestamp(draft?.updatedAt || thread.lastAt);
+  const showStatus = !draft && (presence.kind === "typing" || presence.kind === "active");
+  status.textContent = showStatus ? presence.label : "";
+  status.classList.toggle("hidden", !showStatus);
+  status.classList.toggle("is-typing", presence.kind === "typing");
+  status.classList.toggle("is-active", presence.kind === "active");
 
   let flags = metaWrap.querySelector(".dm-thread-flags");
   if (!flags) {
@@ -3048,19 +3059,25 @@ function updateThreadItem(button, thread, tr, query = "") {
   preview.classList.toggle("has-kind", !!thread?.lastMediaUrl && thread?.lastMediaType === "image");
   const previewState = getThreadPreviewState(thread);
   const youPrefix = tr.dmYouPrefix || "You";
-  if (thread.lastFromMe && previewState.kind !== "draft") {
+  const showTypingPreview = !draft && presence.kind === "typing";
+  if (thread.lastFromMe && previewState.kind !== "draft" && !showTypingPreview) {
     const prefix = document.createElement("span");
     prefix.className = "dm-preview-prefix";
     prefix.textContent = `${youPrefix}: `;
     preview.appendChild(prefix);
   }
-  if (previewState.kind) {
+  if (previewState.kind && !showTypingPreview) {
     const previewKind = document.createElement("span");
     previewKind.className = `dm-thread-preview-pill is-${previewState.kind}`;
     previewKind.textContent = previewState.kindLabel;
     preview.appendChild(previewKind);
   }
-  if (previewState.text || !previewState.kind) {
+  if (showTypingPreview) {
+    const previewText = document.createElement("span");
+    previewText.className = "dm-thread-preview-text is-presence is-typing";
+    previewText.textContent = presence.label || tr.dmTyping || "Typing…";
+    preview.appendChild(previewText);
+  } else if (previewState.text || !previewState.kind) {
     const previewText = document.createElement("span");
     previewText.className = "dm-thread-preview-text";
     if (previewState.kind === "draft") {
@@ -4174,6 +4191,80 @@ function closeDmActionSheet() {
   dmActionSheetMessageId = "";
 }
 
+function buildDmActionSheetHero(message, sharePayload, tr = getDmTranslations()) {
+  if (getDmMessageHasImage(message)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dm-action-sheet-hero-card is-media";
+    button.setAttribute("aria-label", tr.dmOpenPhoto || "Open photo");
+    button.addEventListener("click", () => {
+      closeDmActionSheet();
+      openDmMediaMessage(message);
+    });
+
+    const image = document.createElement("img");
+    image.src = message.media_url;
+    image.alt = getDmMessageSnippet(message, tr) || tr.dmPhotoMessage || "Photo";
+    image.loading = "lazy";
+    image.decoding = "async";
+    button.appendChild(image);
+
+    const badge = document.createElement("span");
+    badge.className = "dm-action-sheet-hero-badge";
+    badge.textContent = tr.dmPhotoMessage || "Photo";
+    button.appendChild(badge);
+    return button;
+  }
+
+  if (sharePayload) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dm-action-sheet-hero-card is-share";
+    if (sharePayload.kind === "link") {
+      button.classList.add("is-link");
+    }
+    button.setAttribute(
+      "aria-label",
+      sharePayload.kind === "post"
+        ? tr.dmSharedPostOpen || "Open post"
+        : tr.dmOpenLink || "Open link"
+    );
+    button.addEventListener("click", () => {
+      closeDmActionSheet();
+      openDmSharedPayload(sharePayload);
+    });
+
+    const kicker = document.createElement("div");
+    kicker.className = "dm-action-sheet-hero-kicker";
+    kicker.textContent =
+      sharePayload.kind === "post"
+        ? tr.dmSharedPostBadge || "Post"
+        : tr.dmInfoLinkBadge || "Link";
+    button.appendChild(kicker);
+
+    const title = document.createElement("div");
+    title.className = "dm-action-sheet-hero-title";
+    title.textContent =
+      sharePayload.title || sharePayload.host || tr.dmSharedPostLead || "Shared post";
+    button.appendChild(title);
+
+    if (sharePayload.note) {
+      const note = document.createElement("div");
+      note.className = "dm-action-sheet-hero-note";
+      note.textContent = sharePayload.note;
+      button.appendChild(note);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "dm-action-sheet-hero-meta";
+    meta.textContent = sharePayload.host || sharePayload.url || "";
+    button.appendChild(meta);
+    return button;
+  }
+
+  return null;
+}
+
 function openDmActionSheet(messageId) {
   const message = getDmMessageById(messageId);
   if (!message || message.pending) return;
@@ -4183,8 +4274,9 @@ function openDmActionSheet(messageId) {
   const meta = $("dm-action-sheet-meta");
   const badges = $("dm-action-sheet-badges");
   const text = $("dm-action-sheet-text");
+  const hero = $("dm-action-sheet-hero");
   const actions = $("dm-action-sheet-actions");
-  if (!sheet || !title || !meta || !badges || !text || !actions) return;
+  if (!sheet || !title || !meta || !badges || !text || !hero || !actions) return;
 
   const tr = getDmTranslations();
   dmActionSheetMessageId = `${messageId || ""}`.trim();
@@ -4225,27 +4317,69 @@ function openDmActionSheet(messageId) {
   );
   badges.classList.toggle("hidden", badgeItems.length === 0);
   text.textContent = snippet;
+  hero.replaceChildren();
+  const heroCard = buildDmActionSheetHero(message, sharePayload, tr);
+  if (heroCard) {
+    hero.appendChild(heroCard);
+  }
+  hero.classList.toggle("hidden", !heroCard);
   actions.replaceChildren();
+  const primaryGroup = document.createElement("div");
+  primaryGroup.className = "dm-action-sheet-group is-primary";
+  const secondaryGroup = document.createElement("div");
+  secondaryGroup.className = "dm-action-sheet-group is-secondary";
+  actions.append(primaryGroup, secondaryGroup);
 
   const addAction = (key, labelText, onClick, options = {}) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "dm-action-sheet-btn";
+    button.classList.add(options.group === "primary" ? "is-primary" : "is-secondary");
     if (options.tone) {
       button.classList.add(`is-${options.tone}`);
     }
     button.setAttribute("data-dm-action-key", key);
-    button.textContent = labelText;
+    const icon = document.createElement("span");
+    icon.className = "dm-action-sheet-btn-icon";
+    icon.textContent = options.icon || "•";
+    button.appendChild(icon);
+
+    const copy = document.createElement("span");
+    copy.className = "dm-action-sheet-btn-copy";
+    const label = document.createElement("span");
+    label.className = "dm-action-sheet-btn-label";
+    label.textContent = labelText;
+    copy.appendChild(label);
+    if (options.detail) {
+      const detail = document.createElement("span");
+      detail.className = "dm-action-sheet-btn-detail";
+      detail.textContent = options.detail;
+      copy.appendChild(detail);
+    }
+    button.appendChild(copy);
+
     button.addEventListener("click", async () => {
       closeDmActionSheet();
       await onClick();
     });
-    actions.appendChild(button);
+    (options.group === "primary" ? primaryGroup : secondaryGroup).appendChild(button);
   };
 
   addAction("reply", tr.dmReplyAction || "Reply", async () => {
     setDmReplyTarget(message.id);
-  });
+  }, { group: "primary", icon: "↩" });
+
+  addAction("react", tr.dmReactAction || "React", async () => {
+    dmReactionPickerMessageId = `${message.id || ""}`.trim();
+    renderConversationMessages({ forceFull: true });
+    scrollToDmMessage(message.id, { block: "nearest" });
+  }, { group: "primary", icon: "✦" });
+
+  if (!hasDmReactionFromCurrentUser(message.id, DM_QUICK_LIKE_EMOJI)) {
+    addAction("like", tr.dmQuickLike || "Like", async () => {
+      await sendDmQuickReaction(message.id, DM_QUICK_LIKE_EMOJI);
+    }, { group: "primary", icon: "♥" });
+  }
 
   addAction(
     "pin",
@@ -4254,29 +4388,18 @@ function openDmActionSheet(messageId) {
       : tr.dmPinMessage || "Pin message",
     async () => {
       toggleDmMessagePinned(message.id);
-    }
+    },
+    { group: "secondary", icon: "⌖" }
   );
-
-  addAction("react", tr.dmReactAction || "React", async () => {
-    dmReactionPickerMessageId = `${message.id || ""}`.trim();
-    renderConversationMessages({ forceFull: true });
-    scrollToDmMessage(message.id, { block: "nearest" });
-  });
-
-  if (!hasDmReactionFromCurrentUser(message.id, DM_QUICK_LIKE_EMOJI)) {
-    addAction("like", tr.dmQuickLike || "Like", async () => {
-      await sendDmQuickReaction(message.id, DM_QUICK_LIKE_EMOJI);
-    });
-  }
 
   addAction("copy", tr.dmCopyMessage || "Copy", async () => {
     await copyDmMessageContent(message);
-  });
+  }, { group: "secondary", icon: "⎘" });
 
   if (getDmMessageHasImage(message)) {
     addAction("photo", tr.dmOpenPhoto || "Open photo", async () => {
       openDmMediaMessage(message);
-    });
+    }, { group: "secondary", icon: "◫", detail: tr.dmPhotoMessage || "Photo" });
   }
 
   if (sharePayload?.url) {
@@ -4287,9 +4410,20 @@ function openDmActionSheet(messageId) {
         : tr.dmOpenLink || "Open link",
       async () => {
         openDmSharedPayload(sharePayload);
+      },
+      {
+        group: "secondary",
+        icon: "↗",
+        detail: sharePayload.kind === "post" ? (tr.dmSharedPostBadge || "Post") : sharePayload.host || "",
       }
     );
   }
+
+  primaryGroup.style.setProperty(
+    "--dm-primary-count",
+    `${Math.max(1, primaryGroup.childElementCount)}`
+  );
+  secondaryGroup.classList.toggle("hidden", secondaryGroup.childElementCount === 0);
 
   sheet.classList.remove("hidden");
   sheet.setAttribute("aria-hidden", "false");
