@@ -627,12 +627,33 @@ function parseDmSharedPostMessage(message, tr = getDmTranslations()) {
     note,
     url,
     host,
+    postId: extractDmPostIdFromUrl(url),
   };
 }
 
 function extractFirstDmUrl(text = "") {
   const match = `${text || ""}`.match(/https?:\/\/[^\s]+/i);
   return match ? `${match[0] || ""}`.trim() : "";
+}
+
+function extractDmPostIdFromUrl(url = "") {
+  const value = `${url || ""}`.trim();
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    const direct = `${parsed.searchParams.get("post") || ""}`.trim();
+    if (direct) return direct;
+    const hash = `${parsed.hash || ""}`.replace(/^#/, "");
+    if (!hash) return "";
+    const hashParams = new URLSearchParams(hash);
+    const hashPost = `${hashParams.get("post") || ""}`.trim();
+    if (hashPost) return hashPost;
+    const hashMatch = hash.match(/(?:^|&)post=([^&]+)/);
+    return hashMatch ? decodeURIComponent(hashMatch[1] || "").trim() : "";
+  } catch {
+    const fallbackMatch = value.match(/[#?&]post=([^&#]+)/i);
+    return fallbackMatch ? decodeURIComponent(fallbackMatch[1] || "").trim() : "";
+  }
 }
 
 function parseDmLinkedMessage(message, tr = getDmTranslations()) {
@@ -662,6 +683,29 @@ function parseDmLinkedMessage(message, tr = getDmTranslations()) {
     url,
     host,
   };
+}
+
+function getDmSharePayloadPostId(payload) {
+  if (!payload) return "";
+  const explicit = `${payload.postId || ""}`.trim();
+  if (explicit) return explicit;
+  return extractDmPostIdFromUrl(payload.url);
+}
+
+function openDmSharedPayload(payload) {
+  if (!payload?.url) return false;
+  const postId = payload.kind === "post" ? getDmSharePayloadPostId(payload) : "";
+  if (postId) {
+    closeDmInfoPanel();
+    setActivePage("feed");
+    openDmPostDetail(postId);
+    return true;
+  }
+  if (typeof window !== "undefined") {
+    window.open(payload.url, "_blank", "noopener,noreferrer");
+    return true;
+  }
+  return false;
 }
 
 function getDmMessageHasImage(message) {
@@ -3521,6 +3565,9 @@ function buildDmInfoLinkCard(item, tr = getDmTranslations()) {
   button.className = "dm-info-link-card";
   button.setAttribute("data-dm-info-link-url", item.url);
   button.setAttribute("data-dm-info-link-kind", item.kind || "link");
+  if (item.postId) {
+    button.setAttribute("data-dm-info-post-id", item.postId);
+  }
 
   const kicker = document.createElement("div");
   kicker.className = `dm-info-link-kicker is-${item.kind || "link"}`;
@@ -3887,9 +3934,11 @@ function openDmActionSheet(messageId) {
   closeDmInfoPanel();
   const sheet = $("dm-action-sheet");
   const title = $("dm-action-sheet-title");
+  const meta = $("dm-action-sheet-meta");
+  const badges = $("dm-action-sheet-badges");
   const text = $("dm-action-sheet-text");
   const actions = $("dm-action-sheet-actions");
-  if (!sheet || !title || !text || !actions) return;
+  if (!sheet || !title || !meta || !badges || !text || !actions) return;
 
   const tr = getDmTranslations();
   dmActionSheetMessageId = `${messageId || ""}`.trim();
@@ -3903,6 +3952,32 @@ function openDmActionSheet(messageId) {
     "";
 
   title.textContent = senderLabel;
+  meta.textContent = formatDateTimeDisplay(message.created_at) || "";
+  badges.replaceChildren();
+  const badgeItems = [];
+  if (parseDmReplyMessage(message)) {
+    badgeItems.push(tr.dmReplyBadge || "Reply");
+  }
+  if (getDmMessageHasImage(message)) {
+    badgeItems.push(tr.dmPhotoMessage || "Photo");
+  }
+  if (sharePayload?.kind === "post") {
+    badgeItems.push(tr.dmSharedPostBadge || "Shared post");
+  } else if (sharePayload?.kind === "link") {
+    badgeItems.push(tr.dmInfoLinkBadge || "Link");
+  }
+  if (getDmPinnedMessageId(dmActivePartnerId) === `${message.id || ""}`.trim()) {
+    badgeItems.push(tr.dmPinnedMessageLabel || "Pinned");
+  }
+  badges.append(
+    ...badgeItems.map((item) => {
+      const badge = document.createElement("span");
+      badge.className = "dm-action-sheet-badge";
+      badge.textContent = item;
+      return badge;
+    })
+  );
+  badges.classList.toggle("hidden", badgeItems.length === 0);
   text.textContent = snippet;
   actions.replaceChildren();
 
@@ -3965,9 +4040,7 @@ function openDmActionSheet(messageId) {
         ? tr.dmSharedPostOpen || "Open post"
         : tr.dmOpenLink || "Open link",
       async () => {
-      if (typeof window !== "undefined") {
-        window.open(sharePayload.url, "_blank", "noopener,noreferrer");
-      }
+        openDmSharedPayload(sharePayload);
       }
     );
   }
@@ -4151,8 +4224,7 @@ function appendDmMessageNodes({
     shareCard.className = "dm-message-share-card";
     shareCard.setAttribute("aria-label", tr.dmSharedPostOpen || "Open post");
     shareCard.addEventListener("click", () => {
-      if (typeof window === "undefined" || !sharePayload.url) return;
-      window.open(sharePayload.url, "_blank", "noopener,noreferrer");
+      openDmSharedPayload(sharePayload);
     });
 
     const shareKicker = document.createElement("div");
@@ -5581,6 +5653,8 @@ export function setupDmControls() {
       const url = `${button.getAttribute("data-dm-info-link-url") || ""}`.trim();
       const kind = `${button.getAttribute("data-dm-info-link-kind") || "link"}`.trim();
       if (!url) return;
+      const postId = `${button.getAttribute("data-dm-info-post-id") || ""}`.trim();
+      const payload = { url, kind, postId };
       const target = event.target;
       const isCta = target instanceof HTMLElement && target.classList.contains("dm-info-link-cta");
       if (
@@ -5597,9 +5671,7 @@ export function setupDmControls() {
           console.error("copy dm info link failed", error);
         }
       }
-      if (typeof window !== "undefined") {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
+      openDmSharedPayload(payload);
     });
   };
   bindDmInfoLinksClick($("dm-info-posts-list"));
