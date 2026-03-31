@@ -5834,6 +5834,32 @@ async function loadProfilePostCount() {
       };
     }
 
+    function buildNotificationProfileEntryContext(note) {
+      if (!note?.actor_id) return null;
+      return {
+        source: "notification",
+        userId: note.actor_id,
+        notificationType: `${note.type || ""}`.trim(),
+        actorName: getProfileDisplayName(
+          note.actor,
+          note.actor?.display_name || note.actor?.handle || "user"
+        ),
+        actorHandle:
+          note.actor?.handle || note.actor?.username || note.actor?.display_name || "",
+      };
+    }
+
+    function openNotificationProfile(note) {
+      if (!note?.actor_id) return false;
+      openPublicProfile(note.actor_id, {
+        entryContext: buildNotificationProfileEntryContext(note),
+      });
+      if (!note.read_at) {
+        void markNotificationRead(note.id);
+      }
+      return true;
+    }
+
     function openNotificationDestination(note, post) {
       if (!note) return false;
       if (note.post_id) {
@@ -5842,7 +5868,9 @@ async function loadProfilePostCount() {
         }
         requestAnimationFrame(() => {
           if (post?.id) {
-            openPostDetail(`${post.id}`);
+            openPostDetail(`${post.id}`, {
+              focusComments: note.type === "comment",
+            });
             return;
           }
           const postEl = document.querySelector(
@@ -5858,11 +5886,7 @@ async function loadProfilePostCount() {
         return true;
       }
       if (note.actor_id) {
-        openPublicProfile(note.actor_id);
-        if (!note.read_at) {
-          void markNotificationRead(note.id);
-        }
-        return true;
+        return openNotificationProfile(note);
       }
       return false;
     }
@@ -6084,7 +6108,9 @@ async function loadProfilePostCount() {
           item.setAttribute(
             "aria-label",
             note.post_id
-              ? tr.notificationViewPost || "View post"
+              ? note.type === "comment"
+                ? tr.notificationViewComments || "View comments"
+                : tr.notificationViewPost || "View post"
               : tr.notificationViewProfile || "View profile"
           );
           item.addEventListener("click", (event) => {
@@ -6110,7 +6136,7 @@ async function loadProfilePostCount() {
               : `${actorName}`
           );
           avatarEl.addEventListener("click", () => {
-            openPublicProfile(note.actor_id);
+            openNotificationProfile(note);
           });
         }
         const actorInitial =
@@ -6170,23 +6196,12 @@ async function loadProfilePostCount() {
         if (note.post_id) {
           const viewBtn = document.createElement("button");
           viewBtn.className = "btn btn-ghost btn-xs";
-          viewBtn.textContent = tr.notificationViewPost || "View post";
+          viewBtn.textContent =
+            note.type === "comment"
+              ? tr.notificationViewComments || "View comments"
+              : tr.notificationViewPost || "View post";
           viewBtn.addEventListener("click", () => {
-            if (typeof setActivePage === "function") {
-              setActivePage("feed");
-            }
-            if (post?.id) {
-              requestAnimationFrame(() => {
-                openPostDetail(`${post.id}`);
-              });
-            } else {
-              requestAnimationFrame(() => {
-                const el = document.querySelector(`[data-post-id="${note.post_id}"]`);
-                if (el) {
-                  el.scrollIntoView({ behavior: "smooth", block: "center" });
-                }
-              });
-            }
+            openNotificationDestination(note, post);
           });
           actions.appendChild(viewBtn);
         }
@@ -6212,7 +6227,7 @@ async function loadProfilePostCount() {
           profileBtn.className = "btn btn-ghost btn-xs";
           profileBtn.textContent = tr.notificationViewProfile || "View profile";
           profileBtn.addEventListener("click", () => {
-            openPublicProfile(note.actor_id);
+            openNotificationProfile(note);
           });
           actions.appendChild(profileBtn);
         }

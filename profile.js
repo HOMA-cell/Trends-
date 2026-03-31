@@ -86,6 +86,7 @@ const publicProfilePostsCache = {
 };
 let publicProfileGallerySignature = "";
 let currentPublicProfileContentTab = "posts";
+let currentPublicProfileEntryContext = null;
 const PROFILE_PINNED_POST_KEY = "trends_profile_pinned_post_v1";
 function getPinnedPostsMap() {
   try {
@@ -118,6 +119,65 @@ function isWithinDays(value, days = 7) {
   const time = toTimeValue(value);
   if (!time) return false;
   return Date.now() - time <= days * 24 * 60 * 60 * 1000;
+}
+
+function normalizePublicProfileEntryContext(context = {}) {
+  if (!context || typeof context !== "object") return null;
+  const source = `${context.source || ""}`.trim();
+  const userId = `${context.userId || context.partnerId || ""}`.trim();
+  if (!source || !userId) return null;
+  return {
+    source,
+    userId,
+    notificationType: `${context.notificationType || ""}`.trim(),
+    actorName: `${context.actorName || ""}`.trim(),
+    actorHandle: `${context.actorHandle || ""}`.trim(),
+  };
+}
+
+function buildPublicProfileEntryLabel(context, tr) {
+  if (!context) return "";
+  if (context.source === "notification" && context.notificationType === "follow") {
+    return tr.profileEntryFromFollow || "From follow notification";
+  }
+  return tr.profileEntryFromNotification || "From notification";
+}
+
+function buildPublicProfileEntryText(context, { canMessage = false, isFollowing = false, tr }) {
+  if (!context) return "";
+  const actorHandle = formatHandle(context.actorHandle || "");
+  const actorDisplay = context.actorName || actorHandle || "";
+  if (context.source === "notification" && context.notificationType === "follow") {
+    const prompt =
+      canMessage && !isFollowing
+        ? tr.profileEntryPromptFollowBack || "Follow back or start with a message"
+        : tr.profileEntryPromptMessage || "Start the conversation with a message";
+    return actorDisplay ? `${actorDisplay} · ${prompt}` : prompt;
+  }
+  return actorDisplay || "";
+}
+
+function renderPublicProfileEntryContext(context, options = {}) {
+  const wrap = $("public-profile-entry");
+  const label = $("public-profile-entry-label");
+  const text = $("public-profile-entry-text");
+  if (!wrap || !label || !text) return;
+  if (!context) {
+    wrap.classList.add("hidden");
+    wrap.setAttribute("aria-hidden", "true");
+    label.textContent = "";
+    text.textContent = "";
+    return;
+  }
+  const tr = options.tr || (t[getCurrentLang()] || t.ja);
+  wrap.classList.remove("hidden");
+  wrap.setAttribute("aria-hidden", "false");
+  label.textContent = buildPublicProfileEntryLabel(context, tr);
+  text.textContent = buildPublicProfileEntryText(context, {
+    canMessage: !!options.canMessage,
+    isFollowing: !!options.isFollowing,
+    tr,
+  });
 }
 function formatCompactNumber(value) {
   if (!Number.isFinite(Number(value))) return "0";
@@ -1189,7 +1249,10 @@ export function setupProfileLinks() {
       try {
         await toggleFollowForUser(currentPublicProfileId);
         await loadFollowStats();
-        await openPublicProfile(currentPublicProfileId, { forceCounts: true });
+        await openPublicProfile(currentPublicProfileId, {
+          forceCounts: true,
+          preserveEntryContext: true,
+        });
       } finally {
         followBtn.classList.remove("is-loading");
         followBtn.disabled = false;
@@ -1203,6 +1266,18 @@ export async function openPublicProfile(userId, options = {}) {
   const tr = t[currentLang] || t.ja;
   if (!userId) return;
   const forceCounts = !!options.forceCounts;
+  if (options.entryContext) {
+    currentPublicProfileEntryContext = normalizePublicProfileEntryContext({
+      ...options.entryContext,
+      userId,
+    });
+  } else if (
+    !options.preserveEntryContext ||
+    !currentPublicProfileEntryContext ||
+    currentPublicProfileEntryContext.userId !== `${userId || ""}`.trim()
+  ) {
+    currentPublicProfileEntryContext = null;
+  }
   const prevPublicId = getCurrentPublicProfileId();
   const isSamePublicProfile = prevPublicId === userId;
   setCurrentPublicProfileId(userId);
@@ -1322,6 +1397,8 @@ export async function openPublicProfile(userId, options = {}) {
   );
 
   const counts = await loadFollowCountsCached(userId, { force: forceCounts });
+  const isFollowing = getFollowingIds().has(userId);
+  const canMessage = !!currentUser && currentUser.id !== userId;
   renderProfileMetaStat(
     followingEl,
     tr.profileFollowing || "Following",
@@ -1343,20 +1420,33 @@ export async function openPublicProfile(userId, options = {}) {
   if (followBtn) {
     if (!currentUser || currentUser.id === userId) {
       followBtn.style.display = "none";
+      followBtn.classList.remove("is-entry-highlight");
     } else {
       followBtn.style.display = "inline-flex";
-      const isFollowing = getFollowingIds().has(userId);
       followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
       followBtn.classList.toggle("is-following", isFollowing);
+      followBtn.classList.toggle(
+        "is-entry-highlight",
+        !!currentPublicProfileEntryContext &&
+          currentPublicProfileEntryContext.source === "notification" &&
+          currentPublicProfileEntryContext.notificationType === "follow" &&
+          !isFollowing
+      );
       followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
     }
   }
   if (messageBtn) {
-    const canMessage = !!currentUser && currentUser.id !== userId;
     messageBtn.classList.toggle("hidden", !canMessage);
     messageBtn.disabled = !canMessage;
     messageBtn.dataset.actorName = displayName || "";
     messageBtn.dataset.actorHandle = handle || "";
+    messageBtn.classList.toggle(
+      "is-entry-highlight",
+      !!currentPublicProfileEntryContext &&
+        currentPublicProfileEntryContext.source === "notification" &&
+        currentPublicProfileEntryContext.notificationType === "follow" &&
+        canMessage
+    );
     if (canMessage) {
       messageBtn.textContent = tr.message || "Message";
       messageBtn.setAttribute(
@@ -1367,6 +1457,11 @@ export async function openPublicProfile(userId, options = {}) {
       messageBtn.removeAttribute("aria-label");
     }
   }
+  renderPublicProfileEntryContext(currentPublicProfileEntryContext, {
+    canMessage,
+    isFollowing,
+    tr,
+  });
 
   const list = $("public-profile-posts-list");
   const moreWrap = $("public-posts-more");

@@ -122,6 +122,8 @@ let feedMoreObserver = null;
 let feedAutoLoadingMore = false;
 let feedLastAutoLoadAt = 0;
 let feedMoreLoading = false;
+let detailCommentsFocusRequested = false;
+let detailCommentsFocusTimer = 0;
 let feedIsOnline =
   typeof navigator === "undefined" ? true : navigator.onLine !== false;
 let feedNetworkListenersBound = false;
@@ -2838,7 +2840,31 @@ function ensureCommentSheetBindings() {
           event.preventDefault();
           closeCommentSheet();
         });
+    }
+}
+
+function focusPostDetailComments() {
+      const commentsEl = $("detail-comments");
+      const commentsTitle = $("detail-comments-title");
+      const section = commentsTitle?.closest?.(".detail-section") || commentsEl?.closest?.(".detail-section");
+      const target = commentsTitle || commentsEl;
+      if (!target || !section) return;
+      section.classList.add("is-focus-target");
+      if (typeof window !== "undefined") {
+        if (detailCommentsFocusTimer) {
+          window.clearTimeout(detailCommentsFocusTimer);
+        }
+        detailCommentsFocusTimer = window.setTimeout(() => {
+          section.classList.remove("is-focus-target");
+          detailCommentsFocusTimer = 0;
+        }, 2200);
+        window.requestAnimationFrame(() => {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          const composerField = commentsEl?.querySelector?.("textarea, input");
+          composerField?.focus?.({ preventScroll: true });
+        });
       }
+      detailCommentsFocusRequested = false;
     }
 function setupFeedCardActionDelegation() {
       if (feedCardActionDelegationBound) return;
@@ -7714,6 +7740,7 @@ export function closePostDetail(options = {}) {
       }
       const previousPostId = currentDetailPostId;
       currentDetailPostId = null;
+      detailCommentsFocusRequested = false;
       if (options.syncHash !== false) {
         clearPostHash(previousPostId);
       }
@@ -7730,6 +7757,7 @@ export function openPostDetail(postId, options = {}) {
         (item) => `${item?.id || ""}` === normalizedPostId
       );
       if (!hasPost) return;
+      detailCommentsFocusRequested = !!options.focusComments;
       currentDetailPostId = normalizedPostId;
       renderPostDetail();
       openBackdrop(backdrop);
@@ -7740,6 +7768,9 @@ export function openPostDetail(postId, options = {}) {
       const commentsEnabled = isCommentsEnabled();
       if (!commentsByPost.has(normalizedPostId) && commentsEnabled) {
         loadCommentsForPost(normalizedPostId).then(() => renderPostDetail());
+      }
+      if (detailCommentsFocusRequested) {
+        focusPostDetailComments();
       }
     }
 export function renderPostDetail() {
@@ -7944,5 +7975,8 @@ export function renderPostDetail() {
             commentsEl.appendChild(inputWrap);
           }
         }
+      }
+      if (detailCommentsFocusRequested && `${currentDetailPostId || ""}` === `${post.id || ""}`) {
+        focusPostDetailComments();
       }
     }
