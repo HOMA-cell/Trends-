@@ -234,6 +234,13 @@
                 <button class="chip" id="dm-filter-muted" type="button">消音</button>
               </div>
               <div class="dm-thread-summary" id="dm-thread-summary">-</div>
+              <div class="dm-presence-strip hidden" id="dm-presence-strip" aria-hidden="true">
+                <div class="dm-presence-strip-head">
+                  <div class="dm-presence-strip-title" id="dm-presence-strip-title">アクティブ</div>
+                  <div class="dm-presence-strip-meta" id="dm-presence-strip-meta">-</div>
+                </div>
+                <div class="dm-presence-strip-list" id="dm-presence-strip-list"></div>
+              </div>
               <div class="field dm-partner-field dm-partner-field-hidden" aria-hidden="true">
                 <label id="dm-partner-label" class="sr-only" for="dm-partner-select">相手</label>
                 <select id="dm-partner-select" class="select-sm"></select>
@@ -432,29 +439,41 @@
                 <button class="btn btn-ghost btn-sm" id="btn-dm-info-pin" type="button">固定</button>
                 <button class="btn btn-ghost btn-sm" id="btn-dm-info-mute" type="button">ミュート</button>
               </div>
-              <div class="dm-info-stats" id="dm-info-stats"></div>
-              <section class="dm-info-section">
+              <div class="dm-info-tabs" id="dm-info-tabs" role="tablist" aria-label="Conversation info tabs">
+                <button class="chip chip-active" id="dm-info-tab-overview" type="button" data-dm-info-tab="overview">概要</button>
+                <button class="chip" id="dm-info-tab-media" type="button" data-dm-info-tab="media">メディア</button>
+                <button class="chip" id="dm-info-tab-shared" type="button" data-dm-info-tab="shared">共有</button>
+              </div>
+              <div class="dm-info-stats" id="dm-info-stats" data-dm-info-section="overview"></div>
+              <section class="dm-info-section" data-dm-info-section="overview">
                 <div class="dm-info-section-head">
                   <div class="dm-info-section-title" id="dm-info-profile-title">プロフィール情報</div>
                   <div class="dm-info-section-meta" id="dm-info-profile-meta">-</div>
                 </div>
                 <div class="dm-info-profile-facts" id="dm-info-profile-facts"></div>
               </section>
-              <section class="dm-info-section">
+              <section class="dm-info-section" data-dm-info-section="media">
                 <div class="dm-info-section-head">
                   <div class="dm-info-section-title" id="dm-info-media-title">共有メディア</div>
                   <div class="dm-info-section-meta" id="dm-info-media-meta">-</div>
                 </div>
                 <div class="dm-info-media-grid" id="dm-info-media-grid"></div>
               </section>
-              <section class="dm-info-section">
+              <section class="dm-info-section" data-dm-info-section="shared">
+                <div class="dm-info-section-head">
+                  <div class="dm-info-section-title" id="dm-info-posts-title">共有投稿</div>
+                  <div class="dm-info-section-meta" id="dm-info-posts-meta">-</div>
+                </div>
+                <div class="dm-info-links-list" id="dm-info-posts-list"></div>
+              </section>
+              <section class="dm-info-section" data-dm-info-section="shared">
                 <div class="dm-info-section-head">
                   <div class="dm-info-section-title" id="dm-info-links-title">共有リンク / 投稿</div>
                   <div class="dm-info-section-meta" id="dm-info-links-meta">-</div>
                 </div>
-                <div class="dm-info-links-list" id="dm-info-links-list"></div>
+                <div class="dm-info-links-list dm-info-links-list-compact" id="dm-info-links-list"></div>
               </section>
-              <section class="dm-info-section">
+              <section class="dm-info-section" data-dm-info-section="overview">
                 <div class="dm-info-section-head">
                   <div class="dm-info-section-title" id="dm-info-search-title">会話内検索</div>
                   <div class="dm-info-section-meta" id="dm-info-search-meta">-</div>

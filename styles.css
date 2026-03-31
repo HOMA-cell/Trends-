@@ -4612,6 +4612,101 @@
     .dm-thread-summary.is-empty {
       display: none;
     }
+    .dm-presence-strip {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 4px 0 8px;
+      padding: 10px 10px 12px;
+      border: 1px solid #efe7dc;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff 0%, #fbf7f1 100%);
+    }
+    .dm-presence-strip-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .dm-presence-strip-title {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6f665b;
+    }
+    .dm-presence-strip-meta {
+      font-size: 9.5px;
+      color: #9a8f82;
+    }
+    .dm-presence-strip-list {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(62px, 1fr);
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .dm-presence-strip-list::-webkit-scrollbar {
+      display: none;
+    }
+    .dm-presence-item {
+      border: 1px solid #efe3d7;
+      border-radius: 18px;
+      background: #fff;
+      min-height: 84px;
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 5px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+    }
+    .dm-presence-item:hover,
+    .dm-presence-item:focus-visible {
+      outline: none;
+      transform: translateY(-1px);
+      border-color: #efcab6;
+      background: #fffaf6;
+    }
+    .dm-presence-avatar {
+      width: 42px;
+      height: 42px;
+      font-size: 14px;
+      border: 1px solid #eee3d7;
+      box-shadow: none;
+      flex-shrink: 0;
+    }
+    .dm-presence-avatar.is-online::after,
+    .dm-presence-avatar.is-recent::after {
+      width: 10px;
+      height: 10px;
+      right: 1px;
+      bottom: 1px;
+    }
+    .dm-presence-name {
+      width: 100%;
+      font-size: 10.5px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: #1f1a16;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-presence-state {
+      font-size: 9px;
+      color: #8c8277;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
     .dm-thread-list {
       flex: 1;
       min-height: 0;
@@ -6373,6 +6468,35 @@
       background: #fff4ed;
       color: #cf582f;
     }
+    .dm-info-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 2px 0 0;
+      scrollbar-width: none;
+    }
+    .dm-info-tabs::-webkit-scrollbar {
+      display: none;
+    }
+    .dm-info-tabs .chip {
+      min-height: 30px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid #ebe1d6;
+      background: #fff;
+      color: #756b60;
+      font-size: 10px;
+      font-weight: 800;
+      box-shadow: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .dm-info-tabs .chip-active {
+      border-color: #f0c8b4;
+      background: #fff4ed;
+      color: #cf592f;
+    }
     .dm-info-stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6459,6 +6583,9 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+    }
+    .dm-info-links-list-compact .dm-info-link-card {
+      padding: 10px;
     }
     .dm-info-link-card {
       width: 100%;
@@ -6766,6 +6893,20 @@
         min-height: 16px;
         padding-inline: 4px;
         font-size: 8px;
+      }
+      .dm-presence-strip {
+        margin-bottom: 6px;
+        padding: 9px 8px 10px;
+      }
+      .dm-presence-strip-list {
+        grid-auto-columns: 62px;
+      }
+      .dm-presence-item {
+        min-height: 78px;
+      }
+      .dm-presence-avatar {
+        width: 38px;
+        height: 38px;
       }
       .dm-thread-item {
         padding: 7px 6px;
@@ -7116,6 +7257,14 @@
       }
       .dm-info-actions {
         gap: 6px;
+      }
+      .dm-info-tabs {
+        gap: 5px;
+      }
+      .dm-info-tabs .chip {
+        min-height: 28px;
+        padding-inline: 10px;
+        font-size: 9.5px;
       }
       .dm-info-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));

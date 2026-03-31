@@ -2358,6 +2358,7 @@ async function loadProfilePostCount() {
       setText("btn-dm-message-search-prev", "dmSearchPrev");
       setText("btn-dm-message-search-next", "dmSearchNext");
       setText("btn-dm-message-search-close", "dmSearchClose");
+      setText("dm-presence-strip-title", "dmPresenceTitle");
       setText("dm-chat-context-label", "dmRecentMediaLabel");
       setText("dm-pinned-message-label", "dmPinnedMessageLabel");
       setText("dm-info-title", "dmInfoTitle");
@@ -2365,8 +2366,12 @@ async function loadProfilePostCount() {
       setText("btn-dm-info-open-profile", "dmOpenProfile");
       setText("btn-dm-info-pin", "dmPinThread");
       setText("btn-dm-info-mute", "dmMuteThread");
+      setText("dm-info-tab-overview", "dmInfoTabOverview");
+      setText("dm-info-tab-media", "dmInfoTabMedia");
+      setText("dm-info-tab-shared", "dmInfoTabShared");
       setText("dm-info-profile-title", "dmInfoProfileTitle");
       setText("dm-info-media-title", "dmInfoMediaTitle");
+      setText("dm-info-posts-title", "dmInfoPostsTitle");
       setText("dm-info-links-title", "dmInfoLinksTitle");
       setText("dm-info-search-title", "dmInfoSearchTitle");
       setText("btn-dm-info-open-search", "dmInfoOpenSearch");

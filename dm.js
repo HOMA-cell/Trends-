@@ -69,6 +69,7 @@ let dmMessageSearchQuery = "";
 let dmMessageSearchMatchIds = [];
 let dmMessageSearchActiveIndex = -1;
 let dmInfoPanelOpen = false;
+let dmInfoTab = "overview";
 let dmEntryContext = null;
 
 const DM_POLL_INTERVAL_MS = 12000;
@@ -224,6 +225,7 @@ function clearDmState() {
   dmMessageSearchMatchIds = [];
   dmMessageSearchActiveIndex = -1;
   dmInfoPanelOpen = false;
+  dmInfoTab = "overview";
   dmEntryContext = null;
   clearDmMessagePressTimer();
   clearDmMediaSelection();
@@ -731,6 +733,37 @@ function getDmConversationSharedItems(limit = 8) {
       });
     });
   return items.slice(0, limit);
+}
+
+function getDmConversationSharedPosts(limit = 6) {
+  return getDmConversationSharedItems(limit * 3)
+    .filter((item) => item.kind === "post")
+    .slice(0, limit);
+}
+
+function getDmConversationSharedLinks(limit = 6) {
+  return getDmConversationSharedItems(limit * 3)
+    .filter((item) => item.kind !== "post")
+    .slice(0, limit);
+}
+
+function getDmPresenceThreads(limit = 8) {
+  if (normalizeDmSearchText(dmThreadSearch).length > 0) return [];
+  if (`${dmThreadView || "all"}`.trim() !== "all") return [];
+  return [...dmThreads]
+    .filter((thread) => {
+      const presence = getDmPartnerPresence(thread?.partnerId);
+      return presence.kind === "active" || presence.kind === "recent";
+    })
+    .sort((a, b) => {
+      const aPresence = getDmPartnerPresence(a?.partnerId);
+      const bPresence = getDmPartnerPresence(b?.partnerId);
+      if (aPresence.kind !== bPresence.kind) {
+        return aPresence.kind === "active" ? -1 : 1;
+      }
+      return compareDmThreads(a, b);
+    })
+    .slice(0, limit);
 }
 
 function openDmMediaMessage(message) {
@@ -1622,6 +1655,61 @@ function renderThreadSummary() {
   }
   summary.textContent = summaryText;
   summary.classList.toggle("is-empty", !summaryText);
+}
+
+function renderDmPresenceStrip() {
+  const wrap = $("dm-presence-strip");
+  const title = $("dm-presence-strip-title");
+  const meta = $("dm-presence-strip-meta");
+  const list = $("dm-presence-strip-list");
+  if (!wrap || !title || !meta || !list) return;
+  const tr = getDmTranslations();
+  const threads = getDmPresenceThreads();
+  if (!threads.length) {
+    wrap.classList.add("hidden");
+    wrap.setAttribute("aria-hidden", "true");
+    list.replaceChildren();
+    title.textContent = tr.dmPresenceTitle || "Active now";
+    meta.textContent = "";
+    return;
+  }
+
+  wrap.classList.remove("hidden");
+  wrap.setAttribute("aria-hidden", "false");
+  title.textContent = tr.dmPresenceTitle || "Active now";
+  meta.textContent = (tr.dmPresenceMeta || "{count} active").replace(
+    "{count}",
+    `${threads.length}`
+  );
+  const fragment = document.createDocumentFragment();
+  threads.forEach((thread) => {
+    const partnerId = `${thread?.partnerId || ""}`.trim();
+    if (!partnerId) return;
+    const identity = getProfileIdentity(thread.profile, partnerId);
+    const presence = getDmPartnerPresence(partnerId, tr);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dm-presence-item";
+    button.setAttribute("data-dm-presence-partner", partnerId);
+    button.setAttribute(
+      "aria-label",
+      [identity.primary, presence.label].filter(Boolean).join(" · ")
+    );
+    const avatar = document.createElement("span");
+    avatar.className = "avatar dm-presence-avatar";
+    renderAvatar(avatar, thread.profile, identity.initial);
+    avatar.classList.toggle("is-online", presence.isOnline);
+    avatar.classList.toggle("is-recent", presence.kind === "recent");
+    const name = document.createElement("span");
+    name.className = "dm-presence-name";
+    name.textContent = identity.primary;
+    const state = document.createElement("span");
+    state.className = "dm-presence-state";
+    state.textContent = presence.label || tr.dmActiveNow || "Active now";
+    button.append(avatar, name, state);
+    fragment.appendChild(button);
+  });
+  list.replaceChildren(fragment);
 }
 
 function createDmThreadSectionLabel(text) {
@@ -2976,6 +3064,7 @@ function renderThreadList(options = {}) {
     list.replaceChildren(empty);
     dmRenderedThreadListKey = `empty-all::${normalizeDmSearchText(searchQuery)}::${dmThreads.length}`;
     renderThreadSummary();
+    renderDmPresenceStrip();
     return;
   }
 
@@ -2996,6 +3085,7 @@ function renderThreadList(options = {}) {
     list.replaceChildren(empty);
     dmRenderedThreadListKey = `empty-filter::${dmThreadView}::${normalizeDmSearchText(searchQuery)}::${dmThreads.length}`;
     renderThreadSummary();
+    renderDmPresenceStrip();
     return;
   }
 
@@ -3021,6 +3111,7 @@ function renderThreadList(options = {}) {
       list.scrollTop = prevScrollTop;
     }
     renderThreadSummary();
+    renderDmPresenceStrip();
     return;
   }
 
@@ -3109,6 +3200,7 @@ function renderThreadList(options = {}) {
     list.scrollTop = prevScrollTop;
   }
   renderThreadSummary();
+  renderDmPresenceStrip();
 }
 
 function renderConversationHeader(options = {}) {
@@ -3394,11 +3486,80 @@ function renderDmSearchDayChips() {
   );
 }
 
+function setDmInfoTab(nextTab = "overview") {
+  const normalized =
+    ["overview", "media", "shared"].includes(`${nextTab || ""}`.trim())
+      ? `${nextTab || ""}`.trim()
+      : "overview";
+  dmInfoTab = normalized;
+}
+
+function syncDmInfoTabs() {
+  const tabButtons = document.querySelectorAll("[data-dm-info-tab]");
+  tabButtons.forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) return;
+    const tab = `${button.getAttribute("data-dm-info-tab") || ""}`.trim();
+    const isActive = dmInfoTab === tab;
+    button.setAttribute("role", "tab");
+    button.classList.toggle("chip-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.setAttribute("tabindex", isActive ? "0" : "-1");
+  });
+  const sections = document.querySelectorAll("[data-dm-info-section]");
+  sections.forEach((section) => {
+    if (!(section instanceof HTMLElement)) return;
+    const sectionTab = `${section.getAttribute("data-dm-info-section") || "overview"}`.trim();
+    const isVisible = sectionTab === dmInfoTab;
+    section.classList.toggle("hidden", !isVisible);
+    section.setAttribute("aria-hidden", isVisible ? "false" : "true");
+  });
+}
+
+function buildDmInfoLinkCard(item, tr = getDmTranslations()) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "dm-info-link-card";
+  button.setAttribute("data-dm-info-link-url", item.url);
+  button.setAttribute("data-dm-info-link-kind", item.kind || "link");
+
+  const kicker = document.createElement("div");
+  kicker.className = `dm-info-link-kicker is-${item.kind || "link"}`;
+  kicker.textContent =
+    item.kind === "post"
+      ? tr.dmSharedPostBadge || "Shared post"
+      : tr.dmInfoLinkBadge || "Link";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "dm-info-link-title";
+  titleEl.textContent = item.title || item.host || item.url;
+
+  const noteEl = document.createElement("div");
+  noteEl.className = "dm-info-link-note";
+  noteEl.textContent =
+    item.note || item.host || formatDateDisplay(item.createdAt) || item.url;
+
+  const metaRow = document.createElement("div");
+  metaRow.className = "dm-info-link-meta";
+  const hostEl = document.createElement("span");
+  hostEl.textContent = item.host || formatDateDisplay(item.createdAt) || "link";
+  const ctaEl = document.createElement("span");
+  ctaEl.className = "dm-info-link-cta";
+  ctaEl.textContent =
+    item.kind === "post"
+      ? tr.dmSharedPostOpen || "Open post"
+      : tr.dmCopyLink || "Copy link";
+  metaRow.append(hostEl, ctaEl);
+
+  button.append(kicker, titleEl, noteEl, metaRow);
+  return button;
+}
+
 function renderDmInfoPanel() {
   const panel = $("dm-info-panel");
   const avatar = $("dm-info-avatar");
   const title = $("dm-info-title");
   const sub = $("dm-info-sub");
+  const tabs = $("dm-info-tabs");
   const stats = $("dm-info-stats");
   const profileTitle = $("dm-info-profile-title");
   const profileMeta = $("dm-info-profile-meta");
@@ -3406,6 +3567,9 @@ function renderDmInfoPanel() {
   const mediaTitle = $("dm-info-media-title");
   const mediaMeta = $("dm-info-media-meta");
   const mediaGrid = $("dm-info-media-grid");
+  const postsTitle = $("dm-info-posts-title");
+  const postsMeta = $("dm-info-posts-meta");
+  const postsList = $("dm-info-posts-list");
   const linksTitle = $("dm-info-links-title");
   const linksMeta = $("dm-info-links-meta");
   const linksList = $("dm-info-links-list");
@@ -3420,6 +3584,7 @@ function renderDmInfoPanel() {
     !avatar ||
     !title ||
     !sub ||
+    !tabs ||
     !stats ||
     !profileTitle ||
     !profileMeta ||
@@ -3427,6 +3592,9 @@ function renderDmInfoPanel() {
     !mediaTitle ||
     !mediaMeta ||
     !mediaGrid ||
+    !postsTitle ||
+    !postsMeta ||
+    !postsList ||
     !linksTitle ||
     !linksMeta ||
     !linksList ||
@@ -3443,6 +3611,7 @@ function renderDmInfoPanel() {
   const tr = getDmTranslations();
   profileTitle.textContent = tr.dmInfoProfileTitle || "Profile details";
   mediaTitle.textContent = tr.dmInfoMediaTitle || "Shared media";
+  postsTitle.textContent = tr.dmInfoPostsTitle || "Shared posts";
   linksTitle.textContent = tr.dmInfoLinksTitle || "Shared links";
   searchTitle.textContent = tr.dmInfoSearchTitle || "Search in conversation";
   openProfileBtn.textContent = tr.dmOpenProfile || "Open profile";
@@ -3463,8 +3632,9 @@ function renderDmInfoPanel() {
 
   const thread = dmThreads.find((item) => item.partnerId === active.id);
   const mediaMessages = getDmConversationMediaMessages(12);
-  const shareCount = getDmConversationShareCount();
-  const sharedItems = getDmConversationSharedItems(8);
+  const sharedPosts = getDmConversationSharedPosts(6);
+  const sharedLinks = getDmConversationSharedLinks(6);
+  const shareCount = sharedPosts.length + sharedLinks.length;
   const unreadCount = Number(thread?.unreadCount || 0);
   const messageCount = dmMessages.filter((message) => !parseDmReactionMessage(message)).length;
   const replyCount = dmMessages.filter((message) => !!parseDmReplyMessage(message)).length;
@@ -3553,54 +3723,31 @@ function renderDmInfoPanel() {
     mediaGrid.replaceChildren(empty);
   }
 
-  linksMeta.textContent = sharedItems.length
-    ? (tr.dmInfoLinksMeta || "{count} shared items").replace(
+  postsMeta.textContent = sharedPosts.length
+    ? (tr.dmInfoPostsMeta || "{count} shared posts").replace(
         "{count}",
-        `${sharedItems.length}`
+        `${sharedPosts.length}`
+      )
+    : tr.dmInfoNoPosts || "No shared posts yet";
+
+  if (sharedPosts.length) {
+    postsList.replaceChildren(...sharedPosts.map((item) => buildDmInfoLinkCard(item, tr)));
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "dm-info-empty";
+    empty.textContent = tr.dmInfoNoPosts || "No shared posts yet";
+    postsList.replaceChildren(empty);
+  }
+
+  linksMeta.textContent = sharedLinks.length
+    ? (tr.dmInfoLinksMetaCount || tr.dmInfoLinksMeta || "{count} shared items").replace(
+        "{count}",
+        `${sharedLinks.length}`
       )
     : tr.dmInfoNoLinks || "No shared links yet";
 
-  if (sharedItems.length) {
-    linksList.replaceChildren(
-      ...sharedItems.map((item) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "dm-info-link-card";
-        button.setAttribute("data-dm-info-link-url", item.url);
-        button.setAttribute("data-dm-info-link-kind", item.kind || "link");
-
-        const kicker = document.createElement("div");
-        kicker.className = `dm-info-link-kicker is-${item.kind || "link"}`;
-        kicker.textContent =
-          item.kind === "post"
-            ? tr.dmSharedPostBadge || "Shared post"
-            : tr.dmInfoLinkBadge || "Link";
-
-        const titleEl = document.createElement("div");
-        titleEl.className = "dm-info-link-title";
-        titleEl.textContent = item.title || item.host || item.url;
-
-        const noteEl = document.createElement("div");
-        noteEl.className = "dm-info-link-note";
-        noteEl.textContent =
-          item.note || item.host || formatDateDisplay(item.createdAt) || item.url;
-
-        const metaRow = document.createElement("div");
-        metaRow.className = "dm-info-link-meta";
-        const hostEl = document.createElement("span");
-        hostEl.textContent = item.host || formatDateDisplay(item.createdAt) || "link";
-        const ctaEl = document.createElement("span");
-        ctaEl.className = "dm-info-link-cta";
-        ctaEl.textContent =
-          item.kind === "post"
-            ? tr.dmSharedPostOpen || "Open post"
-            : tr.dmCopyLink || "Copy link";
-        metaRow.append(hostEl, ctaEl);
-
-        button.append(kicker, titleEl, noteEl, metaRow);
-        return button;
-      })
-    );
+  if (sharedLinks.length) {
+    linksList.replaceChildren(...sharedLinks.map((item) => buildDmInfoLinkCard(item, tr)));
   } else {
     const empty = document.createElement("div");
     empty.className = "dm-info-empty";
@@ -3628,6 +3775,7 @@ function renderDmInfoPanel() {
 
   panel.classList.toggle("hidden", !dmInfoPanelOpen);
   panel.setAttribute("aria-hidden", dmInfoPanelOpen ? "false" : "true");
+  syncDmInfoTabs();
   if (typeof document !== "undefined") {
     document.body.classList.toggle("dm-info-panel-open", dmInfoPanelOpen);
   }
@@ -5399,6 +5547,18 @@ export function setupDmControls() {
     });
   }
 
+  const infoTabs = $("dm-info-tabs");
+  if (infoTabs && infoTabs.dataset.bound !== "true") {
+    infoTabs.dataset.bound = "true";
+    infoTabs.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-dm-info-tab]");
+      if (!(button instanceof HTMLButtonElement)) return;
+      const nextTab = `${button.getAttribute("data-dm-info-tab") || "overview"}`.trim();
+      setDmInfoTab(nextTab);
+      renderDmInfoPanel();
+    });
+  }
+
   const infoMediaGrid = $("dm-info-media-grid");
   if (infoMediaGrid && infoMediaGrid.dataset.bound !== "true") {
     infoMediaGrid.dataset.bound = "true";
@@ -5412,10 +5572,10 @@ export function setupDmControls() {
     });
   }
 
-  const infoLinksList = $("dm-info-links-list");
-  if (infoLinksList && infoLinksList.dataset.bound !== "true") {
-    infoLinksList.dataset.bound = "true";
-    infoLinksList.addEventListener("click", async (event) => {
+  const bindDmInfoLinksClick = (listEl) => {
+    if (!(listEl instanceof HTMLElement) || listEl.dataset.bound === "true") return;
+    listEl.dataset.bound = "true";
+    listEl.addEventListener("click", async (event) => {
       const button = event.target.closest("[data-dm-info-link-url]");
       if (!button) return;
       const url = `${button.getAttribute("data-dm-info-link-url") || ""}`.trim();
@@ -5441,7 +5601,9 @@ export function setupDmControls() {
         window.open(url, "_blank", "noopener,noreferrer");
       }
     });
-  }
+  };
+  bindDmInfoLinksClick($("dm-info-posts-list"));
+  bindDmInfoLinksClick($("dm-info-links-list"));
 
   const threadSearchInput = $("dm-thread-search");
   if (threadSearchInput && threadSearchInput.dataset.bound !== "true") {
@@ -5449,6 +5611,18 @@ export function setupDmControls() {
     threadSearchInput.addEventListener("input", () => {
       dmThreadSearch = `${threadSearchInput.value || ""}`.trim();
       scheduleThreadSearchRender();
+    });
+  }
+
+  const presenceStrip = $("dm-presence-strip-list");
+  if (presenceStrip && presenceStrip.dataset.bound !== "true") {
+    presenceStrip.dataset.bound = "true";
+    presenceStrip.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-dm-presence-partner]");
+      if (!(button instanceof HTMLButtonElement)) return;
+      const partnerId = `${button.getAttribute("data-dm-presence-partner") || ""}`.trim();
+      if (!partnerId) return;
+      selectDmPartner(partnerId, { forceBottom: true });
     });
   }
 
@@ -5699,6 +5873,7 @@ export function renderDmPage(options = {}) {
     if (jumpUnreadBtn) jumpUnreadBtn.classList.add("hidden");
     if (jumpLatestBtn) jumpLatestBtn.classList.add("hidden");
     renderDmReplyComposer();
+    renderDmPresenceStrip();
     renderDmChatContext();
     renderDmPinnedMessageBar();
     renderDmEntryContext();
