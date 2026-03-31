@@ -68,6 +68,7 @@ let dmMessageSearchOpen = false;
 let dmMessageSearchQuery = "";
 let dmMessageSearchMatchIds = [];
 let dmMessageSearchActiveIndex = -1;
+let dmScrollPositionsByPartner = {};
 let dmInfoPanelOpen = false;
 let dmInfoTab = "overview";
 let dmEntryContext = null;
@@ -224,6 +225,7 @@ function clearDmState() {
   dmMessageSearchQuery = "";
   dmMessageSearchMatchIds = [];
   dmMessageSearchActiveIndex = -1;
+  dmScrollPositionsByPartner = {};
   dmInfoPanelOpen = false;
   dmInfoTab = "overview";
   dmEntryContext = null;
@@ -1397,6 +1399,46 @@ function formatMessageDayLabel(value) {
   return formatDateDisplay(date);
 }
 
+function getDmSavedScrollState(partnerId = dmActivePartnerId) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  if (!targetPartnerId) return null;
+  const state = dmScrollPositionsByPartner?.[targetPartnerId];
+  if (!state || typeof state !== "object") return null;
+  const top = Number(state.top);
+  return {
+    top: Number.isFinite(top) ? Math.max(0, top) : 0,
+    atBottom: !!state.atBottom,
+  };
+}
+
+function saveDmConversationScroll(partnerId = dmActivePartnerId) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  const list = $("dm-message-list");
+  if (!targetPartnerId || !(list instanceof HTMLElement)) return;
+  const maxScrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
+  dmScrollPositionsByPartner[targetPartnerId] = {
+    top: Math.max(0, Math.min(list.scrollTop, maxScrollTop)),
+    atBottom: isNearBottom(list, 96),
+  };
+}
+
+function restoreDmConversationScroll(list, partnerId = dmActivePartnerId) {
+  if (!(list instanceof HTMLElement)) return false;
+  const savedState = getDmSavedScrollState(partnerId);
+  if (!savedState) return false;
+  requestAnimationFrame(() => {
+    if (savedState.atBottom) {
+      list.scrollTop = list.scrollHeight;
+    } else {
+      const maxScrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
+      list.scrollTop = Math.max(0, Math.min(savedState.top, maxScrollTop));
+    }
+    saveDmConversationScroll(partnerId);
+    syncDmJumpLatestButton();
+  });
+  return true;
+}
+
 function shouldUseDmStackLayout() {
   if (typeof window === "undefined") return false;
   return (window.innerWidth || 1024) <= 900;
@@ -2010,6 +2052,37 @@ function getDmReplyAuthorLabel(message, tr = getDmTranslations()) {
     dmPartners.find((item) => item.id === partnerId) ||
     dmThreads.find((item) => item.partnerId === partnerId);
   return getProfileIdentity(partner?.profile || null, partnerId).primary;
+}
+
+function getDmMessageAuthorLabel(message, tr = getDmTranslations()) {
+  if (!message) return tr.dmReplyFallback || "Message";
+  const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
+  if (`${message.sender_id || ""}`.trim() === currentUserId) {
+    return tr.dmYouPrefix || "You";
+  }
+  return getDmReplyAuthorLabel(message, tr);
+}
+
+function buildDmSearchSnippet(text, query) {
+  const raw = `${text || ""}`.replace(/\s+/g, " ").trim();
+  const normalizedQuery = normalizeDmSearchText(query);
+  if (!raw) return "";
+  if (!normalizedQuery) return raw;
+  const normalizedRaw = normalizeDmSearchText(raw);
+  let matchIndex = normalizedRaw.indexOf(normalizedQuery);
+  if (matchIndex < 0) {
+    const tokenIndex = getDmSearchTokens(query)
+      .map((token) => normalizedRaw.indexOf(token))
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b)[0];
+    matchIndex = Number.isFinite(tokenIndex) ? tokenIndex : -1;
+  }
+  if (matchIndex < 0 || raw.length <= 96) return raw;
+  const start = Math.max(0, matchIndex - 28);
+  const end = Math.min(raw.length, matchIndex + normalizedQuery.length + 54);
+  const prefix = start > 0 ? "…" : "";
+  const suffix = end < raw.length ? "…" : "";
+  return `${prefix}${raw.slice(start, end).trim()}${suffix}`;
 }
 
 function renderDmReplyComposer() {
@@ -3056,6 +3129,7 @@ function selectDmPartner(partnerId, options = {}) {
     clearDmEntryContext();
   }
   if (nextPartnerId !== dmActivePartnerId) {
+    saveDmConversationScroll(dmActivePartnerId);
     persistDmDraft(dmActivePartnerId, { refreshList: true });
     dmUnreadDividerMessageId = "";
     clearDmReplyTarget();
@@ -3080,11 +3154,15 @@ function selectDmPartner(partnerId, options = {}) {
   if (options.openChat !== false) {
     setDmMobileChatOpen(true);
   }
-  loadConversation(dmActivePartnerId, { forceBottom: options.forceBottom !== false }).catch(
-    (error) => {
-      console.error("select partner load conversation failed:", error);
-    }
-  );
+  const hasSavedScroll = !!getDmSavedScrollState(dmActivePartnerId);
+  const shouldForceBottom =
+    typeof options.forceBottom === "boolean" ? options.forceBottom : !hasSavedScroll;
+  loadConversation(dmActivePartnerId, {
+    forceBottom: shouldForceBottom,
+    restoreScroll: !shouldForceBottom,
+  }).catch((error) => {
+    console.error("select partner load conversation failed:", error);
+  });
 }
 
 function renderThreadList(options = {}) {
@@ -3418,6 +3496,7 @@ function updateDmMessageSearchState() {
     if (prevBtn) prevBtn.disabled = true;
     if (nextBtn) nextBtn.disabled = true;
     renderDmSearchDayChips();
+    renderDmSearchResults();
     if (input && dmMessageSearchOpen && document.activeElement !== input) {
       input.focus();
     }
@@ -3440,6 +3519,7 @@ function updateDmMessageSearchState() {
     if (prevBtn) prevBtn.disabled = true;
     if (nextBtn) nextBtn.disabled = true;
     renderDmSearchDayChips();
+    renderDmSearchResults();
     return;
   }
 
@@ -3457,6 +3537,7 @@ function updateDmMessageSearchState() {
   if (prevBtn) prevBtn.disabled = dmMessageSearchMatchIds.length <= 1;
   if (nextBtn) nextBtn.disabled = dmMessageSearchMatchIds.length <= 1;
   renderDmSearchDayChips();
+  renderDmSearchResults();
 }
 
 function goToDmSearchMatch(direction = 1) {
@@ -3525,6 +3606,85 @@ function renderDmSearchDayChips() {
       count.className = "dm-chat-search-day-count";
       count.textContent = `${group.count}`;
       button.append(label, count);
+      return button;
+    })
+  );
+}
+
+function getDmVisibleSearchResults(limit = 8) {
+  if (!dmMessageSearchMatchIds.length) return [];
+  const total = dmMessageSearchMatchIds.length;
+  const activeIndex = dmMessageSearchActiveIndex >= 0 ? dmMessageSearchActiveIndex : 0;
+  const half = Math.floor(limit / 2);
+  let start = Math.max(0, activeIndex - half);
+  let end = Math.min(total, start + limit);
+  start = Math.max(0, end - limit);
+  return dmMessageSearchMatchIds.slice(start, end).map((messageId, offset) => {
+    const absoluteIndex = start + offset;
+    const message = getDmMessageById(messageId);
+    const tr = getDmTranslations();
+    const rawText = getDmSearchableMessageText(message, tr);
+    return {
+      absoluteIndex,
+      messageId,
+      message,
+      author: getDmMessageAuthorLabel(message, tr),
+      time: formatThreadTimestamp(message?.created_at),
+      snippet: buildDmSearchSnippet(rawText, dmMessageSearchQuery),
+      isActive: absoluteIndex === activeIndex,
+    };
+  });
+}
+
+function renderDmSearchResults() {
+  const wrap = $("dm-message-search-results");
+  if (!wrap) return;
+  if (!dmMessageSearchOpen || !dmMessageSearchMatchIds.length) {
+    wrap.classList.add("hidden");
+    wrap.replaceChildren();
+    return;
+  }
+  const results = getDmVisibleSearchResults();
+  if (!results.length) {
+    wrap.classList.add("hidden");
+    wrap.replaceChildren();
+    return;
+  }
+  wrap.classList.remove("hidden");
+  wrap.replaceChildren(
+    ...results.map((result) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "dm-chat-search-result";
+      if (result.isActive) button.classList.add("is-active");
+      button.setAttribute("data-dm-search-result-index", `${result.absoluteIndex}`);
+      button.setAttribute(
+        "aria-label",
+        (getDmTranslations().dmSearchJumpToMessage || "Jump to message").replace(
+          "{author}",
+          result.author || ""
+        )
+      );
+
+      const meta = document.createElement("div");
+      meta.className = "dm-chat-search-result-meta";
+      const author = document.createElement("span");
+      author.className = "dm-chat-search-result-author";
+      author.textContent = result.author;
+      const time = document.createElement("span");
+      time.className = "dm-chat-search-result-time";
+      time.textContent = result.time || formatMessageDayLabel(result.message?.created_at);
+      meta.append(author, time);
+
+      const snippet = document.createElement("div");
+      snippet.className = "dm-chat-search-result-snippet";
+      applyHighlightedText(
+        snippet,
+        result.snippet || getDmTranslations().dmSearchEmptyState || "No matches",
+        dmMessageSearchQuery
+      );
+
+      button.append(meta, snippet);
       return button;
     })
   );
@@ -4436,6 +4596,7 @@ function renderConversationMessages(options = {}) {
   const activePartner = dmPartners.find((partner) => partner.id === dmActivePartnerId);
   const activePartnerProfile = activePartner?.profile || null;
   const shouldStickToBottom = !!options.forceBottom || isNearBottom(list);
+  const shouldRestoreScroll = !!options.restoreScroll && !shouldStickToBottom;
   const nextMessageKeys = dmMessages.map((message, index) =>
     getDmMessageKey(message, index)
   );
@@ -4542,7 +4703,11 @@ function renderConversationMessages(options = {}) {
     if (shouldStickToBottom) {
       requestAnimationFrame(() => {
         list.scrollTop = list.scrollHeight;
+        saveDmConversationScroll(dmActivePartnerId);
+        syncDmJumpLatestButton();
       });
+    } else if (shouldRestoreScroll) {
+      restoreDmConversationScroll(list, dmActivePartnerId);
     }
     dmRenderedMessagePartnerId = dmActivePartnerId;
     dmRenderedMessageKeys = nextMessageKeys;
@@ -4574,7 +4739,11 @@ function renderConversationMessages(options = {}) {
   if (shouldStickToBottom) {
     requestAnimationFrame(() => {
       list.scrollTop = list.scrollHeight;
+      saveDmConversationScroll(dmActivePartnerId);
+      syncDmJumpLatestButton();
     });
+  } else if (shouldRestoreScroll) {
+    restoreDmConversationScroll(list, dmActivePartnerId);
   }
   dmRenderedMessagePartnerId = dmActivePartnerId;
   dmRenderedMessageKeys = nextMessageKeys;
@@ -4676,7 +4845,10 @@ async function loadConversation(partnerId, options = {}) {
           !message.read_at
       )?.id || "";
     renderDmReplyComposer();
-    renderConversationMessages({ forceBottom: !!options.forceBottom });
+    renderConversationMessages({
+      forceBottom: !!options.forceBottom,
+      restoreScroll: options.restoreScroll !== false,
+    });
     await markConversationRead(partnerId);
     setSendStatus("", "");
   } finally {
@@ -4793,7 +4965,11 @@ export async function refreshDmData(options = {}) {
     renderThreadList();
     renderComposeList();
     renderConversationHeader();
-    await loadConversation(dmActivePartnerId, { forceBottom: true });
+    const hasSavedScroll = !!getDmSavedScrollState(dmActivePartnerId);
+    await loadConversation(dmActivePartnerId, {
+      forceBottom: preservePartner ? !hasSavedScroll : true,
+      restoreScroll: preservePartner && hasSavedScroll,
+    });
     setDmMobileChatOpen(!!dmActivePartnerId);
     renderThreadSummary();
     setThreadStatus("", "");
@@ -5557,6 +5733,27 @@ export function setupDmControls() {
     });
   }
 
+  const searchResults = $("dm-message-search-results");
+  if (searchResults && searchResults.dataset.bound !== "true") {
+    searchResults.dataset.bound = "true";
+    searchResults.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-dm-search-result-index]");
+      if (!(button instanceof HTMLButtonElement)) return;
+      const nextIndex = Number(button.getAttribute("data-dm-search-result-index") || "-1");
+      if (!Number.isFinite(nextIndex) || nextIndex < 0) return;
+      dmMessageSearchActiveIndex = Math.min(
+        nextIndex,
+        Math.max(0, dmMessageSearchMatchIds.length - 1)
+      );
+      updateDmMessageSearchState();
+      renderConversationMessages({ forceFull: true });
+      const messageId = dmMessageSearchMatchIds[dmMessageSearchActiveIndex];
+      if (messageId) {
+        scrollToDmMessage(messageId, { block: "center" });
+      }
+    });
+  }
+
   const infoBackdrop = $("btn-dm-info-backdrop");
   if (infoBackdrop && infoBackdrop.dataset.bound !== "true") {
     infoBackdrop.dataset.bound = "true";
@@ -5794,6 +5991,10 @@ export function setupDmControls() {
 
   if (messageList && messageList.dataset.bound !== "true") {
     messageList.dataset.bound = "true";
+    messageList.addEventListener("scroll", () => {
+      saveDmConversationScroll(dmActivePartnerId);
+      syncDmJumpLatestButton();
+    });
     messageList.addEventListener("click", (event) => {
       const moreButton = event.target.closest("[data-dm-message-more]");
       if (moreButton) {
@@ -5897,6 +6098,7 @@ export function handleDmPageChange(page) {
     renderDmPage({ refreshIfNeeded: true });
     return;
   }
+  saveDmConversationScroll(dmActivePartnerId);
   persistDmDraft(dmActivePartnerId, { refreshList: true });
   setDmMessageSearchOpen(false);
   closeDmActionSheet();

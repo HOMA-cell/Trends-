@@ -5260,6 +5260,64 @@
       font-weight: 800;
       font-variant-numeric: tabular-nums;
     }
+    .dm-chat-search-results {
+      width: 100%;
+      display: grid;
+      gap: 8px;
+      padding-top: 2px;
+    }
+    .dm-chat-search-result {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #eee4d8;
+      border-radius: 16px;
+      background: #fcfaf7;
+      display: grid;
+      gap: 6px;
+      text-align: left;
+      transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+    }
+    .dm-chat-search-result:hover,
+    .dm-chat-search-result:focus-visible {
+      outline: none;
+      transform: translateY(-1px);
+      border-color: #f0c7b4;
+      background: #fff;
+    }
+    .dm-chat-search-result.is-active {
+      border-color: #f0c7b4;
+      background: #fff4ed;
+      box-shadow: 0 10px 24px rgba(208, 89, 47, 0.08);
+    }
+    .dm-chat-search-result-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 10px;
+      color: #8c8277;
+    }
+    .dm-chat-search-result-author {
+      min-width: 0;
+      font-weight: 700;
+      color: #433b34;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-chat-search-result-time {
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .dm-chat-search-result-snippet {
+      font-size: 11px;
+      line-height: 1.45;
+      color: #5d534a;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .dm-chat-context {
       display: flex;
       flex-direction: column;
@@ -7117,6 +7175,19 @@
         min-height: 20px;
         padding-inline: 8px;
         font-size: 8px;
+      }
+      .dm-chat-search-results {
+        gap: 6px;
+      }
+      .dm-chat-search-result {
+        padding: 9px 10px;
+        border-radius: 14px;
+      }
+      .dm-chat-search-result-meta {
+        font-size: 9px;
+      }
+      .dm-chat-search-result-snippet {
+        font-size: 10px;
       }
       .dm-message-media img {
         width: min(240px, 100%);
