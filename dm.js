@@ -3753,8 +3753,14 @@ function renderDmInfoPanel() {
   const sub = $("dm-info-sub");
   const presence = $("dm-info-presence");
   const heroMeta = $("dm-info-hero-meta");
+  const spotlight = $("dm-info-spotlight");
+  const spotlightLabel = $("dm-info-spotlight-label");
+  const spotlightText = $("dm-info-spotlight-text");
   const summaryPills = $("dm-info-summary-pills");
   const tabs = $("dm-info-tabs");
+  const tabOverview = $("dm-info-tab-overview");
+  const tabMedia = $("dm-info-tab-media");
+  const tabShared = $("dm-info-tab-shared");
   const stats = $("dm-info-stats");
   const profileTitle = $("dm-info-profile-title");
   const profileMeta = $("dm-info-profile-meta");
@@ -3783,8 +3789,14 @@ function renderDmInfoPanel() {
     !sub ||
     !presence ||
     !heroMeta ||
+    !spotlight ||
+    !spotlightLabel ||
+    !spotlightText ||
     !summaryPills ||
     !tabs ||
+    !tabOverview ||
+    !tabMedia ||
+    !tabShared ||
     !stats ||
     !profileTitle ||
     !profileMeta ||
@@ -3816,6 +3828,7 @@ function renderDmInfoPanel() {
   postsTitle.textContent = tr.dmInfoPostsTitle || "Shared posts";
   linksTitle.textContent = tr.dmInfoLinksTitle || "Shared links";
   searchTitle.textContent = tr.dmInfoSearchTitle || "Search in conversation";
+  tabOverview.textContent = tr.dmInfoTabOverview || "Overview";
   openProfileBtn.textContent = tr.dmOpenProfile || "Open profile";
   markReadBtn.textContent = tr.dmMarkRead || "Mark read";
   openSearchBtn.textContent = tr.dmInfoOpenSearch || "Open search";
@@ -3846,6 +3859,8 @@ function renderDmInfoPanel() {
   const facts = getDmInfoFacts(active.profile, tr);
   const latestMessage = dmMessages.length ? dmMessages[dmMessages.length - 1] : null;
   const latestActivity = formatDateTimeDisplay(thread?.lastAt || latestMessage?.created_at);
+  const profileBio = `${active.profile?.bio || ""}`.trim();
+  const latestSnippet = latestMessage ? getDmMessageSnippet(latestMessage, tr) : "";
 
   presence.textContent = partnerPresence.label || tr.dmChatSubIdle || "Conversation";
   presence.classList.toggle("is-online", !!partnerPresence.isOnline);
@@ -3853,6 +3868,27 @@ function renderDmInfoPanel() {
   heroMeta.textContent = latestActivity
     ? `${tr.dmInfoRecentActivity || "Latest activity"} · ${latestActivity}`
     : tr.dmInfoSearchMeta || "Jump to messages by keyword";
+
+  if (profileBio) {
+    spotlight.classList.remove("hidden");
+    spotlightLabel.textContent = tr.profileBio || "Bio";
+    spotlightText.textContent = profileBio;
+  } else if (latestSnippet) {
+    spotlight.classList.remove("hidden");
+    spotlightLabel.textContent = tr.dmInfoRecentActivity || "Latest activity";
+    spotlightText.textContent = latestSnippet;
+  } else {
+    spotlight.classList.add("hidden");
+    spotlightLabel.textContent = tr.profileBio || "Bio";
+    spotlightText.textContent = "-";
+  }
+
+  tabMedia.textContent = mediaMessages.length
+    ? `${tr.dmInfoTabMedia || "Media"} ${mediaMessages.length}`
+    : tr.dmInfoTabMedia || "Media";
+  tabShared.textContent = shareCount
+    ? `${tr.dmInfoTabShared || "Shared"} ${shareCount}`
+    : tr.dmInfoTabShared || "Shared";
 
   const summaryItems = [
     { label: tr.dmInfoMessages || "Messages", value: `${messageCount}` },
