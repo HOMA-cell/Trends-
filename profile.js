@@ -1148,7 +1148,14 @@ export function setupProfileLinks() {
       }
       messageBtn.classList.add("is-loading");
       try {
-        await openDmConversation(currentPublicProfileId);
+        await openDmConversation(currentPublicProfileId, {
+          entryContext: {
+            source: "profile",
+            partnerId: currentPublicProfileId,
+            actorName: messageBtn.dataset.actorName || "",
+            actorHandle: messageBtn.dataset.actorHandle || "",
+          },
+        });
       } finally {
         messageBtn.classList.remove("is-loading");
       }
@@ -1348,6 +1355,8 @@ export async function openPublicProfile(userId, options = {}) {
     const canMessage = !!currentUser && currentUser.id !== userId;
     messageBtn.classList.toggle("hidden", !canMessage);
     messageBtn.disabled = !canMessage;
+    messageBtn.dataset.actorName = displayName || "";
+    messageBtn.dataset.actorHandle = handle || "";
     if (canMessage) {
       messageBtn.textContent = tr.message || "Message";
       messageBtn.setAttribute(

@@ -2148,6 +2148,11 @@ async function loadProfilePostCount() {
           openPublicProfile(userId);
         }
       },
+      openPostDetail: (postId, options = {}) => {
+        if (typeof openPostDetail === "function" && postId) {
+          openPostDetail(postId, options);
+        }
+      },
       openMediaViewer: (url, type = "image", options = {}) =>
         openMediaModal(url, type, options),
     });
@@ -2338,6 +2343,9 @@ async function loadProfilePostCount() {
       setText("btn-dm-back", "dmBackToThreads");
       setText("btn-dm-search", "dmSearchInChat");
       setText("btn-dm-info", "dmConversationInfo");
+      setText("dm-entry-context-label", "dmEntryFromNotification");
+      setText("btn-dm-entry-open-post", "dmEntryOpenPost");
+      setText("btn-dm-entry-open-profile", "dmEntryOpenProfile");
       setText("btn-dm-pin", "dmPinThread");
       setText("btn-dm-mute", "dmMuteThread");
       setText("btn-dm-mark-read", "dmMarkRead");
@@ -5791,6 +5799,41 @@ async function loadProfilePostCount() {
       return tr.detailTitle || "Post";
     }
 
+    function getNotificationDmStarterText(type, tr) {
+      if (type === "comment") {
+        return tr.dmStarterFromComment || "Thanks for the comment!";
+      }
+      if (type === "like") {
+        return tr.dmStarterFromLike || "Thanks for the like!";
+      }
+      if (type === "follow") {
+        return tr.dmStarterFromFollow || "Thanks for the follow!";
+      }
+      return tr.dmStarterGeneric || "Hey, thanks!";
+    }
+
+    function buildNotificationDmEntryContext(note, post, tr) {
+      if (!note?.actor_id) return null;
+      const actorName = getProfileDisplayName(
+        note.actor,
+        note.actor?.display_name || note.actor?.handle || "user"
+      );
+      const actorHandle =
+        note.actor?.handle || note.actor?.username || note.actor?.display_name || "";
+      const postPreview = note.post_id ? getNotificationPreviewText(post, tr) : "";
+      return {
+        source: "notification",
+        partnerId: note.actor_id,
+        actorName,
+        actorHandle,
+        notificationType: `${note.type || ""}`.trim(),
+        postId: `${post?.id || note.post_id || ""}`.trim(),
+        postLabel: note.post_id ? getNotificationPreviewKind(post, tr) : "",
+        previewText: postPreview || getNotificationActionText(note.type, tr),
+        prefillMessage: getNotificationDmStarterText(note.type, tr),
+      };
+    }
+
     function openNotificationDestination(note, post) {
       if (!note) return false;
       if (note.post_id) {
@@ -6153,9 +6196,13 @@ async function loadProfilePostCount() {
           messageBtn.className = "btn btn-ghost btn-xs";
           messageBtn.textContent = tr.message || "Message";
           messageBtn.addEventListener("click", async () => {
-            await openDmConversation(note.actor_id, {
+            const opened = await openDmConversation(note.actor_id, {
               profile: note.actor || null,
+              entryContext: buildNotificationDmEntryContext(note, post, tr),
             });
+            if (opened && !note.read_at) {
+              void markNotificationRead(note.id);
+            }
           });
           actions.appendChild(messageBtn);
         }

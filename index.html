@@ -298,6 +298,17 @@
                   type="button"
                 >解除</button>
               </div>
+              <div class="dm-entry-context hidden" id="dm-entry-context" aria-hidden="true">
+                <div class="dm-entry-context-copy">
+                  <div class="dm-entry-context-label" id="dm-entry-context-label">通知から移動</div>
+                  <div class="dm-entry-context-text" id="dm-entry-context-text">-</div>
+                </div>
+                <div class="dm-entry-context-actions">
+                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-post" type="button">投稿へ</button>
+                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-profile" type="button">プロフィール</button>
+                  <button class="btn btn-ghost btn-xs dm-entry-context-dismiss" id="btn-dm-entry-dismiss" type="button">×</button>
+                </div>
+              </div>
               <div class="dm-chat-stage">
                 <div id="dm-message-list" class="dm-message-list"></div>
                 <button class="btn btn-ghost btn-xs hidden dm-jump-unread" id="btn-dm-jump-unread" type="button">
