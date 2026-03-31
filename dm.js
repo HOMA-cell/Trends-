@@ -3746,6 +3746,58 @@ function buildDmInfoLinkCard(item, tr = getDmTranslations()) {
   return button;
 }
 
+function buildDmInfoHighlightCard(item, tr = getDmTranslations()) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "dm-info-highlight-card";
+  if (item.messageId) {
+    button.setAttribute("data-dm-info-message-id", item.messageId);
+  }
+  if (item.mediaMessageId) {
+    button.setAttribute("data-dm-info-media-id", item.mediaMessageId);
+  }
+  if (item.sharePayload?.url) {
+    button.setAttribute("data-dm-info-link-url", item.sharePayload.url);
+    button.setAttribute("data-dm-info-link-kind", item.sharePayload.kind || "link");
+    if (item.sharePayload.postId) {
+      button.setAttribute("data-dm-info-post-id", item.sharePayload.postId);
+    }
+  }
+
+  const copy = document.createElement("div");
+  copy.className = "dm-info-highlight-copy";
+
+  const label = document.createElement("div");
+  label.className = "dm-info-highlight-label";
+  label.textContent = item.label || tr.dmInfoRecentActivity || "Latest activity";
+
+  const title = document.createElement("div");
+  title.className = "dm-info-highlight-title";
+  title.textContent = item.title || tr.dmInfoRecentActivity || "Latest activity";
+
+  const meta = document.createElement("div");
+  meta.className = "dm-info-highlight-meta";
+  meta.textContent = item.meta || "";
+  meta.classList.toggle("hidden", !item.meta);
+
+  copy.append(label, title, meta);
+  button.appendChild(copy);
+
+  if (item.thumbUrl) {
+    const thumb = document.createElement("div");
+    thumb.className = "dm-info-highlight-thumb";
+    const image = document.createElement("img");
+    image.src = item.thumbUrl;
+    image.alt = item.title || tr.dmPhotoMessage || "Photo";
+    image.loading = "lazy";
+    image.decoding = "async";
+    thumb.appendChild(image);
+    button.appendChild(thumb);
+  }
+
+  return button;
+}
+
 function renderDmInfoPanel() {
   const panel = $("dm-info-panel");
   const avatar = $("dm-info-avatar");
@@ -3756,6 +3808,7 @@ function renderDmInfoPanel() {
   const spotlight = $("dm-info-spotlight");
   const spotlightLabel = $("dm-info-spotlight-label");
   const spotlightText = $("dm-info-spotlight-text");
+  const highlights = $("dm-info-highlights");
   const summaryPills = $("dm-info-summary-pills");
   const tabs = $("dm-info-tabs");
   const tabOverview = $("dm-info-tab-overview");
@@ -3792,6 +3845,7 @@ function renderDmInfoPanel() {
     !spotlight ||
     !spotlightLabel ||
     !spotlightText ||
+    !highlights ||
     !summaryPills ||
     !tabs ||
     !tabOverview ||
@@ -3858,6 +3912,8 @@ function renderDmInfoPanel() {
   const replyCount = dmMessages.filter((message) => !!parseDmReplyMessage(message)).length;
   const facts = getDmInfoFacts(active.profile, tr);
   const latestMessage = dmMessages.length ? dmMessages[dmMessages.length - 1] : null;
+  const pinnedMessage = getDmPinnedMessage(active.id);
+  const latestSharedItem = getDmConversationSharedItems(1)[0] || null;
   const latestActivity = formatDateTimeDisplay(thread?.lastAt || latestMessage?.created_at);
   const profileBio = `${active.profile?.bio || ""}`.trim();
   const latestSnippet = latestMessage ? getDmMessageSnippet(latestMessage, tr) : "";
@@ -3889,6 +3945,62 @@ function renderDmInfoPanel() {
   tabShared.textContent = shareCount
     ? `${tr.dmInfoTabShared || "Shared"} ${shareCount}`
     : tr.dmInfoTabShared || "Shared";
+
+  const highlightCards = [];
+  if (pinnedMessage) {
+    highlightCards.push(
+      buildDmInfoHighlightCard(
+        {
+          label: tr.dmPinnedMessageLabel || "Pinned message",
+          title: getDmMessageSnippet(pinnedMessage, tr) || tr.dmPinnedMessageLabel || "Pinned message",
+          meta: formatDateTimeDisplay(pinnedMessage.created_at),
+          messageId: `${pinnedMessage.id || ""}`.trim(),
+        },
+        tr
+      )
+    );
+  }
+  const latestMedia = mediaMessages[0] || null;
+  if (latestMedia) {
+    highlightCards.push(
+      buildDmInfoHighlightCard(
+        {
+          label: tr.dmRecentMediaLabel || "Recent media",
+          title: getDmMessageSnippet(latestMedia, tr) || tr.dmOpenPhoto || "Open photo",
+          meta: formatDateDisplay(latestMedia.created_at) || tr.dmPhotoMessage || "Photo",
+          mediaMessageId: `${latestMedia.id || ""}`.trim(),
+          thumbUrl: latestMedia.media_url,
+        },
+        tr
+      )
+    );
+  }
+  if (latestSharedItem) {
+    highlightCards.push(
+      buildDmInfoHighlightCard(
+        {
+          label:
+            latestSharedItem.kind === "post"
+              ? tr.dmSharedPostBadge || "Shared post"
+              : tr.dmInfoLinkBadge || "Link",
+          title: latestSharedItem.title || latestSharedItem.host || latestSharedItem.url,
+          meta:
+            latestSharedItem.note ||
+            latestSharedItem.host ||
+            formatDateDisplay(latestSharedItem.createdAt),
+          sharePayload: latestSharedItem,
+        },
+        tr
+      )
+    );
+  }
+  if (highlightCards.length) {
+    highlights.classList.remove("hidden");
+    highlights.replaceChildren(...highlightCards.slice(0, 3));
+  } else {
+    highlights.classList.add("hidden");
+    highlights.replaceChildren();
+  }
 
   const summaryItems = [
     { label: tr.dmInfoMessages || "Messages", value: `${messageCount}` },
@@ -6042,6 +6154,46 @@ export function setupDmControls() {
       const message = getDmMessageById(messageId);
       if (!message) return;
       openDmMediaMessage(message);
+    });
+  }
+
+  const infoHighlights = $("dm-info-highlights");
+  if (infoHighlights && infoHighlights.dataset.bound !== "true") {
+    infoHighlights.dataset.bound = "true";
+    infoHighlights.addEventListener("click", (event) => {
+      const messageButton = event.target.closest("[data-dm-info-message-id]");
+      if (messageButton) {
+        const messageId = `${messageButton.getAttribute("data-dm-info-message-id") || ""}`.trim();
+        if (!messageId) return;
+        closeDmInfoPanel();
+        renderConversationHeader({ force: true });
+        if (typeof window !== "undefined") {
+          window.requestAnimationFrame(() => {
+            scrollToDmMessage(messageId, { block: "center" });
+          });
+        } else {
+          scrollToDmMessage(messageId, { block: "center" });
+        }
+        return;
+      }
+
+      const mediaButton = event.target.closest("[data-dm-info-media-id]");
+      if (mediaButton) {
+        const messageId = `${mediaButton.getAttribute("data-dm-info-media-id") || ""}`.trim();
+        const message = getDmMessageById(messageId);
+        if (!message) return;
+        openDmMediaMessage(message);
+        return;
+      }
+
+      const linkButton = event.target.closest("[data-dm-info-link-url]");
+      if (linkButton) {
+        const url = `${linkButton.getAttribute("data-dm-info-link-url") || ""}`.trim();
+        const kind = `${linkButton.getAttribute("data-dm-info-link-kind") || "link"}`.trim();
+        if (!url) return;
+        const postId = `${linkButton.getAttribute("data-dm-info-post-id") || ""}`.trim();
+        openDmSharedPayload({ url, kind, postId });
+      }
     });
   }
 

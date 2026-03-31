@@ -6775,6 +6775,81 @@
       -webkit-line-clamp: 4;
       overflow: hidden;
     }
+    .dm-info-highlights {
+      display: grid;
+      gap: 8px;
+    }
+    .dm-info-highlight-card {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 76px;
+      padding: 12px 44px 12px 14px;
+      border-radius: 20px;
+      border: 1px solid #eee2d6;
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(43, 24, 10, 0.04);
+      position: relative;
+      text-align: left;
+    }
+    .dm-info-highlight-card::after {
+      content: "›";
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      color: #c49a7d;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .dm-info-highlight-copy {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+      flex: 1;
+    }
+    .dm-info-highlight-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #b07d5d;
+    }
+    .dm-info-highlight-title {
+      font-size: 13px;
+      line-height: 1.35;
+      color: #2d231b;
+      font-weight: 700;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    .dm-info-highlight-meta {
+      font-size: 10px;
+      color: #8d8176;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-info-highlight-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #efe4d9;
+      background: #f6eee5;
+      flex-shrink: 0;
+    }
+    .dm-info-highlight-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
     .dm-info-summary-pills {
       display: flex;
       flex-wrap: wrap;
@@ -7782,6 +7857,33 @@
       .dm-info-spotlight-text {
         font-size: 12px;
         -webkit-line-clamp: 3;
+      }
+      .dm-info-highlights {
+        gap: 7px;
+      }
+      .dm-info-highlight-card {
+        min-height: 70px;
+        padding: 11px 40px 11px 12px;
+        border-radius: 18px;
+        gap: 10px;
+      }
+      .dm-info-highlight-card::after {
+        right: 13px;
+        font-size: 17px;
+      }
+      .dm-info-highlight-label {
+        font-size: 9px;
+      }
+      .dm-info-highlight-title {
+        font-size: 12px;
+      }
+      .dm-info-highlight-meta {
+        font-size: 9.5px;
+      }
+      .dm-info-highlight-thumb {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
       }
       .dm-info-summary-pills {
         gap: 6px;
