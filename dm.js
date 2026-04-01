@@ -551,6 +551,46 @@ function parseDmReactionMessage(message) {
   return { targetId, emoji };
 }
 
+function buildDmBaseMessageIdSet(messages = []) {
+  const ids = new Set();
+  (messages || []).forEach((message) => {
+    if (parseDmReactionMessage(message)) return;
+    const messageId = `${message?.id || ""}`.trim();
+    if (messageId) ids.add(messageId);
+  });
+  return ids;
+}
+
+function isDmHiddenReactionMessage(message, baseMessageIds = null) {
+  const reactionPayload = parseDmReactionMessage(message);
+  if (!reactionPayload) return false;
+  if (!(baseMessageIds instanceof Set)) return false;
+  const targetId = `${reactionPayload.targetId || ""}`.trim();
+  return !targetId || !baseMessageIds.has(targetId);
+}
+
+function findDmFirstUnreadMessageId(
+  messages = [],
+  partnerId = "",
+  currentUserId = "",
+  baseMessageIds = buildDmBaseMessageIdSet(messages)
+) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  const viewerId = `${currentUserId || ""}`.trim();
+  if (!targetPartnerId || !viewerId) return "";
+  return (
+    messages.find((message) => {
+      if (!message) return false;
+      if (isDmHiddenReactionMessage(message, baseMessageIds)) return false;
+      return (
+        `${message.sender_id || ""}`.trim() === targetPartnerId &&
+        `${message.recipient_id || ""}`.trim() === viewerId &&
+        !message.read_at
+      );
+    })?.id || ""
+  );
+}
+
 function getDmMessageSnippet(message, tr = getDmTranslations()) {
   const reactionPayload = parseDmReactionMessage(message);
   if (reactionPayload) {
@@ -1862,6 +1902,112 @@ function toggleDmMessagePinned(messageId) {
   return true;
 }
 
+function getDmStorageObjectPath(message) {
+  const mediaUrl = `${message?.media_url || ""}`.trim();
+  if (!mediaUrl) return "";
+  try {
+    const parsed = new URL(mediaUrl);
+    const marker = "/storage/v1/object/public/post-media/";
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex < 0) return "";
+    const rawPath = parsed.pathname.slice(markerIndex + marker.length);
+    return decodeURIComponent(rawPath || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function unsendDmMessage(messageId) {
+  const currentUser = getCurrentUser();
+  const tr = getDmTranslations();
+  const targetMessage = getDmMessageById(messageId);
+  const targetMessageId = `${messageId || ""}`.trim();
+  if (!currentUser || !targetMessage || !targetMessageId) return false;
+  if (`${targetMessage.sender_id || ""}`.trim() !== `${currentUser.id || ""}`.trim()) {
+    showToast(tr.dmUnsendNotAllowed || "You can only unsend your own messages.", "info");
+    return false;
+  }
+
+  const reactionIdsToDelete = dmMessages
+    .filter((message) => {
+      const reactionPayload = parseDmReactionMessage(message);
+      return (
+        !!reactionPayload &&
+        `${reactionPayload.targetId || ""}`.trim() === targetMessageId &&
+        `${message.sender_id || ""}`.trim() === `${currentUser.id || ""}`.trim()
+      );
+    })
+    .map((message) => `${message?.id || ""}`.trim())
+    .filter(Boolean);
+
+  const { error } = await supabase
+    .from("direct_messages")
+    .delete()
+    .eq("id", targetMessageId)
+    .eq("sender_id", currentUser.id);
+
+  if (error) {
+    console.error("unsendDmMessage error:", error);
+    showToast(tr.dmUnsendError || "Couldn't unsend the message.", "error");
+    return false;
+  }
+
+  if (reactionIdsToDelete.length) {
+    supabase
+      .from("direct_messages")
+      .delete()
+      .in("id", reactionIdsToDelete)
+      .eq("sender_id", currentUser.id)
+      .catch((reactionError) => {
+        console.error("unsendDmMessage reaction cleanup error:", reactionError);
+      });
+  }
+
+  const storagePath = getDmStorageObjectPath(targetMessage);
+  if (storagePath) {
+    supabase.storage
+      .from("post-media")
+      .remove([storagePath])
+      .catch((storageError) => {
+        console.error("unsendDmMessage storage cleanup error:", storageError);
+      });
+  }
+
+  dmMessages = dmMessages.filter((message) => {
+    const id = `${message?.id || ""}`.trim();
+    if (!id) return true;
+    if (id === targetMessageId) return false;
+    const reactionPayload = parseDmReactionMessage(message);
+    return !reactionPayload || `${reactionPayload.targetId || ""}`.trim() !== targetMessageId;
+  });
+
+  if (getDmPinnedMessageId(dmActivePartnerId) === targetMessageId) {
+    clearDmPinnedMessage(dmActivePartnerId);
+  }
+  if (dmReplyTargetId === targetMessageId) {
+    clearDmReplyTarget();
+  }
+  if (dmReactionPickerMessageId === targetMessageId) {
+    dmReactionPickerMessageId = "";
+  }
+
+  dmUnreadDividerMessageId = findDmFirstUnreadMessageId(
+    dmMessages,
+    dmActivePartnerId,
+    currentUser.id
+  );
+  renderConversationMessages({ forceFull: true });
+  renderDmInfoPanel();
+  renderConversationHeader({ force: true });
+  renderThreadSummary();
+  showToast(tr.dmUnsendSuccess || "Message unsent.", "success");
+
+  refreshDmData({ preservePartner: true }).catch((refreshError) => {
+    console.error("unsendDmMessage refresh error:", refreshError);
+  });
+  return true;
+}
+
 function renderDmMediaPreview() {
   const preview = $("dm-media-preview");
   const image = $("dm-media-preview-image");
@@ -2171,7 +2317,7 @@ function scrollToDmMessage(messageId, options = {}) {
   return true;
 }
 
-function buildDmReactionMap(messages = []) {
+function buildDmReactionMap(messages = [], baseMessageIds = buildDmBaseMessageIdSet(messages)) {
   const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
   const reactionMap = new Map();
   (messages || []).forEach((message) => {
@@ -2179,6 +2325,7 @@ function buildDmReactionMap(messages = []) {
     if (!reactionPayload?.targetId) return;
     const targetId = `${reactionPayload.targetId || ""}`.trim();
     if (!targetId) return;
+    if (baseMessageIds instanceof Set && !baseMessageIds.has(targetId)) return;
     const list = reactionMap.get(targetId) || [];
     let entry = list.find((item) => item.emoji === reactionPayload.emoji);
     if (!entry) {
@@ -3439,6 +3586,7 @@ function updateDmMessageSearchState() {
   const prevBtn = $("btn-dm-message-search-prev");
   const nextBtn = $("btn-dm-message-search-next");
   const query = normalizeDmSearchText(dmMessageSearchQuery);
+  const baseMessageIds = buildDmBaseMessageIdSet(dmMessages);
   if (!query || !dmActivePartnerId) {
     dmMessageSearchMatchIds = [];
     dmMessageSearchActiveIndex = -1;
@@ -3459,6 +3607,8 @@ function updateDmMessageSearchState() {
   dmMessageSearchMatchIds = dmMessages
     .filter((message) => {
       if (message?.pending) return false;
+      if (parseDmReactionMessage(message)) return false;
+      if (isDmHiddenReactionMessage(message, baseMessageIds)) return false;
       const text = normalizeDmSearchText(getDmSearchableMessageText(message, tr));
       return !!text && text.includes(query);
     })
@@ -4488,6 +4638,32 @@ function openDmActionSheet(messageId) {
     await copyDmMessageContent(message);
   }, { group: "secondary", icon: "⎘" });
 
+  const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
+  if (currentUserId && `${message.sender_id || ""}`.trim() === currentUserId) {
+    addAction(
+      "unsend",
+      tr.dmUnsendMessage || "Unsend",
+      async () => {
+        if (
+          typeof window !== "undefined" &&
+          !window.confirm(
+            tr.dmUnsendConfirm ||
+              "Unsend this message? It will be removed from the chat."
+          )
+        ) {
+          return;
+        }
+        await unsendDmMessage(message.id);
+      },
+      {
+        group: "secondary",
+        icon: "⌫",
+        detail: tr.dmUnsendDetail || "Remove from chat",
+        tone: "danger",
+      }
+    );
+  }
+
   if (getDmMessageHasImage(message)) {
     addAction("photo", tr.dmOpenPhoto || "Open photo", async () => {
       openDmMediaMessage(message);
@@ -4534,16 +4710,11 @@ function appendDmMessageNodes({
   lastSelfMessageId,
   partnerProfile,
   reactionMap,
-  messageIndexMap,
   tr,
 }) {
   const dayKey = getDateKey(message.created_at);
   const reactionPayload = parseDmReactionMessage(message);
-  const reactionTargetExists =
-    !!reactionPayload &&
-    messageIndexMap instanceof Map &&
-    messageIndexMap.has(`${reactionPayload.targetId || ""}`.trim());
-  if (reactionPayload && reactionTargetExists) {
+  if (reactionPayload) {
     return dayKey || previousDayKey;
   }
   if (dayKey && dayKey !== previousDayKey) {
@@ -4909,16 +5080,11 @@ function renderConversationMessages(options = {}) {
   const activePartnerProfile = activePartner?.profile || null;
   const shouldStickToBottom = !!options.forceBottom || isNearBottom(list);
   const shouldRestoreScroll = !!options.restoreScroll && !shouldStickToBottom;
+  const baseMessageIds = buildDmBaseMessageIdSet(dmMessages);
   const nextMessageKeys = dmMessages.map((message, index) =>
     getDmMessageKey(message, index)
   );
-  const messageIndexMap = new Map(
-    dmMessages
-      .filter((message) => !parseDmReactionMessage(message))
-      .map((message) => [`${message?.id || ""}`.trim(), message])
-      .filter(([id]) => !!id)
-  );
-  const reactionMap = buildDmReactionMap(dmMessages);
+  const reactionMap = buildDmReactionMap(dmMessages, baseMessageIds);
 
   if (!dmActivePartnerId) {
     renderEmptyConversationState(list, null, tr);
@@ -5008,7 +5174,6 @@ function renderConversationMessages(options = {}) {
         lastSelfMessageId,
         partnerProfile: activePartnerProfile,
         reactionMap,
-        messageIndexMap,
         tr,
       });
     }
@@ -5043,7 +5208,6 @@ function renderConversationMessages(options = {}) {
       lastSelfMessageId,
       partnerProfile: activePartnerProfile,
       reactionMap,
-      messageIndexMap,
       tr,
     });
   });
@@ -5149,13 +5313,11 @@ async function loadConversation(partnerId, options = {}) {
     }
 
     dmMessages = data || [];
-    dmUnreadDividerMessageId =
-      dmMessages.find(
-        (message) =>
-          message.sender_id === partnerId &&
-          message.recipient_id === currentUser.id &&
-          !message.read_at
-      )?.id || "";
+    dmUnreadDividerMessageId = findDmFirstUnreadMessageId(
+      dmMessages,
+      partnerId,
+      currentUser.id
+    );
     renderDmReplyComposer();
     renderConversationMessages({
       forceBottom: !!options.forceBottom,
@@ -5204,9 +5366,11 @@ export async function refreshDmData(options = {}) {
     }
 
     const rows = messagesRes.data || [];
+    const baseMessageIds = buildDmBaseMessageIdSet(rows);
     const threadByPartner = new Map();
 
     rows.forEach((row) => {
+      if (isDmHiddenReactionMessage(row, baseMessageIds)) return;
       const partnerId = getPartnerId(row, currentUser.id);
       if (!partnerId) return;
       if (!threadByPartner.has(partnerId)) {

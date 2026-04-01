@@ -6619,6 +6619,26 @@
       color: #d2572e;
       background: #fff2eb;
     }
+    .dm-action-sheet-btn.is-danger {
+      border-color: #f2c9cb;
+      background: #fff6f6;
+      color: #7d2f36;
+    }
+    .dm-action-sheet-btn.is-danger:hover,
+    .dm-action-sheet-btn.is-danger:focus-visible {
+      border-color: #e8aab0;
+      background: #ffeded;
+    }
+    .dm-action-sheet-btn.is-danger .dm-action-sheet-btn-icon {
+      color: #bb4a57;
+      background: #ffe8ea;
+    }
+    .dm-action-sheet-btn.is-danger .dm-action-sheet-btn-label {
+      color: #7d2f36;
+    }
+    .dm-action-sheet-btn.is-danger .dm-action-sheet-btn-detail {
+      color: #b06a72;
+    }
     .dm-action-sheet-btn-copy {
       min-width: 0;
       display: flex;
