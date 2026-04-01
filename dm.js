@@ -1777,6 +1777,8 @@ function renderDmPresenceStrip() {
     button.type = "button";
     button.className = "dm-presence-item";
     button.setAttribute("data-dm-presence-partner", partnerId);
+    button.classList.toggle("is-online", presence.isOnline);
+    button.classList.toggle("is-recent", presence.kind === "recent");
     button.setAttribute(
       "aria-label",
       [identity.primary, presence.label].filter(Boolean).join(" · ")
