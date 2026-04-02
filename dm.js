@@ -72,6 +72,8 @@ let dmScrollPositionsByPartner = {};
 let dmInfoPanelOpen = false;
 let dmInfoTab = "overview";
 let dmEntryContext = null;
+let dmFloatingDateHideTimer = null;
+let dmFloatingDateDetachTimer = null;
 
 const DM_POLL_INTERVAL_MS = 12000;
 const DM_FETCH_LIMIT = 350;
@@ -115,6 +117,94 @@ function clearDmMessagePressTimer() {
   if (typeof window === "undefined" || !dmMessagePressTimer) return;
   window.clearTimeout(dmMessagePressTimer);
   dmMessagePressTimer = null;
+}
+
+function clearDmFloatingDateTimers() {
+  if (typeof window === "undefined") return;
+  if (dmFloatingDateHideTimer) {
+    window.clearTimeout(dmFloatingDateHideTimer);
+    dmFloatingDateHideTimer = null;
+  }
+  if (dmFloatingDateDetachTimer) {
+    window.clearTimeout(dmFloatingDateDetachTimer);
+    dmFloatingDateDetachTimer = null;
+  }
+}
+
+function hideDmFloatingDateChip(options = {}) {
+  const chip = $("dm-floating-date");
+  if (!chip) return;
+  clearDmFloatingDateTimers();
+  const immediate = !!options.immediate;
+  if (immediate) {
+    chip.classList.remove("is-visible");
+    chip.classList.add("hidden");
+    return;
+  }
+  chip.classList.remove("is-visible");
+  if (typeof window === "undefined") {
+    chip.classList.add("hidden");
+    return;
+  }
+  dmFloatingDateDetachTimer = window.setTimeout(() => {
+    if (!chip.classList.contains("is-visible")) {
+      chip.classList.add("hidden");
+    }
+    dmFloatingDateDetachTimer = null;
+  }, 180);
+}
+
+function getDmActiveDayDivider(list) {
+  if (!(list instanceof HTMLElement)) return null;
+  const dividers = Array.from(list.querySelectorAll(".dm-day-divider"));
+  if (!dividers.length) return null;
+  const anchor = list.scrollTop + 24;
+  let activeDivider = dividers[0];
+  dividers.forEach((divider) => {
+    if (!(divider instanceof HTMLElement)) return;
+    if (divider.offsetTop <= anchor) {
+      activeDivider = divider;
+    }
+  });
+  return activeDivider instanceof HTMLElement ? activeDivider : null;
+}
+
+function syncDmFloatingDateChip(options = {}) {
+  const chip = $("dm-floating-date");
+  const list = $("dm-message-list");
+  if (!(chip instanceof HTMLElement) || !(list instanceof HTMLElement)) return;
+  if (!dmActivePartnerId || !dmMessages.length) {
+    hideDmFloatingDateChip({ immediate: true });
+    return;
+  }
+  const activeDivider = getDmActiveDayDivider(list);
+  const nextText = `${activeDivider?.textContent || ""}`.trim();
+  if (!nextText) {
+    hideDmFloatingDateChip({ immediate: true });
+    return;
+  }
+  chip.textContent = nextText;
+  const firstDividerText = `${list.querySelector(".dm-day-divider")?.textContent || ""}`.trim();
+  const shouldStayHidden =
+    !options.forceShow &&
+    list.scrollTop < 18 &&
+    nextText === firstDividerText &&
+    !options.reveal;
+  if (shouldStayHidden) {
+    hideDmFloatingDateChip({ immediate: true });
+    return;
+  }
+  if (!options.reveal) return;
+  clearDmFloatingDateTimers();
+  chip.classList.remove("hidden");
+  requestAnimationFrame(() => {
+    chip.classList.add("is-visible");
+  });
+  if (typeof window !== "undefined") {
+    dmFloatingDateHideTimer = window.setTimeout(() => {
+      hideDmFloatingDateChip();
+    }, 920);
+  }
 }
 
 function closeDmInfoPanel() {
@@ -189,6 +279,7 @@ function getDmInfoFacts(profile, tr) {
 function clearDmState() {
   cleanupDmRealtimeChannel();
   closeDmActionSheet();
+  hideDmFloatingDateChip({ immediate: true });
   dmThreads = [];
   dmPartners = [];
   dmMessages = [];
@@ -1570,6 +1661,7 @@ function restoreDmConversationScroll(list, partnerId = dmActivePartnerId) {
     }
     saveDmConversationScroll(partnerId);
     syncDmJumpLatestButton();
+    syncDmFloatingDateChip();
   });
   return true;
 }
@@ -3373,6 +3465,7 @@ function selectDmPartner(partnerId, options = {}) {
     saveDmConversationScroll(dmActivePartnerId);
     persistDmDraft(dmActivePartnerId, { refreshList: true });
     dmUnreadDividerMessageId = "";
+    hideDmFloatingDateChip({ immediate: true });
     clearDmReplyTarget();
     dmReactionPickerMessageId = "";
     setDmMessageSearchOpen(false);
@@ -5192,6 +5285,7 @@ function renderConversationMessages(options = {}) {
     updateDmMessageSearchState();
     renderDmInfoPanel();
     syncDmJumpLatestButton();
+    hideDmFloatingDateChip({ immediate: true });
     return;
   }
 
@@ -5206,6 +5300,7 @@ function renderConversationMessages(options = {}) {
     updateDmMessageSearchState();
     renderDmInfoPanel();
     syncDmJumpLatestButton();
+    hideDmFloatingDateChip({ immediate: true });
     return;
   }
 
@@ -5277,9 +5372,12 @@ function renderConversationMessages(options = {}) {
         list.scrollTop = list.scrollHeight;
         saveDmConversationScroll(dmActivePartnerId);
         syncDmJumpLatestButton();
+        syncDmFloatingDateChip();
       });
     } else if (shouldRestoreScroll) {
       restoreDmConversationScroll(list, dmActivePartnerId);
+    } else {
+      syncDmFloatingDateChip();
     }
     dmRenderedMessagePartnerId = dmActivePartnerId;
     dmRenderedMessageKeys = nextMessageKeys;
@@ -5312,9 +5410,12 @@ function renderConversationMessages(options = {}) {
       list.scrollTop = list.scrollHeight;
       saveDmConversationScroll(dmActivePartnerId);
       syncDmJumpLatestButton();
+      syncDmFloatingDateChip();
     });
   } else if (shouldRestoreScroll) {
     restoreDmConversationScroll(list, dmActivePartnerId);
+  } else {
+    syncDmFloatingDateChip();
   }
   dmRenderedMessagePartnerId = dmActivePartnerId;
   dmRenderedMessageKeys = nextMessageKeys;
@@ -6053,6 +6154,7 @@ export function setupDmControls() {
       "scroll",
       () => {
         syncDmJumpLatestButton();
+        syncDmFloatingDateChip({ reveal: true });
       },
       { passive: true }
     );
