@@ -6051,12 +6051,48 @@ async function loadProfilePostCount() {
       return false;
     }
 
-    function createNotificationPreviewElement(note, post, previewText, tr) {
+    function createNotificationSideMediaElement(post, previewText, tr) {
+      if (!post) return null;
+      const media = document.createElement("div");
+      media.className = "notification-side-media";
+      if (post.media_url && post.media_type !== "video") {
+        const img = document.createElement("img");
+        img.src = post.media_url;
+        img.alt = previewText || tr.detailTitle || "Post";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+        media.appendChild(img);
+      } else {
+        media.classList.add("is-placeholder");
+        const mediaLabel = document.createElement("span");
+        mediaLabel.className = "notification-side-media-label";
+        mediaLabel.textContent = getNotificationPreviewKind(post, tr);
+        media.appendChild(mediaLabel);
+      }
+      return media;
+    }
+
+    function createNotificationPreviewElement(note, post, previewText, tr, options = {}) {
       if (!previewText && !post) return null;
+      const compact = !!options.compact;
       if (!post || note.type === "follow") {
         const preview = document.createElement("div");
-        preview.className = "notification-preview";
+        preview.className = `notification-preview${compact ? " notification-preview-inline" : ""}`;
         preview.textContent = previewText;
+        return preview;
+      }
+
+      if (compact) {
+        const preview = document.createElement("div");
+        preview.className = "notification-preview notification-preview-inline";
+        const kicker = document.createElement("span");
+        kicker.className = "notification-preview-inline-kicker";
+        kicker.textContent = getNotificationPreviewKind(post, tr);
+        const text = document.createElement("span");
+        text.className = "notification-preview-inline-text";
+        text.textContent = previewText;
+        preview.append(kicker, text);
         return preview;
       }
 
@@ -6170,6 +6206,25 @@ async function loadProfilePostCount() {
         const card = document.createElement("article");
         card.className = "notification-priority-card";
         card.setAttribute("data-notification-type", `${note.type || ""}`.trim());
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.setAttribute(
+          "aria-label",
+          note.type === "comment"
+            ? tr.notificationViewComments || "View comments"
+            : note.type === "follow"
+            ? tr.notificationViewProfile || "View profile"
+            : tr.notificationViewPost || "View post"
+        );
+        card.addEventListener("click", (event) => {
+          if (event.target.closest("button, a, input, textarea, select")) return;
+          openNotificationDestination(note, post, { readIds });
+        });
+        card.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          openNotificationDestination(note, post, { readIds });
+        });
 
         const top = document.createElement("div");
         top.className = "notification-priority-top";
@@ -6205,6 +6260,17 @@ async function loadProfilePostCount() {
         const meta = document.createElement("div");
         meta.className = "notification-priority-meta";
         meta.textContent = formatDateTimeDisplay(note.created_at || "");
+
+        const priorityPreview =
+          note.type !== "follow"
+            ? createNotificationPreviewElement(
+                note,
+                post,
+                getNotificationPreviewText(post, tr) || getNotificationActionText(note.type, tr),
+                tr,
+                { compact: true }
+              )
+            : null;
 
         const actions = document.createElement("div");
         actions.className = "notification-priority-actions";
@@ -6255,7 +6321,13 @@ async function loadProfilePostCount() {
           actions.appendChild(messageBtn);
         }
 
-        card.append(top, title, body, meta, actions);
+        if (priorityPreview) {
+          priorityPreview.classList.add("notification-priority-preview");
+        }
+
+        card.append(top, title, body);
+        if (priorityPreview) card.appendChild(priorityPreview);
+        card.append(meta, actions);
         rail.appendChild(card);
       });
     }
@@ -6520,8 +6592,19 @@ async function loadProfilePostCount() {
 
         copy.appendChild(titleRow);
 
+        const sideMedia =
+          note.type !== "follow"
+            ? createNotificationSideMediaElement(post, previewText, tr)
+            : null;
+        if (sideMedia) {
+          head.classList.add("has-side-media");
+          item.classList.add("has-side-media");
+        }
+
         if (previewText || post) {
-          const preview = createNotificationPreviewElement(note, post, previewText, tr);
+          const preview = createNotificationPreviewElement(note, post, previewText, tr, {
+            compact: !!sideMedia,
+          });
           if (preview) {
             copy.appendChild(preview);
           }
@@ -6550,6 +6633,7 @@ async function loadProfilePostCount() {
 
         head.appendChild(avatarEl);
         head.appendChild(copy);
+        if (sideMedia) head.appendChild(sideMedia);
 
         const actions = document.createElement("div");
         actions.className = "notification-item-actions";
