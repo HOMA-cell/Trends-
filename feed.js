@@ -256,6 +256,11 @@ const FEED_SEEN_POSTS_LIMIT = 2000;
 const FEED_CAPTION_TRIM_LIMIT = 140;
 const shortsVisibilityRatios = new Map();
 let shortsSoundEnabled = false;
+const shortsPlaybackCueTimers = new WeakMap();
+const shortsMediaTapTimers = new WeakMap();
+const shortsHoldStates = new WeakMap();
+const SHORTS_HOLD_PAUSE_DELAY_MS = 180;
+const SHORTS_HOLD_SUPPRESS_TAP_MS = 280;
 const FEED_CAPTION_TAG_LIMIT = 5;
 const ADS_SETTINGS_KEY = "trends_ads_config_v1";
 const ADSENSE_SCRIPT_BASE =
@@ -825,6 +830,212 @@ function getShortsButtonForCard(card, action) {
       if (!card || !action) return null;
       return card.querySelector(`button[data-post-action="${action}"]`);
     }
+function getShortsInteractiveSurface(card) {
+      return card?.querySelector?.(".shorts-media.is-interactive") || null;
+    }
+function getShortsPlaybackCue(card) {
+      return card?.querySelector?.(".shorts-center-cue") || null;
+    }
+function getShortsActiveProgressFill(card) {
+      return card?.querySelector?.(
+        ".shorts-progress-segment.is-active .shorts-progress-segment-fill"
+      ) || null;
+    }
+function updateShortsPlaybackProgress(card, videoEl = null) {
+      const fill = getShortsActiveProgressFill(card);
+      if (!fill) return;
+      const targetVideo = videoEl || getShortsVideoForCard(card);
+      if (
+        !targetVideo ||
+        !Number.isFinite(targetVideo.duration) ||
+        targetVideo.duration <= 0
+      ) {
+        fill.style.opacity = "0";
+        fill.style.transform = "scaleX(0)";
+        return;
+      }
+      const nextRatio = Math.max(
+        0,
+        Math.min(1, (targetVideo.currentTime || 0) / targetVideo.duration)
+      );
+      fill.style.opacity = "1";
+      fill.style.transform = `scaleX(${nextRatio.toFixed(4)})`;
+    }
+function triggerShortsCue(card, kind = "play") {
+      const cue = getShortsPlaybackCue(card);
+      if (!cue) return;
+      const icon = cue.querySelector(".shorts-center-cue-icon");
+      const label = cue.querySelector(".shorts-center-cue-label");
+      if (!icon || !label) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      let cueIcon = "▶";
+      let cueLabel = tr.shortsTapPlay || "Tap to play";
+      let tone = kind;
+      if (kind === "pause") {
+        cueIcon = "❚❚";
+        cueLabel = tr.shortsTapPause || "Tap to pause";
+      } else if (kind === "sound-on") {
+        cueIcon = "♪";
+        cueLabel = tr.shortsSoundOn || "Sound on";
+        tone = "sound";
+      } else if (kind === "sound-off") {
+        cueIcon = "🔇";
+        cueLabel = tr.shortsSoundOff || "Sound off";
+        tone = "sound";
+      } else if (kind === "like") {
+        cueIcon = "❤";
+        cueLabel = tr.like || "Like";
+        tone = "like";
+      }
+      cue.dataset.state = tone;
+      icon.textContent = cueIcon;
+      label.textContent = cueLabel;
+      cue.classList.remove("is-visible");
+      void cue.offsetWidth;
+      cue.classList.add("is-visible");
+      const prevTimer = shortsPlaybackCueTimers.get(card);
+      if (prevTimer) {
+        clearTimeout(prevTimer);
+      }
+      const timer = setTimeout(() => {
+        cue.classList.remove("is-visible");
+      }, 760);
+      shortsPlaybackCueTimers.set(card, timer);
+    }
+function clearShortsHoldState(card, { resume = false } = {}) {
+      if (!card) return;
+      const state = shortsHoldStates.get(card);
+      if (!state) return;
+      if (state.timer) {
+        clearTimeout(state.timer);
+      }
+      card.classList.remove("is-press-paused");
+      if (resume && state.holdActivated && state.wasPlaying && state.videoEl) {
+        hydrateDeferredVideo(state.videoEl);
+        const playPromise = state.videoEl.play?.();
+        if (playPromise?.catch) {
+          playPromise.catch(() => {
+            card.classList.add("is-paused");
+            syncShortsPlayButton(card, state.videoEl);
+          });
+        }
+      }
+      if (resume && state.holdActivated) {
+        card.dataset.shortsSuppressTapUntil = `${Date.now() + SHORTS_HOLD_SUPPRESS_TAP_MS}`;
+      }
+      shortsHoldStates.delete(card);
+      syncShortsPlayButton(card, state.videoEl);
+      updateShortsPlaybackProgress(card, state.videoEl);
+    }
+function bindShortsMediaInteractions(card, mediaWrap, videoEl, post) {
+      if (!card || !mediaWrap || !videoEl || !post) return;
+      mediaWrap.classList.add("is-interactive");
+      mediaWrap.tabIndex = 0;
+      mediaWrap.setAttribute("role", "button");
+      mediaWrap.setAttribute("aria-keyshortcuts", "Enter Space");
+      const queueTapToggle = () => {
+        const timer = shortsMediaTapTimers.get(card);
+        if (timer) {
+          clearTimeout(timer);
+        }
+        const nextTimer = setTimeout(() => {
+          shortsMediaTapTimers.delete(card);
+          toggleShortsPlayback(card, { showCue: true });
+        }, 190);
+        shortsMediaTapTimers.set(card, nextTimer);
+      };
+      mediaWrap.addEventListener("click", (event) => {
+        if (event.target?.closest?.("button, a, summary")) return;
+        const suppressUntil = Number(card.dataset.shortsSuppressTapUntil || 0);
+        if (suppressUntil > Date.now()) return;
+        if (`${card.getAttribute("data-post-id") || ""}` !== activeShortsPostId) return;
+        if (event.detail > 1) return;
+        queueTapToggle();
+      });
+      mediaWrap.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        const pending = shortsMediaTapTimers.get(card);
+        if (pending) {
+          clearTimeout(pending);
+          shortsMediaTapTimers.delete(card);
+        }
+        const currentUser = getCurrentUser();
+        if (!currentUser) return;
+        const likeState = getLikeUiState(post.id, getLikedPostIds());
+        if (likeState?.isLiked) {
+          triggerShortsCue(card, "like");
+          return;
+        }
+        toggleLikeForPost(post)
+          .then(() => {
+            triggerShortsCue(card, "like");
+          })
+          .catch((error) => {
+            console.error("shorts double tap like failed", error);
+          });
+      });
+      mediaWrap.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        toggleShortsPlayback(card, { showCue: true });
+      });
+      mediaWrap.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (`${card.getAttribute("data-post-id") || ""}` !== activeShortsPostId) return;
+        const pendingTap = shortsMediaTapTimers.get(card);
+        if (pendingTap) {
+          clearTimeout(pendingTap);
+          shortsMediaTapTimers.delete(card);
+        }
+        clearShortsHoldState(card);
+        const wasPlaying = !videoEl.paused;
+        const holdState = {
+          pointerId: event.pointerId,
+          videoEl,
+          wasPlaying,
+          holdActivated: false,
+          timer: setTimeout(() => {
+            if (!wasPlaying) return;
+            try {
+              videoEl.pause?.();
+            } catch {
+              // ignore pause errors
+            }
+            holdState.holdActivated = true;
+            card.classList.add("is-press-paused");
+            syncShortsPlayButton(card, videoEl);
+            updateShortsPlaybackProgress(card, videoEl);
+            triggerShortsCue(card, "pause");
+          }, SHORTS_HOLD_PAUSE_DELAY_MS),
+        };
+        shortsHoldStates.set(card, holdState);
+      });
+      const releaseHold = (event, { resume = true } = {}) => {
+        const state = shortsHoldStates.get(card);
+        if (!state) return;
+        if (
+          event?.pointerId !== undefined &&
+          state.pointerId !== undefined &&
+          state.pointerId !== event.pointerId
+        ) {
+          return;
+        }
+        clearShortsHoldState(card, { resume });
+      };
+      mediaWrap.addEventListener("pointerup", (event) => releaseHold(event, { resume: true }));
+      mediaWrap.addEventListener("pointercancel", (event) =>
+        releaseHold(event, { resume: false })
+      );
+      mediaWrap.addEventListener("pointerleave", (event) => {
+        const state = shortsHoldStates.get(card);
+        if (!state) return;
+        if (state.holdActivated) {
+          releaseHold(event, { resume: true });
+          return;
+        }
+        clearShortsHoldState(card, { resume: false });
+      });
+    }
 function syncShortsSoundButton(card) {
       const button = getShortsButtonForCard(card, "toggle-shorts-sound");
       if (!button) return;
@@ -843,27 +1054,53 @@ function syncShortsSoundButton(card) {
         : tr.shortsSoundOn || "Sound on";
     }
 function syncShortsPlayButton(card, videoEl = null) {
-      const button = getShortsButtonForCard(card, "toggle-shorts-play");
-      if (!button) return;
       const tr = t[getCurrentLang()] || t.ja;
       const targetVideo = videoEl || getShortsVideoForCard(card);
       const isPlaying = !!targetVideo && !targetVideo.paused;
-      button.classList.toggle("is-active", isPlaying);
-      button.textContent = isPlaying ? "❚❚" : "▶";
-      button.setAttribute(
-        "aria-label",
-        isPlaying
-          ? tr.shortsPause || "Pause short"
-          : tr.shortsPlay || "Play short"
-      );
-      button.title = isPlaying
-        ? tr.shortsTapPause || "Tap to pause"
-        : tr.shortsTapPlay || "Tap to play";
+      const button = getShortsButtonForCard(card, "toggle-shorts-play");
+      if (button) {
+        button.classList.toggle("is-active", isPlaying);
+        button.textContent = isPlaying ? "❚❚" : "▶";
+        button.setAttribute(
+          "aria-label",
+          isPlaying
+            ? tr.shortsPause || "Pause short"
+            : tr.shortsPlay || "Play short"
+        );
+        button.title = isPlaying
+          ? tr.shortsTapPause || "Tap to pause"
+          : tr.shortsTapPlay || "Tap to play";
+      }
+      const surface = getShortsInteractiveSurface(card);
+      if (surface) {
+        surface.setAttribute(
+          "aria-label",
+          isPlaying
+            ? tr.shortsTapPause || "Tap to pause"
+            : tr.shortsTapPlay || "Tap to play"
+        );
+        surface.setAttribute(
+          "title",
+          isPlaying
+            ? tr.shortsTapPause || "Tap to pause"
+            : tr.shortsTapPlay || "Tap to play"
+        );
+      }
+      updateShortsPlaybackProgress(card, targetVideo);
     }
 function syncShortsCardVideo(card, { shouldPlay = false } = {}) {
       if (!card) return;
+      const pendingTap = shortsMediaTapTimers.get(card);
+      if (pendingTap) {
+        clearTimeout(pendingTap);
+        shortsMediaTapTimers.delete(card);
+      }
+      clearShortsHoldState(card);
       const videoEl = getShortsVideoForCard(card);
-      if (!videoEl) return;
+      if (!videoEl) {
+        updateShortsPlaybackProgress(card, null);
+        return;
+      }
       videoEl.muted = !shortsSoundEnabled;
       videoEl.defaultMuted = !shortsSoundEnabled;
       card.classList.toggle("is-muted", !shortsSoundEnabled);
@@ -980,6 +1217,13 @@ function toggleShortsSoundPreference() {
       shortsSoundEnabled = !shortsSoundEnabled;
       persistShortsSoundPreference();
       syncAllShortsCards();
+      const activeCard =
+        shortsObserverRoot?.querySelector?.(
+          `.shorts-card[data-post-id="${activeShortsPostId || ""}"]`
+        ) || shortsObserverRoot?.querySelector?.(".shorts-card.is-active");
+      if (activeCard) {
+        triggerShortsCue(activeCard, shortsSoundEnabled ? "sound-on" : "sound-off");
+      }
       const tr = t[getCurrentLang()] || t.ja;
       showToast(
         shortsSoundEnabled
@@ -988,11 +1232,13 @@ function toggleShortsSoundPreference() {
         "info"
       );
     }
-function toggleShortsPlayback(card) {
+function toggleShortsPlayback(card, { showCue = false } = {}) {
       const videoEl = getShortsVideoForCard(card);
       if (!videoEl) return;
       hydrateDeferredVideo(videoEl);
+      let nextCue = "pause";
       if (videoEl.paused) {
+        nextCue = "play";
         const playPromise = videoEl.play?.();
         if (playPromise?.catch) {
           playPromise.catch(() => {
@@ -1009,6 +1255,9 @@ function toggleShortsPlayback(card) {
       }
       card.classList.toggle("is-paused", !!videoEl.paused);
       syncShortsPlayButton(card, videoEl);
+      if (showCue) {
+        triggerShortsCue(card, nextCue);
+      }
     }
 function ensureFeedMoreObserver() {
       if (feedMoreObserver) {
@@ -2899,7 +3148,7 @@ function setupFeedCardActionDelegation() {
           return;
         }
         if (action === "toggle-shorts-play") {
-          toggleShortsPlayback(card);
+          toggleShortsPlayback(card, { showCue: true });
           return;
         }
         if (action === "toggle-save") {
@@ -5719,6 +5968,9 @@ export function renderFeed(options = {}) {
           segment.classList.add("is-complete");
         } else if (absoluteIndex === progressIndex) {
           segment.classList.add("is-active");
+          const liveFill = document.createElement("span");
+          liveFill.className = "shorts-progress-segment-fill";
+          segment.appendChild(liveFill);
         }
         progressRail.appendChild(segment);
       }
@@ -5816,6 +6068,19 @@ export function renderFeed(options = {}) {
       }
       topBar.appendChild(topBadges);
       overlay.appendChild(topBar);
+      if (isVideoMedia) {
+        const playbackCue = document.createElement("div");
+        playbackCue.className = "shorts-center-cue";
+        playbackCue.setAttribute("aria-hidden", "true");
+        const playbackCueIcon = document.createElement("span");
+        playbackCueIcon.className = "shorts-center-cue-icon";
+        playbackCueIcon.textContent = "▶";
+        const playbackCueLabel = document.createElement("span");
+        playbackCueLabel.className = "shorts-center-cue-label";
+        playbackCueLabel.textContent = tr.shortsTapPlay || "Tap to play";
+        playbackCue.append(playbackCueIcon, playbackCueLabel);
+        card.appendChild(playbackCue);
+      }
       content.appendChild(meta);
 
       const captionText = `${post.note || post.caption || ""}`.trim();
@@ -5937,10 +6202,25 @@ export function renderFeed(options = {}) {
       card.appendChild(overlay);
 
       if (shortsVideoEl) {
+        shortsVideoEl.addEventListener("loadedmetadata", () => {
+          updateShortsPlaybackProgress(card, shortsVideoEl);
+        });
+        shortsVideoEl.addEventListener("durationchange", () => {
+          updateShortsPlaybackProgress(card, shortsVideoEl);
+        });
+        shortsVideoEl.addEventListener("timeupdate", () => {
+          updateShortsPlaybackProgress(card, shortsVideoEl);
+        });
+        shortsVideoEl.addEventListener("seeked", () => {
+          updateShortsPlaybackProgress(card, shortsVideoEl);
+        });
         card.classList.toggle("is-muted", shortsVideoEl.muted);
         card.classList.add("is-paused");
         syncShortsPlayButton(card, shortsVideoEl);
         syncShortsSoundButton(card);
+        bindShortsMediaInteractions(card, mediaWrap, shortsVideoEl, post);
+      } else {
+        updateShortsPlaybackProgress(card, null);
       }
 
       observeSeenPostCard(card, isSeen);
