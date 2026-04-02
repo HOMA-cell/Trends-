@@ -6083,44 +6083,62 @@
     .dm-message-tools {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       opacity: 0.92;
     }
     .dm-message-row.is-self .dm-message-tools {
       justify-content: flex-end;
     }
     .dm-message-tool {
-      min-height: 24px;
-      padding: 0 9px;
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      min-height: 28px;
+      padding: 0;
       border-radius: 999px;
       border: 1px solid #ece2d6;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.94);
       color: #766d62;
-      font-size: 9.5px;
+      font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+      transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease,
+        transform 0.16s ease, box-shadow 0.16s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
     }
     .dm-message-tool:hover,
     .dm-message-tool:focus-visible {
       border-color: #efcbb7;
       background: #fff5ee;
       color: #d25a31;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09);
       outline: none;
     }
     .dm-message-tool.is-icon {
-      min-width: 24px;
-      padding-inline: 7px;
-      font-size: 12px;
-      line-height: 1;
+      padding-inline: 0;
     }
     .dm-message-tool.is-active {
       border-color: #ffc8d8;
       background: #fff1f6;
       color: #d14971;
     }
+    .dm-message-tool.is-heart {
+      color: #c55f7e;
+      background: #fff8fb;
+      border-color: #f2d8e3;
+    }
+    .dm-message-tool.is-heart.is-active {
+      color: #d14971;
+      background: #fff0f5;
+      border-color: #ffc8d8;
+    }
     .dm-message-tool[data-dm-message-more] {
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.08em;
       color: #8c8176;
@@ -6613,6 +6631,49 @@
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+    }
+    .dm-action-sheet-reactions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0 4px;
+    }
+    .dm-action-sheet-reactions-label {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #98897b;
+    }
+    .dm-action-sheet-reactions-list {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .dm-action-sheet-reaction-btn {
+      min-height: 46px;
+      border-radius: 16px;
+      border: 1px solid #ece1d4;
+      background: #fffaf5;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      transition: border-color 0.16s ease, background-color 0.16s ease,
+        transform 0.16s ease, box-shadow 0.16s ease;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+    }
+    .dm-action-sheet-reaction-btn:hover,
+    .dm-action-sheet-reaction-btn:focus-visible {
+      border-color: #efc9b5;
+      background: #fff4ed;
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+      outline: none;
+    }
+    .dm-action-sheet-reaction-btn.is-active {
+      border-color: #ffc8d8;
+      background: #fff0f5;
+      box-shadow: inset 0 0 0 1px rgba(209, 73, 113, 0.1);
     }
     .dm-action-sheet-actions {
       display: flex;
@@ -7812,13 +7873,14 @@
         gap: 5px;
       }
       .dm-message-tool {
-        min-height: 22px;
-        padding-inline: 8px;
-        font-size: 9px;
+        width: 26px;
+        height: 26px;
+        min-width: 26px;
+        min-height: 26px;
+        font-size: 13px;
       }
       .dm-message-tool.is-icon {
-        min-width: 22px;
-        padding-inline: 6px;
+        padding-inline: 0;
       }
       .dm-message-tool[data-dm-message-more] {
         font-size: 14px;
@@ -7923,6 +7985,14 @@
       }
       .dm-action-sheet-actions {
         gap: 8px;
+      }
+      .dm-action-sheet-reactions-list {
+        gap: 6px;
+      }
+      .dm-action-sheet-reaction-btn {
+        min-height: 42px;
+        border-radius: 14px;
+        font-size: 20px;
       }
       .dm-action-sheet-group.is-primary {
         gap: 6px;

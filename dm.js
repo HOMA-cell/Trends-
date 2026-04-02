@@ -2553,14 +2553,6 @@ function hasDmReactionFromCurrentUser(messageId, emoji = DM_QUICK_LIKE_EMOJI) {
   });
 }
 
-function toggleDmReactionPicker(messageId) {
-  const targetId = `${messageId || ""}`.trim();
-  if (!targetId) return;
-  dmReactionPickerMessageId =
-    dmReactionPickerMessageId === targetId ? "" : targetId;
-  renderConversationMessages({ forceFull: true });
-}
-
 function renderEmptyConversationState(list, activePartner, tr) {
   list.innerHTML = "";
   const empty = document.createElement("div");
@@ -4754,6 +4746,39 @@ function openDmActionSheet(messageId) {
   }
   hero.classList.toggle("hidden", !heroCard);
   actions.replaceChildren();
+  const reactionTray = document.createElement("div");
+  reactionTray.className = "dm-action-sheet-reactions";
+  const reactionTrayLabel = document.createElement("div");
+  reactionTrayLabel.className = "dm-action-sheet-reactions-label";
+  reactionTrayLabel.textContent = tr.dmQuickReactions || tr.dmReactAction || "Quick reactions";
+  reactionTray.appendChild(reactionTrayLabel);
+  const reactionTrayList = document.createElement("div");
+  reactionTrayList.className = "dm-action-sheet-reactions-list";
+  ["❤️", "🔥", "💪", "👏"].forEach((emoji) => {
+    const emojiButton = document.createElement("button");
+    emojiButton.type = "button";
+    emojiButton.className = "dm-action-sheet-reaction-btn";
+    emojiButton.textContent = emoji;
+    emojiButton.classList.toggle(
+      "is-active",
+      hasDmReactionFromCurrentUser(message.id, emoji)
+    );
+    emojiButton.setAttribute(
+      "aria-label",
+      (tr.dmReactWith || "React with {emoji}").replace("{emoji}", emoji)
+    );
+    emojiButton.addEventListener("click", async () => {
+      closeDmActionSheet();
+      if (hasDmReactionFromCurrentUser(message.id, emoji)) {
+        showToast(tr.dmReactionExists || "Already reacted.", "info");
+        return;
+      }
+      await sendDmQuickReaction(message.id, emoji);
+    });
+    reactionTrayList.appendChild(emojiButton);
+  });
+  reactionTray.appendChild(reactionTrayList);
+  actions.appendChild(reactionTray);
   const primaryGroup = document.createElement("div");
   primaryGroup.className = "dm-action-sheet-group is-primary";
   const secondaryGroup = document.createElement("div");
@@ -4798,18 +4823,6 @@ function openDmActionSheet(messageId) {
   addAction("reply", tr.dmReplyAction || "Reply", async () => {
     setDmReplyTarget(message.id);
   }, { group: "primary", icon: "↩" });
-
-  addAction("react", tr.dmReactAction || "React", async () => {
-    dmReactionPickerMessageId = `${message.id || ""}`.trim();
-    renderConversationMessages({ forceFull: true });
-    scrollToDmMessage(message.id, { block: "nearest" });
-  }, { group: "primary", icon: "✦" });
-
-  if (!hasDmReactionFromCurrentUser(message.id, DM_QUICK_LIKE_EMOJI)) {
-    addAction("like", tr.dmQuickLike || "Like", async () => {
-      await sendDmQuickReaction(message.id, DM_QUICK_LIKE_EMOJI);
-    }, { group: "primary", icon: "♥" });
-  }
 
   addAction(
     "pin",
@@ -5125,42 +5138,14 @@ function appendDmMessageNodes({
     const tools = document.createElement("div");
     tools.className = "dm-message-tools";
 
-    const replyBtn = document.createElement("button");
-    replyBtn.type = "button";
-    replyBtn.className = "dm-message-tool";
-    replyBtn.setAttribute("aria-label", tr.dmReplyAction || "Reply");
-    replyBtn.textContent = tr.dmReplyAction || "Reply";
-    replyBtn.addEventListener("click", () => {
-      if (!message?.id) return;
-      setDmReplyTarget(message.id);
-      dmReactionPickerMessageId = "";
-    });
-    tools.appendChild(replyBtn);
-
-    const reactBtn = document.createElement("button");
-    reactBtn.type = "button";
-    reactBtn.className = "dm-message-tool is-icon";
-    reactBtn.setAttribute("aria-label", tr.dmReactAction || "React");
-    reactBtn.setAttribute("title", tr.dmReactAction || "React");
-    reactBtn.classList.toggle(
-      "is-active",
-      dmReactionPickerMessageId === `${message?.id || ""}`.trim()
-    );
-    reactBtn.textContent = "＋";
-    reactBtn.addEventListener("click", () => {
-      if (!message?.id) return;
-      toggleDmReactionPicker(message.id);
-    });
-    tools.appendChild(reactBtn);
-
     const likeBtn = document.createElement("button");
     likeBtn.type = "button";
-    likeBtn.className = "dm-message-tool is-icon";
+    likeBtn.className = "dm-message-tool is-icon is-heart";
     likeBtn.setAttribute("aria-label", tr.dmQuickLike || "Like");
     likeBtn.setAttribute("title", tr.dmQuickLike || "Like");
     const likedByMe = hasDmReactionFromCurrentUser(message?.id, DM_QUICK_LIKE_EMOJI);
     likeBtn.classList.toggle("is-active", likedByMe);
-    likeBtn.textContent = DM_QUICK_LIKE_EMOJI;
+    likeBtn.textContent = likedByMe ? "♥" : "♡";
     likeBtn.addEventListener("click", async () => {
       if (!message?.id) return;
       if (hasDmReactionFromCurrentUser(message.id, DM_QUICK_LIKE_EMOJI)) {
@@ -5181,35 +5166,6 @@ function appendDmMessageNodes({
     tools.appendChild(moreBtn);
 
     stack.appendChild(tools);
-
-    if (dmReactionPickerMessageId === `${message?.id || ""}`.trim()) {
-      const picker = document.createElement("div");
-      picker.className = "dm-reaction-picker";
-      ["❤️", "🔥", "💪", "👏"].forEach((emoji) => {
-        const emojiBtn = document.createElement("button");
-        emojiBtn.type = "button";
-        emojiBtn.className = "dm-reaction-picker-btn";
-        emojiBtn.textContent = emoji;
-        emojiBtn.classList.toggle(
-          "is-active",
-          hasDmReactionFromCurrentUser(message.id, emoji)
-        );
-        emojiBtn.setAttribute(
-          "aria-label",
-          (tr.dmReactWith || "React with {emoji}").replace("{emoji}", emoji)
-        );
-        emojiBtn.addEventListener("click", async () => {
-          if (!message?.id) return;
-          if (hasDmReactionFromCurrentUser(message.id, emoji)) {
-            showToast(tr.dmReactionExists || "Already reacted.", "info");
-            return;
-          }
-          await sendDmQuickReaction(message.id, emoji);
-        });
-        picker.appendChild(emojiBtn);
-      });
-      stack.appendChild(picker);
-    }
   }
 
   const meta = document.createElement("div");
