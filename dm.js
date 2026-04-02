@@ -591,6 +591,26 @@ function findDmFirstUnreadMessageId(
   );
 }
 
+function getDmUnreadIncomingMessages(
+  messages = [],
+  partnerId = "",
+  currentUserId = "",
+  baseMessageIds = buildDmBaseMessageIdSet(messages)
+) {
+  const targetPartnerId = `${partnerId || ""}`.trim();
+  const viewerId = `${currentUserId || ""}`.trim();
+  if (!targetPartnerId || !viewerId) return [];
+  return (messages || []).filter((message) => {
+    if (!message || message.pending) return false;
+    if (isDmHiddenReactionMessage(message, baseMessageIds)) return false;
+    return (
+      `${message.sender_id || ""}`.trim() === targetPartnerId &&
+      `${message.recipient_id || ""}`.trim() === viewerId &&
+      !message.read_at
+    );
+  });
+}
+
 function getDmMessageSnippet(message, tr = getDmTranslations()) {
   const reactionPayload = parseDmReactionMessage(message);
   if (reactionPayload) {
@@ -1402,12 +1422,73 @@ function syncDmJumpLatestButton() {
   const latestButton = $("btn-dm-jump-latest");
   const unreadButton = $("btn-dm-jump-unread");
   if (!list) return;
+  const tr = getDmTranslations();
+  const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
+  const baseMessageIds = buildDmBaseMessageIdSet(dmMessages);
+  const unreadMessages = getDmUnreadIncomingMessages(
+    dmMessages,
+    dmActivePartnerId,
+    currentUserId,
+    baseMessageIds
+  );
+  const lastVisibleMessage = [...dmMessages]
+    .slice()
+    .reverse()
+    .find((message) => !isDmHiddenReactionMessage(message, baseMessageIds) && !message.pending);
+  const lastUnreadMessage = unreadMessages[unreadMessages.length - 1] || null;
+  const setJumpButtonContent = (button, payload = {}) => {
+    if (!(button instanceof HTMLButtonElement)) return;
+    const eyebrow = `${payload.eyebrow || ""}`.trim();
+    const label = `${payload.label || ""}`.trim();
+    const badgeValue = Number(payload.badge || 0);
+    button.textContent = "";
+    if (eyebrow) {
+      const eyebrowEl = document.createElement("span");
+      eyebrowEl.className = "dm-jump-copy-eyebrow";
+      eyebrowEl.textContent = eyebrow;
+      button.appendChild(eyebrowEl);
+    }
+    const row = document.createElement("span");
+    row.className = "dm-jump-copy-main";
+    const labelEl = document.createElement("span");
+    labelEl.className = "dm-jump-copy-label";
+    labelEl.textContent = label || (payload.fallbackLabel || "");
+    row.appendChild(labelEl);
+    if (badgeValue > 0) {
+      const badgeEl = document.createElement("span");
+      badgeEl.className = "dm-jump-copy-badge";
+      badgeEl.textContent = `${badgeValue}`;
+      row.appendChild(badgeEl);
+    }
+    button.appendChild(row);
+  };
   if (latestButton) {
     const shouldShowLatest =
       !!dmActivePartnerId &&
       dmMessages.length > 0 &&
       !isNearBottom(list, 96);
     latestButton.classList.toggle("hidden", !shouldShowLatest);
+    latestButton.classList.toggle("has-unread", unreadMessages.length > 0);
+    if (shouldShowLatest) {
+      const latestSnippet =
+        getDmMessageSnippet(lastUnreadMessage || lastVisibleMessage, tr) ||
+        (tr.dmJumpLatest || "Jump to latest");
+      setJumpButtonContent(latestButton, {
+        eyebrow:
+          unreadMessages.length > 0
+            ? tr.dmNewMessages || "New messages"
+            : tr.dmJumpLatest || "Jump to latest",
+        label: latestSnippet,
+        badge: unreadMessages.length,
+        fallbackLabel: tr.dmJumpLatest || "Jump to latest",
+      });
+      latestButton.setAttribute(
+        "aria-label",
+        unreadMessages.length > 0
+          ? `${tr.dmNewMessages || "New messages"} ${unreadMessages.length}`
+          : tr.dmJumpLatest || "Jump to latest"
+      );
+    }
   }
   if (unreadButton) {
     const unreadDivider = list.querySelector(".dm-unread-divider");
@@ -1417,6 +1498,20 @@ function syncDmJumpLatestButton() {
       unreadDivider instanceof HTMLElement &&
       !isElementMostlyVisibleInContainer(list, unreadDivider, 0.92);
     unreadButton.classList.toggle("hidden", !shouldShowUnread);
+    if (shouldShowUnread) {
+      setJumpButtonContent(unreadButton, {
+        eyebrow: tr.dmUnreadDivider || "Unread messages",
+        label: getDmMessageSnippet(unreadMessages[0], tr) || (tr.dmJumpUnread || "Jump to unread"),
+        badge: unreadMessages.length,
+        fallbackLabel: tr.dmJumpUnread || "Jump to unread",
+      });
+      unreadButton.setAttribute(
+        "aria-label",
+        unreadMessages.length > 0
+          ? `${tr.dmJumpUnread || "Jump to unread"} ${unreadMessages.length}`
+          : tr.dmJumpUnread || "Jump to unread"
+      );
+    }
   }
 }
 

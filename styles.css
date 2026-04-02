@@ -5893,26 +5893,41 @@
       position: absolute;
       right: 14px;
       bottom: 14px;
-      min-height: 34px;
-      padding-inline: 12px;
-      border-radius: 999px;
+      min-height: 42px;
+      min-width: 124px;
+      padding: 9px 14px 10px;
+      border-radius: 18px;
       box-shadow: 0 12px 24px rgba(239, 91, 42, 0.22);
       font-size: 10px;
       z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      text-align: left;
     }
     .dm-jump-unread {
       position: absolute;
       left: 14px;
       bottom: 14px;
-      min-height: 34px;
-      padding-inline: 12px;
-      border-radius: 999px;
+      min-height: 42px;
+      min-width: 124px;
+      padding: 9px 14px 10px;
+      border-radius: 18px;
       border: 1px solid #eddccf;
       background: rgba(255, 255, 255, 0.96);
       color: #6f675c;
       box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
       font-size: 10px;
       z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      text-align: left;
+    }
+    .dm-jump-latest.has-unread {
+      box-shadow: 0 14px 28px rgba(239, 91, 42, 0.28);
     }
     .dm-jump-unread:hover,
     .dm-jump-unread:focus-visible {
@@ -5920,6 +5935,46 @@
       border-color: #efcdb9;
       color: #d05b31;
       outline: none;
+    }
+    .dm-jump-copy-eyebrow {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      opacity: 0.74;
+      white-space: nowrap;
+    }
+    .dm-jump-copy-main {
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dm-jump-copy-label {
+      min-width: 0;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-jump-copy-badge {
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.22);
+      color: currentColor;
+      font-size: 10px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .dm-jump-unread .dm-jump-copy-badge {
+      background: #f3e5d7;
+      color: #b8562e;
     }
     .dm-message-share-card {
       width: 100%;
@@ -7694,15 +7749,28 @@
       .dm-jump-latest {
         right: 12px;
         bottom: 12px;
-        min-height: 32px;
-        padding-inline: 11px;
+        min-height: 36px;
+        min-width: 108px;
+        padding: 8px 11px;
         font-size: 9px;
       }
       .dm-jump-unread {
         left: 12px;
         bottom: 12px;
-        min-height: 32px;
-        padding-inline: 11px;
+        min-height: 36px;
+        min-width: 108px;
+        padding: 8px 11px;
+        font-size: 9px;
+      }
+      .dm-jump-copy-eyebrow {
+        font-size: 8px;
+      }
+      .dm-jump-copy-label {
+        font-size: 10px;
+      }
+      .dm-jump-copy-badge {
+        min-width: 16px;
+        height: 16px;
         font-size: 9px;
       }
       .dm-message-tools {
