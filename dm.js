@@ -6679,14 +6679,6 @@ export function setupDmControls() {
         }
         return;
       }
-      if (
-        dmReactionPickerMessageId &&
-        !event.target.closest(".dm-reaction-picker") &&
-        !event.target.closest(".dm-message-tool")
-      ) {
-        dmReactionPickerMessageId = "";
-        renderConversationMessages({ forceFull: true });
-      }
       const promptButton = event.target.closest("[data-dm-empty-prompt]");
       if (promptButton) {
         const prompt = `${promptButton.getAttribute("data-dm-empty-prompt") || ""}`.trim();
