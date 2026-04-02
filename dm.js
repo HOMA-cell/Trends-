@@ -71,6 +71,7 @@ let dmMessageSearchActiveIndex = -1;
 let dmScrollPositionsByPartner = {};
 let dmInfoPanelOpen = false;
 let dmInfoTab = "overview";
+let dmInfoSharedFilter = "all";
 let dmEntryContext = null;
 let dmFloatingDateHideTimer = null;
 let dmFloatingDateDetachTimer = null;
@@ -319,6 +320,7 @@ function clearDmState() {
   dmScrollPositionsByPartner = {};
   dmInfoPanelOpen = false;
   dmInfoTab = "overview";
+  dmInfoSharedFilter = "all";
   dmEntryContext = null;
   clearDmMessagePressTimer();
   clearDmMediaSelection();
@@ -4013,6 +4015,17 @@ function setDmInfoTab(nextTab = "overview") {
       ? `${nextTab || ""}`.trim()
       : "overview";
   dmInfoTab = normalized;
+  if (dmInfoTab !== "shared") {
+    dmInfoSharedFilter = "all";
+  }
+}
+
+function setDmInfoSharedFilter(nextFilter = "all") {
+  const normalized =
+    ["all", "posts", "links"].includes(`${nextFilter || ""}`.trim())
+      ? `${nextFilter || ""}`.trim()
+      : "all";
+  dmInfoSharedFilter = normalized;
 }
 
 function syncDmInfoTabs() {
@@ -4030,9 +4043,21 @@ function syncDmInfoTabs() {
   sections.forEach((section) => {
     if (!(section instanceof HTMLElement)) return;
     const sectionTab = `${section.getAttribute("data-dm-info-section") || "overview"}`.trim();
-    const isVisible = sectionTab === dmInfoTab;
+    let isVisible = sectionTab === dmInfoTab;
+    if (isVisible && sectionTab === "shared") {
+      const sharedKind = `${section.getAttribute("data-dm-info-shared-kind") || "all"}`.trim();
+      isVisible = dmInfoSharedFilter === "all" || dmInfoSharedFilter === sharedKind;
+    }
     section.classList.toggle("hidden", !isVisible);
     section.setAttribute("aria-hidden", isVisible ? "false" : "true");
+  });
+  const sharedFilters = document.querySelectorAll("[data-dm-info-shared-filter]");
+  sharedFilters.forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) return;
+    const filter = `${button.getAttribute("data-dm-info-shared-filter") || ""}`.trim();
+    const isActive = dmInfoSharedFilter === filter;
+    button.classList.toggle("chip-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
 }
 
@@ -4146,6 +4171,10 @@ function renderDmInfoPanel() {
   const tabOverview = $("dm-info-tab-overview");
   const tabMedia = $("dm-info-tab-media");
   const tabShared = $("dm-info-tab-shared");
+  const sharedFilters = $("dm-info-shared-filters");
+  const sharedFilterAll = $("dm-info-shared-filter-all");
+  const sharedFilterPosts = $("dm-info-shared-filter-posts");
+  const sharedFilterLinks = $("dm-info-shared-filter-links");
   const stats = $("dm-info-stats");
   const profileTitle = $("dm-info-profile-title");
   const profileMeta = $("dm-info-profile-meta");
@@ -4183,6 +4212,10 @@ function renderDmInfoPanel() {
     !tabOverview ||
     !tabMedia ||
     !tabShared ||
+    !sharedFilters ||
+    !sharedFilterAll ||
+    !sharedFilterPosts ||
+    !sharedFilterLinks ||
     !stats ||
     !profileTitle ||
     !profileMeta ||
@@ -4277,6 +4310,17 @@ function renderDmInfoPanel() {
   tabShared.textContent = shareCount
     ? `${tr.dmInfoTabShared || "Shared"} ${shareCount}`
     : tr.dmInfoTabShared || "Shared";
+  sharedFilterAll.textContent = shareCount
+    ? `${tr.dmInfoSharedAll || "All"} ${shareCount}`
+    : tr.dmInfoSharedAll || "All";
+  sharedFilterPosts.textContent = sharedPosts.length
+    ? `${tr.dmInfoSharedPosts || "Posts"} ${sharedPosts.length}`
+    : tr.dmInfoSharedPosts || "Posts";
+  sharedFilterLinks.textContent = sharedLinks.length
+    ? `${tr.dmInfoSharedLinks || "Links"} ${sharedLinks.length}`
+    : tr.dmInfoSharedLinks || "Links";
+  sharedFilters.classList.toggle("hidden", dmInfoTab !== "shared");
+  sharedFilters.setAttribute("aria-hidden", dmInfoTab === "shared" ? "false" : "true");
 
   const highlightCards = [];
   if (pinnedMessage) {
@@ -6459,6 +6503,18 @@ export function setupDmControls() {
       if (!(button instanceof HTMLButtonElement)) return;
       const nextTab = `${button.getAttribute("data-dm-info-tab") || "overview"}`.trim();
       setDmInfoTab(nextTab);
+      renderDmInfoPanel();
+    });
+  }
+
+  const infoSharedFilters = $("dm-info-shared-filters");
+  if (infoSharedFilters && infoSharedFilters.dataset.bound !== "true") {
+    infoSharedFilters.dataset.bound = "true";
+    infoSharedFilters.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-dm-info-shared-filter]");
+      if (!(button instanceof HTMLButtonElement)) return;
+      const nextFilter = `${button.getAttribute("data-dm-info-shared-filter") || "all"}`.trim();
+      setDmInfoSharedFilter(nextFilter);
       renderDmInfoPanel();
     });
   }

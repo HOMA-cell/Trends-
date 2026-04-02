@@ -7158,6 +7158,35 @@
       background: #fff4ed;
       color: #cf592f;
     }
+    .dm-info-subfilters {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 2px 0 0;
+      scrollbar-width: none;
+    }
+    .dm-info-subfilters::-webkit-scrollbar {
+      display: none;
+    }
+    .dm-info-subfilters .chip {
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid #efe4d8;
+      background: #fcfaf7;
+      color: #8a7f73;
+      font-size: 9px;
+      font-weight: 800;
+      white-space: nowrap;
+      flex-shrink: 0;
+      box-shadow: none;
+    }
+    .dm-info-subfilters .chip-active {
+      border-color: #f0c8b4;
+      background: #fff4ed;
+      color: #cf592f;
+    }
     .dm-info-stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -8130,6 +8159,14 @@
         min-height: 28px;
         padding-inline: 10px;
         font-size: 9.5px;
+      }
+      .dm-info-subfilters {
+        gap: 5px;
+      }
+      .dm-info-subfilters .chip {
+        min-height: 26px;
+        padding-inline: 9px;
+        font-size: 8.5px;
       }
       .dm-info-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
