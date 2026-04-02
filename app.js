@@ -2155,6 +2155,7 @@ async function loadProfilePostCount() {
       },
       openMediaViewer: (url, type = "image", options = {}) =>
         openMediaModal(url, type, options),
+      updateNavigationBadges: (badges = {}) => updateNavigationBadges(badges),
     });
 
 
@@ -2219,6 +2220,68 @@ async function loadProfilePostCount() {
 
 
 
+    const navigationBadgeState = {
+      dmUnread: 0,
+      notificationUnread: 0,
+    };
+
+    function formatNavigationBadgeCount(count) {
+      const safeCount = Math.max(0, Number(count) || 0);
+      if (safeCount <= 0) return "";
+      return safeCount > 99 ? "99+" : `${safeCount}`;
+    }
+
+    function syncNavigationBadge(id, count, label) {
+      const badge = $(id);
+      if (!badge) return;
+      const safeCount = Math.max(0, Number(count) || 0);
+      if (safeCount <= 0) {
+        badge.classList.add("hidden");
+        badge.textContent = "";
+        badge.removeAttribute("aria-label");
+        return;
+      }
+      badge.classList.remove("hidden");
+      badge.textContent = formatNavigationBadgeCount(safeCount);
+      badge.setAttribute(
+        "aria-label",
+        `${label || "Unread"} ${safeCount}`
+      );
+    }
+
+    function updateNavigationBadges(next = {}) {
+      navigationBadgeState.dmUnread =
+        next.dmUnread !== undefined
+          ? Math.max(0, Number(next.dmUnread) || 0)
+          : navigationBadgeState.dmUnread;
+      navigationBadgeState.notificationUnread =
+        next.notificationUnread !== undefined
+          ? Math.max(0, Number(next.notificationUnread) || 0)
+          : navigationBadgeState.notificationUnread;
+
+      const tr = t[currentLang] || t.ja;
+      syncNavigationBadge(
+        "nav-messages-badge",
+        navigationBadgeState.dmUnread,
+        tr.navMessages || "DM"
+      );
+      syncNavigationBadge(
+        "mini-nav-messages-badge",
+        navigationBadgeState.dmUnread,
+        tr.navMessages || "DM"
+      );
+      syncNavigationBadge(
+        "nav-account-badge",
+        navigationBadgeState.notificationUnread,
+        tr.navAccount || "Account"
+      );
+      syncNavigationBadge(
+        "mini-nav-account-badge",
+        navigationBadgeState.notificationUnread,
+        tr.navAccount || "Account"
+      );
+    }
+
     function applyTranslations() {
       const tr = t[currentLang] || t.ja;
 
@@ -2242,15 +2305,15 @@ async function loadProfilePostCount() {
       setText("app-sub", "appSub");
       setText("btn-open-post", "newPost");
       setText("mini-header-title", "appTitle");
-      setText("nav-feed", "navFeed");
-      setText("nav-messages", "navMessages");
-      setText("nav-account", "navAccount");
+      setText("nav-feed-label", "navFeed");
+      setText("nav-messages-label", "navMessages");
+      setText("nav-account-label", "navAccount");
       setText("nav-settings", "navSettings");
-      setText("mini-nav-feed", "navFeed");
-      setText("mini-nav-shorts", "navShorts");
+      setText("mini-nav-feed-label", "navFeed");
+      setText("mini-nav-shorts-label", "navShorts");
       setText("mini-nav-post", "navPost");
-      setText("mini-nav-messages", "navMessages");
-      setText("mini-nav-account", "navAccount");
+      setText("mini-nav-messages-label", "navMessages");
+      setText("mini-nav-account-label", "navAccount");
       setText("mini-nav-settings", "navSettings");
       const miniPostTab = $("mini-nav-post");
       if (miniPostTab && tr.newPost) {
@@ -2561,6 +2624,7 @@ async function loadProfilePostCount() {
       setText("btn-mark-all-read", "notificationsMarkRead");
       setText("notification-priority-title", "notificationsPriorityTitle");
       setText("notification-priority-sub", "notificationsPrioritySub");
+      updateNavigationBadges();
       setText("notification-filter-all", "all");
       setText("notification-filter-unread", "notificationsUnread");
       setText("notification-filter-comment", "notificationsComments");
@@ -6222,6 +6286,7 @@ async function loadProfilePostCount() {
       }
 
       if (!currentUser) {
+        updateNavigationBadges({ notificationUnread: 0 });
         status.textContent =
           tr.notificationsLoginRequired || "Log in to see notifications.";
         if (markAllBtn) markAllBtn.disabled = true;
@@ -6235,6 +6300,7 @@ async function loadProfilePostCount() {
         return;
       }
       if (!notificationsEnabled) {
+        updateNavigationBadges({ notificationUnread: 0 });
         status.textContent =
           tr.notificationsUnavailable || "Notifications unavailable.";
         if (markAllBtn) markAllBtn.disabled = true;
@@ -6248,6 +6314,7 @@ async function loadProfilePostCount() {
         return;
       }
       if (!notifications.length) {
+        updateNavigationBadges({ notificationUnread: 0 });
         status.textContent = tr.notificationsEmpty || "No notifications.";
         if (markAllBtn) markAllBtn.disabled = true;
         if (unreadCountEl) {
@@ -6274,6 +6341,7 @@ async function loadProfilePostCount() {
         )
       );
       const unreadCount = visibleBySetting.filter((note) => !note.read_at).length;
+      updateNavigationBadges({ notificationUnread: unreadCount });
       if (unreadCountEl) {
         if (unreadCount > 0) {
           unreadCountEl.classList.remove("hidden");

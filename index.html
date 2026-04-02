@@ -46,9 +46,17 @@
       </div>
 
       <div class="mini-nav header-nav">
-        <button class="mini-nav-btn is-active" data-page-target="feed" id="nav-feed">フィード</button>
-        <button class="mini-nav-btn" data-page-target="messages" id="nav-messages">DM</button>
-        <button class="mini-nav-btn" data-page-target="account" id="nav-account">アカウント</button>
+        <button class="mini-nav-btn is-active" data-page-target="feed" id="nav-feed">
+          <span class="mini-nav-label" id="nav-feed-label">フィード</span>
+        </button>
+        <button class="mini-nav-btn" data-page-target="messages" id="nav-messages">
+          <span class="mini-nav-label" id="nav-messages-label">DM</span>
+          <span class="nav-badge hidden" id="nav-messages-badge" aria-live="polite"></span>
+        </button>
+        <button class="mini-nav-btn" data-page-target="account" id="nav-account">
+          <span class="mini-nav-label" id="nav-account-label">アカウント</span>
+          <span class="nav-badge hidden" id="nav-account-badge" aria-live="polite"></span>
+        </button>
       </div>
     </header>
     <div class="mini-header" id="mini-header">
@@ -59,7 +67,7 @@
         data-mini-tab="feed"
         id="mini-nav-feed"
       >
-        フィード
+        <span class="mini-nav-label" id="mini-nav-feed-label">フィード</span>
       </button>
       <button
         class="mini-nav-btn"
@@ -67,7 +75,7 @@
         data-mini-tab="shorts"
         id="mini-nav-shorts"
       >
-        ショート
+        <span class="mini-nav-label" id="mini-nav-shorts-label">ショート</span>
       </button>
       <button
         class="mini-nav-btn mini-nav-post"
@@ -83,7 +91,8 @@
         data-mini-tab="messages"
         id="mini-nav-messages"
       >
-        DM
+        <span class="mini-nav-label" id="mini-nav-messages-label">DM</span>
+        <span class="nav-badge hidden" id="mini-nav-messages-badge" aria-live="polite"></span>
       </button>
       <button
         class="mini-nav-btn"
@@ -91,7 +100,8 @@
         data-mini-tab="account"
         id="mini-nav-account"
       >
-        アカウント
+        <span class="mini-nav-label" id="mini-nav-account-label">アカウント</span>
+        <span class="nav-badge hidden" id="mini-nav-account-badge" aria-live="polite"></span>
       </button>
     </div>
 

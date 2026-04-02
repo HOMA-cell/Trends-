@@ -18,6 +18,7 @@ let dmContext = {
   openMediaViewer: null,
   openPostDetail: () => {},
   setActivePage: () => {},
+  updateNavigationBadges: () => {},
 };
 
 let dmThreads = [];
@@ -113,6 +114,19 @@ const openDmPartnerProfile = (...args) => dmContext.openPublicProfile?.(...args)
 const openDmMediaViewer = (...args) => dmContext.openMediaViewer?.(...args);
 const openDmPostDetail = (...args) => dmContext.openPostDetail?.(...args);
 const setActivePage = (...args) => dmContext.setActivePage?.(...args);
+const updateDmNavigationBadges = (...args) =>
+  dmContext.updateNavigationBadges?.(...args);
+
+function getDmTotalUnreadCount() {
+  return dmThreads.reduce(
+    (total, thread) => total + Math.max(0, Number(thread?.unreadCount || 0)),
+    0
+  );
+}
+
+function syncDmNavigationUnreadBadge() {
+  updateDmNavigationBadges({ dmUnread: getDmTotalUnreadCount() });
+}
 
 function clearDmMessagePressTimer() {
   if (typeof window === "undefined" || !dmMessagePressTimer) return;
@@ -324,6 +338,7 @@ function clearDmState() {
   dmEntryContext = null;
   clearDmMessagePressTimer();
   clearDmMediaSelection();
+  syncDmNavigationUnreadBadge();
 }
 
 function getDmPreferenceStorageKey(baseKey) {
@@ -3494,6 +3509,7 @@ function selectDmPartner(partnerId, options = {}) {
 }
 
 function renderThreadList(options = {}) {
+  syncDmNavigationUnreadBadge();
   const list = $("dm-thread-list");
   if (!list) return;
   const tr = getDmTranslations();
