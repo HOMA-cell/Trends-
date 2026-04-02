@@ -5703,6 +5703,90 @@ async function loadProfilePostCount() {
       return tr.notificationsTitle || "Notifications";
     }
 
+    function getNotificationActorProfiles(items = []) {
+      const seen = new Set();
+      const actors = [];
+      (Array.isArray(items) ? items : []).forEach((note) => {
+        const actorId = `${note?.actor_id || note?.actor?.id || ""}`.trim();
+        if (actorId && seen.has(actorId)) return;
+        if (actorId) {
+          seen.add(actorId);
+        }
+        const profile = note?.actor || null;
+        const fallback =
+          getProfileDisplayName(
+            profile,
+            profile?.display_name || profile?.handle || profile?.username || "user"
+          ) || "user";
+        actors.push({
+          actorId,
+          profile,
+          fallback,
+        });
+      });
+      return actors;
+    }
+
+    function getNotificationActorSummary(items = [], tr) {
+      const actors = getNotificationActorProfiles(items);
+      if (!actors.length) return "user";
+      const first = actors[0]?.fallback || "user";
+      const count = Math.max(actors.length, Array.isArray(items) ? items.length : 0);
+      if (count <= 1) return first;
+      return (tr.notificationActorOthers || "{first} and {count} others")
+        .replace("{first}", first)
+        .replace("{count}", `${count - 1}`);
+    }
+
+    function createNotificationGroup(items = []) {
+      const notes = (Array.isArray(items) ? items : []).filter(Boolean);
+      const primary = notes[0] || null;
+      const unread = notes.some((note) => !note?.read_at);
+      return {
+        primary,
+        notes,
+        isGrouped: notes.length > 1,
+        read_at: unread ? null : primary?.read_at || "",
+        created_at: primary?.created_at || "",
+      };
+    }
+
+    function buildNotificationGroups(items = []) {
+      const groups = [];
+      const visited = new Set();
+      const list = Array.isArray(items) ? items : [];
+
+      list.forEach((note) => {
+        const noteId = `${note?.id || ""}`.trim();
+        if (!noteId || visited.has(noteId)) return;
+
+        const type = `${note?.type || ""}`.trim();
+        const postId = `${note?.post_id || ""}`.trim();
+        const canGroup = (type === "like" || type === "comment") && postId;
+
+        if (canGroup) {
+          const related = list.filter((candidate) => {
+            const candidateId = `${candidate?.id || ""}`.trim();
+            if (!candidateId || visited.has(candidateId)) return false;
+            return (
+              `${candidate?.type || ""}`.trim() === type &&
+              `${candidate?.post_id || ""}`.trim() === postId
+            );
+          });
+          if (related.length > 1) {
+            related.forEach((entry) => visited.add(`${entry?.id || ""}`.trim()));
+            groups.push(createNotificationGroup(related));
+            return;
+          }
+        }
+
+        visited.add(noteId);
+        groups.push(createNotificationGroup([note]));
+      });
+
+      return groups;
+    }
+
     function getNotificationPreviewText(post, tr) {
       if (!post) return "";
       const noteText = `${post?.note || post?.caption || ""}`.trim().replace(/\s+/g, " ");
@@ -5865,8 +5949,11 @@ async function loadProfilePostCount() {
       return true;
     }
 
-    function openNotificationDestination(note, post) {
+    function openNotificationDestination(note, post, options = {}) {
       if (!note) return false;
+      const readIds = Array.isArray(options.readIds)
+        ? options.readIds.map((id) => `${id || ""}`.trim()).filter(Boolean)
+        : [];
       if (note.post_id) {
         if (typeof setActivePage === "function") {
           setActivePage("feed");
@@ -5885,7 +5972,9 @@ async function loadProfilePostCount() {
             postEl.scrollIntoView({ behavior: "smooth", block: "center" });
           }
         });
-        if (!note.read_at) {
+        if (readIds.length) {
+          void markNotificationIdsRead(readIds);
+        } else if (!note.read_at) {
           void markNotificationRead(note.id);
         }
         return true;
@@ -5938,6 +6027,30 @@ async function loadProfilePostCount() {
 
       preview.append(media, copy);
       return preview;
+    }
+
+    function createNotificationAvatarStack(items = []) {
+      const actors = getNotificationActorProfiles(items).slice(0, 3);
+      const stack = document.createElement("div");
+      stack.className = "notification-avatar-stack";
+      stack.setAttribute("aria-hidden", "true");
+
+      actors.forEach((entry, index) => {
+        const avatar = document.createElement("div");
+        avatar.className = "avatar notification-avatar notification-avatar-mini";
+        avatar.style.setProperty("--notification-avatar-index", `${index}`);
+        renderAvatar(avatar, entry.profile, `${entry.fallback || "U"}`.charAt(0).toUpperCase());
+        stack.appendChild(avatar);
+      });
+
+      const remaining = Math.max(0, getNotificationActorProfiles(items).length - actors.length);
+      if (remaining > 0) {
+        const more = document.createElement("div");
+        more.className = "notification-avatar-more";
+        more.textContent = `+${remaining}`;
+        stack.appendChild(more);
+      }
+      return stack;
     }
 
     function renderNotifications() {
@@ -6061,6 +6174,8 @@ async function loadProfilePostCount() {
       sectionOrder.forEach((sectionKey) => {
         const items = sectioned.get(sectionKey) || [];
         if (!items.length) return;
+        const groups = buildNotificationGroups(items);
+        if (!groups.length) return;
 
         const section = document.createElement("section");
         section.className = "notification-section";
@@ -6072,16 +6187,21 @@ async function loadProfilePostCount() {
         sectionTitle.textContent = getNotificationSectionLabel(sectionKey, tr);
         const sectionCount = document.createElement("div");
         sectionCount.className = "notification-section-count";
-        sectionCount.textContent = `${items.length}`;
+        sectionCount.textContent = `${groups.length}`;
         sectionHead.append(sectionTitle, sectionCount);
         section.appendChild(sectionHead);
 
         const sectionList = document.createElement("div");
         sectionList.className = "notification-section-list";
 
-        items.forEach((note) => {
+        groups.forEach((group) => {
+        const note = group.primary;
+        if (!note) return;
+        const readIds = group.notes.map((entry) => entry.id).filter(Boolean);
         const item = document.createElement("div");
-        item.className = `notification-item${note.read_at ? "" : " unread"}`;
+        item.className = `notification-item${group.read_at ? "" : " unread"}${
+          group.isGrouped ? " is-grouped" : ""
+        }`;
         item.setAttribute("data-notification-type", `${note?.type || ""}`.trim());
 
         const actorName =
@@ -6102,6 +6222,9 @@ async function loadProfilePostCount() {
               ? actorHandle
               : ""
             : getNotificationPreviewText(post, tr);
+        const titleActorText = group.isGrouped
+          ? getNotificationActorSummary(group.notes, tr)
+          : actorName;
 
         const head = document.createElement("div");
         head.className = "notification-item-head";
@@ -6120,33 +6243,37 @@ async function loadProfilePostCount() {
           );
           item.addEventListener("click", (event) => {
             if (event.target.closest("button, a, input, textarea, select")) return;
-            openNotificationDestination(note, post);
+            openNotificationDestination(note, post, { readIds });
           });
           item.addEventListener("keydown", (event) => {
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
-            openNotificationDestination(note, post);
+            openNotificationDestination(note, post, { readIds });
           });
         }
 
-        const avatarEl = document.createElement(note.actor_id ? "button" : "div");
-        avatarEl.className = "avatar notification-avatar";
-        if (avatarEl instanceof HTMLButtonElement) {
-          avatarEl.type = "button";
-          avatarEl.classList.add("is-button");
-          avatarEl.setAttribute(
-            "aria-label",
-            actorHandle
-              ? `${actorName} ${actorHandle}`
-              : `${actorName}`
-          );
-          avatarEl.addEventListener("click", () => {
-            openNotificationProfile(note);
-          });
+        const avatarEl = group.isGrouped
+          ? createNotificationAvatarStack(group.notes)
+          : document.createElement(note.actor_id ? "button" : "div");
+        if (!group.isGrouped) {
+          avatarEl.className = "avatar notification-avatar";
+          if (avatarEl instanceof HTMLButtonElement) {
+            avatarEl.type = "button";
+            avatarEl.classList.add("is-button");
+            avatarEl.setAttribute(
+              "aria-label",
+              actorHandle
+                ? `${actorName} ${actorHandle}`
+                : `${actorName}`
+            );
+            avatarEl.addEventListener("click", () => {
+              openNotificationProfile(note);
+            });
+          }
+          const actorInitial =
+            `${actorName || "U"}`.replace("@", "").trim().charAt(0).toUpperCase() || "U";
+          renderAvatar(avatarEl, note.actor, actorInitial);
         }
-        const actorInitial =
-          `${actorName || "U"}`.replace("@", "").trim().charAt(0).toUpperCase() || "U";
-        renderAvatar(avatarEl, note.actor, actorInitial);
 
         const copy = document.createElement("div");
         copy.className = "notification-copy";
@@ -6157,7 +6284,7 @@ async function loadProfilePostCount() {
         const title = document.createElement("div");
         title.className = "notification-title";
         const strong = document.createElement("strong");
-        strong.textContent = actorName;
+        strong.textContent = titleActorText;
         title.appendChild(strong);
         title.append(` ${actionText}`);
 
@@ -6167,6 +6294,12 @@ async function loadProfilePostCount() {
 
         titleRow.appendChild(title);
         titleRow.appendChild(typeChip);
+        if (group.isGrouped) {
+          const groupChip = document.createElement("span");
+          groupChip.className = "notification-group-chip";
+          groupChip.textContent = `${group.notes.length}`;
+          titleRow.appendChild(groupChip);
+        }
 
         copy.appendChild(titleRow);
 
@@ -6184,7 +6317,13 @@ async function loadProfilePostCount() {
           time.textContent = formatDateTimeDisplay(note.created_at);
           meta.appendChild(time);
         }
-        if (!note.read_at) {
+        if (group.isGrouped) {
+          const groupedMeta = document.createElement("span");
+          groupedMeta.className = "notification-group-meta";
+          groupedMeta.textContent = `${group.notes.length}`;
+          meta.appendChild(groupedMeta);
+        }
+        if (!group.read_at) {
           const dot = document.createElement("span");
           dot.className = "notification-dot";
           dot.setAttribute("aria-hidden", "true");
@@ -6206,12 +6345,12 @@ async function loadProfilePostCount() {
               ? tr.notificationViewComments || "View comments"
               : tr.notificationViewPost || "View post";
           viewBtn.addEventListener("click", () => {
-            openNotificationDestination(note, post);
+            openNotificationDestination(note, post, { readIds });
           });
           actions.appendChild(viewBtn);
         }
 
-        if (note.actor_id && note.actor_id !== currentUser?.id) {
+        if (!group.isGrouped && note.actor_id && note.actor_id !== currentUser?.id) {
           const messageBtn = document.createElement("button");
           messageBtn.className = "btn btn-ghost btn-xs";
           messageBtn.textContent = tr.message || "Message";
@@ -6220,14 +6359,14 @@ async function loadProfilePostCount() {
               profile: note.actor || null,
               entryContext: buildNotificationDmEntryContext(note, post, tr),
             });
-            if (opened && !note.read_at) {
-              void markNotificationRead(note.id);
+            if (opened && !group.read_at) {
+              void markNotificationIdsRead(readIds);
             }
           });
           actions.appendChild(messageBtn);
         }
 
-        if (note.type === "follow" && note.actor_id) {
+        if (!group.isGrouped && note.type === "follow" && note.actor_id) {
           const profileBtn = document.createElement("button");
           profileBtn.className = "btn btn-ghost btn-xs";
           profileBtn.textContent = tr.notificationViewProfile || "View profile";
@@ -6237,11 +6376,11 @@ async function loadProfilePostCount() {
           actions.appendChild(profileBtn);
         }
 
-        if (!note.read_at) {
+        if (!group.read_at) {
           const markBtn = document.createElement("button");
           markBtn.className = "btn btn-ghost btn-xs";
           markBtn.textContent = tr.notificationRead || "Mark read";
-          markBtn.addEventListener("click", () => markNotificationRead(note.id));
+          markBtn.addEventListener("click", () => markNotificationIdsRead(readIds));
           actions.appendChild(markBtn);
         }
 
@@ -7094,24 +7233,35 @@ async function loadProfilePostCount() {
       });
     }
 
-    async function markNotificationRead(notificationId) {
-      if (!currentUser || !notificationId) return;
+    async function markNotificationIdsRead(notificationIds = []) {
+      if (!currentUser || !notificationIds.length) return;
+      const ids = [...new Set(notificationIds.map((id) => `${id || ""}`.trim()).filter(Boolean))];
+      const unreadIds = ids.filter((id) =>
+        notifications.some((note) => `${note?.id || ""}`.trim() === id && !note?.read_at)
+      );
+      if (!unreadIds.length) return;
+      const nowIso = new Date().toISOString();
       const { error } = await supabase
         .from("notifications")
-        .update({ read_at: new Date().toISOString() })
-        .eq("id", notificationId)
+        .update({ read_at: nowIso })
+        .in("id", unreadIds)
         .eq("user_id", currentUser.id);
 
       if (error) {
-        console.error("markNotificationRead error:", error);
+        console.error("markNotificationIdsRead error:", error);
         return;
       }
       notifications = notifications.map((note) =>
-        note.id === notificationId
-          ? { ...note, read_at: new Date().toISOString() }
+        unreadIds.includes(`${note?.id || ""}`.trim())
+          ? { ...note, read_at: note.read_at || nowIso }
           : note
       );
       renderNotifications();
+    }
+
+    async function markNotificationRead(notificationId) {
+      if (!notificationId) return;
+      await markNotificationIdsRead([notificationId]);
     }
 
     async function markAllNotificationsRead() {

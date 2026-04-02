@@ -4223,6 +4223,41 @@
     .notification-avatar.is-button {
       cursor: pointer;
     }
+    .notification-avatar-stack {
+      position: relative;
+      width: 52px;
+      min-width: 52px;
+      height: 42px;
+      flex-shrink: 0;
+    }
+    .notification-avatar-mini {
+      position: absolute;
+      top: 0;
+      left: calc(var(--notification-avatar-index, 0) * 12px);
+      width: 34px;
+      height: 34px;
+      font-size: 11px;
+      border: 2px solid rgba(255, 255, 255, 0.96);
+      background: #f7f2eb;
+      box-shadow: 0 6px 16px rgba(17, 24, 39, 0.08);
+    }
+    .notification-avatar-more {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: #111827;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(17, 24, 39, 0.18);
+    }
     .notification-copy {
       min-width: 0;
       flex: 1;
@@ -4271,6 +4306,20 @@
     .notification-type-chip.is-like {
       background: #fff0f4;
       color: #cd4472;
+    }
+    .notification-group-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: rgba(17, 24, 39, 0.06);
+      color: #6f655c;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
     }
     .notification-preview {
       font-size: 11px;
@@ -4360,6 +4409,18 @@
       gap: 8px;
       font-size: 10.5px;
       color: #988e82;
+    }
+    .notification-group-meta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 18px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: rgba(17, 24, 39, 0.05);
+      color: #85786d;
+      font-size: 9px;
+      font-weight: 800;
     }
     .notification-dot {
       width: 7px;
