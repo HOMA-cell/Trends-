@@ -2559,6 +2559,8 @@ async function loadProfilePostCount() {
       setText("notifications-sub", "notificationsSub");
       setText("btn-refresh-notifications", "notificationsRefresh");
       setText("btn-mark-all-read", "notificationsMarkRead");
+      setText("notification-priority-title", "notificationsPriorityTitle");
+      setText("notification-priority-sub", "notificationsPrioritySub");
       setText("notification-filter-all", "all");
       setText("notification-filter-unread", "notificationsUnread");
       setText("notification-filter-comment", "notificationsComments");
@@ -6053,11 +6055,153 @@ async function loadProfilePostCount() {
       return stack;
     }
 
+    function getNotificationPriorityGroups(groups = []) {
+      const now = Date.now();
+      return (Array.isArray(groups) ? groups : [])
+        .filter((group) => group?.primary && !group?.read_at)
+        .map((group) => {
+          const primary = group.primary;
+          const createdAt = new Date(primary.created_at || 0).getTime() || 0;
+          const ageHours = createdAt ? Math.max(0, (now - createdAt) / (1000 * 60 * 60)) : 999;
+          const recencyScore = Math.max(0, 36 - ageHours);
+          const typeScore =
+            primary.type === "comment" ? 36 : primary.type === "follow" ? 30 : 22;
+          const countScore = Math.min(18, Math.max(0, (group.notes?.length || 1) - 1) * 4);
+          return {
+            ...group,
+            priorityScore: typeScore + recencyScore + countScore,
+          };
+        })
+        .sort((a, b) => b.priorityScore - a.priorityScore)
+        .slice(0, 4);
+    }
+
+    function renderNotificationPriorityRail(groups = [], postsById = new Map(), tr) {
+      const container = $("notification-priority");
+      const rail = $("notification-priority-rail");
+      if (!container || !rail) return;
+      rail.innerHTML = "";
+      const priorityGroups = getNotificationPriorityGroups(groups);
+      if (!priorityGroups.length) {
+        container.classList.add("hidden");
+        return;
+      }
+      container.classList.remove("hidden");
+
+      priorityGroups.forEach((group) => {
+        const note = group.primary;
+        if (!note) return;
+        const post = note.post_id ? postsById.get(`${note.post_id}`) || null : null;
+        const actorName =
+          getProfileDisplayName(note.actor, note.actor_id) ||
+          note.actor?.display_name ||
+          note.actor?.handle ||
+          note.actor?.username ||
+          "user";
+        const titleActorText = group.isGrouped
+          ? getNotificationActorSummary(group.notes, tr)
+          : actorName;
+        const readIds = group.notes.map((entry) => entry.id).filter(Boolean);
+
+        const card = document.createElement("article");
+        card.className = "notification-priority-card";
+        card.setAttribute("data-notification-type", `${note.type || ""}`.trim());
+
+        const top = document.createElement("div");
+        top.className = "notification-priority-top";
+        top.appendChild(
+          group.isGrouped
+            ? createNotificationAvatarStack(group.notes)
+            : (() => {
+                const avatar = document.createElement("div");
+                avatar.className = "avatar notification-avatar";
+                const initial =
+                  `${actorName || "U"}`.replace("@", "").trim().charAt(0).toUpperCase() || "U";
+                renderAvatar(avatar, note.actor, initial);
+                return avatar;
+              })()
+        );
+
+        const typeChip = document.createElement("span");
+        typeChip.className = `notification-type-chip is-${note.type || "default"}`;
+        typeChip.textContent = getNotificationTypeLabel(note.type, tr);
+        top.appendChild(typeChip);
+
+        const title = document.createElement("div");
+        title.className = "notification-priority-title-text";
+        title.textContent = titleActorText;
+
+        const body = document.createElement("div");
+        body.className = "notification-priority-body";
+        body.textContent =
+          note.type === "follow"
+            ? tr.profileEntryPromptFollowBack || "Follow back or start with a message"
+            : getNotificationPreviewText(post, tr) || getNotificationActionText(note.type, tr);
+
+        const meta = document.createElement("div");
+        meta.className = "notification-priority-meta";
+        meta.textContent = formatDateTimeDisplay(note.created_at || "");
+
+        const actions = document.createElement("div");
+        actions.className = "notification-priority-actions";
+
+        const primaryBtn = document.createElement("button");
+        primaryBtn.className = "btn btn-ghost btn-xs";
+        primaryBtn.textContent =
+          note.type === "comment"
+            ? tr.notificationViewComments || "View comments"
+            : note.type === "follow"
+            ? tr.notificationViewProfile || "View profile"
+            : tr.notificationViewPost || "View post";
+        primaryBtn.addEventListener("click", () => {
+          openNotificationDestination(note, post, { readIds });
+        });
+        actions.appendChild(primaryBtn);
+
+        if (note.type === "follow" && note.actor_id && note.actor_id !== currentUser?.id) {
+          const isFollowing = followingIds.has(note.actor_id);
+          if (!isFollowing) {
+            const followBtn = document.createElement("button");
+            followBtn.className = "btn btn-primary btn-xs";
+            followBtn.textContent = tr.notificationFollowBack || "Follow back";
+            followBtn.addEventListener("click", async () => {
+              followBtn.disabled = true;
+              try {
+                await toggleFollowForUser(note.actor_id);
+                renderNotifications();
+              } finally {
+                followBtn.disabled = false;
+              }
+            });
+            actions.appendChild(followBtn);
+          }
+        } else if (!group.isGrouped && note.actor_id && note.actor_id !== currentUser?.id) {
+          const messageBtn = document.createElement("button");
+          messageBtn.className = "btn btn-ghost btn-xs";
+          messageBtn.textContent = tr.message || "Message";
+          messageBtn.addEventListener("click", async () => {
+            const opened = await openDmConversation(note.actor_id, {
+              profile: note.actor || null,
+              entryContext: buildNotificationDmEntryContext(note, post, tr),
+            });
+            if (opened) {
+              void markNotificationIdsRead(readIds);
+            }
+          });
+          actions.appendChild(messageBtn);
+        }
+
+        card.append(top, title, body, meta, actions);
+        rail.appendChild(card);
+      });
+    }
+
     function renderNotifications() {
       const list = $("notification-list");
       const status = $("notification-status");
       const unreadCountEl = $("notification-unread-count");
       const markAllBtn = $("btn-mark-all-read");
+      const priorityContainer = $("notification-priority");
       if (!list || !status) return;
       const tr = t[currentLang] || t.ja;
       const filterButtons = [
@@ -6073,6 +6217,9 @@ async function loadProfilePostCount() {
 
       list.innerHTML = "";
       status.textContent = "";
+      if (priorityContainer) {
+        priorityContainer.classList.add("hidden");
+      }
 
       if (!currentUser) {
         status.textContent =
@@ -6160,6 +6307,8 @@ async function loadProfilePostCount() {
         status.textContent = getNotificationEmptyState(notificationsViewFilter, tr);
         return;
       }
+
+      renderNotificationPriorityRail(buildNotificationGroups(filtered), postsById, tr);
 
       const sectionOrder = ["unread", "today", "week", "earlier"];
       const sectioned = new Map();
