@@ -256,6 +256,8 @@ const FEED_SEEN_POSTS_LIMIT = 2000;
 const FEED_CAPTION_TRIM_LIMIT = 140;
 const shortsVisibilityRatios = new Map();
 let shortsSoundEnabled = false;
+const commentReplyTargets = new Map();
+const commentReplyFocusRequests = new Set();
 const shortsPlaybackCueTimers = new WeakMap();
 const shortsMediaTapTimers = new WeakMap();
 const shortsHoldStates = new WeakMap();
@@ -2973,6 +2975,59 @@ function isCommentSheetOpenForPost(postId) {
         activeCommentPostId === normalizedPostId &&
         !backdrop.classList.contains("hidden")
       );
+    }
+function getCommentReplyTarget(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return null;
+      return commentReplyTargets.get(normalizedPostId) || null;
+    }
+function clearCommentReplyTarget(postId, { refresh = true } = {}) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      commentReplyTargets.delete(normalizedPostId);
+      commentReplyFocusRequests.delete(normalizedPostId);
+      if (refresh) {
+        refreshFeedPostComments(normalizedPostId);
+      }
+    }
+function focusCommentComposer(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId || typeof window === "undefined") return;
+      window.requestAnimationFrame(() => {
+        const selector = `.post-card[data-post-id="${normalizedPostId}"] .comment-form-input`;
+        const activeInput =
+          (activeCommentPostId === normalizedPostId
+            ? getCommentSheetBody()?.querySelector?.(".comment-form-input")
+            : null) ||
+          document.querySelector(selector) ||
+          $("detail-comments")?.querySelector?.(".comment-form-input");
+        activeInput?.focus?.({ preventScroll: false });
+        if (activeInput && typeof activeInput.setSelectionRange === "function") {
+          const end = `${activeInput.value || ""}`.length;
+          activeInput.setSelectionRange(end, end);
+        }
+      });
+    }
+function setCommentReplyTarget(postId, comment) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId || !comment) return;
+      const rawHandle =
+        comment.profile?.handle ||
+        comment.profile?.username ||
+        "user";
+      const handleText = formatHandle(rawHandle) || "@user";
+      const displayName =
+        `${comment.profile?.display_name || ""}`.trim() || handleText;
+      commentReplyTargets.set(normalizedPostId, {
+        commentId: `${comment.id || ""}`,
+        userId: `${comment.user_id || ""}`,
+        handle: handleText,
+        displayName,
+        preview: getCaptionPreviewText(comment.body || "") || handleText,
+      });
+      commentReplyFocusRequests.add(normalizedPostId);
+      refreshFeedPostComments(normalizedPostId);
+      focusCommentComposer(normalizedPostId);
     }
 function closeCommentSheet() {
       const previousPostId = activeCommentPostId;
@@ -7360,10 +7415,12 @@ function buildViewerCommentProfile(user) {
           "",
       };
     }
-function buildCommentItemElement(comment, tr) {
+function buildCommentItemElement(comment, tr, options = {}) {
+      const { onReply = null } = options;
       if (!comment) return null;
       const item = document.createElement("div");
       item.className = "comment-item";
+      item.dataset.commentId = `${comment.id || ""}`;
       if (comment.pending) {
         item.classList.add("is-pending");
       }
@@ -7417,11 +7474,36 @@ function buildCommentItemElement(comment, tr) {
 
       const text = document.createElement("div");
       text.className = "comment-text";
-      text.textContent = comment.body || "";
+      const rawBody = `${comment.body || ""}`;
+      const trimmedBody = rawBody.trim();
+      const replyMatch = trimmedBody.match(/^(@\S+)\s+([\s\S]+)$/);
+      if (replyMatch) {
+        const mention = document.createElement("span");
+        mention.className = "comment-text-mention";
+        mention.textContent = `${replyMatch[1]} `;
+        const replyRest = document.createElement("span");
+        replyRest.textContent = replyMatch[2];
+        text.append(mention, replyRest);
+      } else {
+        text.textContent = rawBody;
+      }
 
       bubble.appendChild(header);
       bubble.appendChild(text);
       content.appendChild(bubble);
+      if (typeof onReply === "function") {
+        const actions = document.createElement("div");
+        actions.className = "comment-actions";
+        const replyBtn = document.createElement("button");
+        replyBtn.type = "button";
+        replyBtn.className = "chip chip-ghost chip-comment-reply";
+        replyBtn.textContent = tr.commentReply || "Reply";
+        replyBtn.addEventListener("click", () => {
+          onReply(comment);
+        });
+        actions.appendChild(replyBtn);
+        content.appendChild(actions);
+      }
       item.appendChild(avatarEl);
       item.appendChild(content);
       return item;
@@ -7687,6 +7769,8 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
         compact = false,
         submitLabel,
         showQuickReplies = false,
+        replyTarget = null,
+        onClearReply = null,
       } = options;
 
       const form = document.createElement("div");
@@ -7695,6 +7779,9 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
         : "comment-form";
       if (!compact) {
         form.classList.add("comment-form-sheet");
+      }
+      if (replyTarget) {
+        form.classList.add("has-reply-target");
       }
 
       const viewerProfile = buildViewerCommentProfile(currentUser);
@@ -7712,6 +7799,9 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
 
       const body = document.createElement("div");
       body.className = "comment-form-body";
+      if (replyTarget) {
+        body.classList.add("has-reply-target");
+      }
 
       const field = document.createElement(compact ? "input" : "textarea");
       field.className = compact
@@ -7721,6 +7811,9 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
       if (compact) {
         field.type = "text";
       }
+
+      const main = document.createElement("div");
+      main.className = "comment-form-main";
 
       const actions = document.createElement("div");
       actions.className = "comment-form-actions";
@@ -7748,7 +7841,12 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
         send.classList.add("is-loading");
         syncSendState();
         try {
-          await submitComment(post, field);
+          await submitComment(post, field, {
+            replyTarget,
+          });
+          if (!`${field.value || ""}`.trim() && typeof onClearReply === "function") {
+            onClearReply();
+          }
         } finally {
           send.classList.remove("is-loading");
           syncSendState();
@@ -7767,6 +7865,29 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
       });
 
       actions.appendChild(send);
+      if (replyTarget) {
+        const replyBar = document.createElement("div");
+        replyBar.className = "comment-reply-bar";
+        const replyCopy = document.createElement("div");
+        replyCopy.className = "comment-reply-copy";
+        const replyLabel = document.createElement("div");
+        replyLabel.className = "comment-reply-label";
+        replyLabel.textContent = tr.commentReplyingTo || "Replying to";
+        const replyValue = document.createElement("div");
+        replyValue.className = "comment-reply-value";
+        replyValue.textContent = `${replyTarget.displayName} · ${replyTarget.preview}`;
+        replyCopy.append(replyLabel, replyValue);
+        const replyCancel = document.createElement("button");
+        replyCancel.type = "button";
+        replyCancel.className = "chip chip-ghost chip-comment-reply-cancel";
+        replyCancel.textContent = tr.commentReplyCancel || "Cancel";
+        replyCancel.addEventListener("click", () => {
+          onClearReply?.();
+          field.focus();
+        });
+        replyBar.append(replyCopy, replyCancel);
+        body.appendChild(replyBar);
+      }
       if (showQuickReplies) {
         const quickReplies = getCommentQuickReplySuggestions(post).filter(Boolean).slice(0, 3);
         if (quickReplies.length) {
@@ -7792,11 +7913,22 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
           body.appendChild(quickRow);
         }
       }
-      body.appendChild(field);
-      body.appendChild(actions);
+      main.appendChild(field);
+      main.appendChild(actions);
+      body.appendChild(main);
       form.appendChild(avatar);
       form.appendChild(body);
       syncSendState();
+      if (replyTarget && commentReplyFocusRequests.has(`${post.id || ""}`)) {
+        commentReplyFocusRequests.delete(`${post.id || ""}`);
+        window.requestAnimationFrame(() => {
+          field.focus();
+          if (typeof field.setSelectionRange === "function") {
+            const end = `${field.value || ""}`.length;
+            field.setSelectionRange(end, end);
+          }
+        });
+      }
       return form;
     }
 function buildFeedCommentSection(
@@ -7835,7 +7967,9 @@ function buildFeedCommentSection(
           const list = document.createElement("div");
           list.className = "comment-list";
           comments.forEach((comment) => {
-            const item = buildCommentItemElement(comment, tr);
+            const item = buildCommentItemElement(comment, tr, {
+              onReply: () => setCommentReplyTarget(post.id, comment),
+            });
             if (item) {
               list.appendChild(item);
             }
@@ -7848,6 +7982,8 @@ function buildFeedCommentSection(
         const form = buildCommentComposer(post, tr, currentUser, {
           submitLabel: tr.commentAdd || "Post",
           showQuickReplies,
+          replyTarget: getCommentReplyTarget(post.id),
+          onClearReply: () => clearCommentReplyTarget(post.id),
         });
         if (form) {
           commentSection.appendChild(form);
@@ -8346,7 +8482,9 @@ export function renderPostDetail() {
           commentsEl.appendChild(loading);
         } else {
           comments.forEach((comment) => {
-            const row = buildCommentItemElement(comment, tr);
+            const row = buildCommentItemElement(comment, tr, {
+              onReply: () => setCommentReplyTarget(post.id, comment),
+            });
             if (row) {
               list.appendChild(row);
             }
@@ -8358,6 +8496,8 @@ export function renderPostDetail() {
           const inputWrap = buildCommentComposer(post, tr, currentUser, {
             compact: true,
             submitLabel: tr.commentSubmit || "送信",
+            replyTarget: getCommentReplyTarget(post.id),
+            onClearReply: () => clearCommentReplyTarget(post.id),
           });
           if (inputWrap) {
             inputWrap.classList.add("detail-comment-input");

@@ -7947,7 +7947,7 @@ async function loadProfilePostCount() {
       }
     }
 
-    async function submitComment(post, inputEl) {
+    async function submitComment(post, inputEl, options = {}) {
       const postId = post?.id;
       if (!postId) return;
       if (!currentUser) {
@@ -7955,7 +7955,15 @@ async function loadProfilePostCount() {
         return;
       }
       if (!commentsEnabled) return;
-      const body = inputEl.value.trim();
+      const replyTarget = options?.replyTarget || null;
+      let body = inputEl.value.trim();
+      if (replyTarget?.handle) {
+        const normalizedBody = body.toLowerCase();
+        const normalizedHandle = `${replyTarget.handle}`.trim().toLowerCase();
+        if (normalizedHandle && !normalizedBody.startsWith(normalizedHandle)) {
+          body = `${replyTarget.handle} ${body}`.trim();
+        }
+      }
       if (!body) return;
       const tr = t[currentLang] || t.ja;
 
