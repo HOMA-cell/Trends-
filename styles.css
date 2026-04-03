@@ -2276,6 +2276,39 @@
     .comment-sheet-context-caption.is-empty {
       color: #a09588;
     }
+    .comment-sheet-context-social {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+    .comment-sheet-context-stack {
+      display: inline-flex;
+      align-items: center;
+      padding-left: 2px;
+    }
+    .comment-sheet-context-stack-avatar {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 24px;
+      font-size: 10px;
+      margin-left: -7px;
+      border: 2px solid rgba(255, 253, 249, 0.96);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+    }
+    .comment-sheet-context-stack-avatar:first-child {
+      margin-left: 0;
+    }
+    .comment-sheet-context-social-text {
+      min-width: 0;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #8a8074;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .comment-sheet-context-media {
       width: 70px;
       height: 82px;
@@ -2375,6 +2408,28 @@
       );
       z-index: 2;
     }
+    .comment-sheet-content .comment-quick-replies {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding-left: 2px;
+    }
+    .comment-sheet-content .chip-comment-quick {
+      min-height: 26px;
+      padding-inline: 10px;
+      border-radius: 999px;
+      border: 1px solid #eadfce;
+      background: rgba(255, 255, 255, 0.92);
+      color: #6d6257;
+      font-size: 10.5px;
+      font-weight: 700;
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.03);
+    }
+    .comment-sheet-content .chip-comment-quick:hover {
+      border-color: #dfcab5;
+      background: #fff7ef;
+      color: #4d4338;
+    }
     .comment-sheet-content .comment-form-avatar {
       display: none;
     }
@@ -2414,6 +2469,12 @@
       font-size: 0;
       color: transparent;
       box-shadow: 0 10px 20px rgba(228, 87, 46, 0.18);
+    }
+    .comment-sheet-content .comment-submit-btn.is-disabled,
+    .comment-sheet-content .comment-submit-btn:disabled {
+      opacity: 0.52;
+      box-shadow: none;
+      pointer-events: none;
     }
     .comment-sheet-content .comment-submit-btn::before {
       content: "➤";
@@ -2466,6 +2527,13 @@
     .comment-sheet-context.is-shorts-context .comment-sheet-context-caption.is-empty {
       color: rgba(241, 245, 249, 0.74);
     }
+    .comment-sheet-context.is-shorts-context .comment-sheet-context-stack-avatar {
+      border-color: rgba(8, 11, 17, 0.92);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+    }
+    .comment-sheet-context.is-shorts-context .comment-sheet-context-social-text {
+      color: rgba(241, 245, 249, 0.62);
+    }
     .comment-sheet-context.is-shorts-context .comment-sheet-context-chip {
       background: rgba(255, 255, 255, 0.08);
       border-color: rgba(255, 255, 255, 0.12);
@@ -2499,6 +2567,17 @@
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.12);
       box-shadow: none;
+    }
+    .comment-sheet-content.is-shorts-context .chip-comment-quick {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: rgba(248, 250, 252, 0.86);
+      box-shadow: none;
+    }
+    .comment-sheet-content.is-shorts-context .chip-comment-quick:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.18);
+      color: #fff;
     }
     .comment-sheet-content.is-shorts-context .comment-form-input {
       color: #f8fafc;

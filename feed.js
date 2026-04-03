@@ -3014,6 +3014,7 @@ function renderCommentSheetForPost(postId) {
       }
       const context = buildCommentSheetContext(post, tr, {
         commentCount: comments.length,
+        comments,
       });
       if (context) {
         context.classList.toggle("is-shorts-context", isShortsStylePost(post));
@@ -3025,7 +3026,10 @@ function renderCommentSheetForPost(postId) {
         currentUser,
         commentsByPost,
         commentsLoading,
-        commentsEnabled
+        commentsEnabled,
+        {
+          showQuickReplies: true,
+        }
       );
       if (section) {
         section.classList.add("comment-sheet-content");
@@ -7458,9 +7462,29 @@ function getCommentSheetPreviewFallback(post, tr) {
       }
       return tr.comments || "Comments";
     }
+function getCommentQuickReplySuggestions(post) {
+      const isJapanese = getCurrentLang() !== "en";
+      if (post?.media_type === "video") {
+        return isJapanese
+          ? ["フォームいい", "強い", "🔥"]
+          : ["Great form", "Strong", "🔥"];
+      }
+      if (post?.media_url) {
+        return isJapanese
+          ? ["仕上がってる", "ナイス", "👏"]
+          : ["Looking sharp", "Nice", "👏"];
+      }
+      const workoutLogCount = (getWorkoutLogsByPost().get(post?.id) || []).length;
+      if (workoutLogCount > 0) {
+        return isJapanese
+          ? ["重量やばい", "ナイスセット", "💪"]
+          : ["Big lift", "Nice set", "💪"];
+      }
+      return isJapanese ? ["いいね", "すごい", "🔥"] : ["Nice", "So good", "🔥"];
+    }
 function buildCommentSheetContext(post, tr, options = {}) {
       if (!post) return null;
-      const { commentCount = 0 } = options;
+      const { commentCount = 0, comments = [] } = options;
       const rawHandle =
         post.profile?.handle ||
         post.profile?.username ||
@@ -7519,6 +7543,54 @@ function buildCommentSheetContext(post, tr, options = {}) {
       }
       body.appendChild(authorRow);
       body.appendChild(metaChipRow);
+      if (comments.length) {
+        const recentProfiles = [];
+        const seenUserIds = new Set();
+        [...comments]
+          .reverse()
+          .forEach((comment) => {
+            const userId = `${comment?.user_id || ""}`;
+            if (!userId || seenUserIds.has(userId)) return;
+            seenUserIds.add(userId);
+            recentProfiles.push(comment.profile || { id: userId });
+          });
+        const visibleProfiles = recentProfiles.slice(0, 3);
+        if (visibleProfiles.length) {
+          const socialRow = document.createElement("div");
+          socialRow.className = "comment-sheet-context-social";
+          const stack = document.createElement("div");
+          stack.className = "comment-sheet-context-stack";
+          visibleProfiles.forEach((profile, index) => {
+            const chipAvatar = document.createElement("div");
+            chipAvatar.className = "avatar comment-sheet-context-stack-avatar";
+            const stackHandle =
+              profile?.handle ||
+              profile?.username ||
+              displayName ||
+              "U";
+            const stackLabel =
+              `${profile?.display_name || ""}`.trim() ||
+              formatHandle(stackHandle) ||
+              displayName;
+            renderAvatar(
+              chipAvatar,
+              profile,
+              (stackLabel || "U").replace("@", "").charAt(0).toUpperCase()
+            );
+            chipAvatar.style.zIndex = `${visibleProfiles.length - index}`;
+            stack.appendChild(chipAvatar);
+          });
+          socialRow.appendChild(stack);
+          const socialText = document.createElement("div");
+          socialText.className = "comment-sheet-context-social-text";
+          socialText.textContent =
+            commentCount > 1
+              ? `${commentCount} ${tr.comments || "Comments"}`
+              : `1 ${tr.comments || "Comments"}`;
+          socialRow.appendChild(socialText);
+          body.appendChild(socialRow);
+        }
+      }
       if (snippet) {
         const captionEl = document.createElement("div");
         captionEl.className = "comment-sheet-context-caption";
@@ -7614,6 +7686,7 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
       const {
         compact = false,
         submitLabel,
+        showQuickReplies = false,
       } = options;
 
       const form = document.createElement("div");
@@ -7664,17 +7737,24 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
       if (!compact) {
         send.classList.add("comment-submit-btn");
       }
+      const syncSendState = () => {
+        const hasValue = !!`${field.value || ""}`.trim();
+        send.disabled = !hasValue || send.classList.contains("is-loading");
+        send.classList.toggle("is-disabled", !hasValue);
+      };
       send.addEventListener("click", async () => {
+        if (!`${field.value || ""}`.trim()) return;
         if (send.classList.contains("is-loading")) return;
         send.classList.add("is-loading");
-        send.disabled = true;
+        syncSendState();
         try {
           await submitComment(post, field);
         } finally {
           send.classList.remove("is-loading");
-          send.disabled = false;
+          syncSendState();
         }
       });
+      field.addEventListener("input", syncSendState);
 
       field.addEventListener("keydown", (event) => {
         if (event.isComposing) return;
@@ -7687,10 +7767,36 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
       });
 
       actions.appendChild(send);
+      if (showQuickReplies) {
+        const quickReplies = getCommentQuickReplySuggestions(post).filter(Boolean).slice(0, 3);
+        if (quickReplies.length) {
+          const quickRow = document.createElement("div");
+          quickRow.className = "comment-quick-replies";
+          quickReplies.forEach((reply) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "chip chip-ghost chip-comment-quick";
+            chip.textContent = reply;
+            chip.addEventListener("click", () => {
+              const current = `${field.value || ""}`.trim();
+              field.value = current ? `${current} ${reply}` : reply;
+              syncSendState();
+              field.focus();
+              if (typeof field.setSelectionRange === "function") {
+                const end = field.value.length;
+                field.setSelectionRange(end, end);
+              }
+            });
+            quickRow.appendChild(chip);
+          });
+          body.appendChild(quickRow);
+        }
+      }
       body.appendChild(field);
       body.appendChild(actions);
       form.appendChild(avatar);
       form.appendChild(body);
+      syncSendState();
       return form;
     }
 function buildFeedCommentSection(
@@ -7699,9 +7805,11 @@ function buildFeedCommentSection(
       currentUser,
       commentsByPost,
       commentsLoading,
-      commentsEnabled
+      commentsEnabled,
+      options = {}
     ) {
       if (!post) return null;
+      const { showQuickReplies = false } = options;
       const commentSection = document.createElement("div");
       commentSection.className = "comment-section";
 
@@ -7739,6 +7847,7 @@ function buildFeedCommentSection(
       if (currentUser && commentsEnabled) {
         const form = buildCommentComposer(post, tr, currentUser, {
           submitLabel: tr.commentAdd || "Post",
+          showQuickReplies,
         });
         if (form) {
           commentSection.appendChild(form);
