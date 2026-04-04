@@ -258,6 +258,7 @@ const shortsVisibilityRatios = new Map();
 let shortsSoundEnabled = false;
 const commentReplyTargets = new Map();
 const commentReplyFocusRequests = new Set();
+const expandedCommentThreads = new Set();
 const shortsPlaybackCueTimers = new WeakMap();
 const shortsMediaTapTimers = new WeakMap();
 const shortsHoldStates = new WeakMap();
@@ -2980,6 +2981,25 @@ function getCommentReplyTarget(postId) {
       const normalizedPostId = `${postId || ""}`.trim();
       if (!normalizedPostId) return null;
       return commentReplyTargets.get(normalizedPostId) || null;
+    }
+function getCommentThreadKey(postId, commentId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      const normalizedCommentId = `${commentId || ""}`.trim();
+      if (!normalizedPostId || !normalizedCommentId) return "";
+      return `${normalizedPostId}:${normalizedCommentId}`;
+    }
+function isCommentThreadExpanded(postId, commentId) {
+      return expandedCommentThreads.has(getCommentThreadKey(postId, commentId));
+    }
+function setCommentThreadExpanded(postId, commentId, expanded) {
+      const key = getCommentThreadKey(postId, commentId);
+      if (!key) return;
+      if (expanded) {
+        expandedCommentThreads.add(key);
+      } else {
+        expandedCommentThreads.delete(key);
+      }
+      refreshFeedPostComments(postId);
     }
 function clearCommentReplyTarget(postId, { refresh = true } = {}) {
       const normalizedPostId = `${postId || ""}`.trim();
@@ -7464,6 +7484,42 @@ function buildCommentReplyLookup(comments = []) {
       });
       return replyLookup;
     }
+function buildCommentReplyTree(comments = []) {
+      const replyLookup = buildCommentReplyLookup(comments);
+      const byId = new Map();
+      const childrenByParentId = new Map();
+      const roots = [];
+      comments.forEach((comment) => {
+        byId.set(`${comment?.id || ""}`, comment);
+      });
+      comments.forEach((comment) => {
+        const commentId = `${comment?.id || ""}`;
+        const replyMeta = replyLookup.get(commentId);
+        const parentId =
+          replyMeta?.parentId && byId.has(replyMeta.parentId)
+            ? replyMeta.parentId
+            : "";
+        if (parentId) {
+          const siblings = childrenByParentId.get(parentId) || [];
+          siblings.push(comment);
+          childrenByParentId.set(parentId, siblings);
+        } else {
+          roots.push(comment);
+        }
+      });
+      return { replyLookup, childrenByParentId, roots };
+    }
+function doesCommentThreadContain(childrenByParentId, rootId, targetId) {
+      if (!rootId || !targetId) return false;
+      const queue = [...(childrenByParentId.get(rootId) || [])];
+      while (queue.length) {
+        const next = queue.shift();
+        const nextId = `${next?.id || ""}`;
+        if (nextId === targetId) return true;
+        queue.push(...(childrenByParentId.get(nextId) || []));
+      }
+      return false;
+    }
 function jumpToRenderedComment(commentId) {
       const normalizedCommentId = `${commentId || ""}`.trim();
       if (!normalizedCommentId || typeof document === "undefined") return;
@@ -7478,6 +7534,66 @@ function jumpToRenderedComment(commentId) {
       window.setTimeout(() => {
         target.classList.remove("is-highlighted");
       }, 1400);
+    }
+function buildCommentThreadList(post, comments, tr) {
+      const list = document.createElement("div");
+      list.className = "comment-list";
+      const { replyLookup, childrenByParentId, roots } = buildCommentReplyTree(comments);
+      const replyTargetId = `${getCommentReplyTarget(post?.id)?.commentId || ""}`;
+
+      const renderNode = (comment) => {
+        const fragment = document.createDocumentFragment();
+        const commentId = `${comment?.id || ""}`;
+        const children = childrenByParentId.get(commentId) || [];
+        const item = buildCommentItemElement(comment, tr, {
+          onReply: () => setCommentReplyTarget(post.id, comment),
+          onJumpToParent: jumpToRenderedComment,
+          replyMeta: replyLookup.get(commentId) || null,
+        });
+        if (item) {
+          fragment.appendChild(item);
+        }
+        if (!children.length) return fragment;
+
+        const thread = document.createElement("div");
+        thread.className = "comment-thread";
+        const shouldAutoExpand =
+          children.length <= 1 ||
+          replyTargetId === commentId ||
+          doesCommentThreadContain(childrenByParentId, commentId, replyTargetId);
+        const expanded = shouldAutoExpand || isCommentThreadExpanded(post.id, commentId);
+        if (children.length > 1) {
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = "comment-thread-toggle";
+          toggle.textContent = expanded
+            ? tr.commentHideReplies || "Hide replies"
+            : (tr.commentViewReplies || "View {count} replies").replace(
+                "{count}",
+                `${children.length}`
+              );
+          toggle.addEventListener("click", () => {
+            setCommentThreadExpanded(post.id, commentId, !expanded);
+          });
+          thread.appendChild(toggle);
+        }
+        const replies = document.createElement("div");
+        replies.className = "comment-thread-replies";
+        if (!expanded) {
+          replies.hidden = true;
+        }
+        children.forEach((child) => {
+          replies.appendChild(renderNode(child));
+        });
+        thread.appendChild(replies);
+        fragment.appendChild(thread);
+        return fragment;
+      };
+
+      roots.forEach((comment) => {
+        list.appendChild(renderNode(comment));
+      });
+      return list;
     }
 function buildCommentItemElement(comment, tr, options = {}) {
       const { onReply = null, onJumpToParent = null, replyMeta = null } = options;
@@ -8048,19 +8164,7 @@ function buildFeedCommentSection(
           empty.textContent = tr.commentEmpty || "No comments yet.";
           commentSection.appendChild(empty);
         } else {
-          const list = document.createElement("div");
-          list.className = "comment-list";
-          const replyLookup = buildCommentReplyLookup(comments);
-          comments.forEach((comment) => {
-            const item = buildCommentItemElement(comment, tr, {
-              onReply: () => setCommentReplyTarget(post.id, comment),
-              onJumpToParent: jumpToRenderedComment,
-              replyMeta: replyLookup.get(`${comment.id || ""}`) || null,
-            });
-            if (item) {
-              list.appendChild(item);
-            }
-          });
+          const list = buildCommentThreadList(post, comments, tr);
           commentSection.appendChild(list);
         }
       }
@@ -8554,8 +8658,6 @@ export function renderPostDetail() {
 
       if (commentsEl) {
         commentsEl.innerHTML = "";
-        const list = document.createElement("div");
-        list.className = "comment-list";
         const comments = commentsByPost.get(post.id) || [];
         if (!comments.length && !commentsLoading.has(post.id)) {
           const empty = document.createElement("div");
@@ -8568,18 +8670,7 @@ export function renderPostDetail() {
           loading.textContent = tr.loading || "読み込み中...";
           commentsEl.appendChild(loading);
         } else {
-          const replyLookup = buildCommentReplyLookup(comments);
-          comments.forEach((comment) => {
-            const row = buildCommentItemElement(comment, tr, {
-              onReply: () => setCommentReplyTarget(post.id, comment),
-              onJumpToParent: jumpToRenderedComment,
-              replyMeta: replyLookup.get(`${comment.id || ""}`) || null,
-            });
-            if (row) {
-              list.appendChild(row);
-            }
-          });
-          commentsEl.appendChild(list);
+          commentsEl.appendChild(buildCommentThreadList(post, comments, tr));
         }
 
         if (currentUser && commentsEnabled) {
