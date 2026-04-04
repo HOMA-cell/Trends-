@@ -7415,14 +7415,81 @@ function buildViewerCommentProfile(user) {
           "",
       };
     }
+function normalizeCommentHandle(value) {
+      return `${value || ""}`.replace(/^@/, "").trim().toLowerCase();
+    }
+function parseCommentReplyPrefix(body = "") {
+      const rawBody = `${body || ""}`;
+      const trimmedBody = rawBody.trim();
+      const replyMatch = trimmedBody.match(/^(@[\w.-]+)\s+([\s\S]+)$/);
+      if (!replyMatch) return null;
+      return {
+        handle: replyMatch[1],
+        normalizedHandle: normalizeCommentHandle(replyMatch[1]),
+        bodyWithoutPrefix: replyMatch[2],
+      };
+    }
+function buildCommentReplyLookup(comments = []) {
+      const replyLookup = new Map();
+      const latestCommentByHandle = new Map();
+      comments.forEach((comment) => {
+        if (!comment) return;
+        const replyPrefix = parseCommentReplyPrefix(comment.body || "");
+        if (replyPrefix) {
+          const parentComment =
+            latestCommentByHandle.get(replyPrefix.normalizedHandle) || null;
+          const parentHandle = parentComment
+            ? formatHandle(
+                parentComment.profile?.handle ||
+                  parentComment.profile?.username ||
+                  "user"
+              ) || replyPrefix.handle
+            : replyPrefix.handle;
+          const parentDisplayName = parentComment
+            ? `${parentComment.profile?.display_name || ""}`.trim() || parentHandle
+            : parentHandle;
+          replyLookup.set(`${comment.id || ""}`, {
+            ...replyPrefix,
+            parentId: `${parentComment?.id || ""}`,
+            parentDisplayName,
+          });
+        }
+        const authorHandle =
+          formatHandle(
+            comment.profile?.handle ||
+              comment.profile?.username ||
+              "user"
+          ) || "@user";
+        latestCommentByHandle.set(normalizeCommentHandle(authorHandle), comment);
+      });
+      return replyLookup;
+    }
+function jumpToRenderedComment(commentId) {
+      const normalizedCommentId = `${commentId || ""}`.trim();
+      if (!normalizedCommentId || typeof document === "undefined") return;
+      const selector = `.comment-item[data-comment-id="${normalizedCommentId}"]`;
+      const target =
+        getCommentSheetBody()?.querySelector?.(selector) ||
+        $("detail-comments")?.querySelector?.(selector) ||
+        document.querySelector(selector);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.add("is-highlighted");
+      window.setTimeout(() => {
+        target.classList.remove("is-highlighted");
+      }, 1400);
+    }
 function buildCommentItemElement(comment, tr, options = {}) {
-      const { onReply = null } = options;
+      const { onReply = null, onJumpToParent = null, replyMeta = null } = options;
       if (!comment) return null;
       const item = document.createElement("div");
       item.className = "comment-item";
       item.dataset.commentId = `${comment.id || ""}`;
       if (comment.pending) {
         item.classList.add("is-pending");
+      }
+      if (replyMeta) {
+        item.classList.add("is-reply");
       }
 
       const avatarEl = document.createElement("div");
@@ -7475,14 +7542,31 @@ function buildCommentItemElement(comment, tr, options = {}) {
       const text = document.createElement("div");
       text.className = "comment-text";
       const rawBody = `${comment.body || ""}`;
-      const trimmedBody = rawBody.trim();
-      const replyMatch = trimmedBody.match(/^(@\S+)\s+([\s\S]+)$/);
-      if (replyMatch) {
+      const parsedReply = replyMeta || parseCommentReplyPrefix(rawBody);
+      if (parsedReply && parsedReply.parentDisplayName) {
+        const replyContext = document.createElement(
+          parsedReply.parentId && typeof onJumpToParent === "function"
+            ? "button"
+            : "div"
+        );
+        if (replyContext instanceof HTMLButtonElement) {
+          replyContext.type = "button";
+          replyContext.addEventListener("click", () => {
+            onJumpToParent(parsedReply.parentId);
+          });
+        }
+        replyContext.className = "comment-reply-context";
+        replyContext.textContent = `${
+          tr.commentReplyingTo || "Replying to"
+        } ${parsedReply.parentDisplayName}`;
+        bubble.appendChild(replyContext);
+      }
+      if (parsedReply) {
         const mention = document.createElement("span");
         mention.className = "comment-text-mention";
-        mention.textContent = `${replyMatch[1]} `;
+        mention.textContent = `${parsedReply.handle} `;
         const replyRest = document.createElement("span");
-        replyRest.textContent = replyMatch[2];
+        replyRest.textContent = parsedReply.bodyWithoutPrefix;
         text.append(mention, replyRest);
       } else {
         text.textContent = rawBody;
@@ -7966,9 +8050,12 @@ function buildFeedCommentSection(
         } else {
           const list = document.createElement("div");
           list.className = "comment-list";
+          const replyLookup = buildCommentReplyLookup(comments);
           comments.forEach((comment) => {
             const item = buildCommentItemElement(comment, tr, {
               onReply: () => setCommentReplyTarget(post.id, comment),
+              onJumpToParent: jumpToRenderedComment,
+              replyMeta: replyLookup.get(`${comment.id || ""}`) || null,
             });
             if (item) {
               list.appendChild(item);
@@ -8481,9 +8568,12 @@ export function renderPostDetail() {
           loading.textContent = tr.loading || "読み込み中...";
           commentsEl.appendChild(loading);
         } else {
+          const replyLookup = buildCommentReplyLookup(comments);
           comments.forEach((comment) => {
             const row = buildCommentItemElement(comment, tr, {
               onReply: () => setCommentReplyTarget(post.id, comment),
+              onJumpToParent: jumpToRenderedComment,
+              replyMeta: replyLookup.get(`${comment.id || ""}`) || null,
             });
             if (row) {
               list.appendChild(row);
