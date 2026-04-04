@@ -6020,6 +6020,7 @@ async function loadProfilePostCount() {
       const readIds = Array.isArray(options.readIds)
         ? options.readIds.map((id) => `${id || ""}`.trim()).filter(Boolean)
         : [];
+      const replyToComment = !!options.replyToComment;
       if (note.post_id) {
         if (typeof setActivePage === "function") {
           setActivePage("feed");
@@ -6030,6 +6031,10 @@ async function loadProfilePostCount() {
               focusComments: note.type === "comment",
               focusCommentActorId: note.type === "comment" ? note.actor_id : "",
               focusCommentCreatedAt: note.type === "comment" ? note.created_at : "",
+              replyToCommentActorId:
+                note.type === "comment" && replyToComment ? note.actor_id : "",
+              replyToCommentCreatedAt:
+                note.type === "comment" && replyToComment ? note.created_at : "",
             });
             return;
           }
@@ -6289,6 +6294,16 @@ async function loadProfilePostCount() {
           openNotificationDestination(note, post, { readIds });
         });
         actions.appendChild(primaryBtn);
+
+        if (note.type === "comment") {
+          const replyBtn = document.createElement("button");
+          replyBtn.className = "btn btn-primary btn-xs";
+          replyBtn.textContent = tr.commentReply || "Reply";
+          replyBtn.addEventListener("click", () => {
+            openNotificationDestination(note, post, { readIds, replyToComment: true });
+          });
+          actions.appendChild(replyBtn);
+        }
 
         if (note.type === "follow" && note.actor_id && note.actor_id !== currentUser?.id) {
           const isFollowing = followingIds.has(note.actor_id);
@@ -6651,6 +6666,19 @@ async function loadProfilePostCount() {
             openNotificationDestination(note, post, { readIds });
           });
           actions.appendChild(viewBtn);
+
+          if (note.type === "comment") {
+            const replyBtn = document.createElement("button");
+            replyBtn.className = "btn btn-primary btn-xs";
+            replyBtn.textContent = tr.commentReply || "Reply";
+            replyBtn.addEventListener("click", () => {
+              openNotificationDestination(note, post, {
+                readIds,
+                replyToComment: true,
+              });
+            });
+            actions.appendChild(replyBtn);
+          }
         }
 
         if (!group.isGrouped && note.actor_id && note.actor_id !== currentUser?.id) {

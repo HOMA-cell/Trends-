@@ -179,6 +179,7 @@ let feedCommentSheetBound = false;
 let feedPageSizeResizeBound = false;
 let feedPageSizeResizeTimer = null;
 const commentFocusRequests = new Map();
+const commentReplyRequests = new Map();
 const feedAdaptiveChunkSize = new Map();
 const feedImageHydrationQueue = [];
 let feedImageHydrationActive = 0;
@@ -3007,6 +3008,30 @@ function clearCommentFocusRequest(postId) {
       if (!normalizedPostId) return;
       commentFocusRequests.delete(normalizedPostId);
     }
+function getCommentReplyRequest(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return null;
+      return commentReplyRequests.get(normalizedPostId) || null;
+    }
+function setCommentReplyRequest(postId, request = {}) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      const next = {
+        commentId: `${request.commentId || ""}`.trim(),
+        actorId: `${request.actorId || ""}`.trim(),
+        createdAt: `${request.createdAt || ""}`.trim(),
+      };
+      if (!next.commentId && !next.actorId) {
+        commentReplyRequests.delete(normalizedPostId);
+        return;
+      }
+      commentReplyRequests.set(normalizedPostId, next);
+    }
+function clearCommentReplyRequest(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      commentReplyRequests.delete(normalizedPostId);
+    }
 function getCommentThreadKey(postId, commentId) {
       const normalizedPostId = `${postId || ""}`.trim();
       const normalizedCommentId = `${commentId || ""}`.trim();
@@ -3053,9 +3078,8 @@ function focusCommentComposer(postId) {
         }
       });
     }
-function setCommentReplyTarget(postId, comment) {
-      const normalizedPostId = `${postId || ""}`.trim();
-      if (!normalizedPostId || !comment) return;
+function buildCommentReplyTarget(comment) {
+      if (!comment) return null;
       const rawHandle =
         comment.profile?.handle ||
         comment.profile?.username ||
@@ -3063,15 +3087,39 @@ function setCommentReplyTarget(postId, comment) {
       const handleText = formatHandle(rawHandle) || "@user";
       const displayName =
         `${comment.profile?.display_name || ""}`.trim() || handleText;
-      commentReplyTargets.set(normalizedPostId, {
+      return {
         commentId: `${comment.id || ""}`,
         userId: `${comment.user_id || ""}`,
         handle: handleText,
         displayName,
         preview: getCaptionPreviewText(comment.body || "") || handleText,
+      };
+    }
+function assignCommentReplyTarget(
+      postId,
+      comment,
+      { refresh = true, requestFocus = true } = {}
+    ) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId || !comment) return;
+      const nextTarget = buildCommentReplyTarget(comment);
+      if (!nextTarget) return;
+      commentReplyTargets.set(normalizedPostId, nextTarget);
+      clearCommentReplyRequest(normalizedPostId);
+      if (requestFocus) {
+        commentReplyFocusRequests.add(normalizedPostId);
+      }
+      if (refresh) {
+        refreshFeedPostComments(normalizedPostId);
+      }
+    }
+function setCommentReplyTarget(postId, comment) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId || !comment) return;
+      assignCommentReplyTarget(normalizedPostId, comment, {
+        refresh: true,
+        requestFocus: true,
       });
-      commentReplyFocusRequests.add(normalizedPostId);
-      refreshFeedPostComments(normalizedPostId);
       focusCommentComposer(normalizedPostId);
     }
 function closeCommentSheet() {
@@ -3079,6 +3127,7 @@ function closeCommentSheet() {
       activeCommentPostId = "";
       if (previousPostId) {
         clearCommentFocusRequest(previousPostId);
+        clearCommentReplyRequest(previousPostId);
       }
       syncCommentSheetContextClasses(null);
       const backdrop = getCommentSheetBackdrop();
@@ -3108,6 +3157,14 @@ function renderCommentSheetForPost(postId) {
       const comments = commentsByPost.get(post.id) || [];
       const focusRequest = getCommentFocusRequest(post.id);
       const focusCommentId = resolveCommentFocusId(comments, focusRequest);
+      const replyRequest = getCommentReplyRequest(post.id);
+      const replyComment = resolveCommentByRequest(comments, replyRequest);
+      if (replyComment) {
+        assignCommentReplyTarget(post.id, replyComment, {
+          refresh: false,
+          requestFocus: true,
+        });
+      }
       if (titleEl) {
         const commentsTitle = tr.comments || "Comments";
         titleEl.textContent = comments.length
@@ -3159,10 +3216,16 @@ function openCommentSheet(postId, options = {}) {
         actorId: options.focusCommentActorId,
         createdAt: options.focusCommentCreatedAt,
       });
+      setCommentReplyRequest(normalizedPostId, {
+        commentId: options.replyToCommentId,
+        actorId: options.replyToCommentActorId,
+        createdAt: options.replyToCommentCreatedAt,
+      });
       const previousPostId = activeCommentPostId;
       activeCommentPostId = normalizedPostId;
       if (previousPostId && previousPostId !== normalizedPostId) {
         clearCommentFocusRequest(previousPostId);
+        clearCommentReplyRequest(previousPostId);
         refreshFeedPostComments(previousPostId);
       }
       renderCommentSheetForPost(normalizedPostId);
@@ -7596,6 +7659,13 @@ function resolveCommentFocusId(comments = [], request = null) {
       });
       return `${bestComment?.id || ""}`.trim();
     }
+function resolveCommentByRequest(comments = [], request = null) {
+      const targetId = resolveCommentFocusId(comments, request);
+      if (!targetId) return null;
+      return (
+        comments.find((comment) => `${comment?.id || ""}`.trim() === targetId) || null
+      );
+    }
 function doesCommentThreadContain(childrenByParentId, rootId, targetId) {
       if (!rootId || !targetId) return false;
       const queue = [...(childrenByParentId.get(rootId) || [])];
@@ -8556,6 +8626,7 @@ export function closePostDetail(options = {}) {
       detailCommentsFocusRequested = false;
       if (previousPostId) {
         clearCommentFocusRequest(previousPostId);
+        clearCommentReplyRequest(previousPostId);
       }
       if (options.syncHash !== false) {
         clearPostHash(previousPostId);
@@ -8577,6 +8648,11 @@ export function openPostDetail(postId, options = {}) {
         commentId: options.focusCommentId,
         actorId: options.focusCommentActorId,
         createdAt: options.focusCommentCreatedAt,
+      });
+      setCommentReplyRequest(normalizedPostId, {
+        commentId: options.replyToCommentId,
+        actorId: options.replyToCommentActorId,
+        createdAt: options.replyToCommentCreatedAt,
       });
       detailCommentsFocusRequested = !!options.focusComments;
       currentDetailPostId = normalizedPostId;
@@ -8766,6 +8842,14 @@ export function renderPostDetail() {
         const comments = commentsByPost.get(post.id) || [];
         const focusRequest = getCommentFocusRequest(post.id);
         const focusCommentId = resolveCommentFocusId(comments, focusRequest);
+        const replyRequest = getCommentReplyRequest(post.id);
+        const replyComment = resolveCommentByRequest(comments, replyRequest);
+        if (replyComment) {
+          assignCommentReplyTarget(post.id, replyComment, {
+            refresh: false,
+            requestFocus: true,
+          });
+        }
         if (!comments.length && !commentsLoading.has(post.id)) {
           const empty = document.createElement("div");
           empty.className = "detail-sub";
