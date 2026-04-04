@@ -6028,6 +6028,8 @@ async function loadProfilePostCount() {
           if (post?.id) {
             openPostDetail(`${post.id}`, {
               focusComments: note.type === "comment",
+              focusCommentActorId: note.type === "comment" ? note.actor_id : "",
+              focusCommentCreatedAt: note.type === "comment" ? note.created_at : "",
             });
             return;
           }

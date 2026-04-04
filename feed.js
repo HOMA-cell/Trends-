@@ -178,6 +178,7 @@ let feedAdvancedDismissBound = false;
 let feedCommentSheetBound = false;
 let feedPageSizeResizeBound = false;
 let feedPageSizeResizeTimer = null;
+const commentFocusRequests = new Map();
 const feedAdaptiveChunkSize = new Map();
 const feedImageHydrationQueue = [];
 let feedImageHydrationActive = 0;
@@ -2982,6 +2983,30 @@ function getCommentReplyTarget(postId) {
       if (!normalizedPostId) return null;
       return commentReplyTargets.get(normalizedPostId) || null;
     }
+function getCommentFocusRequest(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return null;
+      return commentFocusRequests.get(normalizedPostId) || null;
+    }
+function setCommentFocusRequest(postId, request = {}) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      const next = {
+        commentId: `${request.commentId || ""}`.trim(),
+        actorId: `${request.actorId || ""}`.trim(),
+        createdAt: `${request.createdAt || ""}`.trim(),
+      };
+      if (!next.commentId && !next.actorId) {
+        commentFocusRequests.delete(normalizedPostId);
+        return;
+      }
+      commentFocusRequests.set(normalizedPostId, next);
+    }
+function clearCommentFocusRequest(postId) {
+      const normalizedPostId = `${postId || ""}`.trim();
+      if (!normalizedPostId) return;
+      commentFocusRequests.delete(normalizedPostId);
+    }
 function getCommentThreadKey(postId, commentId) {
       const normalizedPostId = `${postId || ""}`.trim();
       const normalizedCommentId = `${commentId || ""}`.trim();
@@ -3052,6 +3077,9 @@ function setCommentReplyTarget(postId, comment) {
 function closeCommentSheet() {
       const previousPostId = activeCommentPostId;
       activeCommentPostId = "";
+      if (previousPostId) {
+        clearCommentFocusRequest(previousPostId);
+      }
       syncCommentSheetContextClasses(null);
       const backdrop = getCommentSheetBackdrop();
       if (backdrop) {
@@ -3078,6 +3106,8 @@ function renderCommentSheetForPost(postId) {
       const commentsLoading = getCommentsLoading();
       const commentsEnabled = isCommentsEnabled();
       const comments = commentsByPost.get(post.id) || [];
+      const focusRequest = getCommentFocusRequest(post.id);
+      const focusCommentId = resolveCommentFocusId(comments, focusRequest);
       if (titleEl) {
         const commentsTitle = tr.comments || "Comments";
         titleEl.textContent = comments.length
@@ -3104,6 +3134,7 @@ function renderCommentSheetForPost(postId) {
         commentsEnabled,
         {
           showQuickReplies: true,
+          focusCommentId,
         }
       );
       if (section) {
@@ -3111,15 +3142,27 @@ function renderCommentSheetForPost(postId) {
         section.classList.toggle("is-shorts-context", isShortsStylePost(post));
         bodyRoot.appendChild(section);
       }
+      if (focusCommentId && typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          jumpToRenderedComment(focusCommentId, { surface: "sheet" });
+          clearCommentFocusRequest(post.id);
+        });
+      }
     }
-function openCommentSheet(postId) {
+function openCommentSheet(postId, options = {}) {
       const normalizedPostId = `${postId || ""}`.trim();
       if (!normalizedPostId) return;
       const post = getPostById(normalizedPostId);
       if (!post) return;
+      setCommentFocusRequest(normalizedPostId, {
+        commentId: options.focusCommentId,
+        actorId: options.focusCommentActorId,
+        createdAt: options.focusCommentCreatedAt,
+      });
       const previousPostId = activeCommentPostId;
       activeCommentPostId = normalizedPostId;
       if (previousPostId && previousPostId !== normalizedPostId) {
+        clearCommentFocusRequest(previousPostId);
         refreshFeedPostComments(previousPostId);
       }
       renderCommentSheetForPost(normalizedPostId);
@@ -7509,6 +7552,50 @@ function buildCommentReplyTree(comments = []) {
       });
       return { replyLookup, childrenByParentId, roots };
     }
+function resolveCommentFocusId(comments = [], request = null) {
+      if (!request || !Array.isArray(comments) || !comments.length) return "";
+      const explicitCommentId = `${request.commentId || ""}`.trim();
+      if (explicitCommentId) {
+        const directMatch = comments.find(
+          (comment) => `${comment?.id || ""}`.trim() === explicitCommentId
+        );
+        if (directMatch) {
+          return explicitCommentId;
+        }
+      }
+      const actorId = `${request.actorId || ""}`.trim();
+      if (!actorId) return "";
+      const actorComments = comments.filter(
+        (comment) => `${comment?.user_id || ""}`.trim() === actorId
+      );
+      if (!actorComments.length) return "";
+      const targetTime = Date.parse(request.createdAt || "");
+      if (!Number.isFinite(targetTime)) {
+        return `${actorComments[actorComments.length - 1]?.id || ""}`.trim();
+      }
+      let bestComment = actorComments[0] || null;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      actorComments.forEach((comment) => {
+        const nextTime = Date.parse(comment?.created_at || "");
+        const nextDistance = Number.isFinite(nextTime)
+          ? Math.abs(nextTime - targetTime)
+          : Number.POSITIVE_INFINITY;
+        if (nextDistance < bestDistance) {
+          bestDistance = nextDistance;
+          bestComment = comment;
+          return;
+        }
+        if (
+          nextDistance === bestDistance &&
+          `${comment?.created_at || ""}`.localeCompare(
+            `${bestComment?.created_at || ""}`
+          ) > 0
+        ) {
+          bestComment = comment;
+        }
+      });
+      return `${bestComment?.id || ""}`.trim();
+    }
 function doesCommentThreadContain(childrenByParentId, rootId, targetId) {
       if (!rootId || !targetId) return false;
       const queue = [...(childrenByParentId.get(rootId) || [])];
@@ -7520,11 +7607,18 @@ function doesCommentThreadContain(childrenByParentId, rootId, targetId) {
       }
       return false;
     }
-function jumpToRenderedComment(commentId) {
+function jumpToRenderedComment(commentId, options = {}) {
       const normalizedCommentId = `${commentId || ""}`.trim();
       if (!normalizedCommentId || typeof document === "undefined") return;
       const selector = `.comment-item[data-comment-id="${normalizedCommentId}"]`;
+      const preferredSurface = `${options.surface || ""}`.trim();
       const target =
+        (preferredSurface === "sheet"
+          ? getCommentSheetBody()?.querySelector?.(selector)
+          : null) ||
+        (preferredSurface === "detail"
+          ? $("detail-comments")?.querySelector?.(selector)
+          : null) ||
         getCommentSheetBody()?.querySelector?.(selector) ||
         $("detail-comments")?.querySelector?.(selector) ||
         document.querySelector(selector);
@@ -7535,11 +7629,12 @@ function jumpToRenderedComment(commentId) {
         target.classList.remove("is-highlighted");
       }, 1400);
     }
-function buildCommentThreadList(post, comments, tr) {
+function buildCommentThreadList(post, comments, tr, options = {}) {
       const list = document.createElement("div");
       list.className = "comment-list";
       const { replyLookup, childrenByParentId, roots } = buildCommentReplyTree(comments);
       const replyTargetId = `${getCommentReplyTarget(post?.id)?.commentId || ""}`;
+      const focusCommentId = `${options.focusCommentId || ""}`.trim();
 
       const renderNode = (comment) => {
         const fragment = document.createDocumentFragment();
@@ -7560,6 +7655,8 @@ function buildCommentThreadList(post, comments, tr) {
         const shouldAutoExpand =
           children.length <= 1 ||
           replyTargetId === commentId ||
+          focusCommentId === commentId ||
+          doesCommentThreadContain(childrenByParentId, commentId, focusCommentId) ||
           doesCommentThreadContain(childrenByParentId, commentId, replyTargetId);
         const expanded = shouldAutoExpand || isCommentThreadExpanded(post.id, commentId);
         if (children.length > 1) {
@@ -8141,7 +8238,7 @@ function buildFeedCommentSection(
       options = {}
     ) {
       if (!post) return null;
-      const { showQuickReplies = false } = options;
+      const { showQuickReplies = false, focusCommentId = "" } = options;
       const commentSection = document.createElement("div");
       commentSection.className = "comment-section";
 
@@ -8164,7 +8261,7 @@ function buildFeedCommentSection(
           empty.textContent = tr.commentEmpty || "No comments yet.";
           commentSection.appendChild(empty);
         } else {
-          const list = buildCommentThreadList(post, comments, tr);
+          const list = buildCommentThreadList(post, comments, tr, { focusCommentId });
           commentSection.appendChild(list);
         }
       }
@@ -8457,6 +8554,9 @@ export function closePostDetail(options = {}) {
       const previousPostId = currentDetailPostId;
       currentDetailPostId = null;
       detailCommentsFocusRequested = false;
+      if (previousPostId) {
+        clearCommentFocusRequest(previousPostId);
+      }
       if (options.syncHash !== false) {
         clearPostHash(previousPostId);
       }
@@ -8473,6 +8573,11 @@ export function openPostDetail(postId, options = {}) {
         (item) => `${item?.id || ""}` === normalizedPostId
       );
       if (!hasPost) return;
+      setCommentFocusRequest(normalizedPostId, {
+        commentId: options.focusCommentId,
+        actorId: options.focusCommentActorId,
+        createdAt: options.focusCommentCreatedAt,
+      });
       detailCommentsFocusRequested = !!options.focusComments;
       currentDetailPostId = normalizedPostId;
       renderPostDetail();
@@ -8485,7 +8590,7 @@ export function openPostDetail(postId, options = {}) {
       if (!commentsByPost.has(normalizedPostId) && commentsEnabled) {
         loadCommentsForPost(normalizedPostId).then(() => renderPostDetail());
       }
-      if (detailCommentsFocusRequested) {
+      if (detailCommentsFocusRequested && !getCommentFocusRequest(normalizedPostId)) {
         focusPostDetailComments();
       }
     }
@@ -8659,6 +8764,8 @@ export function renderPostDetail() {
       if (commentsEl) {
         commentsEl.innerHTML = "";
         const comments = commentsByPost.get(post.id) || [];
+        const focusRequest = getCommentFocusRequest(post.id);
+        const focusCommentId = resolveCommentFocusId(comments, focusRequest);
         if (!comments.length && !commentsLoading.has(post.id)) {
           const empty = document.createElement("div");
           empty.className = "detail-sub";
@@ -8670,7 +8777,9 @@ export function renderPostDetail() {
           loading.textContent = tr.loading || "読み込み中...";
           commentsEl.appendChild(loading);
         } else {
-          commentsEl.appendChild(buildCommentThreadList(post, comments, tr));
+          commentsEl.appendChild(
+            buildCommentThreadList(post, comments, tr, { focusCommentId })
+          );
         }
 
         if (currentUser && commentsEnabled) {
@@ -8687,6 +8796,18 @@ export function renderPostDetail() {
         }
       }
       if (detailCommentsFocusRequested && `${currentDetailPostId || ""}` === `${post.id || ""}`) {
-        focusPostDetailComments();
+        const focusCommentId = resolveCommentFocusId(
+          commentsByPost.get(post.id) || [],
+          getCommentFocusRequest(post.id)
+        );
+        if (focusCommentId && typeof window !== "undefined") {
+          window.requestAnimationFrame(() => {
+            jumpToRenderedComment(focusCommentId, { surface: "detail" });
+            clearCommentFocusRequest(post.id);
+          });
+          detailCommentsFocusRequested = false;
+        } else {
+          focusPostDetailComments();
+        }
       }
     }
