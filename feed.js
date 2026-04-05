@@ -6529,6 +6529,10 @@ export function renderFeed(options = {}) {
       header.className = "post-header";
       const headerActions = document.createElement("div");
       headerActions.className = "post-header-actions";
+      const identityBtn = document.createElement("button");
+      identityBtn.type = "button";
+      identityBtn.className = "post-identity-link profile-link";
+      identityBtn.setAttribute("data-user-id", post.user_id || "");
 
       const avatar = document.createElement("div");
       avatar.className = "avatar";
@@ -6552,8 +6556,7 @@ export function renderFeed(options = {}) {
       const userMain = document.createElement("div");
       userMain.className = "post-user-main";
       const nameSpan = document.createElement("span");
-      nameSpan.className = "profile-link";
-      nameSpan.setAttribute("data-user-id", post.user_id);
+      nameSpan.className = "post-user-name";
       const handleBare = handleText.replace("@", "");
       if (displayName && displayName.toLowerCase() !== handleBare.toLowerCase()) {
         nameSpan.textContent = displayName;
@@ -6571,8 +6574,7 @@ export function renderFeed(options = {}) {
       subRow.className = "post-meta-line";
       if (displayName && displayName.toLowerCase() !== handleBare.toLowerCase()) {
         const handleSpan = document.createElement("span");
-        handleSpan.className = "handle profile-link post-handle-inline";
-        handleSpan.setAttribute("data-user-id", post.user_id);
+        handleSpan.className = "handle post-handle-inline";
         handleSpan.textContent = handleText;
         subRow.appendChild(handleSpan);
       }
@@ -6672,6 +6674,17 @@ export function renderFeed(options = {}) {
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost);
       appendPrimaryAction(commentBtn);
 
+      const openDetailBtn = document.createElement("button");
+      openDetailBtn.className = "chip chip-log chip-action post-inline-open";
+      openDetailBtn.dataset.postAction = "open-detail";
+      setActionButtonContent(openDetailBtn, {
+        kind: "open",
+        icon: "↗",
+        label: tr.notificationViewPost || "View post",
+      });
+      openDetailBtn.setAttribute("aria-label", tr.notificationViewPost || "View post");
+      appendPrimaryAction(openDetailBtn);
+
       const shareBtn = document.createElement("button");
       shareBtn.className = "chip chip-log chip-action";
       shareBtn.dataset.postAction = "share-post";
@@ -6718,8 +6731,8 @@ export function renderFeed(options = {}) {
         headerActions.appendChild(followBtn);
       }
 
-      header.appendChild(avatar);
-      header.appendChild(meta);
+      identityBtn.append(avatar, meta);
+      header.appendChild(identityBtn);
 
       if (secondaryActions.childNodes.length) {
         const secondaryWrap = document.createElement("details");

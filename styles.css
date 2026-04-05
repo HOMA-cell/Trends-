@@ -1178,6 +1178,28 @@
       gap: 9px;
       margin-bottom: 3px;
     }
+    .post-identity-link {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      min-width: 0;
+      flex: 1;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      font: inherit;
+      border-radius: 14px;
+    }
+    .post-identity-link:hover .post-user-name,
+    .post-identity-link:hover .post-handle-inline {
+      color: #111827;
+    }
+    .post-identity-link:focus-visible {
+      outline: 2px solid rgba(228, 87, 46, 0.24);
+      outline-offset: 2px;
+    }
     .post-header-actions {
       margin-left: auto;
       display: inline-flex;
@@ -1226,6 +1248,14 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .post-user-name {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 800;
+      line-height: 1.2;
     }
     .post-user .handle {
       font-weight: 500;
@@ -1560,6 +1590,31 @@
       border-color: transparent;
       color: #2f5a93;
       box-shadow: none;
+    }
+    .post-footer .post-action-row-primary .post-inline-open {
+      min-height: 26px;
+      padding-inline: 10px;
+      border-radius: 999px;
+      border-color: rgba(228, 87, 46, 0.14);
+      background: rgba(239, 91, 42, 0.08);
+      color: #c4542c;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    }
+    .post-footer .post-action-row-primary .post-inline-open:hover {
+      background: rgba(239, 91, 42, 0.12);
+      border-color: rgba(228, 87, 46, 0.22);
+      color: #a94523;
+    }
+    .post-footer .post-action-row-primary .post-inline-open .chip-icon {
+      width: 14px;
+      height: 14px;
+      flex: 0 0 14px;
+      font-size: 10px;
+    }
+    .post-footer .post-action-row-primary .post-inline-open .chip-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
     .post-footer .chip-action.chip-like.chip-like-on {
       background: var(--primary-soft);
@@ -11320,6 +11375,10 @@
     min-height: 22px;
     padding-inline: 0;
   }
+  .feed-list .post-action-row-primary .post-inline-open {
+    min-height: 24px;
+    padding-inline: 9px;
+  }
 .feed-list .post-action-menu > summary {
   min-height: 20px;
   min-width: 20px;
@@ -11412,6 +11471,10 @@
   .feed-list .post-action-row-primary .chip-action.reaction-btn {
     min-height: 22px;
     padding-inline: 0;
+  }
+  .feed-list .post-action-row-primary .post-inline-open {
+    min-height: 24px;
+    padding-inline: 9px;
   }
   .feed-list .post-action-menu > summary {
     min-height: 22px;
