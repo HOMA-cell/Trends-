@@ -556,6 +556,113 @@ export function renderProfileHighlights(highlightsEl, profile, tr) {
   });
 }
 
+function renderPublicProfileHeroFacts(targetEl, profile, tr) {
+  if (!targetEl) return;
+  targetEl.innerHTML = "";
+  const settings = getSettings();
+  const heightText = profile?.height_cm
+    ? formatHeight(profile.height_cm, settings.heightUnit)
+    : "";
+  const experienceText = formatExperience(profile?.experience_level, tr);
+  const items = [
+    { label: tr.profileGoal || "Goal", value: profile?.training_goal },
+    { label: tr.profileGym || "Gym", value: profile?.gym },
+    { label: tr.profileSplit || "Split", value: profile?.training_split },
+    { label: tr.profileExperience || "Experience", value: experienceText },
+    { label: tr.profileHeight || "Height", value: heightText },
+  ]
+    .filter((item) => `${item?.value || ""}`.trim())
+    .slice(0, 4);
+
+  items.forEach((item) => {
+    const chip = document.createElement("div");
+    chip.className = "public-profile-hero-fact";
+    const label = document.createElement("span");
+    label.className = "public-profile-hero-fact-label";
+    label.textContent = item.label;
+    const value = document.createElement("span");
+    value.className = "public-profile-hero-fact-value";
+    value.textContent = item.value;
+    chip.append(label, value);
+    targetEl.appendChild(chip);
+  });
+
+  targetEl.classList.toggle("hidden", items.length === 0);
+}
+
+function renderPublicProfileSpotlight(targetEl, metrics, profile, tr) {
+  if (!targetEl) return;
+  targetEl.innerHTML = "";
+  if (!(metrics?.postCount || 0)) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+
+  const shell = document.createElement("div");
+  shell.className = "public-profile-spotlight-card";
+
+  const copy = document.createElement("div");
+  copy.className = "public-profile-spotlight-copy";
+
+  const kicker = document.createElement("div");
+  kicker.className = "public-profile-spotlight-kicker";
+  kicker.textContent = tr.profileSpotlightTitle || "Recent momentum";
+
+  const title = document.createElement("div");
+  title.className = "public-profile-spotlight-title";
+  const latestText = metrics.latestPostTime
+    ? formatDateDisplay(metrics.latestPostTime)
+    : tr.profileSpotlightEmpty || "No recent posts yet.";
+  title.textContent = `${tr.profileSpotlightLatest || "Latest post"} · ${latestText}`;
+
+  const note = document.createElement("div");
+  note.className = "public-profile-spotlight-note";
+  if (metrics.bestLift?.weight) {
+    const bestLiftText = metrics.bestLift.exercise
+      ? `${metrics.bestLift.exercise} · ${formatWeight(metrics.bestLift.weight)}`
+      : formatWeight(metrics.bestLift.weight);
+    note.textContent = `${tr.profileBestLift || "Best lift"} · ${bestLiftText}`;
+  } else if (`${profile?.training_goal || ""}`.trim()) {
+    note.textContent = `${tr.profileGoal || "Goal"} · ${profile.training_goal}`;
+  } else {
+    note.textContent = tr.profileContentPostsHint || "Latest posts";
+  }
+
+  copy.append(kicker, title, note);
+
+  const stats = document.createElement("div");
+  stats.className = "public-profile-spotlight-stats";
+  [
+    {
+      label: tr.profileQuickPosts7d || "Posts (7d)",
+      value: `${metrics.weeklyPosts}`,
+    },
+    {
+      label: tr.profileTabMedia || "Media",
+      value: `${metrics.mediaCount}`,
+    },
+    {
+      label: tr.profileWorkouts || "Workouts",
+      value: `${metrics.workoutPostCount}`,
+    },
+  ].forEach((item) => {
+    const stat = document.createElement("div");
+    stat.className = "public-profile-spotlight-stat";
+    const value = document.createElement("span");
+    value.className = "public-profile-spotlight-stat-value";
+    value.textContent = item.value;
+    const label = document.createElement("span");
+    label.className = "public-profile-spotlight-stat-label";
+    label.textContent = item.label;
+    stat.append(value, label);
+    stats.appendChild(stat);
+  });
+
+  shell.append(copy, stats);
+  targetEl.appendChild(shell);
+  targetEl.classList.remove("hidden");
+}
+
 export function renderProfileLinks(linksEl, profile, tr) {
   if (!linksEl) return;
   linksEl.innerHTML = "";
@@ -1302,6 +1409,8 @@ export async function openPublicProfile(userId, options = {}) {
   const displayEl = $("public-profile-name");
   const nameEl = $("public-profile-handle");
   const bioEl = $("public-profile-bio");
+  const heroFactsEl = $("public-profile-hero-facts");
+  const spotlightEl = $("public-profile-spotlight");
   const joinedEl = $("public-profile-joined");
   const postsEl = $("public-profile-posts");
   const streakEl = $("public-profile-streak");
@@ -1333,6 +1442,7 @@ export async function openPublicProfile(userId, options = {}) {
   }
   renderProfileFacts(factsEl, profile, tr);
   renderProfileHighlights(highlightsEl, profile, tr);
+  renderPublicProfileHeroFacts(heroFactsEl, profile, tr);
   toggleSectionVisibility("public-profile-facts-title", factsEl);
   toggleSectionVisibility("public-profile-highlights-title", highlightsEl);
   const hasPublicExtras = Boolean(
@@ -1388,6 +1498,7 @@ export async function openPublicProfile(userId, options = {}) {
   renderProfileStatsGrid(statsGridEl, userPosts, tr);
   renderProfileQuickStats(quickStatsEl, userPosts, tr);
   const metrics = buildProfileMetrics(userPosts, getWorkoutLogsByPost());
+  renderPublicProfileSpotlight(spotlightEl, metrics, profile, tr);
 
   renderProfileMetaStat(postsEl, tr.profilePosts || "Posts", userPosts.length);
   renderProfileMetaStat(

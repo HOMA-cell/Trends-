@@ -9152,6 +9152,121 @@
       margin-top: 14px;
       margin-bottom: 4px;
     }
+    .public-profile-hero-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .public-profile-hero-fact {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(236, 226, 213, 0.92);
+      background: rgba(255, 250, 245, 0.88);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .public-profile-hero-fact-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8a7f73;
+    }
+    .public-profile-hero-fact-value {
+      font-size: 12px;
+      font-weight: 800;
+      color: #201b16;
+      letter-spacing: -0.01em;
+    }
+    .public-profile-spotlight {
+      margin-top: 16px;
+    }
+    .public-profile-spotlight-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr);
+      gap: 16px;
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(236, 226, 213, 0.92);
+      background: linear-gradient(135deg, rgba(255, 250, 245, 0.98), rgba(249, 242, 232, 0.94));
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+    .public-profile-spotlight-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -45% auto;
+      width: 180px;
+      height: 180px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(239, 91, 42, 0.16) 0%, rgba(239, 91, 42, 0) 72%);
+      pointer-events: none;
+    }
+    .public-profile-spotlight-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .public-profile-spotlight-kicker {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ef5b2a;
+    }
+    .public-profile-spotlight-title {
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #171717;
+      line-height: 1.3;
+    }
+    .public-profile-spotlight-note {
+      font-size: 12px;
+      line-height: 1.55;
+      color: #6f665a;
+      max-width: 48ch;
+    }
+    .public-profile-spotlight-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      align-self: stretch;
+    }
+    .public-profile-spotlight-stat {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      padding: 12px 12px 11px;
+      border-radius: 18px;
+      border: 1px solid rgba(236, 226, 213, 0.96);
+      background: rgba(255, 255, 255, 0.72);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+    .public-profile-spotlight-stat-value {
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: #171717;
+      font-variant-numeric: tabular-nums;
+    }
+    .public-profile-spotlight-stat-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: #7b6f63;
+      line-height: 1.4;
+    }
     .public-profile-content-tabs {
       display: flex;
       align-items: center;
@@ -9360,6 +9475,38 @@
       }
       .public-profile-entry-text {
         font-size: 11px;
+      }
+      .public-profile-hero-facts {
+        margin-top: 12px;
+        gap: 6px;
+      }
+      .public-profile-hero-fact {
+        min-height: 32px;
+        padding-inline: 10px;
+      }
+      .public-profile-hero-fact-label {
+        font-size: 9px;
+      }
+      .public-profile-hero-fact-value {
+        font-size: 11px;
+      }
+      .public-profile-spotlight {
+        margin-top: 12px;
+      }
+      .public-profile-spotlight-card {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 15px;
+      }
+      .public-profile-spotlight-title {
+        font-size: 15px;
+      }
+      .public-profile-spotlight-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .public-profile-spotlight-stat {
+        padding: 10px;
       }
       .public-profile-content-tabs {
         margin-top: 14px;
