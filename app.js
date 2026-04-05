@@ -6717,6 +6717,34 @@ async function loadProfilePostCount() {
 
         copy.appendChild(titleRow);
 
+        const contextRow = document.createElement("div");
+        contextRow.className = "notification-context-row";
+
+        if (!group.isGrouped && actorHandle && actorHandle !== actorName) {
+          const handleEl = document.createElement(note.actor_id ? "button" : "span");
+          handleEl.className = "notification-context-handle";
+          handleEl.textContent = actorHandle;
+          if (handleEl instanceof HTMLButtonElement) {
+            handleEl.type = "button";
+            handleEl.classList.add("is-button");
+            handleEl.addEventListener("click", () => {
+              openNotificationProfile(note);
+            });
+          }
+          contextRow.appendChild(handleEl);
+        }
+
+        if (note.type !== "follow" && post) {
+          const sourceChip = document.createElement("span");
+          sourceChip.className = "notification-context-chip";
+          sourceChip.textContent = getNotificationPreviewKind(post, tr, note);
+          contextRow.appendChild(sourceChip);
+        }
+
+        if (contextRow.childNodes.length) {
+          copy.appendChild(contextRow);
+        }
+
         const sideMedia =
           note.type !== "follow"
             ? createNotificationSideMediaElement(note, post, previewText, tr)
@@ -6790,6 +6818,22 @@ async function loadProfilePostCount() {
         }
 
         if (!group.isGrouped && note.actor_id && note.actor_id !== currentUser?.id) {
+          if (note.type === "follow" && !followingIds.has(note.actor_id)) {
+            const followBtn = document.createElement("button");
+            followBtn.className = "btn btn-primary btn-xs";
+            followBtn.textContent = tr.notificationFollowBack || "Follow back";
+            followBtn.addEventListener("click", async () => {
+              followBtn.disabled = true;
+              try {
+                await toggleFollowForUser(note.actor_id);
+                renderNotifications();
+              } finally {
+                followBtn.disabled = false;
+              }
+            });
+            actions.appendChild(followBtn);
+          }
+
           const messageBtn = document.createElement("button");
           messageBtn.className = "btn btn-ghost btn-xs";
           messageBtn.textContent = tr.message || "Message";
