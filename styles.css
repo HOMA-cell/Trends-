@@ -10823,6 +10823,12 @@
   color: #f8fafc;
   text-align: left;
 }
+.feed-list.shorts-view .shorts-comment-teaser-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 .feed-list.shorts-view .shorts-comment-teaser:focus-visible {
   outline: none;
   border-color: rgba(255, 255, 255, 0.24);
@@ -10854,6 +10860,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.feed-list.shorts-view .shorts-comment-teaser-author {
+  font-weight: 800;
+  color: #ffffff;
+}
+.feed-list.shorts-view .shorts-comment-teaser-meta-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.feed-list.shorts-view .shorts-comment-teaser-stack {
+  display: inline-flex;
+  align-items: center;
+  padding-left: 6px;
+}
+.feed-list.shorts-view .shorts-comment-teaser-avatar {
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border: 2px solid rgba(15, 23, 42, 0.42);
+  box-shadow: 0 6px 12px rgba(2, 6, 23, 0.18);
+}
+.feed-list.shorts-view .shorts-comment-teaser-avatar:first-child {
+  margin-left: 0;
+}
 .feed-list.shorts-view .shorts-comment-teaser-meta {
   display: inline-flex;
   align-items: center;
@@ -10873,6 +10903,9 @@
 .feed-list.shorts-view .shorts-comment-teaser.is-empty .shorts-comment-teaser-meta {
   min-width: auto;
   color: rgba(248, 250, 252, 0.76);
+}
+.feed-list.shorts-view .shorts-comment-teaser.is-empty .shorts-comment-teaser-meta-wrap {
+  gap: 0;
 }
 .feed-list.shorts-view .shorts-footer {
   display: flex;
@@ -11116,6 +11149,14 @@
   }
   .feed-list.shorts-view .shorts-caption-title {
     font-size: 13px;
+  }
+  .feed-list.shorts-view .shorts-comment-teaser {
+    gap: 7px;
+    padding: 8px 10px;
+  }
+  .feed-list.shorts-view .shorts-comment-teaser-avatar {
+    width: 20px;
+    height: 20px;
   }
   .feed-list.shorts-view .shorts-stat-chip {
     min-height: 20px;

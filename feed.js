@@ -8209,9 +8209,13 @@ function buildShortsCommentTeaser(post, tr, commentsByPost) {
         teaser.classList.add("is-empty");
       }
 
+      const teaserCopy = document.createElement("div");
+      teaserCopy.className = "shorts-comment-teaser-copy";
+
       const teaserLabel = document.createElement("span");
       teaserLabel.className = "shorts-comment-teaser-label";
       teaserLabel.textContent = tr.comments || "Comments";
+      teaserCopy.appendChild(teaserLabel);
 
       const teaserText = document.createElement("span");
       teaserText.className = "shorts-comment-teaser-text";
@@ -8224,21 +8228,68 @@ function buildShortsCommentTeaser(post, tr, commentsByPost) {
         const commentName =
           `${firstComment.profile?.display_name || ""}`.trim() || commentHandle;
         const commentPreview = getCaptionPreviewText(firstComment.body || "");
-        teaserText.textContent = commentPreview
-          ? `${commentName}: ${commentPreview}`
-          : `${commentName}`;
+        const author = document.createElement("span");
+        author.className = "shorts-comment-teaser-author";
+        author.textContent = commentName;
+        teaserText.appendChild(author);
+        const preview = document.createElement("span");
+        preview.textContent = commentPreview
+          ? ` ${commentPreview}`
+          : ` ${tr.commentsShow || tr.comments || "Comments"}`;
+        teaserText.appendChild(preview);
       } else {
         teaserText.textContent =
           tr.commentEmpty || tr.commentPlaceholder || "Add a comment";
       }
+      teaserCopy.appendChild(teaserText);
+
+      const teaserMetaWrap = document.createElement("div");
+      teaserMetaWrap.className = "shorts-comment-teaser-meta-wrap";
+      if (comments.length) {
+        const recentProfiles = [];
+        const seenUserIds = new Set();
+        [...comments]
+          .reverse()
+          .forEach((comment) => {
+            const userId = `${comment?.user_id || ""}`;
+            if (!userId || seenUserIds.has(userId)) return;
+            seenUserIds.add(userId);
+            recentProfiles.push(comment.profile || { id: userId });
+          });
+        const visibleProfiles = recentProfiles.slice(0, 3);
+        if (visibleProfiles.length) {
+          const stack = document.createElement("div");
+          stack.className = "shorts-comment-teaser-stack";
+          visibleProfiles.forEach((profile, index) => {
+            const avatar = document.createElement("div");
+            avatar.className = "avatar shorts-comment-teaser-avatar";
+            const stackHandle =
+              profile?.handle ||
+              profile?.username ||
+              firstComment?.profile?.display_name ||
+              "U";
+            const stackLabel =
+              `${profile?.display_name || ""}`.trim() ||
+              formatHandle(stackHandle) ||
+              "U";
+            renderAvatar(
+              avatar,
+              profile,
+              (stackLabel || "U").replace("@", "").charAt(0).toUpperCase()
+            );
+            avatar.style.zIndex = `${visibleProfiles.length - index}`;
+            stack.appendChild(avatar);
+          });
+          teaserMetaWrap.appendChild(stack);
+        }
+      }
 
       const teaserMeta = document.createElement("span");
       teaserMeta.className = "shorts-comment-teaser-meta";
-      teaserMeta.textContent = comments.length
-        ? `${comments.length}`
-        : "→";
+      teaserMeta.textContent = comments.length ? `${comments.length}` : "→";
+      teaserMetaWrap.appendChild(teaserMeta);
 
-      teaser.append(teaserLabel, teaserText, teaserMeta);
+      teaser.append(teaserCopy, teaserMetaWrap);
       return teaser;
     }
 function buildCommentComposer(post, tr, currentUser, options = {}) {
