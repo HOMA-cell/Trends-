@@ -10695,6 +10695,31 @@
   overflow: hidden;
   text-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
 }
+.feed-list.shorts-view .shorts-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.feed-list.shorts-view .shorts-context-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(248, 250, 252, 0.94);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.feed-list.shorts-view .shorts-context-chip.is-strong {
+  background: rgba(239, 91, 42, 0.18);
+  border-color: rgba(255, 196, 174, 0.22);
+  color: #fff7f2;
+}
 .feed-list.shorts-view .shorts-caption-wrap {
   display: flex;
   flex-direction: column;
@@ -10793,6 +10818,46 @@
 .feed-list.shorts-view .shorts-comment-teaser.is-empty .shorts-comment-teaser-meta {
   min-width: auto;
   color: rgba(248, 250, 252, 0.76);
+}
+.feed-list.shorts-view .shorts-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.feed-list.shorts-view .shorts-open-btn {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.feed-list.shorts-view .shorts-open-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.feed-list.shorts-view .shorts-secondary-btn {
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 12, 19, 0.28);
+  color: rgba(248, 250, 252, 0.92);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.feed-list.shorts-view .shorts-secondary-btn:hover {
+  background: rgba(15, 23, 42, 0.42);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 .feed-list.shorts-view .shorts-actions {
   display: flex;
@@ -11009,6 +11074,15 @@
   }
   .feed-list.shorts-view .shorts-actions .shorts-action-btn .chip-label {
     font-size: 9.5px;
+  }
+  .feed-list.shorts-view .shorts-footer {
+    gap: 6px;
+  }
+  .feed-list.shorts-view .shorts-open-btn,
+  .feed-list.shorts-view .shorts-secondary-btn {
+    min-height: 28px;
+    padding-inline: 11px;
+    font-size: 9px;
   }
   .feed-list.shorts-view .shorts-actions {
     gap: 9px;

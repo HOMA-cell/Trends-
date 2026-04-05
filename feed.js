@@ -3322,6 +3322,10 @@ function setupFeedCardActionDelegation() {
           openCommentSheet(postId);
           return;
         }
+        if (action === "open-detail") {
+          openPostDetail(postId);
+          return;
+        }
         const post = getPostById(postId);
         if (!post) return;
         if (action === "toggle-like") {
@@ -6029,6 +6033,22 @@ export function renderFeed(options = {}) {
       card.setAttribute("data-post-id", post.id);
       card.dataset.postRenderKey = buildPostRenderKey(post);
       const logs = workoutLogsByPost.get(post.id) || [];
+      const setCount = logs.reduce(
+        (sum, item) => sum + ((item?.sets || []).length || 0),
+        0
+      );
+      const topWeight = logs.reduce((maxWeight, item) => {
+        const sets = Array.isArray(item?.sets) ? item.sets : [];
+        return sets.reduce((best, set) => {
+          const weight = Number(set?.weight || 0);
+          if (!Number.isFinite(weight) || weight <= 0) return best;
+          return Math.max(best, weight);
+        }, maxWeight);
+      }, 0);
+      const topNames = logs
+        .map((item) => String(item?.exercise || "").trim())
+        .filter(Boolean)
+        .slice(0, 2);
       const isSeen = seenPostIds.has(`${post.id || ""}`);
       if (isSeen) {
         card.classList.add("post-card-seen");
@@ -6268,6 +6288,45 @@ export function renderFeed(options = {}) {
       }
       content.appendChild(meta);
 
+      const contextRow = document.createElement("div");
+      contextRow.className = "shorts-context";
+      const primaryContext = document.createElement("span");
+      primaryContext.className = "shorts-context-chip";
+      primaryContext.textContent = logs.length
+        ? topNames.join(" • ") || (tr.profileTabWorkouts || "Workouts")
+        : post.media_type === "video"
+          ? tr.mediaVideoLabel || "VIDEO"
+          : post.media_url
+            ? tr.mediaPhotoLabel || "PHOTO"
+            : tr.profileTabPosts || "Posts";
+      contextRow.appendChild(primaryContext);
+      if (setCount > 0) {
+        const setChip = document.createElement("span");
+        setChip.className = "shorts-context-chip";
+        setChip.textContent = `${setCount}${tr.workoutSetCountLabel || "セット"}`;
+        contextRow.appendChild(setChip);
+      }
+      if (topWeight > 0) {
+        const liftChip = document.createElement("span");
+        liftChip.className = "shorts-context-chip is-strong";
+        liftChip.textContent = `${tr.profileBestLift || "Best lift"} · ${formatWeight(topWeight)}`;
+        contextRow.appendChild(liftChip);
+      }
+      if (
+        settings.showBodyweight &&
+        post.bodyweight !== null &&
+        post.bodyweight !== undefined &&
+        post.bodyweight !== ""
+      ) {
+        const weightChip = document.createElement("span");
+        weightChip.className = "shorts-context-chip";
+        weightChip.textContent = `${tr.weight || "Weight"} · ${formatWeight(post.bodyweight)}`;
+        contextRow.appendChild(weightChip);
+      }
+      if (contextRow.childNodes.length) {
+        content.appendChild(contextRow);
+      }
+
       const captionText = `${post.note || post.caption || ""}`.trim();
       if (captionText) {
         const { title: captionTitle, body: captionBody } = splitCaptionContent(captionText);
@@ -6295,10 +6354,6 @@ export function renderFeed(options = {}) {
           exerciseChip.className = "shorts-stat-chip";
           exerciseChip.textContent = `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`;
           stats.appendChild(exerciseChip);
-          const setCount = logs.reduce(
-            (sum, item) => sum + ((item?.sets || []).length || 0),
-            0
-          );
           if (setCount > 0) {
             const setChip = document.createElement("span");
             setChip.className = "shorts-stat-chip";
@@ -6325,6 +6380,33 @@ export function renderFeed(options = {}) {
       if (commentTeaser) {
         content.appendChild(commentTeaser);
       }
+      const footerRow = document.createElement("div");
+      footerRow.className = "shorts-footer";
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "shorts-open-btn";
+      openBtn.dataset.postAction = "open-detail";
+      openBtn.textContent = tr.notificationViewPost || "View post";
+      footerRow.appendChild(openBtn);
+      const footerCommentBtn = document.createElement("button");
+      const footerCommentCount = Math.max(
+        0,
+        Number((commentsByPost.get(post.id) || []).length || 0)
+      );
+      footerCommentBtn.type = "button";
+      footerCommentBtn.className = "shorts-secondary-btn";
+      footerCommentBtn.dataset.postAction = "toggle-comments";
+      footerCommentBtn.textContent = footerCommentCount
+        ? `${footerCommentCount} ${tr.comments || "Comments"}`
+        : tr.commentsShow || tr.comments || "Comments";
+      footerCommentBtn.setAttribute(
+        "aria-label",
+        footerCommentCount
+          ? `${tr.comments || "Comments"} (${footerCommentCount})`
+          : tr.commentsShow || tr.comments || "Comments"
+      );
+      footerRow.appendChild(footerCommentBtn);
+      content.appendChild(footerRow);
       const actions = document.createElement("div");
       actions.className = "shorts-actions";
       const appendShortAction = (button) => {
