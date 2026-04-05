@@ -1100,6 +1100,15 @@
         transition: opacity 0.14s ease;
         contain-intrinsic-size: 280px;
       }
+      .post-context-line {
+        gap: 5px;
+        margin-top: 3px;
+      }
+      .post-context-mini-chip {
+        min-height: 17px;
+        padding: 0 6px;
+        font-size: 8.5px;
+      }
       .feed-ad-card {
         margin-bottom: 8px;
         padding: 8px;
@@ -1233,6 +1242,39 @@
       gap: 4px;
       min-width: 0;
       flex-wrap: wrap;
+    }
+    .post-context-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+      min-width: 0;
+    }
+    .post-context-mini-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: 999px;
+      border: 1px solid #ece2d6;
+      background: #fbf7f1;
+      color: #7d6f61;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .post-context-mini-chip.is-workout {
+      background: #fff3ed;
+      border-color: #f3d4c6;
+      color: #c4542c;
+    }
+    .post-context-mini-chip.is-bodyweight {
+      background: #f7f8fb;
+      border-color: #e0e6ee;
+      color: #516072;
     }
     .post-sub {
       font-size: 10.5px;

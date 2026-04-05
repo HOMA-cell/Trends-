@@ -6426,6 +6426,22 @@ export function renderFeed(options = {}) {
       card.setAttribute("data-post-id", post.id);
       card.dataset.postRenderKey = buildPostRenderKey(post);
       const logs = workoutLogsByPost.get(post.id) || [];
+      const exerciseCount = logs.length;
+      const setCount = logs.reduce(
+        (sum, item) => sum + ((item?.sets || []).length || 0),
+        0
+      );
+      const topWeight = logs.reduce((maxWeight, item) => {
+        const sets = Array.isArray(item?.sets) ? item.sets : [];
+        return sets.reduce((best, set) => {
+          const weight = Number(set?.weight || 0);
+          if (!Number.isFinite(weight) || weight <= 0) return best;
+          return Math.max(best, weight);
+        }, maxWeight);
+      }, 0);
+      const topNames = logs
+        .map((item) => String(item?.exercise || "").trim())
+        .filter(Boolean);
 
       const header = document.createElement("div");
       header.className = "post-header";
@@ -6507,6 +6523,42 @@ export function renderFeed(options = {}) {
       }
       meta.appendChild(userRow);
       meta.appendChild(subRow);
+
+      const headerContext = document.createElement("div");
+      headerContext.className = "post-context-line";
+      if (post.media_url) {
+        const mediaChip = document.createElement("span");
+        mediaChip.className = "post-context-mini-chip";
+        mediaChip.textContent =
+          post.media_type === "video"
+            ? tr.mediaVideoLabel || "Video"
+            : tr.mediaPhotoLabel || "Photo";
+        headerContext.appendChild(mediaChip);
+      }
+      if (exerciseCount > 0) {
+        const workoutChip = document.createElement("span");
+        workoutChip.className = "post-context-mini-chip is-workout";
+        workoutChip.textContent = `${exerciseCount}${
+          tr.workoutExerciseCountLabel || "種目"
+        } · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
+        headerContext.appendChild(workoutChip);
+      }
+      if (
+        settings.showBodyweight &&
+        post.bodyweight !== null &&
+        post.bodyweight !== undefined &&
+        post.bodyweight !== ""
+      ) {
+        const bodyweightChip = document.createElement("span");
+        bodyweightChip.className = "post-context-mini-chip is-bodyweight";
+        bodyweightChip.textContent = `${tr.weight || "Weight"} · ${formatWeight(
+          post.bodyweight
+        )}`;
+        headerContext.appendChild(bodyweightChip);
+      }
+      if (headerContext.childNodes.length) {
+        meta.appendChild(headerContext);
+      }
 
       const footer = document.createElement("div");
       footer.className = "post-footer";
@@ -6711,23 +6763,7 @@ export function renderFeed(options = {}) {
 
       const body = document.createElement("div");
       body.className = "post-body";
-      const contextChips = document.createElement("div");
-      contextChips.className = "post-context-chips";
       let captionBlock = null;
-
-      if (
-        settings.showBodyweight &&
-        post.bodyweight !== null &&
-        post.bodyweight !== undefined &&
-        post.bodyweight !== ""
-      ) {
-        const weight = document.createElement("div");
-        weight.className = "post-context-chip";
-        weight.textContent = `${tr.weight || "Weight"} · ${formatWeight(
-          post.bodyweight
-        )}`;
-        contextChips.appendChild(weight);
-      }
 
       if (post.note || post.caption) {
         const fullText = `${post.note || post.caption || ""}`.trim();
@@ -6739,22 +6775,6 @@ export function renderFeed(options = {}) {
 
       if (logs.length) {
         body.classList.add("has-workout-preview");
-        const exerciseCount = logs.length;
-        const setCount = logs.reduce(
-          (sum, item) => sum + ((item?.sets || []).length || 0),
-          0
-        );
-        const topWeight = logs.reduce((maxWeight, item) => {
-          const sets = Array.isArray(item?.sets) ? item.sets : [];
-          return sets.reduce((best, set) => {
-            const weight = Number(set?.weight || 0);
-            if (!Number.isFinite(weight) || weight <= 0) return best;
-            return Math.max(best, weight);
-          }, maxWeight);
-        }, 0);
-        const topNames = logs
-          .map((item) => String(item?.exercise || "").trim())
-          .filter(Boolean);
         const workoutPreview = document.createElement("div");
         workoutPreview.className = "post-workout-preview";
         const workoutHead = document.createElement("div");
@@ -6818,10 +6838,6 @@ export function renderFeed(options = {}) {
 
       if (captionBlock) {
         body.appendChild(captionBlock);
-      }
-
-      if (contextChips.childNodes.length) {
-        body.appendChild(contextChips);
       }
 
       if (body.childNodes.length) {
