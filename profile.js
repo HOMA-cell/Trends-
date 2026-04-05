@@ -1602,6 +1602,8 @@ export async function openPublicProfile(userId, options = {}) {
         );
         const headlineText = buildProfilePostHeadline(post, logs, tr);
         const previewText = buildProfilePostPreview(post, logs, tr);
+        const isPinnedPost = `${post?.id || ""}` === pinnedPostId;
+        const isLatestPost = `${selectedPosts?.[0]?.id || ""}` === `${post?.id || ""}`;
         const clone = document.createElement("div");
         clone.className = "post-card public-profile-post-card";
         clone.setAttribute("data-post-id", post.id);
@@ -1618,6 +1620,18 @@ export async function openPublicProfile(userId, options = {}) {
 
         const badgeRow = document.createElement("div");
         badgeRow.className = "public-profile-post-badges";
+        if (isPinnedPost) {
+          const pinnedBadge = document.createElement("span");
+          pinnedBadge.className = "public-profile-post-badge is-pinned";
+          pinnedBadge.textContent = tr.postPinnedBadge || tr.pinned || "Pinned";
+          badgeRow.appendChild(pinnedBadge);
+        }
+        if (isLatestPost) {
+          const latestBadge = document.createElement("span");
+          latestBadge.className = "public-profile-post-badge is-latest";
+          latestBadge.textContent = tr.profileSpotlightLatest || "Latest post";
+          badgeRow.appendChild(latestBadge);
+        }
         if (post.visibility === "private") {
           const privateBadge = document.createElement("span");
           privateBadge.className = "public-profile-post-badge is-private";
@@ -1642,6 +1656,25 @@ export async function openPublicProfile(userId, options = {}) {
         if (badgeRow.childNodes.length) {
           titleRow.appendChild(badgeRow);
         }
+        const contextRow = document.createElement("div");
+        contextRow.className = "public-profile-post-context";
+        const primaryContext = document.createElement("span");
+        primaryContext.className = "public-profile-post-context-chip";
+        primaryContext.textContent = logs.length
+          ? tr.profileTabWorkouts || "Workouts"
+          : post.media_type === "video"
+            ? tr.mediaVideoLabel || "VIDEO"
+            : post.media_url
+              ? tr.mediaPhotoLabel || "PHOTO"
+              : tr.profileTabPosts || "Posts";
+        contextRow.appendChild(primaryContext);
+        if (post.bodyweight !== null && post.bodyweight !== undefined && post.bodyweight !== "") {
+          const weightContext = document.createElement("span");
+          weightContext.className = "public-profile-post-context-chip is-bodyweight";
+          weightContext.textContent = `${tr.weight || "Weight"} · ${formatWeight(post.bodyweight)}`;
+          contextRow.appendChild(weightContext);
+        }
+
         const headline = document.createElement("div");
         headline.className = "public-profile-post-title";
         headline.textContent = headlineText;
@@ -1693,12 +1726,30 @@ export async function openPublicProfile(userId, options = {}) {
             summary.appendChild(chip);
           });
 
+        const footer = document.createElement("div");
+        footer.className = "public-profile-post-footer";
+        if (summary.childNodes.length) {
+          footer.appendChild(summary);
+        }
+        const openHint = document.createElement("span");
+        openHint.className = "public-profile-post-open";
+        const openLabel = document.createElement("span");
+        openLabel.className = "public-profile-post-open-label";
+        openLabel.textContent = tr.notificationViewPost || "View post";
+        const openArrow = document.createElement("span");
+        openArrow.className = "public-profile-post-open-arrow";
+        openArrow.setAttribute("aria-hidden", "true");
+        openArrow.textContent = "↗";
+        openHint.append(openLabel, openArrow);
+
         copy.appendChild(titleRow);
+        if (contextRow.childNodes.length) {
+          copy.appendChild(contextRow);
+        }
         copy.appendChild(headline);
         copy.appendChild(body);
-        if (summary.childNodes.length) {
-          copy.appendChild(summary);
-        }
+        footer.appendChild(openHint);
+        copy.appendChild(footer);
         shell.appendChild(copy);
         if (post.media_url) {
           const thumb = document.createElement("div");
