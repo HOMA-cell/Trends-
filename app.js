@@ -5738,9 +5738,99 @@ async function loadProfilePostCount() {
           ...item,
           actor: actorMap.get(item.actor_id) || null,
         }));
-        notifications = enriched;
+        notifications = await hydrateNotificationCommentMatches(enriched);
       }
       renderNotifications();
+    }
+
+    async function hydrateNotificationCommentMatches(items = []) {
+      const list = Array.isArray(items) ? items : [];
+      const commentNotes = list.filter(
+        (note) =>
+          `${note?.type || ""}`.trim() === "comment" &&
+          `${note?.post_id || ""}`.trim() &&
+          `${note?.actor_id || ""}`.trim()
+      );
+      if (!commentNotes.length) return list;
+
+      const commentsByNotificationPost = new Map();
+      const postIds = [...new Set(commentNotes.map((note) => `${note.post_id || ""}`.trim()).filter(Boolean))];
+
+      postIds.forEach((postId) => {
+        const cachedComments = commentsByPost.get(postId);
+        if (Array.isArray(cachedComments) && cachedComments.length) {
+          commentsByNotificationPost.set(postId, cachedComments);
+        }
+      });
+
+      const missingPostIds = postIds.filter((postId) => !commentsByNotificationPost.has(postId));
+      if (missingPostIds.length) {
+        const { data, error } = await supabase
+          .from("comments")
+          .select("id, post_id, user_id, body, created_at")
+          .in("post_id", missingPostIds)
+          .order("created_at", { ascending: true });
+        if (!error && Array.isArray(data)) {
+          data.forEach((comment) => {
+            const postId = `${comment?.post_id || ""}`.trim();
+            if (!postId) return;
+            const next = commentsByNotificationPost.get(postId) || [];
+            next.push(comment);
+            commentsByNotificationPost.set(postId, next);
+          });
+        } else if (error) {
+          console.error("hydrateNotificationCommentMatches error:", error);
+        }
+      }
+
+      const findMatchingComment = (note) => {
+        const postComments =
+          commentsByNotificationPost.get(`${note?.post_id || ""}`.trim()) || [];
+        if (!postComments.length) return null;
+        const actorId = `${note?.actor_id || ""}`.trim();
+        const actorComments = postComments.filter(
+          (comment) => `${comment?.user_id || ""}`.trim() === actorId
+        );
+        if (!actorComments.length) return null;
+        const targetTime = Date.parse(note?.created_at || "");
+        if (!Number.isFinite(targetTime)) {
+          return actorComments[actorComments.length - 1] || null;
+        }
+        let bestComment = actorComments[0] || null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        actorComments.forEach((comment) => {
+          const nextTime = Date.parse(comment?.created_at || "");
+          const nextDistance = Number.isFinite(nextTime)
+            ? Math.abs(nextTime - targetTime)
+            : Number.POSITIVE_INFINITY;
+          if (nextDistance < bestDistance) {
+            bestDistance = nextDistance;
+            bestComment = comment;
+            return;
+          }
+          if (
+            nextDistance === bestDistance &&
+            `${comment?.created_at || ""}`.localeCompare(
+              `${bestComment?.created_at || ""}`
+            ) > 0
+          ) {
+            bestComment = comment;
+          }
+        });
+        return bestComment;
+      };
+
+      return list.map((note) => {
+        if (`${note?.type || ""}`.trim() !== "comment") return note;
+        const match = findMatchingComment(note);
+        if (!match) return note;
+        return {
+          ...note,
+          matched_comment_id: `${match?.id || ""}`.trim(),
+          matched_comment_body: `${match?.body || ""}`.trim(),
+          matched_comment_created_at: `${match?.created_at || ""}`.trim(),
+        };
+      });
     }
 
     function getNotificationActionText(type, tr) {
@@ -5853,7 +5943,17 @@ async function loadProfilePostCount() {
       return groups;
     }
 
-    function getNotificationPreviewText(post, tr) {
+    function getNotificationCommentPreviewText(note, tr) {
+      const rawText = `${note?.matched_comment_body || ""}`.trim().replace(/\s+/g, " ");
+      if (!rawText) return "";
+      return rawText.slice(0, 120) || tr.notificationActionComment || "commented on your post";
+    }
+
+    function getNotificationPreviewText(post, tr, note = null) {
+      if (`${note?.type || ""}`.trim() === "comment") {
+        const commentPreview = getNotificationCommentPreviewText(note, tr);
+        if (commentPreview) return commentPreview;
+      }
       if (!post) return "";
       const noteText = `${post?.note || post?.caption || ""}`.trim().replace(/\s+/g, " ");
       if (noteText) {
@@ -5939,7 +6039,10 @@ async function loadProfilePostCount() {
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
     }
 
-    function getNotificationPreviewKind(post, tr) {
+    function getNotificationPreviewKind(post, tr, note = null) {
+      if (`${note?.type || ""}`.trim() === "comment" && getNotificationCommentPreviewText(note, tr)) {
+        return tr.notificationsComments || "Comments";
+      }
       if (!post) return tr.detailTitle || "Post";
       const workoutRows = workoutLogsByPost.get(`${post?.id || ""}`) || [];
       if (`${post?.media_type || ""}` === "video") {
@@ -5975,7 +6078,7 @@ async function loadProfilePostCount() {
       );
       const actorHandle =
         note.actor?.handle || note.actor?.username || note.actor?.display_name || "";
-      const postPreview = note.post_id ? getNotificationPreviewText(post, tr) : "";
+      const postPreview = note.post_id ? getNotificationPreviewText(post, tr, note) : "";
       return {
         source: "notification",
         partnerId: note.actor_id,
@@ -5983,7 +6086,7 @@ async function loadProfilePostCount() {
         actorHandle,
         notificationType: `${note.type || ""}`.trim(),
         postId: `${post?.id || note.post_id || ""}`.trim(),
-        postLabel: note.post_id ? getNotificationPreviewKind(post, tr) : "",
+        postLabel: note.post_id ? getNotificationPreviewKind(post, tr, note) : "",
         previewText: postPreview || getNotificationActionText(note.type, tr),
         prefillMessage: getNotificationDmStarterText(note.type, tr),
       };
@@ -6029,8 +6132,13 @@ async function loadProfilePostCount() {
           if (post?.id) {
             openPostDetail(`${post.id}`, {
               focusComments: note.type === "comment",
+              focusCommentId: note.type === "comment" ? note.matched_comment_id || "" : "",
               focusCommentActorId: note.type === "comment" ? note.actor_id : "",
               focusCommentCreatedAt: note.type === "comment" ? note.created_at : "",
+              replyToCommentId:
+                note.type === "comment" && replyToComment
+                  ? note.matched_comment_id || ""
+                  : "",
               replyToCommentActorId:
                 note.type === "comment" && replyToComment ? note.actor_id : "",
               replyToCommentCreatedAt:
@@ -6058,7 +6166,7 @@ async function loadProfilePostCount() {
       return false;
     }
 
-    function createNotificationSideMediaElement(post, previewText, tr) {
+    function createNotificationSideMediaElement(note, post, previewText, tr) {
       if (!post) return null;
       const media = document.createElement("div");
       media.className = "notification-side-media";
@@ -6074,7 +6182,7 @@ async function loadProfilePostCount() {
         media.classList.add("is-placeholder");
         const mediaLabel = document.createElement("span");
         mediaLabel.className = "notification-side-media-label";
-        mediaLabel.textContent = getNotificationPreviewKind(post, tr);
+        mediaLabel.textContent = getNotificationPreviewKind(post, tr, note);
         media.appendChild(mediaLabel);
       }
       return media;
@@ -6095,7 +6203,7 @@ async function loadProfilePostCount() {
         preview.className = "notification-preview notification-preview-inline";
         const kicker = document.createElement("span");
         kicker.className = "notification-preview-inline-kicker";
-        kicker.textContent = getNotificationPreviewKind(post, tr);
+        kicker.textContent = getNotificationPreviewKind(post, tr, note);
         const text = document.createElement("span");
         text.className = "notification-preview-inline-text";
         text.textContent = previewText;
@@ -6120,7 +6228,7 @@ async function loadProfilePostCount() {
         media.classList.add("is-placeholder");
         const mediaLabel = document.createElement("span");
         mediaLabel.className = "notification-preview-media-label";
-        mediaLabel.textContent = getNotificationPreviewKind(post, tr);
+        mediaLabel.textContent = getNotificationPreviewKind(post, tr, note);
         media.appendChild(mediaLabel);
       }
 
@@ -6128,7 +6236,7 @@ async function loadProfilePostCount() {
       copy.className = "notification-preview-copy";
       const kicker = document.createElement("div");
       kicker.className = "notification-preview-kicker";
-      kicker.textContent = getNotificationPreviewKind(post, tr);
+      kicker.textContent = getNotificationPreviewKind(post, tr, note);
       const text = document.createElement("div");
       text.className = "notification-preview-text";
       text.textContent = previewText;
@@ -6262,7 +6370,7 @@ async function loadProfilePostCount() {
         body.textContent =
           note.type === "follow"
             ? tr.profileEntryPromptFollowBack || "Follow back or start with a message"
-            : getNotificationPreviewText(post, tr) || getNotificationActionText(note.type, tr);
+            : getNotificationPreviewText(post, tr, note) || getNotificationActionText(note.type, tr);
 
         const meta = document.createElement("div");
         meta.className = "notification-priority-meta";
@@ -6273,7 +6381,7 @@ async function loadProfilePostCount() {
             ? createNotificationPreviewElement(
                 note,
                 post,
-                getNotificationPreviewText(post, tr) || getNotificationActionText(note.type, tr),
+                getNotificationPreviewText(post, tr, note) || getNotificationActionText(note.type, tr),
                 tr,
                 { compact: true }
               )
@@ -6527,7 +6635,7 @@ async function loadProfilePostCount() {
             ? actorHandle && actorHandle !== actorName
               ? actorHandle
               : ""
-            : getNotificationPreviewText(post, tr);
+            : getNotificationPreviewText(post, tr, note);
         const titleActorText = group.isGrouped
           ? getNotificationActorSummary(group.notes, tr)
           : actorName;
@@ -6611,7 +6719,7 @@ async function loadProfilePostCount() {
 
         const sideMedia =
           note.type !== "follow"
-            ? createNotificationSideMediaElement(post, previewText, tr)
+            ? createNotificationSideMediaElement(note, post, previewText, tr)
             : null;
         if (sideMedia) {
           head.classList.add("has-side-media");
