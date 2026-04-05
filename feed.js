@@ -3466,62 +3466,66 @@ function setupFeedCardActionDelegation() {
           return;
         }
         if (action === "share-post") {
-          const tr = t[getCurrentLang()] || t.ja;
-          const origin =
-            typeof window !== "undefined" ? window.location.origin : "";
-          const path =
-            typeof window !== "undefined" ? window.location.pathname : "";
-          const shareUrl = `${origin}${path}#post=${post.id}`;
-          const shareTextRaw = `${post?.note || post?.caption || ""}`.trim();
-          const shareTitle = shareTextRaw
-            ? shareTextRaw.slice(0, 80)
-            : post?.profile?.display_name ||
-              formatHandle(post?.profile?.handle || "") ||
-              tr.dmSharePreviewFallback ||
-              tr.detailTitle ||
-              "Trends post";
-          const sharePayload = {
-            title: shareTitle,
-            text: shareTextRaw ? shareTextRaw.slice(0, 160) : "",
-            url: shareUrl,
-            postId: post.id,
-          };
-          try {
-            if (getCurrentUser()) {
-              openDmShareComposer(sharePayload);
-              return;
-            }
-            if (
-              typeof navigator !== "undefined" &&
-              typeof navigator.share === "function"
-            ) {
-              await navigator.share(sharePayload);
-              showToast(tr.feedShared || "Shared.", "success");
-              return;
-            }
-            if (
-              typeof navigator !== "undefined" &&
-              navigator.clipboard &&
-              typeof navigator.clipboard.writeText === "function"
-            ) {
-              await navigator.clipboard.writeText(shareUrl);
-              showToast(tr.feedLinkCopied || "Link copied.", "success");
-            } else {
-              showToast(shareUrl, "info");
-            }
-          } catch (error) {
-            if (error?.name === "AbortError") {
-              return;
-            }
-            console.error("share post failed", error);
-            showToast(shareUrl, "info");
-          }
+          await sharePost(post);
           return;
         }
         if (action === "delete-post") {
           await deletePost(post.id);
         }
       });
+    }
+async function sharePost(post) {
+      if (!post) return;
+      const tr = t[getCurrentLang()] || t.ja;
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const path =
+        typeof window !== "undefined" ? window.location.pathname : "";
+      const shareUrl = `${origin}${path}#post=${post.id}`;
+      const shareTextRaw = `${post?.note || post?.caption || ""}`.trim();
+      const shareTitle = shareTextRaw
+        ? shareTextRaw.slice(0, 80)
+        : post?.profile?.display_name ||
+          formatHandle(post?.profile?.handle || "") ||
+          tr.dmSharePreviewFallback ||
+          tr.detailTitle ||
+          "Trends post";
+      const sharePayload = {
+        title: shareTitle,
+        text: shareTextRaw ? shareTextRaw.slice(0, 160) : "",
+        url: shareUrl,
+        postId: post.id,
+      };
+      try {
+        if (getCurrentUser()) {
+          openDmShareComposer(sharePayload);
+          return;
+        }
+        if (
+          typeof navigator !== "undefined" &&
+          typeof navigator.share === "function"
+        ) {
+          await navigator.share(sharePayload);
+          showToast(tr.feedShared || "Shared.", "success");
+          return;
+        }
+        if (
+          typeof navigator !== "undefined" &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === "function"
+        ) {
+          await navigator.clipboard.writeText(shareUrl);
+          showToast(tr.feedLinkCopied || "Link copied.", "success");
+        } else {
+          showToast(shareUrl, "info");
+        }
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+        console.error("share post failed", error);
+        showToast(shareUrl, "info");
+      }
     }
 function clearFeedMoreGhostCards(container = null) {
       const root = container || $("feed-list");
@@ -8045,6 +8049,7 @@ function getCommentQuickReplySuggestions(post) {
 function buildCommentSheetContext(post, tr, options = {}) {
       if (!post) return null;
       const { commentCount = 0, comments = [] } = options;
+      const isShortsContext = isShortsStylePost(post);
       const rawHandle =
         post.profile?.handle ||
         post.profile?.username ||
@@ -8162,6 +8167,57 @@ function buildCommentSheetContext(post, tr, options = {}) {
         emptyEl.textContent = getCommentSheetPreviewFallback(post, tr);
         body.appendChild(emptyEl);
       }
+      const actionRow = document.createElement("div");
+      actionRow.className = "comment-sheet-context-actions";
+      if (isShortsContext) {
+        actionRow.classList.add("is-shorts-context");
+      }
+
+      const likeBtn = document.createElement("button");
+      likeBtn.type = "button";
+      likeBtn.className =
+        "chip chip-log chip-action comment-sheet-context-action comment-sheet-context-action-like";
+      applyLikeButtonState(likeBtn, likeState, tr);
+      likeBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await toggleLikeForPost(post);
+        renderCommentSheetForPost(post.id);
+      });
+      actionRow.appendChild(likeBtn);
+
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className =
+        "chip chip-log chip-action comment-sheet-context-action comment-sheet-context-action-open";
+      setActionButtonContent(openBtn, {
+        kind: "open",
+        icon: "↗",
+        label: tr.notificationViewPost || "View post",
+      });
+      openBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openPostDetail(post.id);
+      });
+      actionRow.appendChild(openBtn);
+
+      const shareBtn = document.createElement("button");
+      shareBtn.type = "button";
+      shareBtn.className =
+        "chip chip-log chip-action comment-sheet-context-action comment-sheet-context-action-share";
+      setActionButtonContent(shareBtn, {
+        kind: "share",
+        icon: "↗",
+        label: tr.share || "Share",
+      });
+      shareBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await sharePost(post);
+      });
+      actionRow.appendChild(shareBtn);
+      body.appendChild(actionRow);
       wrap.appendChild(body);
       if (post.media_url) {
         const mediaEl = document.createElement("div");

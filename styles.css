@@ -2526,6 +2526,36 @@
     .comment-sheet-context-caption.is-empty {
       color: #a09588;
     }
+    .comment-sheet-context-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .comment-sheet-context-action {
+      min-height: 28px;
+      padding-inline: 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid #eadfce;
+      color: #4f473d;
+      box-shadow: none;
+    }
+    .comment-sheet-context-action .chip-icon {
+      font-size: 11px;
+    }
+    .comment-sheet-context-action .chip-label {
+      font-size: 10.5px;
+      font-weight: 700;
+    }
+    .comment-sheet-context-action:hover {
+      background: #fff7ef;
+      border-color: #dfcab5;
+    }
+    .comment-sheet-context-action-like.chip-like-on {
+      background: rgba(228, 87, 46, 0.08);
+      border-color: rgba(228, 87, 46, 0.2);
+    }
     .comment-sheet-context-social {
       display: inline-flex;
       align-items: center;
@@ -2825,6 +2855,25 @@
       background: rgba(255, 255, 255, 0.08);
       border-color: rgba(255, 255, 255, 0.12);
       color: #f8fafc;
+    }
+    .comment-sheet-context.is-shorts-context .comment-sheet-context-actions {
+      gap: 7px;
+      margin-top: 2px;
+    }
+    .comment-sheet-context.is-shorts-context .comment-sheet-context-action {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: rgba(248, 250, 252, 0.92);
+      box-shadow: none;
+    }
+    .comment-sheet-context.is-shorts-context .comment-sheet-context-action:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+    }
+    .comment-sheet-context.is-shorts-context .comment-sheet-context-action-like.chip-like-on {
+      background: rgba(255, 109, 58, 0.18);
+      border-color: rgba(255, 139, 94, 0.28);
     }
     .comment-sheet-context.is-shorts-context .comment-sheet-context-media {
       border-color: rgba(255, 255, 255, 0.14);
