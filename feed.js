@@ -6388,9 +6388,13 @@ export function renderFeed(options = {}) {
       footerRow.className = "shorts-footer";
       const openBtn = document.createElement("button");
       openBtn.type = "button";
-      openBtn.className = "shorts-open-btn";
+      openBtn.className = "surface-cta surface-cta-primary shorts-footer-btn shorts-open-btn";
       openBtn.dataset.postAction = "open-detail";
-      openBtn.textContent = tr.notificationViewPost || "View post";
+      setActionButtonContent(openBtn, {
+        kind: "open",
+        icon: "↗",
+        label: tr.notificationViewPost || "View post",
+      });
       footerRow.appendChild(openBtn);
       const footerCommentBtn = document.createElement("button");
       const footerCommentCount = Math.max(
@@ -6398,11 +6402,16 @@ export function renderFeed(options = {}) {
         Number((commentsByPost.get(post.id) || []).length || 0)
       );
       footerCommentBtn.type = "button";
-      footerCommentBtn.className = "shorts-secondary-btn";
+      footerCommentBtn.className =
+        "surface-cta surface-cta-secondary shorts-footer-btn shorts-secondary-btn";
       footerCommentBtn.dataset.postAction = "toggle-comments";
-      footerCommentBtn.textContent = footerCommentCount
-        ? `${footerCommentCount} ${tr.comments || "Comments"}`
-        : tr.commentsShow || tr.comments || "Comments";
+      setActionButtonContent(footerCommentBtn, {
+        kind: "comments",
+        icon: "💬",
+        label: footerCommentCount
+          ? `${footerCommentCount} ${tr.comments || "Comments"}`
+          : tr.commentsShow || tr.comments || "Comments",
+      });
       footerCommentBtn.setAttribute(
         "aria-label",
         footerCommentCount
@@ -6679,7 +6688,8 @@ export function renderFeed(options = {}) {
       appendPrimaryAction(commentBtn);
 
       const openDetailBtn = document.createElement("button");
-      openDetailBtn.className = "chip chip-log chip-action post-inline-open";
+      openDetailBtn.className =
+        "chip chip-log chip-action post-inline-open surface-cta surface-cta-primary";
       openDetailBtn.dataset.postAction = "open-detail";
       setActionButtonContent(openDetailBtn, {
         kind: "open",
@@ -6690,7 +6700,8 @@ export function renderFeed(options = {}) {
       appendPrimaryAction(openDetailBtn);
 
       const shareBtn = document.createElement("button");
-      shareBtn.className = "chip chip-log chip-action";
+      shareBtn.className =
+        "chip chip-log chip-action surface-cta surface-cta-secondary";
       shareBtn.dataset.postAction = "share-post";
       setActionButtonContent(shareBtn, {
         kind: "share",
@@ -6701,7 +6712,8 @@ export function renderFeed(options = {}) {
       appendSecondaryAction(shareBtn);
 
       const saveBtn = document.createElement("button");
-      saveBtn.className = "chip chip-log chip-save chip-action";
+      saveBtn.className =
+        "chip chip-log chip-save chip-action surface-cta surface-cta-secondary";
       saveBtn.dataset.postAction = "toggle-save";
       const isSaved = savedPostIds.has(`${post.id || ""}`);
       setActionButtonContent(saveBtn, {
