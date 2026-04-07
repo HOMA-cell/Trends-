@@ -7088,6 +7088,34 @@ async function loadProfilePostCount() {
           img.alt = "progress";
           item.appendChild(img);
         }
+        const overlay = document.createElement("div");
+        overlay.className = "gallery-item-overlay";
+        const top = document.createElement("div");
+        top.className = "gallery-item-topline";
+        const kind = document.createElement("span");
+        kind.className = "gallery-item-chip";
+        kind.textContent =
+          post.media_type === "video"
+            ? tr.mediaVideoLabel || "VIDEO"
+            : tr.mediaPhotoLabel || "PHOTO";
+        top.appendChild(kind);
+        if (post.bodyweight !== null && post.bodyweight !== undefined && post.bodyweight !== "") {
+          const weight = document.createElement("span");
+          weight.className = "gallery-item-chip is-weight";
+          weight.textContent = formatWeight(post.bodyweight);
+          top.appendChild(weight);
+        }
+        const bottom = document.createElement("div");
+        bottom.className = "gallery-item-bottomline";
+        const date = document.createElement("span");
+        date.className = "gallery-item-date";
+        date.textContent = formatDateDisplay(post.date || post.created_at || "");
+        const cta = document.createElement("span");
+        cta.className = "gallery-item-open";
+        cta.textContent = tr.notificationViewPost || "View post";
+        bottom.append(date, cta);
+        overlay.append(top, bottom);
+        item.appendChild(overlay);
         item.addEventListener("click", () => {
           const entryContext =
             gallery.dataset.detailSource === "public-profile"

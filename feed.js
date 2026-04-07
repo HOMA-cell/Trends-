@@ -9052,6 +9052,7 @@ export function renderPostDetail() {
       const commentsLoading = getCommentsLoading();
       const commentsEnabled = isCommentsEnabled();
       const tr = t[currentLang] || t.ja;
+      const logs = workoutLogsByPost.get(post.id) || [];
       const headerEl = $("detail-header");
       const mediaEl = $("detail-media");
       const bodyEl = $("detail-body");
@@ -9066,10 +9067,13 @@ export function renderPostDetail() {
 
       if (headerEl) {
         headerEl.innerHTML = "";
-        const avatar = document.createElement("div");
-        avatar.className = "avatar";
         const displayName =
           post.profile?.display_name || post.profile?.handle || "user";
+        const authorButton = document.createElement("button");
+        authorButton.type = "button";
+        authorButton.className = "detail-author-link";
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
         const initial = displayName.charAt(0).toUpperCase();
         renderAvatar(avatar, post.profile, initial);
 
@@ -9085,9 +9089,27 @@ export function renderPostDetail() {
         )} · ${post.visibility === "private" ? (tr.privateOnly || "Private") : (tr.public || "Public")}`;
         meta.appendChild(name);
         meta.appendChild(sub);
-
-        headerEl.appendChild(avatar);
-        headerEl.appendChild(meta);
+        authorButton.append(avatar, meta);
+        if (`${post.user_id || ""}`.trim()) {
+          authorButton.setAttribute(
+            "aria-label",
+            `${tr.notificationViewProfile || "View profile"} ${displayName}`
+          );
+          authorButton.addEventListener("click", () => {
+            const targetUserId = `${post.user_id || ""}`.trim();
+            if (!targetUserId) return;
+            const cameFromSameProfile =
+              currentDetailEntryContext?.source === "public_profile" &&
+              `${currentDetailEntryContext?.userId || ""}` === targetUserId;
+            closePostDetail({ syncHash: false });
+            if (!cameFromSameProfile) {
+              openPublicProfile(targetUserId);
+            }
+          });
+        } else {
+          authorButton.disabled = true;
+        }
+        headerEl.appendChild(authorButton);
       }
 
       if (mediaEl) {
@@ -9145,13 +9167,38 @@ export function renderPostDetail() {
         bodyEl.innerHTML = "";
         const body = document.createElement("div");
         body.className = "post-body";
-        if (post.bodyweight !== null && post.bodyweight !== undefined && post.bodyweight !== "") {
-          const weight = document.createElement("div");
-          weight.className = "post-weight";
-          weight.textContent = `${tr.weight || "Bodyweight"}: ${formatWeight(
-            post.bodyweight
-          )}`;
-          body.appendChild(weight);
+        const detailContextRow = document.createElement("div");
+        detailContextRow.className = "detail-context-row";
+        const detailContextItems = [
+          post.media_url
+            ? {
+                text:
+                  post.media_type === "video"
+                    ? tr.mediaVideoLabel || "VIDEO"
+                    : tr.mediaPhotoLabel || "PHOTO",
+              }
+            : null,
+          logs.length
+            ? {
+                text: `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`,
+              }
+            : null,
+          post.bodyweight !== null && post.bodyweight !== undefined && post.bodyweight !== ""
+            ? {
+                text: `${tr.weight || "Weight"} · ${formatWeight(post.bodyweight)}`,
+                tone: "weight",
+              }
+            : null,
+        ].filter(Boolean);
+        detailContextItems.forEach((item) => {
+          const chip = document.createElement("span");
+          chip.className = "detail-context-chip";
+          if (item.tone) chip.classList.add(`is-${item.tone}`);
+          chip.textContent = item.text;
+          detailContextRow.appendChild(chip);
+        });
+        if (detailContextRow.childNodes.length) {
+          body.appendChild(detailContextRow);
         }
         if (post.note || post.caption) {
           const caption = document.createElement("div");
@@ -9179,7 +9226,6 @@ export function renderPostDetail() {
 
       if (workoutEl) {
         workoutEl.innerHTML = "";
-        const logs = workoutLogsByPost.get(post.id) || [];
         if (!logs.length) {
           const empty = document.createElement("div");
           empty.className = "detail-sub";
