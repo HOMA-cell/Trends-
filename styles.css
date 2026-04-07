@@ -9602,6 +9602,75 @@
       font-variant-numeric: tabular-nums;
       flex: 0 0 auto;
     }
+    .public-profile-action-dock {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(236, 226, 213, 0.94);
+      background: rgba(255, 251, 246, 0.9);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.07);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 58px;
+      z-index: 3;
+    }
+    .public-profile-action-dock-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .public-profile-action-dock-title {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #18120d;
+    }
+    .public-profile-action-dock-note {
+      font-size: 11px;
+      line-height: 1.45;
+      color: #766a5f;
+    }
+    .public-profile-action-dock-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .public-profile-action-dock .btn {
+      min-height: 36px;
+      padding-inline: 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: none;
+    }
+    .public-profile-action-dock #btn-public-dock-message {
+      background: rgba(255, 255, 255, 0.88);
+      border-color: rgba(223, 213, 200, 0.92);
+      color: #1f2937;
+    }
+    .public-profile-action-dock #btn-public-dock-message:hover {
+      background: #ffffff;
+      border-color: rgba(208, 197, 184, 0.96);
+    }
+    .public-profile-action-dock #btn-public-dock-share {
+      background: rgba(255, 245, 239, 0.92);
+      border-color: rgba(241, 208, 190, 0.96);
+      color: #8a4227;
+    }
+    .public-profile-action-dock #btn-public-dock-share:hover {
+      background: #fff1ea;
+      border-color: rgba(239, 91, 42, 0.28);
+      color: #7a3318;
+    }
     #public-profile-meta {
       margin-top: 16px;
       gap: 18px 22px;
@@ -9860,6 +9929,22 @@
       }
       .public-profile-content-summary {
         margin-top: 8px;
+      }
+      .public-profile-action-dock {
+        margin-top: 10px;
+        top: 54px;
+        padding: 12px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .public-profile-action-dock-actions {
+        width: 100%;
+        justify-content: stretch;
+      }
+      .public-profile-action-dock .btn {
+        flex: 1 1 calc(33.333% - 6px);
+        justify-content: center;
       }
       #public-profile-meta {
         gap: 12px 18px;

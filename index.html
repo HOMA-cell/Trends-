@@ -860,7 +860,7 @@
             <div class="card-title" id="public-profile-title">Profile</div>
             <div class="public-profile-header-actions">
               <button class="btn btn-ghost btn-xs" id="btn-back-to-feed">戻る</button>
-              <button class="btn btn-ghost btn-xs" id="btn-share-profile">共有</button>
+              <button class="btn btn-ghost btn-xs" id="btn-share-profile" data-public-share-trigger>共有</button>
               <button class="btn btn-ghost btn-xs" data-collapsible-btn>Show more</button>
             </div>
           </div>
@@ -877,8 +877,8 @@
               </div>
             </div>
             <div class="public-profile-actions">
-              <button class="btn btn-ghost hidden" id="btn-public-message">メッセージ</button>
-              <button class="btn btn-primary" id="btn-public-follow">フォロー</button>
+              <button class="btn btn-ghost hidden" id="btn-public-message" data-public-message-trigger>メッセージ</button>
+              <button class="btn btn-primary" id="btn-public-follow" data-public-follow-trigger>フォロー</button>
             </div>
           </div>
           <div class="public-profile-entry hidden" id="public-profile-entry" aria-hidden="true">
@@ -926,6 +926,17 @@
               <div class="public-profile-content-summary-note" id="public-profile-content-summary-note">最新の投稿</div>
             </div>
             <div class="public-profile-content-summary-count" id="public-profile-content-summary-count">0</div>
+          </div>
+          <div class="public-profile-action-dock" id="public-profile-action-dock">
+            <div class="public-profile-action-dock-copy">
+              <div class="public-profile-action-dock-title" id="public-profile-action-dock-title">つながる</div>
+              <div class="public-profile-action-dock-note" id="public-profile-action-dock-note">進捗を見ながらそのまま会話できます。</div>
+            </div>
+            <div class="public-profile-action-dock-actions">
+              <button class="btn btn-ghost hidden" id="btn-public-dock-message" data-public-message-trigger>メッセージ</button>
+              <button class="btn btn-primary hidden" id="btn-public-dock-follow" data-public-follow-trigger>フォロー</button>
+              <button class="btn btn-ghost" id="btn-public-dock-share" data-public-share-trigger>共有</button>
+            </div>
           </div>
           <div id="public-profile-posts-list" class="feed-list public-profile-posts" style="margin-top: 12px;"></div>
           <div class="feed-more hidden" id="public-posts-more">

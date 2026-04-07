@@ -1161,6 +1161,46 @@ function updatePublicProfileContentSummary(
   if (countEl) countEl.textContent = formatCompactNumber(selected.count || 0);
 }
 
+function updatePublicProfileActionDock(
+  {
+    canMessage = false,
+    isFollowing = false,
+    counts = {},
+    tr = t[getCurrentLang()] || t.ja,
+  } = {}
+) {
+  const dockEl = $("public-profile-action-dock");
+  const titleEl = $("public-profile-action-dock-title");
+  const noteEl = $("public-profile-action-dock-note");
+  const activeTab = normalizePublicProfileContentTab(getPublicProfileContentTab());
+  const activeCount = Number(counts?.[activeTab] || 0);
+  if (!dockEl || !titleEl || !noteEl) return;
+
+  if (canMessage && !isFollowing) {
+    titleEl.textContent =
+      tr.profileActionDockTitleConnect || "Start the conversation";
+    noteEl.textContent = (
+      tr.profileActionDockNoteConnect ||
+      "{count} things to react to in this profile."
+    ).replace("{count}", formatCompactNumber(activeCount));
+  } else if (canMessage && isFollowing) {
+    titleEl.textContent =
+      tr.profileActionDockTitleFollow || "Keep the momentum going";
+    noteEl.textContent = (
+      tr.profileActionDockNoteFollow ||
+      "Jump back in with a message or share this profile."
+    ).replace("{count}", formatCompactNumber(activeCount));
+  } else {
+    titleEl.textContent =
+      tr.profileActionDockTitleShare || "Share this profile";
+    noteEl.textContent = (
+      tr.profileActionDockNoteShare ||
+      "{count} posts you can revisit from here."
+    ).replace("{count}", formatCompactNumber(activeCount));
+  }
+  dockEl.classList.remove("hidden");
+}
+
 export function updateProfileSummary() {
   const cardEl = $("profile-section");
   const bannerEl = $("profile-banner");
@@ -1483,9 +1523,12 @@ export function setupProfileLinks() {
     });
   }
 
-  const shareBtn = $("btn-share-profile");
-  if (shareBtn) {
-    shareBtn.addEventListener("click", async () => {
+  document
+    .querySelectorAll("[data-public-share-trigger]")
+    .forEach((shareBtn) => {
+      if (shareBtn.dataset.bound === "true") return;
+      shareBtn.dataset.bound = "true";
+      shareBtn.addEventListener("click", async () => {
       const currentPublicProfileId = getCurrentPublicProfileId();
       if (!currentPublicProfileId) return;
       const base = window.location.href.split("#")[0];
@@ -1497,11 +1540,14 @@ export function setupProfileLinks() {
         window.prompt("このURLをコピーしてください", url);
       }
     });
-  }
+    });
 
-  const messageBtn = $("btn-public-message");
-  if (messageBtn) {
-    messageBtn.addEventListener("click", async () => {
+  document
+    .querySelectorAll("[data-public-message-trigger]")
+    .forEach((messageBtn) => {
+      if (messageBtn.dataset.bound === "true") return;
+      messageBtn.dataset.bound = "true";
+      messageBtn.addEventListener("click", async () => {
       if (messageBtn.classList.contains("is-loading")) return;
       const currentUser = getCurrentUser();
       const currentPublicProfileId = getCurrentPublicProfileId();
@@ -1522,7 +1568,7 @@ export function setupProfileLinks() {
         messageBtn.classList.remove("is-loading");
       }
     });
-  }
+    });
 
   document
     .querySelectorAll("[data-profile-content-tab]")
@@ -1539,9 +1585,12 @@ export function setupProfileLinks() {
       });
     });
 
-  const followBtn = $("btn-public-follow");
-  if (followBtn) {
-    followBtn.addEventListener("click", async () => {
+  document
+    .querySelectorAll("[data-public-follow-trigger]")
+    .forEach((followBtn) => {
+      if (followBtn.dataset.bound === "true") return;
+      followBtn.dataset.bound = "true";
+      followBtn.addEventListener("click", async () => {
       if (followBtn.classList.contains("is-loading")) return;
       const currentUser = getCurrentUser();
       const currentPublicProfileId = getCurrentPublicProfileId();
@@ -1560,7 +1609,7 @@ export function setupProfileLinks() {
         followBtn.disabled = false;
       }
     });
-  }
+    });
 }
 
 export async function openPublicProfile(userId, options = {}) {
@@ -1612,8 +1661,15 @@ export async function openPublicProfile(userId, options = {}) {
   const streakEl = $("public-profile-streak");
   const followingEl = $("public-profile-following");
   const followersEl = $("public-profile-followers");
-  const followBtn = $("btn-public-follow");
-  const messageBtn = $("btn-public-message");
+  const followButtons = Array.from(
+    document.querySelectorAll("[data-public-follow-trigger]")
+  );
+  const messageButtons = Array.from(
+    document.querySelectorAll("[data-public-message-trigger]")
+  );
+  const shareButtons = Array.from(
+    document.querySelectorAll("[data-public-share-trigger]")
+  );
 
   const handleText = formatHandle(handle) || "@user";
   const displayName = profile?.display_name || handleText.replace("@", "");
@@ -1686,6 +1742,16 @@ export async function openPublicProfile(userId, options = {}) {
     },
     tr
   );
+  updatePublicProfileActionDock({
+    canMessage: !!currentUser && currentUser.id !== userId,
+    isFollowing: getFollowingIds().has(userId),
+    counts: {
+      posts: userPosts.length,
+      media: mediaPosts.length,
+      workouts: workoutPosts.length,
+    },
+    tr,
+  });
   const activeContentTab = getPublicProfileContentTab();
   const selectedPosts =
     activeContentTab === "media"
@@ -1727,25 +1793,26 @@ export async function openPublicProfile(userId, options = {}) {
   );
   renderPinnedPostPreview(pinnedEl, pinnedPost, tr);
 
-  if (followBtn) {
+  followButtons.forEach((followBtn) => {
     if (!currentUser || currentUser.id === userId) {
-      followBtn.style.display = "none";
-      followBtn.classList.remove("is-entry-highlight");
-    } else {
-      followBtn.style.display = "inline-flex";
-      followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
-      followBtn.classList.toggle("is-following", isFollowing);
-      followBtn.classList.toggle(
-        "is-entry-highlight",
-        !!currentPublicProfileEntryContext &&
-          currentPublicProfileEntryContext.source === "notification" &&
-          currentPublicProfileEntryContext.notificationType === "follow" &&
-          !isFollowing
-      );
-      followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
+      followBtn.classList.add("hidden");
+      followBtn.classList.remove("is-entry-highlight", "is-following");
+      followBtn.removeAttribute("aria-pressed");
+      return;
     }
-  }
-  if (messageBtn) {
+    followBtn.classList.remove("hidden");
+    followBtn.textContent = isFollowing ? tr.unfollow || "Following" : tr.follow || "Follow";
+    followBtn.classList.toggle("is-following", isFollowing);
+    followBtn.classList.toggle(
+      "is-entry-highlight",
+      !!currentPublicProfileEntryContext &&
+        currentPublicProfileEntryContext.source === "notification" &&
+        currentPublicProfileEntryContext.notificationType === "follow" &&
+        !isFollowing
+    );
+    followBtn.setAttribute("aria-pressed", isFollowing ? "true" : "false");
+  });
+  messageButtons.forEach((messageBtn) => {
     messageBtn.classList.toggle("hidden", !canMessage);
     messageBtn.disabled = !canMessage;
     messageBtn.dataset.actorName = displayName || "";
@@ -1766,7 +1833,14 @@ export async function openPublicProfile(userId, options = {}) {
     } else {
       messageBtn.removeAttribute("aria-label");
     }
-  }
+  });
+  shareButtons.forEach((shareBtn) => {
+    shareBtn.textContent = tr.shareProfile || tr.share || "Share";
+    shareBtn.setAttribute(
+      "aria-label",
+      `${tr.shareProfile || tr.share || "Share"} ${displayName}`
+    );
+  });
   renderPublicProfileEntryContext(currentPublicProfileEntryContext, {
     canMessage,
     isFollowing,
