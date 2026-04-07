@@ -272,6 +272,45 @@ function buildPublicProfileConnectionSignals(viewerProfile, targetProfile, tr) {
 
   return signals.slice(0, 3);
 }
+function buildPublicProfileStarterMessage(signal, tr) {
+  const label = `${signal?.label || ""}`.trim();
+  const value = `${signal?.value || ""}`.trim();
+  if (!label || !value) return "";
+  if (label === (tr.profileConnectionSameGoal || "Similar goal")) {
+    return (tr.profileConnectionStarterGoal || "同じ目標ですね。最近どんなメニューを組んでますか？").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSameGym || "Same gym")) {
+    return (tr.profileConnectionStarterGym || "{value}仲間ですね。最近よくやる種目ありますか？").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSameSplit || "Same split")) {
+    return (tr.profileConnectionStarterSplit || "{value}で回してるんですね。最近の当たりメニュー知りたいです。").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSameExperience || "Similar experience")) {
+    return (tr.profileConnectionStarterExperience || "近い経験レベルですね。今いちばん伸ばしたいところはどこですか？").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSharedLifts || "Shared lifts")) {
+    return (tr.profileConnectionStarterLifts || "{value}好きなの同じですね。最近のベストやコツがあれば聞きたいです。").replace(
+      "{value}",
+      value
+    );
+  }
+  return (tr.profileConnectionStarterDefault || "{value}つながりで話しかけました。最近ハマってるトレーニングありますか？").replace(
+    "{value}",
+    value
+  );
+}
 function renderPublicProfileConnection(targetEl, viewerProfile, targetProfile, tr) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
@@ -309,7 +348,31 @@ function renderPublicProfileConnection(targetEl, viewerProfile, targetProfile, t
     chip.append(label, value);
     list.appendChild(chip);
   });
-  targetEl.append(title, note, list);
+  const actions = document.createElement("div");
+  actions.className = "public-profile-connection-actions";
+  signals.forEach((signal) => {
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "public-profile-connection-action";
+    action.textContent = signal.label;
+    action.addEventListener("click", async () => {
+      const currentUser = getCurrentUser();
+      const targetUserId = `${targetProfile?.id || ""}`.trim();
+      if (!currentUser || !targetUserId || currentUser.id === targetUserId) return;
+      await openDmConversation(targetUserId, {
+        profile: targetProfile,
+        entryContext: {
+          source: "profile",
+          partnerId: targetUserId,
+          actorName: targetProfile?.display_name || "",
+          actorHandle: targetProfile?.handle || "",
+          prefillMessage: buildPublicProfileStarterMessage(signal, tr),
+        },
+      });
+    });
+    actions.appendChild(action);
+  });
+  targetEl.append(title, note, list, actions);
 }
 function formatCompactNumber(value) {
   if (!Number.isFinite(Number(value))) return "0";
