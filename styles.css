@@ -10376,6 +10376,24 @@
       border-color: rgba(243, 112, 63, 0.18);
       color: #b24d22;
     }
+    .detail-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .detail-action-btn {
+      min-height: 34px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(20, 28, 45, 0.08);
+      box-shadow: 0 10px 20px rgba(23, 31, 53, 0.05);
+    }
+    .detail-action-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(23, 31, 53, 0.08);
+    }
     .detail-workout {
       display: flex;
       flex-direction: column;

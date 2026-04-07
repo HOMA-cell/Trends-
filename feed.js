@@ -9053,6 +9053,7 @@ export function renderPostDetail() {
       const commentsEnabled = isCommentsEnabled();
       const tr = t[currentLang] || t.ja;
       const logs = workoutLogsByPost.get(post.id) || [];
+      const detailComments = commentsByPost.get(post.id) || [];
       const headerEl = $("detail-header");
       const mediaEl = $("detail-media");
       const bodyEl = $("detail-body");
@@ -9200,6 +9201,43 @@ export function renderPostDetail() {
         if (detailContextRow.childNodes.length) {
           body.appendChild(detailContextRow);
         }
+        const detailActions = document.createElement("div");
+        detailActions.className = "detail-actions";
+        const likeBtn = document.createElement("button");
+        likeBtn.type = "button";
+        likeBtn.className = "chip chip-action detail-action-btn";
+        const likeState = getLikeUiState(post.id);
+        applyLikeButtonState(likeBtn, likeState, tr);
+        likeBtn.addEventListener("click", async () => {
+          await toggleLikeForPost(post);
+          renderPostDetail();
+        });
+        const commentBtn = document.createElement("button");
+        commentBtn.type = "button";
+        commentBtn.className = "chip chip-action detail-action-btn";
+        setActionButtonContent(commentBtn, {
+          kind: "comment",
+          icon: "💬",
+          label: detailComments.length
+            ? `${tr.comment || "Comment"} (${formatCompactNumber(detailComments.length)})`
+            : tr.comment || "Comment",
+        });
+        commentBtn.addEventListener("click", () => {
+          openCommentSheet(post.id);
+        });
+        const shareBtn = document.createElement("button");
+        shareBtn.type = "button";
+        shareBtn.className = "chip chip-action detail-action-btn";
+        setActionButtonContent(shareBtn, {
+          kind: "share",
+          icon: "↗",
+          label: tr.share || "Share",
+        });
+        shareBtn.addEventListener("click", async () => {
+          await sharePost(post);
+        });
+        detailActions.append(likeBtn, commentBtn, shareBtn);
+        body.appendChild(detailActions);
         if (post.note || post.caption) {
           const caption = document.createElement("div");
           caption.className = "post-caption";
@@ -9255,7 +9293,7 @@ export function renderPostDetail() {
 
       if (commentsEl) {
         commentsEl.innerHTML = "";
-        const comments = commentsByPost.get(post.id) || [];
+        const comments = detailComments;
         const focusRequest = getCommentFocusRequest(post.id);
         const focusCommentId = resolveCommentFocusId(comments, focusRequest);
         const replyRequest = getCommentReplyRequest(post.id);
