@@ -111,6 +111,7 @@ let feedVisibleCount = 8;
 let feedLastLoadedAt = null;
 let feedLoadingGeneration = 0;
 let currentDetailPostId = null;
+let currentDetailEntryContext = null;
 let feedRenderToken = 0;
 let feedLoadPromise = null;
 let feedNotice = "";
@@ -8786,12 +8787,74 @@ function isPostDetailOpen(backdrop = null) {
       if (!target) return false;
       return !target.classList.contains("hidden");
     }
+function normalizeDetailEntryContext(context = {}) {
+      if (!context || typeof context !== "object") return null;
+      const source = `${context.source || ""}`.trim();
+      const userId = `${context.userId || context.profileUserId || ""}`.trim();
+      if (!source || !userId) return null;
+      return {
+        source,
+        userId,
+        actorName: `${context.actorName || context.profileName || ""}`.trim(),
+        actorHandle: `${context.actorHandle || context.profileHandle || ""}`.trim(),
+        tab: `${context.tab || "posts"}`.trim() || "posts",
+      };
+    }
+function getDetailEntryTabLabel(context, tr) {
+      const tab = `${context?.tab || ""}`.trim();
+      if (tab === "media") return tr.profileTabMedia || "Media";
+      if (tab === "workouts") return tr.profileTabWorkouts || "Workouts";
+      return tr.profileTabPosts || "Posts";
+    }
+function buildDetailEntryText(context, tr) {
+      if (!context) return "";
+      const actorHandle = formatHandle(context.actorHandle || "");
+      const actorDisplay = context.actorName || actorHandle || "";
+      const tabLabel = getDetailEntryTabLabel(context, tr);
+      if (actorDisplay && tabLabel) return `${actorDisplay} · ${tabLabel}`;
+      return actorDisplay || tabLabel || "";
+    }
+function renderDetailEntryContext(context, tr) {
+      const wrap = $("detail-entry");
+      const label = $("detail-entry-label");
+      const text = $("detail-entry-text");
+      const action = $("btn-detail-entry-action");
+      if (!wrap || !label || !text || !action) return;
+      if (!context || context.source !== "public_profile") {
+        wrap.classList.add("hidden");
+        wrap.setAttribute("aria-hidden", "true");
+        label.textContent = "";
+        text.textContent = "";
+        action.dataset.userId = "";
+        return;
+      }
+      wrap.classList.remove("hidden");
+      wrap.setAttribute("aria-hidden", "false");
+      label.textContent = tr.detailEntryFromProfile || "Opened from profile";
+      text.textContent = buildDetailEntryText(context, tr);
+      action.textContent = tr.detailEntryBackToProfile || "Back to profile";
+      action.dataset.userId = context.userId || "";
+    }
 function getDetailNavigablePosts() {
       const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
+      const profileScope =
+        currentDetailEntryContext?.source === "public_profile"
+          ? currentDetailEntryContext
+          : null;
+      const workoutLogsByPost = getWorkoutLogsByPost();
       return (getAllPosts() || []).filter((post) => {
         if (!post) return false;
         if (post.visibility === "private") {
           return !!currentUserId && `${post.user_id || ""}` === currentUserId;
+        }
+        if (profileScope) {
+          if (`${post.user_id || ""}` !== profileScope.userId) return false;
+          if (profileScope.tab === "media") {
+            return !!post.media_url;
+          }
+          if (profileScope.tab === "workouts") {
+            return (workoutLogsByPost.get(post.id) || []).length > 0;
+          }
         }
         return true;
       });
@@ -8808,7 +8871,7 @@ function openAdjacentPostDetail(step = 1) {
       if (nextIndex < 0 || nextIndex >= posts.length) return false;
       const targetPostId = `${posts[nextIndex]?.id || ""}`.trim();
       if (!targetPostId) return false;
-      openPostDetail(targetPostId);
+      openPostDetail(targetPostId, { preserveEntryContext: true });
       return true;
     }
 export function setupPostDetailModal() {
@@ -8833,7 +8896,17 @@ export function setupPostDetailModal() {
         if (!card) return;
         const postId = card.getAttribute("data-post-id");
         if (postId) {
-          openPostDetail(postId);
+          const entryContext =
+            `${card.dataset.detailSource || ""}` === "public-profile"
+              ? {
+                  source: "public_profile",
+                  userId: `${card.dataset.profileUserId || ""}`.trim(),
+                  actorName: `${card.dataset.profileName || ""}`.trim(),
+                  actorHandle: `${card.dataset.profileHandle || ""}`.trim(),
+                  tab: `${card.dataset.profileTab || "posts"}`.trim(),
+                }
+              : null;
+          openPostDetail(postId, entryContext ? { entryContext } : {});
         }
       };
 
@@ -8849,6 +8922,16 @@ export function setupPostDetailModal() {
         closeBtn.dataset.bound = "true";
         closeBtn.addEventListener("click", () => {
           closePostDetail();
+        });
+      }
+      const entryActionBtn = $("btn-detail-entry-action");
+      if (entryActionBtn && entryActionBtn.dataset.bound !== "true") {
+        entryActionBtn.dataset.bound = "true";
+        entryActionBtn.addEventListener("click", () => {
+          const userId = `${entryActionBtn.dataset.userId || ""}`.trim();
+          if (!userId) return;
+          closePostDetail({ syncHash: false });
+          openPublicProfile(userId, { preserveEntryContext: true });
         });
       }
       if (backdrop && backdrop.dataset.bound !== "true") {
@@ -8903,6 +8986,7 @@ export function closePostDetail(options = {}) {
       }
       const previousPostId = currentDetailPostId;
       currentDetailPostId = null;
+      currentDetailEntryContext = null;
       detailCommentsFocusRequested = false;
       if (previousPostId) {
         clearCommentFocusRequest(previousPostId);
@@ -8924,6 +9008,11 @@ export function openPostDetail(postId, options = {}) {
         (item) => `${item?.id || ""}` === normalizedPostId
       );
       if (!hasPost) return;
+      if (options.entryContext) {
+        currentDetailEntryContext = normalizeDetailEntryContext(options.entryContext);
+      } else if (!options.preserveEntryContext) {
+        currentDetailEntryContext = null;
+      }
       setCommentFocusRequest(normalizedPostId, {
         commentId: options.focusCommentId,
         actorId: options.focusCommentActorId,
@@ -8973,6 +9062,7 @@ export function renderPostDetail() {
       if (titleEl) {
         titleEl.textContent = tr.detailTitle || "投稿詳細";
       }
+      renderDetailEntryContext(currentDetailEntryContext, tr);
 
       if (headerEl) {
         headerEl.innerHTML = "";

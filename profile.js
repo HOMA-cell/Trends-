@@ -1781,6 +1781,11 @@ export async function openPublicProfile(userId, options = {}) {
   if (list) {
     list.classList.toggle("hidden", activeContentTab === "media");
     list.innerHTML = "";
+    list.dataset.detailSource = "public-profile";
+    list.dataset.profileUserId = `${userId || ""}`;
+    list.dataset.profileName = displayName || "";
+    list.dataset.profileHandle = handle || "";
+    list.dataset.profileTab = activeContentTab || "posts";
     if (!selectedPosts.length && activeContentTab !== "media") {
       const empty = document.createElement("div");
       empty.className = "empty";
@@ -1806,6 +1811,11 @@ export async function openPublicProfile(userId, options = {}) {
         const clone = document.createElement("div");
         clone.className = "post-card public-profile-post-card";
         clone.setAttribute("data-post-id", post.id);
+        clone.dataset.detailSource = "public-profile";
+        clone.dataset.profileUserId = `${userId || ""}`;
+        clone.dataset.profileName = displayName || "";
+        clone.dataset.profileHandle = handle || "";
+        clone.dataset.profileTab = activeContentTab || "posts";
         const shell = document.createElement("div");
         shell.className = "public-profile-post-shell";
         const copy = document.createElement("div");
@@ -2011,6 +2021,14 @@ export async function openPublicProfile(userId, options = {}) {
   }
   if (gallerySection) {
     gallerySection.classList.toggle("hidden", activeContentTab !== "media");
+  }
+  const galleryEl = $("public-profile-gallery");
+  if (galleryEl) {
+    galleryEl.dataset.detailSource = "public-profile";
+    galleryEl.dataset.profileUserId = `${userId || ""}`;
+    galleryEl.dataset.profileName = displayName || "";
+    galleryEl.dataset.profileHandle = handle || "";
+    galleryEl.dataset.profileTab = "media";
   }
   renderGalleryPage();
 

@@ -2068,9 +2068,9 @@ async function loadProfilePostCount() {
       renderInsights,
       renderOnboardingChecklist,
       openDmShareComposer,
-      openPublicProfile: (userId) => {
+      openPublicProfile: (userId, options = {}) => {
         if (typeof openPublicProfile === "function" && userId) {
-          openPublicProfile(userId);
+          openPublicProfile(userId, options);
         }
       },
       openPostModal: (options = {}) => {
@@ -7088,9 +7088,23 @@ async function loadProfilePostCount() {
           img.alt = "progress";
           item.appendChild(img);
         }
-        item.addEventListener("click", () =>
-          openMediaModal(post.media_url, post.media_type)
-        );
+        item.addEventListener("click", () => {
+          const entryContext =
+            gallery.dataset.detailSource === "public-profile"
+              ? {
+                  source: "public_profile",
+                  userId: `${gallery.dataset.profileUserId || ""}`.trim(),
+                  actorName: `${gallery.dataset.profileName || ""}`.trim(),
+                  actorHandle: `${gallery.dataset.profileHandle || ""}`.trim(),
+                  tab: `${gallery.dataset.profileTab || "media"}`.trim(),
+                }
+              : null;
+          if (post?.id) {
+            openPostDetail(`${post.id}`, entryContext ? { entryContext } : {});
+            return;
+          }
+          openMediaModal(post.media_url, post.media_type);
+        });
         gallery.appendChild(item);
       });
 
