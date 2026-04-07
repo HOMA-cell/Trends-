@@ -179,6 +179,138 @@ function renderPublicProfileEntryContext(context, options = {}) {
     tr,
   });
 }
+function normalizeMatchText(value = "") {
+  return `${value || ""}`
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+function extractProfileTerms(value = "") {
+  return Array.from(
+    new Set(
+      `${value || ""}`
+        .split(/[,\n/・|]+/)
+        .map((item) => `${item || ""}`.trim())
+        .filter(Boolean)
+    )
+  );
+}
+function buildPublicProfileConnectionSignals(viewerProfile, targetProfile, tr) {
+  if (!viewerProfile || !targetProfile) return [];
+  const signals = [];
+  const pushSignal = (label, value, accent = "") => {
+    const text = `${value || ""}`.trim();
+    if (!label || !text) return;
+    signals.push({ label, value: text, accent });
+  };
+
+  if (
+    normalizeMatchText(viewerProfile.training_goal) &&
+    normalizeMatchText(viewerProfile.training_goal) ===
+      normalizeMatchText(targetProfile.training_goal)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameGoal || "Similar goal",
+      targetProfile.training_goal,
+      "goal"
+    );
+  }
+  if (
+    normalizeMatchText(viewerProfile.gym) &&
+    normalizeMatchText(viewerProfile.gym) === normalizeMatchText(targetProfile.gym)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameGym || "Same gym",
+      targetProfile.gym,
+      "gym"
+    );
+  }
+  if (
+    normalizeMatchText(viewerProfile.training_split) &&
+    normalizeMatchText(viewerProfile.training_split) ===
+      normalizeMatchText(targetProfile.training_split)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameSplit || "Same split",
+      targetProfile.training_split,
+      "split"
+    );
+  }
+  if (
+    normalizeMatchText(viewerProfile.experience_level) &&
+    normalizeMatchText(viewerProfile.experience_level) ===
+      normalizeMatchText(targetProfile.experience_level)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameExperience || "Similar experience",
+      formatExperience(targetProfile.experience_level, tr),
+      "experience"
+    );
+  }
+
+  const viewerFavoriteSet = new Set(
+    extractProfileTerms(viewerProfile.favorite_lifts).map((term) =>
+      normalizeMatchText(term)
+    )
+  );
+  const targetFavoriteTerms = extractProfileTerms(targetProfile.favorite_lifts);
+  const sharedFavoriteTerms = targetFavoriteTerms.filter((term) =>
+    viewerFavoriteSet.has(normalizeMatchText(term))
+  );
+  if (sharedFavoriteTerms.length) {
+    const preview =
+      sharedFavoriteTerms.slice(0, 2).join(" · ") +
+      (sharedFavoriteTerms.length > 2
+        ? ` +${sharedFavoriteTerms.length - 2}`
+        : "");
+    pushSignal(
+      tr.profileConnectionSharedLifts || "Shared lifts",
+      preview,
+      "lifts"
+    );
+  }
+
+  return signals.slice(0, 3);
+}
+function renderPublicProfileConnection(targetEl, viewerProfile, targetProfile, tr) {
+  if (!targetEl) return;
+  targetEl.innerHTML = "";
+  const signals = buildPublicProfileConnectionSignals(
+    viewerProfile,
+    targetProfile,
+    tr
+  );
+  if (!signals.length) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+  targetEl.classList.remove("hidden");
+  const title = document.createElement("div");
+  title.className = "public-profile-connection-title";
+  title.textContent = tr.profileConnectionTitle || "Why you might connect";
+  const note = document.createElement("div");
+  note.className = "public-profile-connection-note";
+  note.textContent =
+    tr.profileConnectionNote ||
+    "Shared context makes it easier to start a conversation.";
+  const list = document.createElement("div");
+  list.className = "public-profile-connection-list";
+  signals.forEach((signal) => {
+    const chip = document.createElement("div");
+    chip.className = `public-profile-connection-chip${
+      signal.accent ? ` is-${signal.accent}` : ""
+    }`;
+    const label = document.createElement("span");
+    label.className = "public-profile-connection-chip-label";
+    label.textContent = signal.label;
+    const value = document.createElement("span");
+    value.className = "public-profile-connection-chip-value";
+    value.textContent = signal.value;
+    chip.append(label, value);
+    list.appendChild(chip);
+  });
+  targetEl.append(title, note, list);
+}
 function formatCompactNumber(value) {
   if (!Number.isFinite(Number(value))) return "0";
   try {
@@ -1410,6 +1542,7 @@ export async function openPublicProfile(userId, options = {}) {
   const nameEl = $("public-profile-handle");
   const bioEl = $("public-profile-bio");
   const heroFactsEl = $("public-profile-hero-facts");
+  const connectionEl = $("public-profile-connection");
   const spotlightEl = $("public-profile-spotlight");
   const joinedEl = $("public-profile-joined");
   const postsEl = $("public-profile-posts");
@@ -1458,6 +1591,9 @@ export async function openPublicProfile(userId, options = {}) {
   }
 
   const currentUser = getCurrentUser();
+  const viewerProfile =
+    currentUser && currentUser.id !== userId ? getCurrentProfile() : null;
+  renderPublicProfileConnection(connectionEl, viewerProfile, profile, tr);
   const allPosts = getAllPosts();
   const workoutLogsByPost = getWorkoutLogsByPost();
   const likesByPost = getLikesByPost();
