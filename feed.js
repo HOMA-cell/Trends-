@@ -51,6 +51,7 @@ let feedContext = {
   renderOnboardingChecklist: () => {},
   setActivePage: () => {},
   openDmShareComposer: () => {},
+  openPublicProfile: () => {},
   onFeedLayoutChange: null,
   openPostModal: () => {},
 };
@@ -91,6 +92,7 @@ const renderInsights = () => feedContext.renderInsights?.();
 const renderOnboardingChecklist = () => feedContext.renderOnboardingChecklist?.();
 const setActivePage = (page) => feedContext.setActivePage?.(page);
 const openPostModal = (...args) => feedContext.openPostModal?.(...args);
+const openPublicProfile = (...args) => feedContext.openPublicProfile?.(...args);
 
 let currentFilter = "foryou";
 let filterMedia = false;
@@ -7923,8 +7925,18 @@ function buildCommentItemElement(comment, tr, options = {}) {
       const bubble = document.createElement("div");
       bubble.className = "comment-bubble";
 
-      const header = document.createElement("div");
+      const header = document.createElement(comment.user_id ? "button" : "div");
       header.className = "comment-header";
+      if (header instanceof HTMLButtonElement) {
+        header.type = "button";
+        header.classList.add("comment-author-link");
+        header.setAttribute("aria-label", displayName);
+        header.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openPublicProfile(comment.user_id);
+        });
+      }
 
       const author = document.createElement("span");
       author.className = "comment-author";
@@ -7998,7 +8010,21 @@ function buildCommentItemElement(comment, tr, options = {}) {
         actions.appendChild(replyBtn);
         content.appendChild(actions);
       }
-      item.appendChild(avatarEl);
+      if (comment.user_id) {
+        const avatarLink = document.createElement("button");
+        avatarLink.type = "button";
+        avatarLink.className = "comment-avatar-link";
+        avatarLink.setAttribute("aria-label", displayName);
+        avatarLink.appendChild(avatarEl);
+        avatarLink.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openPublicProfile(comment.user_id);
+        });
+        item.appendChild(avatarLink);
+      } else {
+        item.appendChild(avatarEl);
+      }
       item.appendChild(content);
       return item;
     }
@@ -8086,12 +8112,36 @@ function buildCommentSheetContext(post, tr, options = {}) {
         .charAt(0)
         .toUpperCase();
       renderAvatar(avatarEl, post.profile, initial);
-      wrap.appendChild(avatarEl);
+      if (post.user_id) {
+        const avatarLink = document.createElement("button");
+        avatarLink.type = "button";
+        avatarLink.className = "comment-sheet-context-avatar-link";
+        avatarLink.setAttribute("aria-label", displayName);
+        avatarLink.appendChild(avatarEl);
+        avatarLink.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openPublicProfile(post.user_id);
+        });
+        wrap.appendChild(avatarLink);
+      } else {
+        wrap.appendChild(avatarEl);
+      }
 
       const body = document.createElement("div");
       body.className = "comment-sheet-context-body";
-      const authorRow = document.createElement("div");
+      const authorRow = document.createElement(post.user_id ? "button" : "div");
       authorRow.className = "comment-sheet-context-author";
+      if (authorRow instanceof HTMLButtonElement) {
+        authorRow.type = "button";
+        authorRow.classList.add("comment-sheet-context-profile-link");
+        authorRow.setAttribute("aria-label", displayName);
+        authorRow.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openPublicProfile(post.user_id);
+        });
+      }
       const nameEl = document.createElement("span");
       nameEl.className = "comment-sheet-context-name";
       nameEl.textContent = displayName;

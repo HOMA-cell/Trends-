@@ -2068,6 +2068,11 @@ async function loadProfilePostCount() {
       renderInsights,
       renderOnboardingChecklist,
       openDmShareComposer,
+      openPublicProfile: (userId) => {
+        if (typeof openPublicProfile === "function" && userId) {
+          openPublicProfile(userId);
+        }
+      },
       openPostModal: (options = {}) => {
         if (typeof openPostModal === "function") {
           openPostModal(options);
