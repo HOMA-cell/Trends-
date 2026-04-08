@@ -9053,7 +9053,25 @@ export function renderPostDetail() {
       const commentsEnabled = isCommentsEnabled();
       const tr = t[currentLang] || t.ja;
       const logs = workoutLogsByPost.get(post.id) || [];
+      const likesByPost = getLikesByPost();
       const detailComments = commentsByPost.get(post.id) || [];
+      const likeCount = Number(likesByPost.get(post.id) || 0);
+      const commentCount = detailComments.length;
+      const setCount = logs.reduce(
+        (sum, item) => sum + ((item?.sets || []).length || 0),
+        0
+      );
+      const topWeight = logs.reduce((maxWeight, item) => {
+        const sets = Array.isArray(item?.sets) ? item.sets : [];
+        return sets.reduce((best, set) => {
+          const weight = Number(set?.weight || 0);
+          if (!Number.isFinite(weight) || weight <= 0) return best;
+          return Math.max(best, weight);
+        }, maxWeight);
+      }, 0);
+      const topNames = logs
+        .map((item) => String(item?.exercise || "").trim())
+        .filter(Boolean);
       const headerEl = $("detail-header");
       const mediaEl = $("detail-media");
       const bodyEl = $("detail-body");
@@ -9070,6 +9088,7 @@ export function renderPostDetail() {
         headerEl.innerHTML = "";
         const displayName =
           post.profile?.display_name || post.profile?.handle || "user";
+        const relativeText = formatRelative(post.date || post.created_at);
         const authorButton = document.createElement("button");
         authorButton.type = "button";
         authorButton.className = "detail-author-link";
@@ -9085,9 +9104,9 @@ export function renderPostDetail() {
         name.textContent = displayName;
         const sub = document.createElement("div");
         sub.className = "detail-sub";
-        sub.textContent = `${formatDateDisplay(
-          post.date || post.created_at || Date.now()
-        )} · ${post.visibility === "private" ? (tr.privateOnly || "Private") : (tr.public || "Public")}`;
+        sub.textContent = `${
+          relativeText || formatDateDisplay(post.date || post.created_at || Date.now())
+        } · ${post.visibility === "private" ? (tr.privateOnly || "Private") : (tr.public || "Public")}`;
         meta.appendChild(name);
         meta.appendChild(sub);
         authorButton.append(avatar, meta);
@@ -9110,7 +9129,55 @@ export function renderPostDetail() {
         } else {
           authorButton.disabled = true;
         }
-        headerEl.appendChild(authorButton);
+        const hero = document.createElement("div");
+        hero.className = "detail-hero";
+        const heroTop = document.createElement("div");
+        heroTop.className = "detail-hero-top";
+        heroTop.appendChild(authorButton);
+        hero.appendChild(heroTop);
+
+        const heroStats = document.createElement("div");
+        heroStats.className = "detail-hero-stats";
+        [
+          likeCount
+            ? { label: tr.likes || "Likes", value: formatCompactCount(likeCount) }
+            : null,
+          commentCount
+            ? { label: tr.comments || "Comments", value: formatCompactCount(commentCount) }
+            : null,
+          logs.length
+            ? {
+                label: tr.profileTabWorkouts || "Workouts",
+                value: `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`,
+              }
+            : null,
+          topWeight > 0
+            ? {
+                label: tr.profileBestLift || "Best lift",
+                value: formatWeight(topWeight),
+                tone: "strong",
+              }
+            : null,
+        ]
+          .filter(Boolean)
+          .slice(0, 4)
+          .forEach((stat) => {
+            const chip = document.createElement("div");
+            chip.className = "detail-hero-stat";
+            if (stat.tone) chip.classList.add(`is-${stat.tone}`);
+            const labelEl = document.createElement("span");
+            labelEl.className = "detail-hero-stat-label";
+            labelEl.textContent = stat.label;
+            const valueEl = document.createElement("strong");
+            valueEl.className = "detail-hero-stat-value";
+            valueEl.textContent = stat.value;
+            chip.append(labelEl, valueEl);
+            heroStats.appendChild(chip);
+          });
+        if (heroStats.childNodes.length) {
+          hero.appendChild(heroStats);
+        }
+        headerEl.appendChild(hero);
       }
 
       if (mediaEl) {
@@ -9239,11 +9306,24 @@ export function renderPostDetail() {
         detailActions.append(likeBtn, commentBtn, shareBtn);
         body.appendChild(detailActions);
         if (post.note || post.caption) {
-          const caption = document.createElement("div");
-          caption.className = "post-caption";
           const captionText = `${post.note || post.caption || ""}`.trim();
-          caption.textContent = captionText;
-          body.appendChild(caption);
+          const { title: captionTitle, body: captionBody } =
+            splitCaptionContent(captionText);
+          const captionBlock = document.createElement("div");
+          captionBlock.className = "post-caption-block detail-caption-block";
+          if (captionTitle) {
+            const titleEl = document.createElement("div");
+            titleEl.className = "post-caption-title detail-caption-title";
+            titleEl.textContent = captionTitle;
+            captionBlock.appendChild(titleEl);
+          }
+          if (captionBody || !captionTitle) {
+            const caption = document.createElement("div");
+            caption.className = "post-caption detail-caption-body";
+            caption.textContent = captionBody || captionText;
+            captionBlock.appendChild(caption);
+          }
+          body.appendChild(captionBlock);
           const captionTags = getCaptionHashtags(captionText, FEED_CAPTION_TAG_LIMIT);
           if (captionTags.length) {
             const tagRow = document.createElement("div");
@@ -9270,6 +9350,46 @@ export function renderPostDetail() {
           empty.textContent = tr.workoutEmpty || "ワークアウトログなし";
           workoutEl.appendChild(empty);
         } else {
+          const summary = document.createElement("div");
+          summary.className = "detail-workout-summary";
+          const summaryTitle = document.createElement("div");
+          summaryTitle.className = "detail-workout-summary-title";
+          summaryTitle.textContent =
+            topNames.slice(0, 2).join(" • ") ||
+            tr.profileTabWorkouts ||
+            "Workouts";
+          summary.appendChild(summaryTitle);
+          const summaryStats = document.createElement("div");
+          summaryStats.className = "detail-workout-summary-stats";
+          [
+            {
+              label: tr.workoutExerciseCountLabel || "種目",
+              value: `${logs.length}`,
+            },
+            {
+              label: tr.workoutSetCountLabel || "セット",
+              value: `${setCount}`,
+            },
+            topWeight > 0
+              ? {
+                  label: tr.profileBestLift || "Best lift",
+                  value: formatWeight(topWeight),
+                }
+              : null,
+          ]
+            .filter(Boolean)
+            .forEach((item) => {
+              const stat = document.createElement("div");
+              stat.className = "detail-workout-summary-stat";
+              const value = document.createElement("strong");
+              value.textContent = item.value;
+              const label = document.createElement("span");
+              label.textContent = item.label;
+              stat.append(value, label);
+              summaryStats.appendChild(stat);
+            });
+          summary.appendChild(summaryStats);
+          workoutEl.appendChild(summary);
           logs.forEach((exercise) => {
             const item = document.createElement("div");
             item.className = "detail-workout-item";
