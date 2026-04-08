@@ -9202,6 +9202,18 @@ export function renderPostDetail() {
       }
       renderDetailEntryContext(currentDetailEntryContext, tr);
 
+      const focusDetailSection = (targetEl) => {
+        const section = targetEl?.closest?.(".detail-section");
+        if (!targetEl || !section || typeof window === "undefined") return;
+        section.classList.add("is-focus-target");
+        window.setTimeout(() => {
+          section.classList.remove("is-focus-target");
+        }, 2200);
+        window.requestAnimationFrame(() => {
+          targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      };
+
       if (headerEl) {
         headerEl.innerHTML = "";
         const displayName =
@@ -9261,12 +9273,17 @@ export function renderPostDetail() {
             ? { label: tr.likes || "Likes", value: formatCompactCount(likeCount) }
             : null,
           commentCount
-            ? { label: tr.comments || "Comments", value: formatCompactCount(commentCount) }
+            ? {
+                label: tr.comments || "Comments",
+                value: formatCompactCount(commentCount),
+                action: () => focusPostDetailComments(),
+              }
             : null,
           logs.length
             ? {
                 label: tr.profileTabWorkouts || "Workouts",
                 value: `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`,
+                action: () => focusDetailSection(workoutEl),
               }
             : null,
           topWeight > 0
@@ -9274,15 +9291,22 @@ export function renderPostDetail() {
                 label: tr.profileBestLift || "Best lift",
                 value: formatWeight(topWeight),
                 tone: "strong",
+                action: () => focusDetailSection(workoutEl),
               }
             : null,
         ]
           .filter(Boolean)
           .slice(0, 4)
           .forEach((stat) => {
-            const chip = document.createElement("div");
+            const chip = document.createElement(stat.action ? "button" : "div");
             chip.className = "detail-hero-stat";
             if (stat.tone) chip.classList.add(`is-${stat.tone}`);
+            if (stat.action) {
+              chip.type = "button";
+              chip.classList.add("is-action");
+              chip.setAttribute("aria-label", `${stat.label} ${stat.value}`);
+              chip.addEventListener("click", stat.action);
+            }
             const labelEl = document.createElement("span");
             labelEl.className = "detail-hero-stat-label";
             labelEl.textContent = stat.label;
