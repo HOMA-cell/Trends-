@@ -6524,6 +6524,8 @@ export function renderFeed(options = {}) {
       card.setAttribute("data-post-id", post.id);
       card.dataset.postRenderKey = buildPostRenderKey(post);
       const logs = workoutLogsByPost.get(post.id) || [];
+      const likeCount = Number(getLikesByPost().get(post.id) || 0);
+      const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
       const exerciseCount = logs.length;
       const setCount = logs.reduce(
         (sum, item) => sum + ((item?.sets || []).length || 0),
@@ -6540,6 +6542,8 @@ export function renderFeed(options = {}) {
       const topNames = logs
         .map((item) => String(item?.exercise || "").trim())
         .filter(Boolean);
+      const rawCaptionText = `${post.note || post.caption || ""}`.trim();
+      const { title: captionTitleText } = splitCaptionContent(rawCaptionText);
 
       const header = document.createElement("div");
       header.className = "post-header";
@@ -6879,12 +6883,92 @@ export function renderFeed(options = {}) {
       body.className = "post-body";
       let captionBlock = null;
 
-      if (post.note || post.caption) {
-        const fullText = `${post.note || post.caption || ""}`.trim();
-        captionBlock = createPostCaptionBlock(fullText, tr);
+      if (rawCaptionText) {
+        captionBlock = createPostCaptionBlock(rawCaptionText, tr, {
+          suppressTitle: Boolean(captionTitleText),
+        });
         if (captionBlock) {
           body.classList.add("has-caption");
         }
+      }
+
+      if (captionTitleText) {
+        const leadCard = document.createElement("div");
+        leadCard.className = "post-lead-card";
+
+        const leadTop = document.createElement("div");
+        leadTop.className = "post-lead-top";
+
+        const leadKicker = document.createElement("span");
+        leadKicker.className = "post-lead-kicker";
+        if (logs.length) {
+          leadKicker.textContent = tr.workoutLogTitle || "Workout log";
+        } else if (post.media_type === "video") {
+          leadKicker.textContent = tr.mediaVideoLabel || "Video";
+        } else if (post.media_url) {
+          leadKicker.textContent = tr.mediaPhotoLabel || "Photo";
+        } else {
+          leadKicker.textContent = tr.notificationNow || "Now";
+        }
+        leadTop.appendChild(leadKicker);
+
+        if (topWeight > 0) {
+          const leadMetric = document.createElement("span");
+          leadMetric.className = "post-lead-metric";
+          leadMetric.textContent = `${
+            tr.profileBestLift || "Best lift"
+          } · ${formatWeight(topWeight)}`;
+          leadTop.appendChild(leadMetric);
+        } else if (
+          settings.showBodyweight &&
+          post.bodyweight !== null &&
+          post.bodyweight !== undefined &&
+          post.bodyweight !== ""
+        ) {
+          const leadMetric = document.createElement("span");
+          leadMetric.className = "post-lead-metric";
+          leadMetric.textContent = `${tr.weight || "Weight"} · ${formatWeight(
+            post.bodyweight
+          )}`;
+          leadTop.appendChild(leadMetric);
+        }
+
+        const leadTitle = document.createElement("div");
+        leadTitle.className = "post-lead-title";
+        leadTitle.textContent = captionTitleText;
+
+        const leadFacts = document.createElement("div");
+        leadFacts.className = "post-lead-facts";
+        const leadFactValues = [];
+        if (post.media_url) {
+          leadFactValues.push(
+            post.media_type === "video"
+              ? tr.mediaVideoLabel || "Video"
+              : tr.mediaPhotoLabel || "Photo"
+          );
+        }
+        if (exerciseCount > 0) {
+          leadFactValues.push(
+            `${exerciseCount}${tr.workoutExerciseCountLabel || "種目"} · ${setCount}${
+              tr.workoutSetCountLabel || "セット"
+            }`
+          );
+        }
+        if (reasonLabel) {
+          leadFactValues.push(reasonLabel);
+        }
+        leadFactValues.slice(0, 3).forEach((value) => {
+          const chip = document.createElement("span");
+          chip.className = "post-lead-fact";
+          chip.textContent = value;
+          leadFacts.appendChild(chip);
+        });
+
+        leadCard.append(leadTop, leadTitle);
+        if (leadFacts.childNodes.length) {
+          leadCard.appendChild(leadFacts);
+        }
+        body.appendChild(leadCard);
       }
 
       if (logs.length) {
@@ -6956,6 +7040,35 @@ export function renderFeed(options = {}) {
 
       if (body.childNodes.length) {
         card.appendChild(body);
+      }
+
+      const insightValues = [];
+      if (likeCount > 0) {
+        insightValues.push(`${likeCount} ${tr.notificationsLikes || "Likes"}`);
+      }
+      if (commentCount > 0) {
+        insightValues.push(`${commentCount} ${tr.comments || "Comments"}`);
+      }
+      if (topWeight > 0) {
+        insightValues.push(`${tr.profileBestLift || "Best lift"} · ${formatWeight(topWeight)}`);
+      } else if (
+        settings.showBodyweight &&
+        post.bodyweight !== null &&
+        post.bodyweight !== undefined &&
+        post.bodyweight !== ""
+      ) {
+        insightValues.push(`${tr.weight || "Weight"} · ${formatWeight(post.bodyweight)}`);
+      }
+      if (insightValues.length) {
+        const insightRow = document.createElement("div");
+        insightRow.className = "post-insight-row";
+        insightValues.slice(0, 3).forEach((value) => {
+          const chip = document.createElement("span");
+          chip.className = "post-insight-chip";
+          chip.textContent = value;
+          insightRow.appendChild(chip);
+        });
+        card.appendChild(insightRow);
       }
 
       if (primaryActions.childNodes.length) {
@@ -7595,17 +7708,22 @@ function getCaptionPreviewText(fullText = "") {
       }
       return `${fullText.slice(0, FEED_CAPTION_TRIM_LIMIT)}…`;
     }
-function createPostCaptionBlock(fullText = "", tr = t[getCurrentLang()] || t.ja) {
+function createPostCaptionBlock(
+      fullText = "",
+      tr = t[getCurrentLang()] || t.ja,
+      options = {}
+    ) {
       const { title, body } = splitCaptionContent(fullText);
       const normalizedText = `${body || ""}`.trim();
-      if (!normalizedText && !title) return null;
+      const suppressTitle = Boolean(options?.suppressTitle);
+      if (!normalizedText && (!title || suppressTitle)) return null;
       const previewText = getCaptionPreviewText(normalizedText);
       const isExpandable = previewText !== normalizedText;
 
       const wrap = document.createElement("div");
       wrap.className = "post-caption-block";
 
-      if (title) {
+      if (title && !suppressTitle) {
         const titleEl = document.createElement("div");
         titleEl.className = "post-caption-title";
         titleEl.textContent = title;
