@@ -7075,9 +7075,12 @@ async function loadProfilePostCount() {
         start + galleryPageSize
       );
 
-      pagePosts.forEach((post) => {
-        const item = document.createElement("div");
+      pagePosts.forEach((post, index) => {
+        const item = document.createElement("button");
+        item.type = "button";
         item.className = "gallery-item";
+        const isFeatured = galleryPage === 1 && index === 0 && pagePosts.length >= 3;
+        if (isFeatured) item.classList.add("is-featured");
         if (post.media_type === "video") {
           const video = document.createElement("video");
           video.src = post.media_url;
@@ -7100,11 +7103,62 @@ async function loadProfilePostCount() {
             ? tr.mediaVideoLabel || "VIDEO"
             : tr.mediaPhotoLabel || "PHOTO";
         top.appendChild(kind);
+        if (isFeatured) {
+          const latest = document.createElement("span");
+          latest.className = "gallery-item-chip is-latest";
+          latest.textContent = tr.profileSpotlightLatest || "Latest post";
+          top.appendChild(latest);
+        }
         if (post.bodyweight !== null && post.bodyweight !== undefined && post.bodyweight !== "") {
           const weight = document.createElement("span");
           weight.className = "gallery-item-chip is-weight";
           weight.textContent = formatWeight(post.bodyweight);
           top.appendChild(weight);
+        }
+        const body = document.createElement("div");
+        body.className = "gallery-item-copy";
+        const title = document.createElement("div");
+        title.className = "gallery-item-title";
+        title.textContent = (() => {
+          const source = `${post.caption || post.body || ""}`.trim();
+          if (source) return source.split(/\n+/)[0].trim();
+          if (post.media_type === "video") {
+            return tr.mediaVideoLabel || "VIDEO";
+          }
+          return tr.mediaPhotoLabel || "PHOTO";
+        })();
+        body.appendChild(title);
+        const stats = document.createElement("div");
+        stats.className = "gallery-item-stats";
+        const likeCount = Number(likesByPost.get(post.id) || 0);
+        const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
+        [
+          likeCount
+            ? { icon: "♡", text: formatCompactCount(likeCount) }
+            : null,
+          commentCount
+            ? { icon: "💬", text: formatCompactCount(commentCount) }
+            : null,
+          post.bodyweight !== null && post.bodyweight !== undefined && post.bodyweight !== ""
+            ? { icon: "◔", text: formatWeight(post.bodyweight) }
+            : null,
+        ]
+          .filter(Boolean)
+          .slice(0, 3)
+          .forEach((itemStat) => {
+            const chip = document.createElement("span");
+            chip.className = "gallery-item-stat";
+            const icon = document.createElement("span");
+            icon.className = "gallery-item-stat-icon";
+            icon.textContent = itemStat.icon;
+            const text = document.createElement("span");
+            text.className = "gallery-item-stat-text";
+            text.textContent = itemStat.text;
+            chip.append(icon, text);
+            stats.appendChild(chip);
+          });
+        if (stats.childNodes.length) {
+          body.appendChild(stats);
         }
         const bottom = document.createElement("div");
         bottom.className = "gallery-item-bottomline";
@@ -7115,7 +7169,7 @@ async function loadProfilePostCount() {
         cta.className = "gallery-item-open";
         cta.textContent = tr.notificationViewPost || "View post";
         bottom.append(date, cta);
-        overlay.append(top, bottom);
+        overlay.append(top, body, bottom);
         item.appendChild(overlay);
         item.addEventListener("click", () => {
           const entryContext =
