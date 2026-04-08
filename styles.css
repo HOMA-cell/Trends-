@@ -10810,6 +10810,66 @@
       grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
       gap: 8px;
     }
+    .detail-section-nav {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-top: 2px;
+    }
+    .detail-section-nav-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(226, 214, 198, 0.96);
+      background: rgba(255, 255, 255, 0.82);
+      color: #5c4c3d;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      cursor: pointer;
+      transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease,
+        box-shadow 160ms ease,
+        color 160ms ease;
+    }
+    .detail-section-nav-chip:hover {
+      transform: translateY(-1px);
+      border-color: rgba(228, 87, 46, 0.24);
+      color: #b24d22;
+      box-shadow:
+        0 12px 22px rgba(15, 23, 42, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    }
+    .detail-section-nav-chip:focus-visible {
+      outline: none;
+      border-color: rgba(228, 87, 46, 0.34);
+      box-shadow:
+        0 0 0 3px rgba(239, 91, 42, 0.14),
+        0 12px 24px rgba(15, 23, 42, 0.08);
+    }
+    .detail-section-nav-label {
+      white-space: nowrap;
+    }
+    .detail-section-nav-value {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(246, 237, 228, 0.94);
+      color: #7a6857;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
     .detail-hero-stat {
       display: flex;
       appearance: none;
@@ -11017,6 +11077,13 @@
       }
       .detail-hero-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .detail-section-nav {
+        gap: 6px;
+      }
+      .detail-section-nav-chip {
+        min-height: 32px;
+        padding-inline: 11px;
       }
       .detail-caption-block {
         padding: 11px 12px;

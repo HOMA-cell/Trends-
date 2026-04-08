@@ -9195,6 +9195,8 @@ export function renderPostDetail() {
       const bodyEl = $("detail-body");
       const workoutEl = $("detail-workout");
       const commentsEl = $("detail-comments");
+      const workoutTitleEl = $("detail-workout-title");
+      const commentsTitleEl = $("detail-comments-title");
       const titleEl = $("detail-title");
 
       if (titleEl) {
@@ -9319,7 +9321,64 @@ export function renderPostDetail() {
         if (heroStats.childNodes.length) {
           hero.appendChild(heroStats);
         }
+        const sectionNav = document.createElement("div");
+        sectionNav.className = "detail-section-nav";
+        [
+          {
+            label: tr.profileTabPosts || tr.detailTitle || "Post",
+            value: post.media_url ? (post.media_type === "video" ? tr.mediaVideoLabel || "VIDEO" : tr.mediaPhotoLabel || "PHOTO") : null,
+            action: () => focusDetailSection(bodyEl),
+          },
+          logs.length
+            ? {
+                label: tr.profileTabWorkouts || "Workouts",
+                value: `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`,
+                action: () => focusDetailSection(workoutEl),
+              }
+            : null,
+          {
+            label: tr.comments || "Comments",
+            value: commentCount ? formatCompactCount(commentCount) : null,
+            action: () => focusPostDetailComments(),
+          },
+        ]
+          .filter(Boolean)
+          .forEach((item) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "detail-section-nav-chip";
+            chip.setAttribute(
+              "aria-label",
+              item.value ? `${item.label} ${item.value}` : item.label
+            );
+            chip.addEventListener("click", item.action);
+            const label = document.createElement("span");
+            label.className = "detail-section-nav-label";
+            label.textContent = item.label;
+            chip.appendChild(label);
+            if (item.value) {
+              const value = document.createElement("span");
+              value.className = "detail-section-nav-value";
+              value.textContent = item.value;
+              chip.appendChild(value);
+            }
+            sectionNav.appendChild(chip);
+          });
+        if (sectionNav.childNodes.length) {
+          hero.appendChild(sectionNav);
+        }
         headerEl.appendChild(hero);
+      }
+
+      if (workoutTitleEl) {
+        workoutTitleEl.textContent = logs.length
+          ? `${tr.profileTabWorkouts || "Workout"} · ${logs.length}${tr.workoutExerciseCountLabel || "種目"}`
+          : tr.profileTabWorkouts || "Workout";
+      }
+      if (commentsTitleEl) {
+        commentsTitleEl.textContent = commentCount
+          ? `${tr.comments || "Comments"} · ${formatCompactCount(commentCount)}`
+          : tr.comments || "Comments";
       }
 
       if (mediaEl) {
