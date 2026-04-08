@@ -2127,6 +2127,7 @@ async function loadProfilePostCount() {
           setActivePage(page);
         }
       },
+      openPostDetail,
       openDmConversation,
       toggleFollowForUser,
       loadFollowStats,

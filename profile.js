@@ -40,6 +40,7 @@ let profileContext = {
   getProfile: async () => null,
   getFollowCounts: async () => ({ following: 0, followers: 0 }),
   setActivePage: () => {},
+  openPostDetail: () => {},
   openDmConversation: async () => false,
   toggleFollowForUser: async () => {},
   loadFollowStats: async () => {},
@@ -74,6 +75,7 @@ const renderGalleryPage = () => profileContext.renderGalleryPage?.();
 const getProfile = (...args) => profileContext.getProfile?.(...args);
 const getFollowCounts = (...args) => profileContext.getFollowCounts?.(...args);
 const setActivePage = (page) => profileContext.setActivePage?.(page);
+const openPostDetail = (...args) => profileContext.openPostDetail?.(...args);
 const openDmConversation = (...args) => profileContext.openDmConversation?.(...args);
 const toggleFollowForUser = (...args) => profileContext.toggleFollowForUser?.(...args);
 const loadFollowStats = (...args) => profileContext.loadFollowStats?.(...args);
@@ -1201,6 +1203,122 @@ function updatePublicProfileActionDock(
   dockEl.classList.remove("hidden");
 }
 
+function renderPublicProfileContentRail(
+  targetEl,
+  posts = [],
+  {
+    activeTab = "posts",
+    displayName = "",
+    handle = "",
+    userId = "",
+    workoutLogsByPost = new Map(),
+    tr = t[getCurrentLang()] || t.ja,
+  } = {}
+) {
+  if (!targetEl) return;
+  targetEl.innerHTML = "";
+  const normalizedTab = normalizePublicProfileContentTab(activeTab);
+  const visiblePosts = (Array.isArray(posts) ? posts : []).slice(0, 3);
+  if (!visiblePosts.length) {
+    targetEl.classList.add("hidden");
+    return;
+  }
+  targetEl.classList.remove("hidden");
+  visiblePosts.forEach((post, index) => {
+    const logs = workoutLogsByPost.get(post.id) || [];
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `public-profile-rail-card is-${normalizedTab}`;
+    const entryContext = {
+      source: "public_profile",
+      userId: `${userId || ""}`.trim(),
+      actorName: `${displayName || ""}`.trim(),
+      actorHandle: `${handle || ""}`.trim(),
+      tab: normalizedTab,
+    };
+    card.addEventListener("click", () => {
+      if (!post?.id) return;
+      openPostDetail(`${post.id}`, { entryContext });
+    });
+
+    const top = document.createElement("div");
+    top.className = "public-profile-rail-top";
+    const pill = document.createElement("span");
+    pill.className = "public-profile-rail-pill";
+    pill.textContent =
+      normalizedTab === "media"
+        ? post.media_type === "video"
+          ? tr.mediaVideoLabel || "VIDEO"
+          : tr.mediaPhotoLabel || "PHOTO"
+        : normalizedTab === "workouts"
+          ? tr.profileTabWorkouts || "Workouts"
+          : index === 0
+            ? tr.profileSpotlightLatest || "Latest post"
+            : tr.profileTabPosts || "Posts";
+    const date = document.createElement("span");
+    date.className = "public-profile-rail-date";
+    date.textContent = formatDateDisplay(post.date || post.created_at || "");
+    top.append(pill, date);
+
+    const title = document.createElement("div");
+    title.className = "public-profile-rail-title";
+    title.textContent = buildProfilePostHeadline(post, logs, tr);
+
+    const note = document.createElement("div");
+    note.className = "public-profile-rail-note";
+    note.textContent = buildProfilePostPreview(post, logs, tr);
+
+    const bottom = document.createElement("div");
+    bottom.className = "public-profile-rail-bottom";
+    const meta = document.createElement("span");
+    meta.className = "public-profile-rail-meta";
+    if (normalizedTab === "workouts") {
+      const setCount = logs.reduce(
+        (sum, item) => sum + ((item?.sets || []).length || 0),
+        0
+      );
+      meta.textContent = `${logs.length}${tr.workoutExerciseCountLabel || "種目"} · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
+    } else if (post.bodyweight !== null && post.bodyweight !== undefined && post.bodyweight !== "") {
+      meta.textContent = `${tr.weight || "Weight"} · ${formatWeight(post.bodyweight)}`;
+    } else {
+      meta.textContent =
+        normalizedTab === "media"
+          ? tr.profileContentMediaHint || "Photos and videos"
+          : tr.profileContentPostsHint || "Latest posts";
+    }
+    const cta = document.createElement("span");
+    cta.className = "public-profile-rail-cta";
+    cta.textContent = tr.notificationViewPost || "View post";
+    bottom.append(meta, cta);
+
+    if (normalizedTab === "media" && post.media_url) {
+      const thumb = document.createElement("div");
+      thumb.className = "public-profile-rail-thumb";
+      if (post.media_type === "video") {
+        const video = document.createElement("video");
+        video.src = post.media_url;
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        thumb.appendChild(video);
+      } else {
+        const img = document.createElement("img");
+        img.src = post.media_url;
+        img.alt = displayName || handle || "profile media";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+        thumb.appendChild(img);
+      }
+      card.append(top, thumb, title, bottom);
+    } else {
+      card.append(top, title, note, bottom);
+    }
+
+    targetEl.appendChild(card);
+  });
+}
+
 export function updateProfileSummary() {
   const cardEl = $("profile-section");
   const bannerEl = $("profile-banner");
@@ -1656,6 +1774,7 @@ export async function openPublicProfile(userId, options = {}) {
   const heroFactsEl = $("public-profile-hero-facts");
   const connectionEl = $("public-profile-connection");
   const spotlightEl = $("public-profile-spotlight");
+  const contentRailEl = $("public-profile-content-rail");
   const joinedEl = $("public-profile-joined");
   const postsEl = $("public-profile-posts");
   const streakEl = $("public-profile-streak");
@@ -1759,6 +1878,14 @@ export async function openPublicProfile(userId, options = {}) {
       : activeContentTab === "workouts"
         ? workoutPosts
         : userPosts;
+  renderPublicProfileContentRail(contentRailEl, selectedPosts, {
+    activeTab: activeContentTab,
+    displayName,
+    handle,
+    userId,
+    workoutLogsByPost,
+    tr,
+  });
 
   renderProfileStatsGrid(statsGridEl, userPosts, tr);
   renderProfileQuickStats(quickStatsEl, userPosts, tr);
