@@ -7148,14 +7148,33 @@ export function renderFeed(options = {}) {
           parseCommentReplyPrefix(`${latestComment?.body || ""}`)?.bodyWithoutPrefix ||
             `${latestComment?.body || ""}`
         );
+        const latestCommentId = `${latestComment?.id || ""}`.trim();
+        const latestCommentActorId = `${latestComment?.user_id || ""}`.trim();
+        const canQuickReply =
+          !!currentUser &&
+          !!latestCommentId &&
+          latestCommentActorId &&
+          `${currentUser.id || ""}` !== latestCommentActorId;
         const socialPreview = document.createElement("button");
         socialPreview.type = "button";
         socialPreview.className = "post-social-preview";
+        if (canQuickReply) {
+          socialPreview.classList.add("is-reply-ready");
+        }
         socialPreview.setAttribute(
           "aria-label",
-          `${tr.feedLatestReply || "Latest reply"} · ${latestName}`
+          `${canQuickReply ? tr.commentReply || "Reply" : tr.feedLatestReply || "Latest reply"} · ${latestName}`
         );
-        socialPreview.addEventListener("click", () => openCommentSheet(post.id));
+        socialPreview.addEventListener("click", () =>
+          openCommentSheet(post.id, {
+            focusCommentId: latestCommentId,
+            focusCommentActorId: latestCommentActorId,
+            focusCommentCreatedAt: latestComment?.created_at || "",
+            replyToCommentId: canQuickReply ? latestCommentId : "",
+            replyToCommentActorId: canQuickReply ? latestCommentActorId : "",
+            replyToCommentCreatedAt: canQuickReply ? latestComment?.created_at || "" : "",
+          })
+        );
 
         const stack = document.createElement("div");
         stack.className = "post-social-preview-stack";
@@ -7198,7 +7217,9 @@ export function renderFeed(options = {}) {
 
         const action = document.createElement("span");
         action.className = "post-social-preview-action";
-        action.textContent = tr.feedOpenDiscussion || "Open discussion";
+        action.textContent = canQuickReply
+          ? tr.commentReply || "Reply"
+          : tr.feedOpenDiscussion || "Open discussion";
 
         socialPreview.append(stack, copy, action);
         body.appendChild(socialPreview);

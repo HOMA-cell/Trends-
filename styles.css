@@ -2148,6 +2148,15 @@
       border-color: rgba(222, 205, 188, 0.98);
       box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
     }
+    .post-social-preview.is-reply-ready {
+      background:
+        linear-gradient(180deg, rgba(255, 249, 245, 0.98), rgba(252, 244, 237, 0.94));
+      border-color: rgba(235, 185, 160, 0.92);
+    }
+    .post-social-preview.is-reply-ready:hover {
+      border-color: rgba(228, 147, 105, 0.96);
+      box-shadow: 0 16px 32px rgba(228, 87, 46, 0.09);
+    }
     .post-social-preview:focus-visible {
       outline: 2px solid rgba(228, 87, 46, 0.24);
       outline-offset: 2px;
@@ -2235,6 +2244,11 @@
       font-weight: 800;
       letter-spacing: 0.03em;
       white-space: nowrap;
+    }
+    .post-social-preview.is-reply-ready .post-social-preview-action {
+      background: rgba(228, 87, 46, 0.1);
+      border-color: rgba(228, 87, 46, 0.18);
+      color: #bf4d23;
     }
     .post-caption-block.is-expanded .post-caption {
       display: block;
