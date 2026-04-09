@@ -6573,7 +6573,8 @@ export function renderFeed(options = {}) {
       card.dataset.postRenderKey = buildPostRenderKey(post);
       const logs = workoutLogsByPost.get(post.id) || [];
       const likeCount = Number(getLikesByPost().get(post.id) || 0);
-      const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
+      const comments = commentsByPost.get(post.id) || [];
+      const commentCount = Number(comments.length || 0);
       const exerciseCount = logs.length;
       const setCount = logs.reduce(
         (sum, item) => sum + ((item?.sets || []).length || 0),
@@ -6976,6 +6977,9 @@ export function renderFeed(options = {}) {
         });
         if (captionBlock) {
           body.classList.add("has-caption");
+          if (!post.media_url && !logs.length) {
+            captionBlock.classList.add("post-copy-surface");
+          }
         }
       }
 
@@ -7123,6 +7127,81 @@ export function renderFeed(options = {}) {
 
       if (captionBlock) {
         body.appendChild(captionBlock);
+      }
+
+      if (comments.length) {
+        const recentComments = [...comments]
+          .sort((a, b) => {
+            const aTime = new Date(a?.created_at || 0).getTime();
+            const bTime = new Date(b?.created_at || 0).getTime();
+            return bTime - aTime;
+          })
+          .slice(0, 3);
+        const latestComment = recentComments[0];
+        const latestProfile = latestComment?.profile || null;
+        const latestHandle = formatHandle(
+          latestProfile?.handle || latestProfile?.username || "user"
+        );
+        const latestName =
+          `${latestProfile?.display_name || ""}`.trim() || latestHandle || "@user";
+        const latestPreview = getCaptionPreviewText(
+          parseCommentReplyPrefix(`${latestComment?.body || ""}`)?.bodyWithoutPrefix ||
+            `${latestComment?.body || ""}`
+        );
+        const socialPreview = document.createElement("button");
+        socialPreview.type = "button";
+        socialPreview.className = "post-social-preview";
+        socialPreview.setAttribute(
+          "aria-label",
+          `${tr.feedLatestReply || "Latest reply"} · ${latestName}`
+        );
+        socialPreview.addEventListener("click", () => openCommentSheet(post.id));
+
+        const stack = document.createElement("div");
+        stack.className = "post-social-preview-stack";
+        recentComments.slice(0, 2).forEach((comment) => {
+          const avatar = document.createElement("div");
+          avatar.className = "avatar post-social-preview-avatar";
+          const profile = comment?.profile || null;
+          const label =
+            `${profile?.display_name || ""}`.trim() ||
+            formatHandle(profile?.handle || profile?.username || "u") ||
+            "U";
+          renderAvatar(avatar, profile, label.replace("@", "").charAt(0).toUpperCase() || "U");
+          stack.appendChild(avatar);
+        });
+        if (recentComments.length > 2) {
+          const more = document.createElement("span");
+          more.className = "post-social-preview-more";
+          more.textContent = `+${recentComments.length - 2}`;
+          stack.appendChild(more);
+        }
+
+        const copy = document.createElement("div");
+        copy.className = "post-social-preview-copy";
+        const top = document.createElement("div");
+        top.className = "post-social-preview-top";
+        const kicker = document.createElement("span");
+        kicker.className = "post-social-preview-kicker";
+        kicker.textContent = `${tr.feedLatestReply || "Latest reply"} · ${formatCompactCount(
+          commentCount
+        )}`;
+        const name = document.createElement("span");
+        name.className = "post-social-preview-name";
+        name.textContent = latestName;
+        top.append(kicker, name);
+        const snippet = document.createElement("div");
+        snippet.className = "post-social-preview-snippet";
+        snippet.textContent =
+          latestPreview || tr.commentEmpty || "No comments yet.";
+        copy.append(top, snippet);
+
+        const action = document.createElement("span");
+        action.className = "post-social-preview-action";
+        action.textContent = tr.feedOpenDiscussion || "Open discussion";
+
+        socialPreview.append(stack, copy, action);
+        body.appendChild(socialPreview);
       }
 
       if (body.childNodes.length) {

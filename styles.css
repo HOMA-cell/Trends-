@@ -2093,6 +2093,15 @@
       align-items: flex-start;
       gap: 5px;
     }
+    .post-copy-surface {
+      width: 100%;
+      padding: 12px 13px;
+      border-radius: 18px;
+      border: 1px solid rgba(231, 221, 208, 0.92);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(251, 246, 240, 0.94));
+      box-shadow: 0 12px 26px rgba(15, 23, 42, 0.04);
+    }
     .post-caption-title {
       font-size: 14px;
       font-weight: 800;
@@ -2113,6 +2122,119 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .post-social-preview {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(230, 221, 208, 0.95);
+      background: rgba(252, 248, 242, 0.88);
+      color: inherit;
+      text-align: left;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+      transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease,
+        box-shadow 160ms ease;
+    }
+    .post-social-preview:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 251, 246, 0.98);
+      border-color: rgba(222, 205, 188, 0.98);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+    }
+    .post-social-preview:focus-visible {
+      outline: 2px solid rgba(228, 87, 46, 0.24);
+      outline-offset: 2px;
+    }
+    .post-social-preview-stack {
+      display: inline-flex;
+      align-items: center;
+      padding-left: 2px;
+    }
+    .post-social-preview-avatar {
+      width: 24px;
+      height: 24px;
+      font-size: 10px;
+      border: 2px solid rgba(255, 255, 255, 0.98);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    }
+    .post-social-preview-avatar + .post-social-preview-avatar {
+      margin-left: -8px;
+    }
+    .post-social-preview-more {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      margin-left: -6px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.98);
+      background: #f3ece3;
+      color: #7a6d5f;
+      font-size: 9px;
+      font-weight: 800;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    }
+    .post-social-preview-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .post-social-preview-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .post-social-preview-kicker {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #c4542c;
+      white-space: nowrap;
+    }
+    .post-social-preview-name {
+      font-size: 10px;
+      font-weight: 700;
+      color: #465161;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .post-social-preview-snippet {
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: #475569;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .post-social-preview-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid rgba(228, 216, 202, 0.92);
+      color: #6a6055;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
     }
     .post-caption-block.is-expanded .post-caption {
       display: block;
@@ -12679,6 +12801,46 @@
 .feed-list .post-caption-block {
   gap: 4px;
 }
+.feed-list .post-copy-surface {
+  padding: 10px 11px;
+  border-radius: 16px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
+}
+.feed-list .post-social-preview {
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 16px;
+}
+.feed-list .post-social-preview-avatar,
+.feed-list .post-social-preview-more {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  font-size: 8.5px;
+}
+.feed-list .post-social-preview-avatar + .post-social-preview-avatar {
+  margin-left: -7px;
+}
+.feed-list .post-social-preview-copy {
+  gap: 2px;
+}
+.feed-list .post-social-preview-top {
+  gap: 5px;
+}
+.feed-list .post-social-preview-kicker {
+  font-size: 8px;
+}
+.feed-list .post-social-preview-name {
+  font-size: 9.5px;
+}
+.feed-list .post-social-preview-snippet {
+  font-size: 10.5px;
+}
+.feed-list .post-social-preview-action {
+  min-height: 22px;
+  padding-inline: 9px;
+  font-size: 8.5px;
+}
 .feed-list .chip-caption-toggle {
   padding-inline: 7px;
   font-size: 10px;
@@ -12720,6 +12882,18 @@
   .feed-list .post-sub {
     max-width: 88px;
     font-size: 9.5px;
+  }
+  .feed-list .post-copy-surface {
+    padding: 9px 10px;
+  }
+  .feed-list .post-social-preview {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 8px 9px;
+  }
+  .feed-list .post-social-preview-action {
+    grid-column: 2;
+    justify-self: flex-start;
+    margin-top: 2px;
   }
   .feed-list .post-footer {
     margin-top: 8px;
@@ -12794,6 +12968,36 @@
   }
   .feed-list .post-caption-title {
     font-size: 12.5px;
+  }
+  .feed-list .post-copy-surface {
+    padding: 8px 9px;
+    border-radius: 14px;
+  }
+  .feed-list .post-social-preview {
+    gap: 7px;
+    padding: 8px 9px;
+    border-radius: 14px;
+  }
+  .feed-list .post-social-preview-avatar,
+  .feed-list .post-social-preview-more {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    font-size: 8px;
+  }
+  .feed-list .post-social-preview-kicker {
+    font-size: 7.5px;
+  }
+  .feed-list .post-social-preview-name {
+    font-size: 9px;
+  }
+  .feed-list .post-social-preview-snippet {
+    font-size: 10px;
+  }
+  .feed-list .post-social-preview-action {
+    min-height: 20px;
+    padding-inline: 8px;
+    font-size: 8px;
   }
   .feed-list .post-workout-preview {
     padding: 9px 10px;
