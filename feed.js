@@ -94,6 +94,54 @@ const setActivePage = (page) => feedContext.setActivePage?.(page);
 const openPostModal = (...args) => feedContext.openPostModal?.(...args);
 const openPublicProfile = (...args) => feedContext.openPublicProfile?.(...args);
 
+const compactNumberFormatters = new Map();
+
+function getCompactNumberFormatter(lang = "ja") {
+  const locale = lang === "ja" ? "ja-JP" : "en-US";
+  if (!compactNumberFormatters.has(locale)) {
+    compactNumberFormatters.set(
+      locale,
+      new Intl.NumberFormat(locale, {
+        notation: "compact",
+        compactDisplay: "short",
+        maximumFractionDigits: 1,
+      })
+    );
+  }
+  return compactNumberFormatters.get(locale);
+}
+
+function formatCompactNumber(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "0";
+  const abs = Math.abs(numeric);
+  if (abs < 1000) return `${Math.round(numeric)}`;
+  return getCompactNumberFormatter(getCurrentLang()).format(numeric);
+}
+
+function formatCompactCount(value) {
+  return formatCompactNumber(value);
+}
+
+function formatRelative(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const tr = t(getCurrentLang()) || {};
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.max(0, Math.round(diffMs / 60000));
+  if (diffMins < 1) return tr.feedJustNow || "たった今";
+  if (diffMins < 60) {
+    return (tr.feedMinutesAgo || "{count}分前").replace("{count}", `${diffMins}`);
+  }
+  const diffHours = Math.round(diffMins / 60);
+  if (diffHours < 24) {
+    return (tr.feedHoursAgo || "{count}時間前").replace("{count}", `${diffHours}`);
+  }
+  const diffDays = Math.round(diffHours / 24);
+  return (tr.feedDaysAgo || "{count}日前").replace("{count}", `${diffDays}`);
+}
+
 let currentFilter = "foryou";
 let filterMedia = false;
 let filterWorkout = false;
@@ -6668,6 +6716,8 @@ export function renderFeed(options = {}) {
       footer.className = "post-footer";
       const primaryActions = document.createElement("div");
       primaryActions.className = "post-actions post-action-row post-action-row-primary";
+      const ctaActions = document.createElement("div");
+      ctaActions.className = "post-actions post-action-row post-action-row-cta";
       const secondaryActions = document.createElement("div");
       secondaryActions.className =
         "post-actions post-action-row post-action-row-secondary";
@@ -6698,13 +6748,20 @@ export function renderFeed(options = {}) {
       openDetailBtn.className =
         "chip chip-log chip-action post-inline-open surface-cta surface-cta-primary";
       openDetailBtn.dataset.postAction = "open-detail";
+      const openDetailLabel = logs.length
+        ? tr.feedViewWorkout || "View workout"
+        : post.media_type === "video"
+          ? tr.feedViewVideo || "Watch video"
+          : post.media_url
+            ? tr.feedViewPhoto || "View photo"
+            : tr.notificationViewPost || "View post";
       setActionButtonContent(openDetailBtn, {
         kind: "open",
         icon: "↗",
-        label: tr.notificationViewPost || "View post",
+        label: openDetailLabel,
       });
-      openDetailBtn.setAttribute("aria-label", tr.notificationViewPost || "View post");
-      appendPrimaryAction(openDetailBtn);
+      openDetailBtn.setAttribute("aria-label", openDetailLabel);
+      ctaActions.appendChild(openDetailBtn);
 
       const shareBtn = document.createElement("button");
       shareBtn.className =
@@ -7073,6 +7130,9 @@ export function renderFeed(options = {}) {
 
       if (primaryActions.childNodes.length) {
         footer.appendChild(primaryActions);
+      }
+      if (ctaActions.childNodes.length) {
+        footer.appendChild(ctaActions);
       }
       if (footer.childNodes.length) {
         card.appendChild(footer);
