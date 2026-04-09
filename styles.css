@@ -10032,6 +10032,33 @@
       -webkit-line-clamp: 2;
       overflow: hidden;
     }
+    .public-profile-rail-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .public-profile-rail-stat {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 23px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(232, 220, 208, 0.86);
+      color: #5f554a;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .public-profile-rail-stat-icon {
+      font-size: 10px;
+      line-height: 1;
+      color: #9c4f2d;
+    }
+    .public-profile-rail-stat-text {
+      line-height: 1;
+    }
     .public-profile-rail-cta {
       display: inline-flex;
       align-items: center;
@@ -10342,14 +10369,32 @@
         justify-content: center;
       }
       .public-profile-content-rail {
-        grid-template-columns: 1fr;
-        gap: 8px;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(82vw, 1fr);
+        grid-template-columns: none;
+        gap: 10px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity;
+        padding-bottom: 4px;
+        margin-inline: -2px;
+        padding-inline: 2px;
       }
       .public-profile-rail-card {
         min-height: auto;
+        scroll-snap-align: start;
       }
       .public-profile-rail-card.is-media {
         padding: 10px;
+      }
+      .public-profile-rail-stats {
+        gap: 5px;
+      }
+      .public-profile-rail-stat {
+        min-height: 22px;
+        padding-inline: 7px;
+        font-size: 9.5px;
       }
       .public-profile-rail-thumb {
         height: 104px;

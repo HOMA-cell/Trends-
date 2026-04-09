@@ -89,6 +89,19 @@ const publicProfilePostsCache = {
 let publicProfileGallerySignature = "";
 let currentPublicProfileContentTab = "posts";
 let currentPublicProfileEntryContext = null;
+const profileCompactCountFormatter =
+  typeof Intl !== "undefined"
+    ? new Intl.NumberFormat(undefined, {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      })
+    : null;
+function formatProfileCompactCount(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return "0";
+  if (!profileCompactCountFormatter) return `${Math.round(numeric)}`;
+  return profileCompactCountFormatter.format(numeric);
+}
 const PROFILE_PINNED_POST_KEY = "trends_profile_pinned_post_v1";
 function getPinnedPostsMap() {
   try {
@@ -1212,6 +1225,8 @@ function renderPublicProfileContentRail(
     handle = "",
     userId = "",
     workoutLogsByPost = new Map(),
+    likesByPost = new Map(),
+    commentsByPost = new Map(),
     tr = t[getCurrentLang()] || t.ja,
   } = {}
 ) {
@@ -1268,6 +1283,64 @@ function renderPublicProfileContentRail(
     note.className = "public-profile-rail-note";
     note.textContent = buildProfilePostPreview(post, logs, tr);
 
+    const likeCount = Number(likesByPost.get(post.id) || 0);
+    const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
+    const stats = document.createElement("div");
+    stats.className = "public-profile-rail-stats";
+    const statItems = [];
+    if (likeCount > 0) {
+      statItems.push({
+        icon: "♡",
+        text: `${formatProfileCompactCount(likeCount)} ${tr.likes || "Likes"}`,
+      });
+    }
+    if (commentCount > 0) {
+      statItems.push({
+        icon: "💬",
+        text: `${formatProfileCompactCount(commentCount)} ${tr.comments || "Comments"}`,
+      });
+    }
+    if (normalizedTab === "workouts") {
+      const setCount = logs.reduce(
+        (sum, item) => sum + ((item?.sets || []).length || 0),
+        0
+      );
+      if (logs.length > 0) {
+        statItems.push({
+          icon: "🏋",
+          text: `${logs.length}${tr.workoutExerciseCountLabel || "種目"}`,
+        });
+      }
+      if (setCount > 0) {
+        statItems.push({
+          icon: "◔",
+          text: `${setCount}${tr.workoutSetCountLabel || "セット"}`,
+        });
+      }
+    } else if (
+      normalizedTab === "media" &&
+      post.bodyweight !== null &&
+      post.bodyweight !== undefined &&
+      post.bodyweight !== ""
+    ) {
+      statItems.push({
+        icon: "◔",
+        text: formatWeight(post.bodyweight),
+      });
+    }
+    statItems.slice(0, 3).forEach((itemStat) => {
+      const chip = document.createElement("span");
+      chip.className = "public-profile-rail-stat";
+      const icon = document.createElement("span");
+      icon.className = "public-profile-rail-stat-icon";
+      icon.textContent = itemStat.icon;
+      const text = document.createElement("span");
+      text.className = "public-profile-rail-stat-text";
+      text.textContent = itemStat.text;
+      chip.append(icon, text);
+      stats.appendChild(chip);
+    });
+
     const bottom = document.createElement("div");
     bottom.className = "public-profile-rail-bottom";
     const meta = document.createElement("span");
@@ -1302,17 +1375,21 @@ function renderPublicProfileContentRail(
         video.preload = "metadata";
         thumb.appendChild(video);
       } else {
-        const img = document.createElement("img");
-        img.src = post.media_url;
-        img.alt = displayName || handle || "profile media";
-        img.loading = "lazy";
+      const img = document.createElement("img");
+      img.src = post.media_url;
+      img.alt = displayName || handle || "profile media";
+      img.loading = "lazy";
         img.decoding = "async";
         img.referrerPolicy = "no-referrer";
         thumb.appendChild(img);
       }
-      card.append(top, thumb, title, bottom);
+      card.append(top, thumb, title);
+      if (stats.childNodes.length) card.appendChild(stats);
+      card.append(bottom);
     } else {
-      card.append(top, title, note, bottom);
+      card.append(top, title, note);
+      if (stats.childNodes.length) card.appendChild(stats);
+      card.append(bottom);
     }
 
     targetEl.appendChild(card);
@@ -1884,6 +1961,8 @@ export async function openPublicProfile(userId, options = {}) {
     handle,
     userId,
     workoutLogsByPost,
+    likesByPost,
+    commentsByPost,
     tr,
   });
 
