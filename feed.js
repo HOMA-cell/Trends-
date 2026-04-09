@@ -6592,6 +6592,26 @@ export function renderFeed(options = {}) {
         .filter(Boolean);
       const rawCaptionText = `${post.note || post.caption || ""}`.trim();
       const { title: captionTitleText } = splitCaptionContent(rawCaptionText);
+      const appendLimitedItems = (
+        target,
+        nodes,
+        {
+          maxVisible = 2,
+          overflowClassName = "",
+        } = {}
+      ) => {
+        if (!target || !Array.isArray(nodes) || !nodes.length) return;
+        nodes.slice(0, maxVisible).forEach((node) => {
+          if (node) target.appendChild(node);
+        });
+        const hiddenCount = Math.max(0, nodes.length - maxVisible);
+        if (!hiddenCount) return;
+        const overflow = document.createElement("span");
+        overflow.className = overflowClassName;
+        overflow.textContent = `+${hiddenCount}`;
+        overflow.setAttribute("aria-label", `+${hiddenCount}`);
+        target.appendChild(overflow);
+      };
 
       const header = document.createElement("div");
       header.className = "post-header";
@@ -6653,11 +6673,12 @@ export function renderFeed(options = {}) {
         relativeText || formatPostDate(post);
       subRow.appendChild(timeSpan);
 
+      const badgeNodes = [];
       if (post.visibility === "private") {
         const visibilityBadge = document.createElement("span");
         visibilityBadge.className = "post-visibility-badge is-private";
         visibilityBadge.textContent = tr.privateOnly || "Private";
-        subRow.appendChild(visibilityBadge);
+        badgeNodes.push(visibilityBadge);
       }
 
       const reasonLabel = getForYouReasonLabel(post);
@@ -6665,19 +6686,24 @@ export function renderFeed(options = {}) {
         const pinBadge = document.createElement("span");
         pinBadge.className = "post-pin-badge";
         pinBadge.textContent = tr.postPinnedBadge || "Pinned";
-        subRow.appendChild(pinBadge);
+        badgeNodes.push(pinBadge);
       }
       if (reasonLabel) {
         const reason = document.createElement("span");
         reason.className = "post-reason-badge";
         reason.textContent = reasonLabel;
-        subRow.appendChild(reason);
+        badgeNodes.push(reason);
       }
+      appendLimitedItems(subRow, badgeNodes, {
+        maxVisible: 2,
+        overflowClassName: "post-overflow-badge",
+      });
       meta.appendChild(userRow);
       meta.appendChild(subRow);
 
       const headerContext = document.createElement("div");
       headerContext.className = "post-context-line";
+      const contextNodes = [];
       if (post.media_url) {
         const mediaChip = document.createElement("span");
         mediaChip.className = "post-context-mini-chip";
@@ -6685,7 +6711,7 @@ export function renderFeed(options = {}) {
           post.media_type === "video"
             ? tr.mediaVideoLabel || "Video"
             : tr.mediaPhotoLabel || "Photo";
-        headerContext.appendChild(mediaChip);
+        contextNodes.push(mediaChip);
       }
       if (exerciseCount > 0) {
         const workoutChip = document.createElement("span");
@@ -6693,7 +6719,7 @@ export function renderFeed(options = {}) {
         workoutChip.textContent = `${exerciseCount}${
           tr.workoutExerciseCountLabel || "種目"
         } · ${setCount}${tr.workoutSetCountLabel || "セット"}`;
-        headerContext.appendChild(workoutChip);
+        contextNodes.push(workoutChip);
       }
       if (
         settings.showBodyweight &&
@@ -6706,8 +6732,12 @@ export function renderFeed(options = {}) {
         bodyweightChip.textContent = `${tr.weight || "Weight"} · ${formatWeight(
           post.bodyweight
         )}`;
-        headerContext.appendChild(bodyweightChip);
+        contextNodes.push(bodyweightChip);
       }
+      appendLimitedItems(headerContext, contextNodes, {
+        maxVisible: 2,
+        overflowClassName: "post-context-mini-chip is-overflow",
+      });
       if (headerContext.childNodes.length) {
         meta.appendChild(headerContext);
       }

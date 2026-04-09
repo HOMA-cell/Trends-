@@ -1217,6 +1217,11 @@
     .post-identity-link:hover .post-handle-inline {
       color: #111827;
     }
+    .post-identity-link:hover .avatar,
+    .post-identity-link:focus-visible .avatar {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+    }
     .post-identity-link:focus-visible {
       outline: 2px solid rgba(228, 87, 46, 0.24);
       outline-offset: 2px;
@@ -1327,6 +1332,11 @@
       border-color: #e0e6ee;
       color: #516072;
     }
+    .post-context-mini-chip.is-overflow {
+      background: transparent;
+      border-style: dashed;
+      color: #8a7c6d;
+    }
     .post-sub {
       font-size: 10.5px;
       color: var(--text-sub);
@@ -1419,6 +1429,20 @@
       margin-top: 0;
       white-space: nowrap;
       flex-shrink: 0;
+    }
+    .post-overflow-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 16px;
+      padding: 0 6px;
+      border-radius: 999px;
+      border: 1px dashed #e9dece;
+      background: #faf7f2;
+      color: #8a7c6d;
+      font-size: 8px;
+      font-weight: 700;
+      white-space: nowrap;
     }
     .avatar {
       width: 34px;
@@ -12636,7 +12660,8 @@
     font-size: 9px;
   }
 .feed-list .post-pin-badge,
-.feed-list .post-reason-badge {
+.feed-list .post-reason-badge,
+.feed-list .post-overflow-badge {
   min-height: 17px;
   padding-inline: 6px;
   font-size: 8.5px;
@@ -12685,7 +12710,8 @@
   }
   .feed-list .post-new-badge,
   .feed-list .post-pin-badge,
-  .feed-list .post-reason-badge {
+  .feed-list .post-reason-badge,
+  .feed-list .post-overflow-badge {
     display: none;
   }
   .feed-list .post-meta {
@@ -12800,7 +12826,8 @@
   }
   .feed-list .post-pin-badge,
   .feed-list .post-reason-badge,
-  .feed-list .post-visibility-badge {
+  .feed-list .post-visibility-badge,
+  .feed-list .post-overflow-badge {
     min-height: 16px;
     padding-inline: 5px;
     font-size: 8px;
