@@ -400,6 +400,139 @@ function formatCompactNumber(value) {
     return `${Math.round(Number(value) * 10) / 10}`;
   }
 }
+function buildPublicProfileDetailEntryContext({
+  userId = "",
+  displayName = "",
+  handle = "",
+  tab = "posts",
+} = {}) {
+  return {
+    source: "public_profile",
+    userId: `${userId || ""}`.trim(),
+    actorName: `${displayName || ""}`.trim(),
+    actorHandle: `${handle || ""}`.trim(),
+    tab: normalizePublicProfileContentTab(tab),
+  };
+}
+function stripPublicProfileReplyPrefix(text = "") {
+  const normalized = `${text || ""}`.trim();
+  if (!normalized) return "";
+  return normalized.replace(/^@[A-Za-z0-9._-]+\s+/, "").trim();
+}
+function buildPublicProfileDiscussionPreview(
+  post,
+  comments = [],
+  {
+    currentUser = null,
+    entryContext = null,
+    tr = t[getCurrentLang()] || t.ja,
+  } = {}
+) {
+  const recentComments = (Array.isArray(comments) ? comments : [])
+    .filter((comment) => `${comment?.id || ""}`.trim())
+    .sort(
+      (a, b) =>
+        new Date(b?.created_at || b?.date || 0).getTime() -
+        new Date(a?.created_at || a?.date || 0).getTime()
+    );
+  if (!recentComments.length || !post?.id) return null;
+
+  const latestComment = recentComments[0];
+  const latestProfile = latestComment?.profile || null;
+  const latestHandle = formatHandle(
+    latestProfile?.handle || latestProfile?.username || "user"
+  );
+  const latestName =
+    `${latestProfile?.display_name || ""}`.trim() || latestHandle || "@user";
+  const latestPreview =
+    stripPublicProfileReplyPrefix(`${latestComment?.body || ""}`) ||
+    tr.commentEmpty ||
+    "No comments yet.";
+  const latestCommentId = `${latestComment?.id || ""}`.trim();
+  const latestCommentActorId = `${latestComment?.user_id || ""}`.trim();
+  const canQuickReply =
+    !!currentUser &&
+    !!latestCommentId &&
+    !!latestCommentActorId &&
+    `${currentUser.id || ""}` !== latestCommentActorId;
+
+  const socialPreview = document.createElement("button");
+  socialPreview.type = "button";
+  socialPreview.className = "post-social-preview public-profile-post-social-preview";
+  if (canQuickReply) {
+    socialPreview.classList.add("is-reply-ready");
+  }
+  socialPreview.setAttribute(
+    "aria-label",
+    `${
+      canQuickReply ? tr.commentReply || "Reply" : tr.feedLatestReply || "Latest reply"
+    } · ${latestName}`
+  );
+  socialPreview.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openPostDetail(`${post.id}`, {
+      entryContext,
+      focusComments: true,
+      focusCommentId: latestCommentId,
+      focusCommentActorId: latestCommentActorId,
+      focusCommentCreatedAt: latestComment?.created_at || "",
+      replyToCommentId: canQuickReply ? latestCommentId : "",
+      replyToCommentActorId: canQuickReply ? latestCommentActorId : "",
+      replyToCommentCreatedAt: canQuickReply ? latestComment?.created_at || "" : "",
+    });
+  });
+
+  const stack = document.createElement("div");
+  stack.className = "post-social-preview-stack";
+  recentComments.slice(0, 2).forEach((comment) => {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar post-social-preview-avatar";
+    const profile = comment?.profile || null;
+    const label =
+      `${profile?.display_name || ""}`.trim() ||
+      formatHandle(profile?.handle || profile?.username || "u") ||
+      "U";
+    renderAvatar(
+      avatar,
+      profile,
+      label.replace("@", "").charAt(0).toUpperCase() || "U"
+    );
+    stack.appendChild(avatar);
+  });
+  if (recentComments.length > 2) {
+    const more = document.createElement("span");
+    more.className = "post-social-preview-more";
+    more.textContent = `+${recentComments.length - 2}`;
+    stack.appendChild(more);
+  }
+
+  const copy = document.createElement("div");
+  copy.className = "post-social-preview-copy";
+  const top = document.createElement("div");
+  top.className = "post-social-preview-top";
+  const kicker = document.createElement("span");
+  kicker.className = "post-social-preview-kicker";
+  kicker.textContent = `${tr.feedLatestReply || "Latest reply"} · ${formatCompactNumber(
+    recentComments.length
+  )}`;
+  const name = document.createElement("span");
+  name.className = "post-social-preview-name";
+  name.textContent = latestName;
+  top.append(kicker, name);
+  const snippet = document.createElement("div");
+  snippet.className = "post-social-preview-snippet";
+  snippet.textContent = latestPreview;
+  copy.append(top, snippet);
+
+  const action = document.createElement("span");
+  action.className = "post-social-preview-action";
+  action.textContent = canQuickReply
+    ? tr.commentReply || "Reply"
+    : tr.feedOpenDiscussion || "Open discussion";
+
+  socialPreview.append(stack, copy, action);
+  return socialPreview;
+}
 function buildProfileMetrics(posts = [], workoutLogsByPost = new Map()) {
   const safePosts = Array.isArray(posts) ? posts : [];
   const dateKeys = new Set();
@@ -1244,13 +1377,12 @@ function renderPublicProfileContentRail(
     const card = document.createElement("button");
     card.type = "button";
     card.className = `public-profile-rail-card is-${normalizedTab}`;
-    const entryContext = {
-      source: "public_profile",
-      userId: `${userId || ""}`.trim(),
-      actorName: `${displayName || ""}`.trim(),
-      actorHandle: `${handle || ""}`.trim(),
+    const entryContext = buildPublicProfileDetailEntryContext({
+      userId,
+      displayName,
+      handle,
       tab: normalizedTab,
-    };
+    });
     card.addEventListener("click", () => {
       if (!post?.id) return;
       openPostDetail(`${post.id}`, { entryContext });
@@ -2078,8 +2210,15 @@ export async function openPublicProfile(userId, options = {}) {
       const visiblePosts = selectedPosts.slice(0, getPublicPostsVisibleCount());
       visiblePosts.forEach((post) => {
         const logs = workoutLogsByPost.get(post.id) || [];
+        const detailEntryContext = buildPublicProfileDetailEntryContext({
+          userId,
+          displayName,
+          handle,
+          tab: activeContentTab || "posts",
+        });
         const likeCount = Number(likesByPost.get(post.id) || 0);
-        const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
+        const postComments = commentsByPost.get(post.id) || [];
+        const commentCount = Number(postComments.length || 0);
         const setCount = logs.reduce(
           (sum, item) => sum + ((item?.sets || []).length || 0),
           0
@@ -2092,10 +2231,10 @@ export async function openPublicProfile(userId, options = {}) {
         clone.className = "post-card public-profile-post-card";
         clone.setAttribute("data-post-id", post.id);
         clone.dataset.detailSource = "public-profile";
-        clone.dataset.profileUserId = `${userId || ""}`;
-        clone.dataset.profileName = displayName || "";
-        clone.dataset.profileHandle = handle || "";
-        clone.dataset.profileTab = activeContentTab || "posts";
+        clone.dataset.profileUserId = detailEntryContext.userId || "";
+        clone.dataset.profileName = detailEntryContext.actorName || "";
+        clone.dataset.profileHandle = detailEntryContext.actorHandle || "";
+        clone.dataset.profileTab = detailEntryContext.tab || "posts";
         const shell = document.createElement("div");
         shell.className = "public-profile-post-shell";
         const copy = document.createElement("div");
@@ -2237,6 +2376,14 @@ export async function openPublicProfile(userId, options = {}) {
         }
         copy.appendChild(headline);
         copy.appendChild(body);
+        const discussionPreview = buildPublicProfileDiscussionPreview(post, postComments, {
+          currentUser,
+          entryContext: detailEntryContext,
+          tr,
+        });
+        if (discussionPreview) {
+          copy.appendChild(discussionPreview);
+        }
         footer.appendChild(openHint);
         copy.appendChild(footer);
         shell.appendChild(copy);

@@ -13287,6 +13287,30 @@
   align-items: center;
   min-width: 0;
 }
+.public-profile-post-social-preview {
+  margin-top: 2px;
+  border-radius: 18px;
+  border-color: rgba(234, 223, 206, 0.96);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 243, 235, 0.96) 100%);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.045);
+}
+.public-profile-post-social-preview:hover {
+  transform: translateY(-1px);
+}
+.public-profile-post-social-preview .post-social-preview-kicker {
+  color: #8a7f72;
+}
+.public-profile-post-social-preview .post-social-preview-name {
+  color: #1f2937;
+}
+.public-profile-post-social-preview .post-social-preview-snippet {
+  color: #5c5348;
+}
+.public-profile-post-social-preview .post-social-preview-action {
+  min-width: 118px;
+  justify-content: center;
+}
 .public-profile-post-footer {
   display: flex;
   align-items: center;
@@ -13424,6 +13448,9 @@
   }
   .public-profile-post-title {
     font-size: 13.5px;
+  }
+  .public-profile-post-social-preview .post-social-preview-action {
+    min-width: 0;
   }
 }
 
