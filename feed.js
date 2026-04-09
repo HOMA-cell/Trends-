@@ -9711,18 +9711,20 @@ export function renderPostDetail() {
           summary.appendChild(summaryAction);
         }
         commentsEl.appendChild(summary);
+        const threadShell = document.createElement("div");
+        threadShell.className = "detail-comments-thread-shell";
         if (!comments.length && !commentsLoading.has(post.id)) {
           const empty = document.createElement("div");
           empty.className = "detail-sub";
           empty.textContent = tr.commentEmpty || "コメントはまだありません。";
-          commentsEl.appendChild(empty);
+          threadShell.appendChild(empty);
         } else if (commentsLoading.has(post.id)) {
           const loading = document.createElement("div");
           loading.className = "detail-sub";
           loading.textContent = tr.loading || "読み込み中...";
-          commentsEl.appendChild(loading);
+          threadShell.appendChild(loading);
         } else {
-          commentsEl.appendChild(
+          threadShell.appendChild(
             buildCommentThreadList(post, comments, tr, { focusCommentId })
           );
         }
@@ -9736,9 +9738,10 @@ export function renderPostDetail() {
           });
           if (inputWrap) {
             inputWrap.classList.add("detail-comment-input");
-            commentsEl.appendChild(inputWrap);
+            threadShell.appendChild(inputWrap);
           }
         }
+        commentsEl.appendChild(threadShell);
       }
       if (detailCommentsFocusRequested && `${currentDetailPostId || ""}` === `${post.id || ""}`) {
         const focusCommentId = resolveCommentFocusId(
