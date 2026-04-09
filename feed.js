@@ -9625,6 +9625,92 @@ export function renderPostDetail() {
             requestFocus: true,
           });
         }
+        const summary = document.createElement("div");
+        summary.className = "detail-comments-summary";
+        const summaryCopy = document.createElement("div");
+        summaryCopy.className = "detail-comments-summary-copy";
+        const summaryTitle = document.createElement("div");
+        summaryTitle.className = "detail-comments-summary-title";
+        summaryTitle.textContent = commentCount
+          ? `${formatCompactCount(commentCount)} ${tr.comments || "Comments"}`
+          : tr.comments || "Comments";
+        summaryCopy.appendChild(summaryTitle);
+        const summarySub = document.createElement("div");
+        summarySub.className = "detail-comments-summary-sub";
+        const latestComment = [...comments]
+          .sort((a, b) => {
+            const aTime = new Date(a?.created_at || 0).getTime();
+            const bTime = new Date(b?.created_at || 0).getTime();
+            return bTime - aTime;
+          })[0];
+        if (latestComment) {
+          const latestHandle =
+            latestComment.profile?.handle ||
+            latestComment.profile?.username ||
+            "user";
+          const latestName =
+            `${latestComment.profile?.display_name || ""}`.trim() ||
+            formatHandle(latestHandle) ||
+            "@user";
+          const latestPreview = getCaptionPreviewText(
+            parseCommentReplyPrefix(`${latestComment.body || ""}`)?.bodyWithoutPrefix ||
+              `${latestComment.body || ""}`
+          );
+          summarySub.textContent = latestPreview
+            ? `${latestName} · ${latestPreview}`
+            : latestName;
+        } else {
+          summarySub.textContent = tr.commentEmpty || "No comments yet.";
+        }
+        summaryCopy.appendChild(summarySub);
+        summary.appendChild(summaryCopy);
+        if (comments.length) {
+          const stack = document.createElement("div");
+          stack.className = "detail-comments-stack";
+          const seenUsers = new Set();
+          [...comments]
+            .reverse()
+            .forEach((comment) => {
+              const userId = `${comment?.user_id || ""}`;
+              if (!userId || seenUsers.has(userId) || stack.childNodes.length >= 3) return;
+              seenUsers.add(userId);
+              const avatar = document.createElement("div");
+              avatar.className = "avatar detail-comments-stack-avatar";
+              const stackHandle =
+                comment.profile?.handle ||
+                comment.profile?.username ||
+                "user";
+              const stackName =
+                `${comment.profile?.display_name || ""}`.trim() ||
+                formatHandle(stackHandle) ||
+                "@user";
+              renderAvatar(
+                avatar,
+                comment.profile,
+                stackName.replace("@", "").charAt(0).toUpperCase()
+              );
+              avatar.style.zIndex = `${4 - stack.childNodes.length}`;
+              stack.appendChild(avatar);
+            });
+          if (stack.childNodes.length) {
+            summary.appendChild(stack);
+          }
+        }
+        if (currentUser && commentsEnabled) {
+          const summaryAction = document.createElement("button");
+          summaryAction.type = "button";
+          summaryAction.className = "chip chip-action detail-comments-summary-action";
+          setActionButtonContent(summaryAction, {
+            kind: "comment",
+            icon: "💬",
+            label: tr.commentReply || "Reply",
+          });
+          summaryAction.addEventListener("click", () => {
+            focusPostDetailComments();
+          });
+          summary.appendChild(summaryAction);
+        }
+        commentsEl.appendChild(summary);
         if (!comments.length && !commentsLoading.has(post.id)) {
           const empty = document.createElement("div");
           empty.className = "detail-sub";
