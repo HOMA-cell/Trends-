@@ -115,6 +115,13 @@ import {
     const galleryPageSize = 9;
     let publicPostsPageSize = 4;
     let publicPostsVisibleCount = 4;
+    const compactCountFormatter =
+      typeof Intl !== "undefined"
+        ? new Intl.NumberFormat(undefined, {
+            notation: "compact",
+            maximumFractionDigits: 1,
+          })
+        : null;
     let exercisePRs = new Map();
     let prTrackingEnabled = true;
     let setActivePage = null;
@@ -139,6 +146,13 @@ import {
       checkedAt: 0,
       retryAfter: 0,
     };
+
+    function formatCompactCount(value) {
+      const numeric = Number(value || 0);
+      if (!Number.isFinite(numeric)) return "0";
+      if (!compactCountFormatter) return `${Math.round(numeric)}`;
+      return compactCountFormatter.format(numeric);
+    }
     let appBuildMetaLoaded = false;
     let appBuildMeta = {
       version: "dev-local",
