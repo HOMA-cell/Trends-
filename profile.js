@@ -414,6 +414,19 @@ function buildPublicProfileDetailEntryContext({
     tab: normalizePublicProfileContentTab(tab),
   };
 }
+function getPublicProfilePostKind(post, logs = []) {
+  if ((Array.isArray(logs) ? logs : []).length) return "workout";
+  if (post?.media_type === "video") return "video";
+  if (post?.media_url) return "photo";
+  return "post";
+}
+function getPublicProfilePostCtaLabel(post, logs = [], tr = t[getCurrentLang()] || t.ja) {
+  const kind = getPublicProfilePostKind(post, logs);
+  if (kind === "workout") return tr.feedViewWorkout || "View workout";
+  if (kind === "video") return tr.feedViewVideo || "Watch video";
+  if (kind === "photo") return tr.feedViewPhoto || "View photo";
+  return tr.notificationViewPost || "View post";
+}
 function stripPublicProfileReplyPrefix(text = "") {
   const normalized = `${text || ""}`.trim();
   if (!normalized) return "";
@@ -1492,8 +1505,11 @@ function renderPublicProfileContentRail(
           : tr.profileContentPostsHint || "Latest posts";
     }
     const cta = document.createElement("span");
-    cta.className = "public-profile-rail-cta";
-    cta.textContent = tr.notificationViewPost || "View post";
+    cta.className = `public-profile-rail-cta is-${getPublicProfilePostKind(
+      post,
+      logs
+    )}`;
+    cta.textContent = getPublicProfilePostCtaLabel(post, logs, tr);
     bottom.append(meta, cta);
 
     if (normalizedTab === "media" && post.media_url) {
@@ -2227,8 +2243,10 @@ export async function openPublicProfile(userId, options = {}) {
         const previewText = buildProfilePostPreview(post, logs, tr);
         const isPinnedPost = `${post?.id || ""}` === pinnedPostId;
         const isLatestPost = `${selectedPosts?.[0]?.id || ""}` === `${post?.id || ""}`;
+        const postKind = getPublicProfilePostKind(post, logs);
         const clone = document.createElement("div");
         clone.className = "post-card public-profile-post-card";
+        clone.classList.add(`is-${postKind}`);
         clone.setAttribute("data-post-id", post.id);
         clone.dataset.detailSource = "public-profile";
         clone.dataset.profileUserId = detailEntryContext.userId || "";
@@ -2360,10 +2378,10 @@ export async function openPublicProfile(userId, options = {}) {
           footer.appendChild(summary);
         }
         const openHint = document.createElement("span");
-        openHint.className = "public-profile-post-open";
+        openHint.className = `public-profile-post-open is-${postKind}`;
         const openLabel = document.createElement("span");
         openLabel.className = "public-profile-post-open-label";
-        openLabel.textContent = tr.notificationViewPost || "View post";
+        openLabel.textContent = getPublicProfilePostCtaLabel(post, logs, tr);
         const openArrow = document.createElement("span");
         openArrow.className = "public-profile-post-open-arrow";
         openArrow.setAttribute("aria-hidden", "true");
