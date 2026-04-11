@@ -9126,22 +9126,50 @@ function renderDetailEntryContext(context, tr) {
       const wrap = $("detail-entry");
       const label = $("detail-entry-label");
       const text = $("detail-entry-text");
+      const scope = $("detail-entry-scope");
+      const position = $("detail-entry-position");
       const action = $("btn-detail-entry-action");
-      if (!wrap || !label || !text || !action) return;
+      const prevBtn = $("btn-detail-entry-prev");
+      const nextBtn = $("btn-detail-entry-next");
+      if (!wrap || !label || !text || !action || !scope || !position || !prevBtn || !nextBtn) return;
       if (!context || context.source !== "public_profile") {
         wrap.classList.add("hidden");
         wrap.setAttribute("aria-hidden", "true");
         label.textContent = "";
         text.textContent = "";
+        scope.textContent = "";
+        position.textContent = "";
         action.dataset.userId = "";
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
         return;
       }
+      const navigablePosts = getDetailNavigablePosts();
+      const currentIndex = navigablePosts.findIndex(
+        (post) => `${post?.id || ""}` === `${currentDetailPostId || ""}`
+      );
+      const totalCount = navigablePosts.length;
+      const hasPrev = currentIndex > 0;
+      const hasNext = currentIndex >= 0 && currentIndex < totalCount - 1;
+      const scopeLabel =
+        context.tab === "media"
+          ? tr.profileTabMedia || "Media"
+          : context.tab === "workouts"
+            ? tr.profileTabWorkouts || "Workouts"
+            : tr.profileTabPosts || "Posts";
       wrap.classList.remove("hidden");
       wrap.setAttribute("aria-hidden", "false");
       label.textContent = tr.detailEntryFromProfile || "Opened from profile";
       text.textContent = buildDetailEntryText(context, tr);
+      scope.textContent = scopeLabel;
+      position.textContent =
+        totalCount > 0 && currentIndex >= 0 ? `${currentIndex + 1} / ${totalCount}` : "1 / 1";
       action.textContent = tr.detailEntryBackToProfile || "Back to profile";
       action.dataset.userId = context.userId || "";
+      prevBtn.disabled = !hasPrev;
+      nextBtn.disabled = !hasNext;
+      prevBtn.setAttribute("aria-label", tr.galleryPrev || "Prev");
+      nextBtn.setAttribute("aria-label", tr.galleryNext || "Next");
     }
 function getDetailNavigablePosts() {
       const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
@@ -9233,6 +9261,8 @@ export function setupPostDetailModal() {
         });
       }
       const entryActionBtn = $("btn-detail-entry-action");
+      const entryPrevBtn = $("btn-detail-entry-prev");
+      const entryNextBtn = $("btn-detail-entry-next");
       if (entryActionBtn && entryActionBtn.dataset.bound !== "true") {
         entryActionBtn.dataset.bound = "true";
         entryActionBtn.addEventListener("click", () => {
@@ -9240,6 +9270,20 @@ export function setupPostDetailModal() {
           if (!userId) return;
           closePostDetail({ syncHash: false });
           openPublicProfile(userId, { preserveEntryContext: true });
+        });
+      }
+      if (entryPrevBtn && entryPrevBtn.dataset.bound !== "true") {
+        entryPrevBtn.dataset.bound = "true";
+        entryPrevBtn.addEventListener("click", () => {
+          if (entryPrevBtn.disabled) return;
+          openAdjacentPostDetail(-1);
+        });
+      }
+      if (entryNextBtn && entryNextBtn.dataset.bound !== "true") {
+        entryNextBtn.dataset.bound = "true";
+        entryNextBtn.addEventListener("click", () => {
+          if (entryNextBtn.disabled) return;
+          openAdjacentPostDetail(1);
         });
       }
       if (backdrop && backdrop.dataset.bound !== "true") {
