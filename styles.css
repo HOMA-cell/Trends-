@@ -11389,6 +11389,171 @@
     .detail-workout-item strong {
       font-size: 12px;
     }
+    .detail-related {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding: 2px 2px 4px;
+      scroll-snap-type: x proximity;
+      scrollbar-width: none;
+    }
+    .detail-related::-webkit-scrollbar {
+      display: none;
+    }
+    .detail-related-card {
+      flex: 0 0 min(248px, 78vw);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      text-align: left;
+      padding: 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(230, 220, 207, 0.92);
+      background: linear-gradient(180deg, rgba(255, 253, 249, 0.98) 0%, rgba(255, 247, 239, 0.94) 100%);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+      scroll-snap-align: start;
+      cursor: pointer;
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+      overflow: hidden;
+    }
+    .detail-related-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(239, 91, 42, 0.24);
+      box-shadow: 0 18px 34px rgba(15, 23, 42, 0.1);
+    }
+    .detail-related-card:focus-visible {
+      outline: none;
+      border-color: rgba(239, 91, 42, 0.34);
+      box-shadow: 0 0 0 3px rgba(239, 91, 42, 0.14), 0 18px 34px rgba(15, 23, 42, 0.12);
+    }
+    .detail-related-thumb {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(17, 24, 39, 0.06);
+      border: 1px solid rgba(230, 220, 207, 0.92);
+    }
+    .detail-related-thumb img,
+    .detail-related-thumb video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .detail-related-thumb-overlay {
+      position: absolute;
+      inset: auto 10px 10px 10px;
+      display: flex;
+      justify-content: flex-start;
+    }
+    .detail-related-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+    .detail-related-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .detail-related-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(231, 221, 210, 0.94);
+      color: #695b4a;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .detail-related-chip.is-accent {
+      background: rgba(239, 91, 42, 0.1);
+      border-color: rgba(239, 91, 42, 0.2);
+      color: #bf4a22;
+    }
+    .detail-related-chip.is-weight {
+      background: rgba(17, 24, 39, 0.06);
+      border-color: rgba(17, 24, 39, 0.08);
+      color: #374151;
+      text-transform: none;
+      letter-spacing: 0.01em;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .detail-related-chip.is-overlay {
+      background: rgba(17, 24, 39, 0.62);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(10px);
+    }
+    .detail-related-title {
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+      color: #19140f;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+    .detail-related-sub {
+      font-size: 12px;
+      line-height: 1.55;
+      color: #6c6258;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+    .detail-related-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: auto;
+    }
+    .detail-related-insights {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-width: 0;
+    }
+    .detail-related-insight {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(245, 239, 230, 0.92);
+      color: #7a6b5a;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .detail-related-cta {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(231, 221, 210, 0.96);
+      color: #2d2721;
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
     .detail-comment-input {
       margin-top: 12px;
       padding-top: 4px;
@@ -11565,6 +11730,19 @@
       }
       .detail-workout-summary {
         padding: 12px;
+      }
+      .detail-related {
+        gap: 10px;
+      }
+      .detail-related-card {
+        flex-basis: min(82vw, 234px);
+        padding: 11px;
+      }
+      .detail-related-title {
+        font-size: 13px;
+      }
+      .detail-related-sub {
+        font-size: 11px;
       }
       .detail-comments-summary {
         flex-wrap: wrap;

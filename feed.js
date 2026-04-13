@@ -9501,6 +9501,9 @@ export function renderPostDetail() {
       const mediaEl = $("detail-media");
       const bodyEl = $("detail-body");
       const workoutEl = $("detail-workout");
+      const relatedSectionEl = $("detail-related-section");
+      const relatedTitleEl = $("detail-related-title");
+      const relatedEl = $("detail-related");
       const commentsEl = $("detail-comments");
       const workoutTitleEl = $("detail-workout-title");
       const commentsTitleEl = $("detail-comments-title");
@@ -9521,6 +9524,42 @@ export function renderPostDetail() {
         window.requestAnimationFrame(() => {
           targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
         });
+      };
+
+      const getDetailPrimaryActionLabel = (candidatePost, candidateLogs = []) =>
+        candidateLogs.length
+          ? tr.feedViewWorkout || "View workout"
+          : candidatePost?.media_type === "video"
+            ? tr.feedViewVideo || "Watch video"
+            : candidatePost?.media_url
+              ? tr.feedViewPhoto || "View photo"
+              : tr.notificationViewPost || "View post";
+
+      const buildDetailRelatedPosts = () => {
+        const currentUserId = `${currentUser?.id || ""}`.trim();
+        const basePosts = currentDetailEntryContext?.source === "public_profile"
+          ? getDetailNavigablePosts()
+          : (getAllPosts() || [])
+              .filter((candidate) => {
+                if (!candidate) return false;
+                if (`${candidate.id || ""}` === `${post.id || ""}`) return false;
+                if (`${candidate.user_id || ""}` !== `${post.user_id || ""}`) return false;
+                if (
+                  candidate.visibility === "private" &&
+                  `${candidate.user_id || ""}` !== currentUserId
+                ) {
+                  return false;
+                }
+                return true;
+              })
+              .sort((a, b) => {
+                const pinDiff = Number(isPinnedPostForUser(b.id, b.user_id)) - Number(isPinnedPostForUser(a.id, a.user_id));
+                if (pinDiff) return pinDiff;
+                return new Date(b?.date || b?.created_at || 0).getTime() - new Date(a?.date || a?.created_at || 0).getTime();
+              });
+        return (basePosts || [])
+          .filter((candidate) => `${candidate?.id || ""}` !== `${post.id || ""}`)
+          .slice(0, 4);
       };
 
       if (headerEl) {
@@ -9924,6 +9963,159 @@ export function renderPostDetail() {
               .join(" · ");
             item.appendChild(sets);
             workoutEl.appendChild(item);
+          });
+        }
+      }
+
+      if (relatedSectionEl && relatedEl && relatedTitleEl) {
+        relatedEl.innerHTML = "";
+        const relatedPosts = buildDetailRelatedPosts();
+        const relatedDisplayName =
+          `${post.profile?.display_name || ""}`.trim() ||
+          formatHandle(post.profile?.handle || post.profile?.username || "user") ||
+          (tr.detailRelatedFallback || "More from this athlete");
+        relatedTitleEl.textContent = (tr.detailRelatedTitle || "More from {name}").replace(
+          "{name}",
+          relatedDisplayName
+        );
+        if (!relatedPosts.length) {
+          relatedSectionEl.classList.add("hidden");
+          relatedSectionEl.setAttribute("aria-hidden", "true");
+        } else {
+          relatedSectionEl.classList.remove("hidden");
+          relatedSectionEl.setAttribute("aria-hidden", "false");
+          relatedPosts.forEach((candidate) => {
+            const candidateLogs = workoutLogsByPost.get(candidate.id) || [];
+            const candidateCaption = `${candidate.note || candidate.caption || ""}`.trim();
+            const { title: candidateTitle, body: candidateBody } = splitCaptionContent(candidateCaption);
+            const previewText = getCaptionPreviewText(candidateCaption);
+            const setTotal = candidateLogs.reduce(
+              (sum, item) => sum + ((item?.sets || []).length || 0),
+              0
+            );
+            const bestLift = candidateLogs.reduce((maxWeight, item) => {
+              const sets = Array.isArray(item?.sets) ? item.sets : [];
+              return sets.reduce((best, set) => {
+                const weight = Number(set?.weight || 0);
+                if (!Number.isFinite(weight) || weight <= 0) return best;
+                return Math.max(best, weight);
+              }, maxWeight);
+            }, 0);
+            const kindLabel = candidateLogs.length
+              ? tr.profileTabWorkouts || "Workout"
+              : candidate.media_type === "video"
+                ? tr.mediaVideoLabel || "VIDEO"
+                : candidate.media_url
+                  ? tr.mediaPhotoLabel || "PHOTO"
+                  : tr.notificationViewPost || "View post";
+            const summaryText = candidateLogs.length
+              ? [
+                  `${candidateLogs.length}${tr.workoutExerciseCountLabel || "種目"}`,
+                  setTotal ? `${setTotal}${tr.workoutSetCountLabel || "セット"}` : "",
+                  bestLift > 0 ? `${tr.profileBestLift || "Best lift"} · ${formatWeight(bestLift)}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+              : candidateBody || previewText || kindLabel;
+            const card = document.createElement("button");
+            card.type = "button";
+            card.className = "detail-related-card";
+            card.setAttribute(
+              "aria-label",
+              `${getDetailPrimaryActionLabel(candidate, candidateLogs)} ${candidateTitle || previewText || kindLabel}`
+            );
+            card.addEventListener("click", () => {
+              openPostDetail(candidate.id, currentDetailEntryContext
+                ? { preserveEntryContext: true, entryContext: currentDetailEntryContext }
+                : {});
+            });
+
+            if (candidate.media_url) {
+              const thumb = document.createElement("div");
+              thumb.className = "detail-related-thumb";
+              if (candidate.media_type === "video") {
+                const video = document.createElement("video");
+                video.muted = true;
+                video.playsInline = true;
+                video.preload = "metadata";
+                video.src = candidate.media_url;
+                thumb.appendChild(video);
+              } else {
+                const img = document.createElement("img");
+                img.loading = "lazy";
+                img.decoding = "async";
+                img.referrerPolicy = "no-referrer";
+                img.alt = candidateTitle || previewText || kindLabel;
+                img.src = candidate.media_url;
+                thumb.appendChild(img);
+              }
+              const thumbOverlay = document.createElement("div");
+              thumbOverlay.className = "detail-related-thumb-overlay";
+              const thumbChip = document.createElement("span");
+              thumbChip.className = "detail-related-chip is-overlay";
+              thumbChip.textContent = kindLabel;
+              thumbOverlay.appendChild(thumbChip);
+              thumb.appendChild(thumbOverlay);
+              card.appendChild(thumb);
+            }
+
+            const body = document.createElement("div");
+            body.className = "detail-related-body";
+            const meta = document.createElement("div");
+            meta.className = "detail-related-meta";
+            const dateChip = document.createElement("span");
+            dateChip.className = "detail-related-chip";
+            dateChip.textContent = formatDateDisplay(candidate.date || candidate.created_at || Date.now());
+            meta.appendChild(dateChip);
+            if (isPinnedPostForUser(candidate.id, candidate.user_id)) {
+              const pinnedChip = document.createElement("span");
+              pinnedChip.className = "detail-related-chip is-accent";
+              pinnedChip.textContent = tr.profilePinnedTitle || "Pinned";
+              meta.appendChild(pinnedChip);
+            }
+            if (candidate.bodyweight !== null && candidate.bodyweight !== undefined && candidate.bodyweight !== "") {
+              const weightChip = document.createElement("span");
+              weightChip.className = "detail-related-chip is-weight";
+              weightChip.textContent = `${tr.weight || "Weight"} · ${formatWeight(candidate.bodyweight)}`;
+              meta.appendChild(weightChip);
+            }
+            body.appendChild(meta);
+
+            const title = document.createElement("div");
+            title.className = "detail-related-title";
+            title.textContent = candidateTitle || previewText || kindLabel;
+            body.appendChild(title);
+
+            const sub = document.createElement("div");
+            sub.className = "detail-related-sub";
+            sub.textContent = summaryText;
+            body.appendChild(sub);
+
+            const footer = document.createElement("div");
+            footer.className = "detail-related-footer";
+            const insights = document.createElement("div");
+            insights.className = "detail-related-insights";
+            [
+              candidateLogs.length ? `${candidateLogs.length}${tr.workoutExerciseCountLabel || "種目"}` : "",
+              likeCount !== undefined ? `${formatCompactCount(Number(likesByPost.get(candidate.id) || 0))} ${tr.likes || "Likes"}` : "",
+              `${formatCompactCount(Number((commentsByPost.get(candidate.id) || []).length || 0))} ${tr.comments || "Comments"}`,
+            ]
+              .filter(Boolean)
+              .slice(0, 2)
+              .forEach((itemText) => {
+                const item = document.createElement("span");
+                item.className = "detail-related-insight";
+                item.textContent = itemText;
+                insights.appendChild(item);
+              });
+            footer.appendChild(insights);
+            const cta = document.createElement("span");
+            cta.className = "detail-related-cta";
+            cta.textContent = getDetailPrimaryActionLabel(candidate, candidateLogs);
+            footer.appendChild(cta);
+            body.appendChild(footer);
+            card.appendChild(body);
+            relatedEl.appendChild(card);
           });
         }
       }
