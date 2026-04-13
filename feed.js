@@ -123,6 +123,42 @@ function formatCompactCount(value) {
   return formatCompactNumber(value);
 }
 
+function buildFeedProfileEntryContext({
+  post = null,
+  comment = null,
+  source = "feed",
+  focusComments = false,
+} = {}) {
+  const targetUserId = `${comment?.user_id || post?.user_id || ""}`.trim();
+  if (!targetUserId) return null;
+  const profile = comment?.profile || post?.profile || null;
+  const actorHandle = formatHandle(profile?.handle || profile?.username || "user") || "@user";
+  const actorName = `${profile?.display_name || ""}`.trim() || actorHandle;
+  return {
+    source,
+    userId: targetUserId,
+    actorName,
+    actorHandle,
+    postId: `${post?.id || ""}`.trim(),
+    commentId: `${comment?.id || ""}`.trim(),
+    commentActorId: `${comment?.user_id || ""}`.trim(),
+    commentCreatedAt: `${comment?.created_at || ""}`.trim(),
+    focusComments: !!focusComments || !!comment,
+  };
+}
+
+function applyProfileEntryDataset(target, context) {
+  if (!(target instanceof HTMLElement) || !context) return;
+  target.dataset.entrySource = context.source || "";
+  target.dataset.entryActorName = context.actorName || "";
+  target.dataset.entryActorHandle = context.actorHandle || "";
+  target.dataset.entryPostId = context.postId || "";
+  target.dataset.entryCommentId = context.commentId || "";
+  target.dataset.entryCommentActorId = context.commentActorId || "";
+  target.dataset.entryCommentCreatedAt = context.commentCreatedAt || "";
+  target.dataset.entryFocusComments = context.focusComments ? "true" : "false";
+}
+
 function formatRelative(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -6269,6 +6305,10 @@ export function renderFeed(options = {}) {
       authorButton.type = "button";
       authorButton.className = "shorts-author profile-link";
       authorButton.setAttribute("data-user-id", post.user_id || "");
+      applyProfileEntryDataset(
+        authorButton,
+        buildFeedProfileEntryContext({ post, source: "shorts" })
+      );
       const authorAvatar = document.createElement("div");
       authorAvatar.className = "avatar shorts-author-avatar";
       const authorFallbackInitial = (displayName || handleText || "U")
@@ -6622,6 +6662,10 @@ export function renderFeed(options = {}) {
       identityBtn.type = "button";
       identityBtn.className = "post-identity-link profile-link";
       identityBtn.setAttribute("data-user-id", post.user_id || "");
+      applyProfileEntryDataset(
+        identityBtn,
+        buildFeedProfileEntryContext({ post, source: "feed" })
+      );
 
       const avatar = document.createElement("div");
       avatar.className = "avatar";
@@ -8152,6 +8196,7 @@ function buildCommentThreadList(post, comments, tr, options = {}) {
           onReply: () => setCommentReplyTarget(post.id, comment),
           onJumpToParent: jumpToRenderedComment,
           replyMeta: replyLookup.get(commentId) || null,
+          post,
         });
         if (item) {
           fragment.appendChild(item);
@@ -8201,7 +8246,7 @@ function buildCommentThreadList(post, comments, tr, options = {}) {
       return list;
     }
 function buildCommentItemElement(comment, tr, options = {}) {
-      const { onReply = null, onJumpToParent = null, replyMeta = null } = options;
+      const { onReply = null, onJumpToParent = null, replyMeta = null, post = null } = options;
       if (!comment) return null;
       const item = document.createElement("div");
       item.className = "comment-item";
@@ -8243,7 +8288,13 @@ function buildCommentItemElement(comment, tr, options = {}) {
         header.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          openPublicProfile(comment.user_id);
+          openPublicProfile(comment.user_id, {
+            entryContext: buildFeedProfileEntryContext({
+              post,
+              comment,
+              source: "comment",
+            }),
+          });
         });
       }
 
@@ -8328,7 +8379,13 @@ function buildCommentItemElement(comment, tr, options = {}) {
         avatarLink.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          openPublicProfile(comment.user_id);
+          openPublicProfile(comment.user_id, {
+            entryContext: buildFeedProfileEntryContext({
+              post,
+              comment,
+              source: "comment",
+            }),
+          });
         });
         item.appendChild(avatarLink);
       } else {
@@ -8430,7 +8487,13 @@ function buildCommentSheetContext(post, tr, options = {}) {
         avatarLink.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          openPublicProfile(post.user_id);
+          openPublicProfile(post.user_id, {
+            entryContext: buildFeedProfileEntryContext({
+              post,
+              source: isShortsContext ? "shorts" : "comment",
+              focusComments: true,
+            }),
+          });
         });
         wrap.appendChild(avatarLink);
       } else {
@@ -8448,7 +8511,13 @@ function buildCommentSheetContext(post, tr, options = {}) {
         authorRow.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          openPublicProfile(post.user_id);
+          openPublicProfile(post.user_id, {
+            entryContext: buildFeedProfileEntryContext({
+              post,
+              source: isShortsContext ? "shorts" : "comment",
+              focusComments: true,
+            }),
+          });
         });
       }
       const nameEl = document.createElement("span");
@@ -9269,7 +9338,11 @@ export function setupPostDetailModal() {
           const userId = `${entryActionBtn.dataset.userId || ""}`.trim();
           if (!userId) return;
           closePostDetail({ syncHash: false });
-          openPublicProfile(userId, { preserveEntryContext: true });
+          openPublicProfile(userId, {
+            preserveEntryContext: true,
+            revealPostId: currentDetailPostId || "",
+            revealTab: currentDetailEntryContext?.tab || "posts",
+          });
         });
       }
       if (entryPrevBtn && entryPrevBtn.dataset.bound !== "true") {
@@ -9489,7 +9562,16 @@ export function renderPostDetail() {
               `${currentDetailEntryContext?.userId || ""}` === targetUserId;
             closePostDetail({ syncHash: false });
             if (!cameFromSameProfile) {
-              openPublicProfile(targetUserId);
+              openPublicProfile(targetUserId, {
+                entryContext: buildFeedProfileEntryContext({
+                  post,
+                  source:
+                    currentDetailEntryContext?.source === "shorts" || isShortsStylePost(post)
+                      ? "shorts"
+                      : "feed",
+                  focusComments: false,
+                }),
+              });
             }
           });
         } else {

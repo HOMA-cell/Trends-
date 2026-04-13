@@ -89,6 +89,8 @@ const publicProfilePostsCache = {
 let publicProfileGallerySignature = "";
 let currentPublicProfileContentTab = "posts";
 let currentPublicProfileEntryContext = null;
+let pendingPublicProfileReveal = null;
+let publicProfileRevealTimer = null;
 const profileCompactCountFormatter =
   typeof Intl !== "undefined"
     ? new Intl.NumberFormat(undefined, {
@@ -147,13 +149,94 @@ function normalizePublicProfileEntryContext(context = {}) {
     notificationType: `${context.notificationType || ""}`.trim(),
     actorName: `${context.actorName || ""}`.trim(),
     actorHandle: `${context.actorHandle || ""}`.trim(),
+    postId: `${context.postId || ""}`.trim(),
+    commentId: `${context.commentId || ""}`.trim(),
+    commentActorId: `${context.commentActorId || ""}`.trim(),
+    commentCreatedAt: `${context.commentCreatedAt || ""}`.trim(),
+    focusComments: !!context.focusComments,
   };
+}
+
+function buildPublicProfileEntryContextFromElement(target) {
+  if (!(target instanceof HTMLElement)) return null;
+  return normalizePublicProfileEntryContext({
+    source: target.dataset.entrySource || "",
+    userId: target.dataset.userId || target.getAttribute("data-user-id") || "",
+    actorName: target.dataset.entryActorName || "",
+    actorHandle: target.dataset.entryActorHandle || "",
+    postId: target.dataset.entryPostId || "",
+    commentId: target.dataset.entryCommentId || "",
+    commentActorId: target.dataset.entryCommentActorId || "",
+    commentCreatedAt: target.dataset.entryCommentCreatedAt || "",
+    focusComments:
+      `${target.dataset.entryFocusComments || ""}`.trim().toLowerCase() === "true",
+  });
+}
+
+function normalizePublicProfileRevealState(reveal = {}) {
+  if (!reveal || typeof reveal !== "object") return null;
+  const userId = `${reveal.userId || ""}`.trim();
+  const postId = `${reveal.postId || reveal.revealPostId || ""}`.trim();
+  const tab = normalizePublicProfileContentTab(reveal.tab || reveal.revealTab || "posts");
+  if (!userId || !postId) return null;
+  return {
+    userId,
+    postId,
+    tab,
+  };
+}
+
+function clearPublicProfileRevealState() {
+  pendingPublicProfileReveal = null;
+  if (publicProfileRevealTimer) {
+    clearTimeout(publicProfileRevealTimer);
+    publicProfileRevealTimer = null;
+  }
+}
+
+function revealPublicProfilePostCard({ userId = "", postId = "", tab = "posts" } = {}) {
+  const normalizedUserId = `${userId || ""}`.trim();
+  const normalizedPostId = `${postId || ""}`.trim();
+  if (!normalizedUserId || !normalizedPostId) return;
+  if (`${getCurrentPublicProfileId() || ""}`.trim() !== normalizedUserId) return;
+  const selectors =
+    tab === "media"
+      ? [
+          `#public-profile-gallery .gallery-item[data-post-id="${normalizedPostId}"]`,
+          `#public-profile-content-rail .public-profile-rail-card[data-post-id="${normalizedPostId}"]`,
+        ]
+      : [
+          `#public-profile-posts-list .public-profile-post-card[data-post-id="${normalizedPostId}"]`,
+          `#public-profile-content-rail .public-profile-rail-card[data-post-id="${normalizedPostId}"]`,
+        ];
+  const target = selectors
+    .map((selector) => document.querySelector(selector))
+    .find(Boolean);
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  target.classList.add("is-revealed");
+  if (publicProfileRevealTimer) {
+    clearTimeout(publicProfileRevealTimer);
+  }
+  publicProfileRevealTimer = setTimeout(() => {
+    target.classList.remove("is-revealed");
+    publicProfileRevealTimer = null;
+  }, 1800);
 }
 
 function buildPublicProfileEntryLabel(context, tr) {
   if (!context) return "";
   if (context.source === "notification" && context.notificationType === "follow") {
     return tr.profileEntryFromFollow || "From follow notification";
+  }
+  if (context.source === "comment") {
+    return tr.profileEntryFromComment || "From discussion";
+  }
+  if (context.source === "shorts") {
+    return tr.profileEntryFromShorts || "From Shorts";
+  }
+  if (context.source === "feed") {
+    return tr.profileEntryFromFeed || "From feed";
   }
   return tr.profileEntryFromNotification || "From notification";
 }
@@ -169,19 +252,79 @@ function buildPublicProfileEntryText(context, { canMessage = false, isFollowing 
         : tr.profileEntryPromptMessage || "Start the conversation with a message";
     return actorDisplay ? `${actorDisplay} · ${prompt}` : prompt;
   }
+  if (context.source === "comment") {
+    return (
+      tr.profileEntryPromptComment ||
+      "Return to the discussion or open the post again."
+    );
+  }
+  if (context.source === "shorts") {
+    return tr.profileEntryPromptShorts || "Jump back to the short you were watching.";
+  }
+  if (context.source === "feed") {
+    return tr.profileEntryPromptFeed || "Go back to the post you opened from feed.";
+  }
   return actorDisplay || "";
+}
+
+function buildPublicProfileEntryAction(context, tr) {
+  if (!context?.postId) return null;
+  if (context.source === "comment") {
+    return {
+      label: tr.profileEntryReturnComment || "Back to comment",
+    };
+  }
+  if (context.source === "shorts") {
+    return {
+      label: tr.profileEntryReturnShorts || "Back to short",
+    };
+  }
+  if (context.source === "feed") {
+    return {
+      label: tr.profileEntryReturnPost || "Back to post",
+    };
+  }
+  return null;
+}
+
+function handlePublicProfileEntryAction(context = {}) {
+  const normalized = normalizePublicProfileEntryContext(context);
+  if (!normalized?.postId) return;
+  const displayName = $("public-profile-name")?.textContent?.trim() || normalized.actorName;
+  const handleText = $("public-profile-handle")?.textContent?.trim() || normalized.actorHandle;
+  setActivePage("feed");
+  requestAnimationFrame(() => {
+    openPostDetail(`${normalized.postId}`, {
+      entryContext: buildPublicProfileDetailEntryContext({
+        userId: normalized.userId,
+        displayName,
+        handle: handleText,
+        tab: getPublicProfileContentTab(),
+      }),
+      focusComments: normalized.focusComments || normalized.source === "comment",
+      focusCommentId: normalized.commentId || "",
+      focusCommentActorId: normalized.commentActorId || "",
+      focusCommentCreatedAt: normalized.commentCreatedAt || "",
+    });
+  });
 }
 
 function renderPublicProfileEntryContext(context, options = {}) {
   const wrap = $("public-profile-entry");
   const label = $("public-profile-entry-label");
   const text = $("public-profile-entry-text");
+  const actionBtn = $("btn-public-profile-entry-action");
   if (!wrap || !label || !text) return;
   if (!context) {
     wrap.classList.add("hidden");
     wrap.setAttribute("aria-hidden", "true");
     label.textContent = "";
     text.textContent = "";
+    if (actionBtn) {
+      actionBtn.classList.add("hidden");
+      actionBtn.onclick = null;
+      actionBtn.textContent = "";
+    }
     return;
   }
   const tr = options.tr || (t[getCurrentLang()] || t.ja);
@@ -193,6 +336,20 @@ function renderPublicProfileEntryContext(context, options = {}) {
     isFollowing: !!options.isFollowing,
     tr,
   });
+  const action = buildPublicProfileEntryAction(context, tr);
+  if (actionBtn) {
+    if (action) {
+      actionBtn.classList.remove("hidden");
+      actionBtn.textContent = action.label;
+      actionBtn.onclick = () => {
+        handlePublicProfileEntryAction(context);
+      };
+    } else {
+      actionBtn.classList.add("hidden");
+      actionBtn.onclick = null;
+      actionBtn.textContent = "";
+    }
+  }
 }
 function normalizeMatchText(value = "") {
   return `${value || ""}`
@@ -1390,6 +1547,7 @@ function renderPublicProfileContentRail(
     const card = document.createElement("button");
     card.type = "button";
     card.className = `public-profile-rail-card is-${normalizedTab}`;
+    card.dataset.postId = `${post?.id || ""}`;
     const entryContext = buildPublicProfileDetailEntryContext({
       userId,
       displayName,
@@ -1835,7 +1993,8 @@ export function setupProfileLinks() {
       if (!link) return;
       const userId = link.getAttribute("data-user-id");
       if (userId) {
-        openPublicProfile(userId);
+        const entryContext = buildPublicProfileEntryContextFromElement(link);
+        openPublicProfile(userId, entryContext ? { entryContext } : {});
       }
     });
   }
@@ -1960,6 +2119,16 @@ export async function openPublicProfile(userId, options = {}) {
   const tr = t[currentLang] || t.ja;
   if (!userId) return;
   const forceCounts = !!options.forceCounts;
+  const revealState = normalizePublicProfileRevealState({
+    userId,
+    postId: options.revealPostId,
+    tab: options.revealTab,
+  });
+  if (revealState) {
+    pendingPublicProfileReveal = revealState;
+  } else {
+    clearPublicProfileRevealState();
+  }
   if (options.entryContext) {
     currentPublicProfileEntryContext = normalizePublicProfileEntryContext({
       ...options.entryContext,
@@ -1979,6 +2148,9 @@ export async function openPublicProfile(userId, options = {}) {
     setPublicPostsVisibleCount(getPublicPostsPageSize());
     setPublicProfileContentTab("posts");
     toggleCollapsibleVisibility("public-profile-details", false);
+  }
+  if (revealState?.tab) {
+    setPublicProfileContentTab(revealState.tab);
   }
 
   const profile = await getProfile(userId);
@@ -2103,6 +2275,24 @@ export async function openPublicProfile(userId, options = {}) {
       : activeContentTab === "workouts"
         ? workoutPosts
         : userPosts;
+  if (
+    revealState &&
+    revealState.tab !== "media" &&
+    revealState.tab === activeContentTab
+  ) {
+    const revealIndex = selectedPosts.findIndex(
+      (post) => `${post?.id || ""}` === revealState.postId
+    );
+    if (revealIndex >= 0) {
+      const requiredVisibleCount = Math.max(
+        getPublicPostsPageSize(),
+        revealIndex + 1
+      );
+      if (requiredVisibleCount > getPublicPostsVisibleCount()) {
+        setPublicPostsVisibleCount(requiredVisibleCount);
+      }
+    }
+  }
   renderPublicProfileContentRail(contentRailEl, selectedPosts, {
     activeTab: activeContentTab,
     displayName,
@@ -2475,7 +2665,23 @@ export async function openPublicProfile(userId, options = {}) {
     galleryEl.dataset.profileHandle = handle || "";
     galleryEl.dataset.profileTab = "media";
   }
+  if (revealState && revealState.tab === "media") {
+    const revealIndex = mediaPosts.findIndex(
+      (post) => `${post?.id || ""}` === revealState.postId
+    );
+    if (revealIndex >= 0) {
+      const galleryPageSize = 9;
+      setGalleryPage(Math.floor(revealIndex / galleryPageSize) + 1);
+    }
+  }
   renderGalleryPage();
+
+  if (revealState) {
+    requestAnimationFrame(() => {
+      revealPublicProfilePostCard(revealState);
+      pendingPublicProfileReveal = null;
+    });
+  }
 
   if (
     (document?.body?.dataset?.page || "") !== "public-profile"

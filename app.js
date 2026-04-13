@@ -274,7 +274,7 @@ import {
       renderOnboardingChecklist: () => renderOnboardingChecklist(),
       renderNotifications: () => renderNotifications(),
       getCurrentPublicProfileId: () => currentPublicProfileId,
-      openPublicProfile: (userId) => openPublicProfile(userId),
+      openPublicProfile: (userId, options = {}) => openPublicProfile(userId, options),
       showToast: (message, tone) => showToast(message, tone),
     });
 
@@ -2163,9 +2163,9 @@ async function loadProfilePostCount() {
           "";
         return activePage === "messages";
       },
-      openPublicProfile: (userId) => {
+      openPublicProfile: (userId, options = {}) => {
         if (typeof openPublicProfile === "function" && userId) {
-          openPublicProfile(userId);
+          openPublicProfile(userId, options);
         }
       },
       openPostDetail: (postId, options = {}) => {
@@ -7093,6 +7093,7 @@ async function loadProfilePostCount() {
         const item = document.createElement("button");
         item.type = "button";
         item.className = "gallery-item";
+        item.dataset.postId = `${post?.id || ""}`;
         const isFeatured = galleryPage === 1 && index === 0 && pagePosts.length >= 3;
         if (isFeatured) item.classList.add("is-featured");
         if (post.media_type === "video") {
