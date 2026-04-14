@@ -483,6 +483,47 @@ function buildPublicProfileStarterMessage(signal, tr) {
     value
   );
 }
+function buildPublicProfileMessageStarter({
+  viewerProfile = null,
+  targetProfile = null,
+  posts = [],
+  workoutLogsByPost = new Map(),
+  tr = t[getCurrentLang()] || t.ja,
+} = {}) {
+  const signals = buildPublicProfileConnectionSignals(viewerProfile, targetProfile, tr);
+  if (signals.length) {
+    return buildPublicProfileStarterMessage(signals[0], tr);
+  }
+
+  const latestPost = (Array.isArray(posts) ? posts : []).find((post) => !!post?.id) || null;
+  if (!latestPost) {
+    return tr.profileEntryPromptMessage || tr.message || "Message";
+  }
+  const logs = workoutLogsByPost.get(latestPost.id) || [];
+  const label = buildProfilePostHeadline(latestPost, logs, tr) || (tr.notificationViewPost || "Post");
+  if (logs.length) {
+    const template =
+      tr.dmStarterFromWorkoutPost ||
+      "Saw your {label} post. What were you focused on in that session?";
+    return template.replace("{label}", label).replace("{preview}", label);
+  }
+  if (latestPost?.media_type === "video") {
+    const template =
+      tr.dmStarterFromVideoPost ||
+      "Saw your video post. What were you working on in that clip?";
+    return template.replace("{preview}", label || (tr.feedViewVideo || "Video"));
+  }
+  if (latestPost?.media_url) {
+    const template =
+      tr.dmStarterFromPhotoPost ||
+      "Saw your photo post. How did that session feel?";
+    return template.replace("{preview}", label || (tr.feedViewPhoto || "Photo"));
+  }
+  const template =
+    tr.dmStarterFromPost ||
+    "Saw your post and wanted to ask about it. How's training going?";
+  return template.replace("{preview}", label || (tr.notificationViewPost || "Post"));
+}
 function renderPublicProfileConnection(targetEl, viewerProfile, targetProfile, tr) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
@@ -589,14 +630,11 @@ function stripPublicProfileReplyPrefix(text = "") {
   if (!normalized) return "";
   return normalized.replace(/^@[A-Za-z0-9._-]+\s+/, "").trim();
 }
-function buildPublicProfileDiscussionPreview(
+function getPublicProfileLatestDiscussionTarget(
   post,
   comments = [],
-  {
-    currentUser = null,
-    entryContext = null,
-    tr = t[getCurrentLang()] || t.ja,
-  } = {}
+  currentUser = null,
+  tr = t[getCurrentLang()] || t.ja
 ) {
   const recentComments = (Array.isArray(comments) ? comments : [])
     .filter((comment) => `${comment?.id || ""}`.trim())
@@ -625,6 +663,44 @@ function buildPublicProfileDiscussionPreview(
     !!latestCommentId &&
     !!latestCommentActorId &&
     `${currentUser.id || ""}` !== latestCommentActorId;
+
+  return {
+    recentComments,
+    latestComment,
+    latestName,
+    latestPreview,
+    latestCommentId,
+    latestCommentActorId,
+    canQuickReply,
+  };
+}
+
+function buildPublicProfileDiscussionPreview(
+  post,
+  comments = [],
+  {
+    currentUser = null,
+    entryContext = null,
+    tr = t[getCurrentLang()] || t.ja,
+  } = {}
+) {
+  const discussionTarget = getPublicProfileLatestDiscussionTarget(
+    post,
+    comments,
+    currentUser,
+    tr
+  );
+  if (!discussionTarget || !post?.id) return null;
+
+  const {
+    recentComments,
+    latestComment,
+    latestName,
+    latestPreview,
+    latestCommentId,
+    latestCommentActorId,
+    canQuickReply,
+  } = discussionTarget;
 
   const socialPreview = document.createElement("button");
   socialPreview.type = "button";
@@ -2064,6 +2140,7 @@ export function setupProfileLinks() {
             partnerId: currentPublicProfileId,
             actorName: messageBtn.dataset.actorName || "",
             actorHandle: messageBtn.dataset.actorHandle || "",
+            prefillMessage: messageBtn.dataset.prefillMessage || "",
           },
         });
       } finally {
@@ -2319,6 +2396,13 @@ export async function openPublicProfile(userId, options = {}) {
   const counts = await loadFollowCountsCached(userId, { force: forceCounts });
   const isFollowing = getFollowingIds().has(userId);
   const canMessage = !!currentUser && currentUser.id !== userId;
+  const smartMessageStarter = buildPublicProfileMessageStarter({
+    viewerProfile: currentProfile,
+    targetProfile: profile,
+    posts,
+    workoutLogsByPost,
+    tr,
+  });
   renderProfileMetaStat(
     followingEl,
     tr.profileFollowing || "Following",
@@ -2361,6 +2445,7 @@ export async function openPublicProfile(userId, options = {}) {
     messageBtn.disabled = !canMessage;
     messageBtn.dataset.actorName = displayName || "";
     messageBtn.dataset.actorHandle = handle || "";
+    messageBtn.dataset.prefillMessage = smartMessageStarter || "";
     messageBtn.classList.toggle(
       "is-entry-highlight",
       !!currentPublicProfileEntryContext &&
@@ -2584,6 +2669,12 @@ export async function openPublicProfile(userId, options = {}) {
         }
         copy.appendChild(headline);
         copy.appendChild(body);
+        const discussionTarget = getPublicProfileLatestDiscussionTarget(
+          post,
+          postComments,
+          currentUser,
+          tr
+        );
         const discussionPreview = buildPublicProfileDiscussionPreview(post, postComments, {
           currentUser,
           entryContext: detailEntryContext,
@@ -2592,7 +2683,41 @@ export async function openPublicProfile(userId, options = {}) {
         if (discussionPreview) {
           copy.appendChild(discussionPreview);
         }
-        footer.appendChild(openHint);
+        const footerActions = document.createElement("div");
+        footerActions.className = "public-profile-post-footer-actions";
+        if (discussionTarget) {
+          const discussionBtn = document.createElement("button");
+          discussionBtn.type = "button";
+          discussionBtn.className = "public-profile-post-discuss";
+          if (discussionTarget.canQuickReply) {
+            discussionBtn.classList.add("is-reply");
+          }
+          discussionBtn.textContent = discussionTarget.canQuickReply
+            ? tr.commentReply || "Reply"
+            : tr.feedOpenDiscussion || "Open discussion";
+          discussionBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            openPostDetail(`${post.id}`, {
+              entryContext: detailEntryContext,
+              focusComments: true,
+              focusCommentId: discussionTarget.latestCommentId,
+              focusCommentActorId: discussionTarget.latestCommentActorId,
+              focusCommentCreatedAt: discussionTarget.latestComment?.created_at || "",
+              replyToCommentId: discussionTarget.canQuickReply
+                ? discussionTarget.latestCommentId
+                : "",
+              replyToCommentActorId: discussionTarget.canQuickReply
+                ? discussionTarget.latestCommentActorId
+                : "",
+              replyToCommentCreatedAt: discussionTarget.canQuickReply
+                ? discussionTarget.latestComment?.created_at || ""
+                : "",
+            });
+          });
+          footerActions.appendChild(discussionBtn);
+        }
+        footerActions.appendChild(openHint);
+        footer.appendChild(footerActions);
         copy.appendChild(footer);
         shell.appendChild(copy);
         if (post.media_url) {

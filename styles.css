@@ -13761,6 +13761,44 @@
   gap: 10px;
   margin-top: 2px;
 }
+.public-profile-post-footer-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.public-profile-post-discuss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(234, 223, 206, 0.94);
+  background: rgba(255, 255, 255, 0.72);
+  color: #5f5346;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease,
+    color 180ms ease;
+}
+.public-profile-post-discuss:hover,
+.public-profile-post-discuss:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(239, 91, 42, 0.28);
+  background: rgba(255, 247, 237, 0.92);
+  color: #c84a26;
+}
+.public-profile-post-discuss.is-reply {
+  border-color: rgba(239, 91, 42, 0.2);
+  background: rgba(239, 91, 42, 0.08);
+  color: #bd4320;
+}
 .public-profile-post-open {
   display: inline-flex;
   align-items: center;
@@ -13900,6 +13938,10 @@
   .public-profile-post-footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .public-profile-post-footer-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
   .public-profile-post-open {
     align-self: flex-start;
