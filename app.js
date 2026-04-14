@@ -2082,6 +2082,7 @@ async function loadProfilePostCount() {
       renderInsights,
       renderOnboardingChecklist,
       openDmShareComposer,
+      openDmConversation,
       openPublicProfile: (userId, options = {}) => {
         if (typeof openPublicProfile === "function" && userId) {
           openPublicProfile(userId, options);

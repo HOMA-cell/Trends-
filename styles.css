@@ -11126,7 +11126,17 @@
     .detail-hero-top {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
+      flex-wrap: wrap;
+    }
+    .detail-hero-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
     .detail-meta {
       display: flex;
@@ -11140,6 +11150,70 @@
     .detail-sub {
       font-size: 11px;
       color: var(--text-sub);
+    }
+    .detail-hero-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(226, 214, 198, 0.96);
+      background: rgba(255, 255, 255, 0.86);
+      color: #5c4c3d;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.74),
+        0 10px 18px rgba(15, 23, 42, 0.04);
+      cursor: pointer;
+      transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background-color 160ms ease,
+        color 160ms ease,
+        box-shadow 160ms ease;
+    }
+    .detail-hero-cta:hover {
+      transform: translateY(-1px);
+      border-color: rgba(228, 87, 46, 0.24);
+      color: #b24d22;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        0 14px 22px rgba(15, 23, 42, 0.08);
+    }
+    .detail-hero-cta:focus-visible {
+      outline: none;
+      border-color: rgba(228, 87, 46, 0.34);
+      box-shadow:
+        0 0 0 3px rgba(239, 91, 42, 0.14),
+        0 14px 24px rgba(15, 23, 42, 0.1);
+    }
+    .detail-hero-cta:disabled {
+      opacity: 0.68;
+      cursor: progress;
+      transform: none;
+    }
+    .detail-hero-cta.is-primary {
+      border-color: rgba(239, 91, 42, 0.18);
+      background: linear-gradient(135deg, rgba(239, 91, 42, 0.98) 0%, rgba(240, 114, 71, 0.96) 100%);
+      color: #fff9f5;
+      box-shadow:
+        0 16px 30px rgba(239, 91, 42, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    .detail-hero-cta.is-primary:hover {
+      color: #fff;
+      border-color: rgba(239, 91, 42, 0.22);
+      box-shadow:
+        0 20px 34px rgba(239, 91, 42, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    }
+    .detail-hero-cta.is-following {
+      border-color: rgba(239, 91, 42, 0.16);
+      background: rgba(255, 243, 237, 0.92);
+      color: #b24d22;
     }
     .detail-hero-stats {
       display: grid;
@@ -11714,6 +11788,19 @@
       .detail-hero {
         padding: 11px;
         border-radius: 20px;
+      }
+      .detail-hero-top {
+        align-items: stretch;
+      }
+      .detail-hero-actions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: stretch;
+      }
+      .detail-hero-cta {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 34px;
       }
       .detail-hero-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));

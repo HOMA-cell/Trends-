@@ -51,6 +51,7 @@ let feedContext = {
   renderOnboardingChecklist: () => {},
   setActivePage: () => {},
   openDmShareComposer: () => {},
+  openDmConversation: async () => false,
   openPublicProfile: () => {},
   onFeedLayoutChange: null,
   openPostModal: () => {},
@@ -92,6 +93,7 @@ const renderInsights = () => feedContext.renderInsights?.();
 const renderOnboardingChecklist = () => feedContext.renderOnboardingChecklist?.();
 const setActivePage = (page) => feedContext.setActivePage?.(page);
 const openPostModal = (...args) => feedContext.openPostModal?.(...args);
+const openDmConversation = (...args) => feedContext.openDmConversation?.(...args);
 const openPublicProfile = (...args) => feedContext.openPublicProfile?.(...args);
 
 const compactNumberFormatters = new Map();
@@ -9616,11 +9618,84 @@ export function renderPostDetail() {
         } else {
           authorButton.disabled = true;
         }
+        const targetUserId = `${post.user_id || ""}`.trim();
+        const currentUserId = `${currentUser?.id || ""}`.trim();
+        const profileHandle =
+          `${post.profile?.handle || post.profile?.username || ""}`.trim();
+        const canMessageAuthor =
+          !!currentUserId && !!targetUserId && currentUserId !== targetUserId;
+        const canFollowAuthor =
+          canMessageAuthor && typeof toggleFollowForUser === "function";
+        const isFollowingAuthor = getFollowingIds().has(targetUserId);
         const hero = document.createElement("div");
         hero.className = "detail-hero";
         const heroTop = document.createElement("div");
         heroTop.className = "detail-hero-top";
         heroTop.appendChild(authorButton);
+        if (canMessageAuthor || canFollowAuthor) {
+          const heroActions = document.createElement("div");
+          heroActions.className = "detail-hero-actions";
+          if (canFollowAuthor) {
+            const followBtn = document.createElement("button");
+            followBtn.type = "button";
+            followBtn.className = "detail-hero-cta";
+            if (isFollowingAuthor) {
+              followBtn.classList.add("is-following");
+            } else {
+              followBtn.classList.add("is-primary");
+            }
+            followBtn.textContent = isFollowingAuthor
+              ? tr.unfollow || "Following"
+              : tr.follow || "Follow";
+            followBtn.setAttribute(
+              "aria-pressed",
+              isFollowingAuthor ? "true" : "false"
+            );
+            followBtn.addEventListener("click", async () => {
+              followBtn.disabled = true;
+              try {
+                await toggleFollowForUser(targetUserId);
+                renderPostDetail();
+              } finally {
+                followBtn.disabled = false;
+              }
+            });
+            heroActions.appendChild(followBtn);
+          }
+          if (canMessageAuthor) {
+            const messageBtn = document.createElement("button");
+            messageBtn.type = "button";
+            messageBtn.className = "detail-hero-cta";
+            messageBtn.textContent = tr.message || "Message";
+            messageBtn.addEventListener("click", async () => {
+              messageBtn.disabled = true;
+              try {
+                closePostDetail({ syncHash: false });
+                await openDmConversation(targetUserId, {
+                  profile: post.profile || null,
+                  entryContext: {
+                    source:
+                      currentDetailEntryContext?.source === "shorts" || isShortsStylePost(post)
+                        ? "shorts"
+                        : "feed",
+                    partnerId: targetUserId,
+                    actorName: displayName,
+                    actorHandle: profileHandle,
+                    postId: `${post.id || ""}`.trim(),
+                    postLabel: getDetailPrimaryActionLabel(post, logs),
+                    previewText:
+                      getCaptionPreviewText(`${post.note || post.caption || ""}`.trim(), 88) ||
+                      getDetailPrimaryActionLabel(post, logs),
+                  },
+                });
+              } finally {
+                messageBtn.disabled = false;
+              }
+            });
+            heroActions.appendChild(messageBtn);
+          }
+          heroTop.appendChild(heroActions);
+        }
         hero.appendChild(heroTop);
 
         const heroStats = document.createElement("div");
