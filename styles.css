@@ -6648,6 +6648,19 @@
       border-bottom: 1px solid #f4eee6;
       background: linear-gradient(180deg, #fff8f4 0%, #fff 100%);
     }
+    .dm-entry-context[data-source="feed"] {
+      background: linear-gradient(180deg, #fff7ef 0%, #fffdf9 100%);
+    }
+    .dm-entry-context[data-source="shorts"] {
+      background: linear-gradient(180deg, #fff6ef 0%, #fffaf6 100%);
+    }
+    .dm-entry-context[data-source="profile"],
+    .dm-entry-context[data-source="public_profile"] {
+      background: linear-gradient(180deg, #f7f9ff 0%, #fff 100%);
+    }
+    .dm-entry-context[data-source="notification"] {
+      background: linear-gradient(180deg, #fff8f4 0%, #fff 100%);
+    }
     .dm-entry-context-copy {
       min-width: 0;
       display: flex;
@@ -6660,6 +6673,16 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: #c86a41;
+    }
+    .dm-entry-context[data-source="feed"] .dm-entry-context-label {
+      color: #d16b34;
+    }
+    .dm-entry-context[data-source="shorts"] .dm-entry-context-label {
+      color: #c45a2a;
+    }
+    .dm-entry-context[data-source="profile"] .dm-entry-context-label,
+    .dm-entry-context[data-source="public_profile"] .dm-entry-context-label {
+      color: #4566c2;
     }
     .dm-entry-context-text {
       min-width: 0;

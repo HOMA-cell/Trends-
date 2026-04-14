@@ -9537,6 +9537,38 @@ export function renderPostDetail() {
               ? tr.feedViewPhoto || "View photo"
               : tr.notificationViewPost || "View post";
 
+      const buildDetailDmStarterMessage = () => {
+        const preview =
+          getCaptionPreviewText(`${post.note || post.caption || ""}`.trim()) ||
+          getDetailPrimaryActionLabel(post, logs);
+        const primaryLift = topNames[0] || "";
+        if (logs.length) {
+          const template =
+            tr.dmStarterFromWorkoutPost ||
+            "Your {label} looked strong. What was the focus for this session?";
+          const label = primaryLift || (tr.feedViewWorkout || "Workout");
+          return template
+            .replace('{label}', label)
+            .replace('{preview}', preview || label);
+        }
+        if (post?.media_type === "video") {
+          const template =
+            tr.dmStarterFromVideoPost ||
+            "Saw your video post. What were you working on in that clip?";
+          return template.replace('{preview}', preview || (tr.feedViewVideo || "Video"));
+        }
+        if (post?.media_url) {
+          const template =
+            tr.dmStarterFromPhotoPost ||
+            "Saw your photo post. How did that session feel?";
+          return template.replace('{preview}', preview || (tr.feedViewPhoto || "Photo"));
+        }
+        const template =
+          tr.dmStarterFromPost ||
+          "Saw your post and wanted to ask about it. How's training going?";
+        return template.replace('{preview}', preview || (tr.notificationViewPost || "Post"));
+      };
+
       const buildDetailRelatedPosts = () => {
         const currentUserId = `${currentUser?.id || ""}`.trim();
         const basePosts = currentDetailEntryContext?.source === "public_profile"
@@ -9686,6 +9718,7 @@ export function renderPostDetail() {
                     previewText:
                       getCaptionPreviewText(`${post.note || post.caption || ""}`.trim(), 88) ||
                       getDetailPrimaryActionLabel(post, logs),
+                    prefillMessage: buildDetailDmStarterMessage(),
                   },
                 });
               } finally {

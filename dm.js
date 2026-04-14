@@ -1224,8 +1224,14 @@ function buildDmEntryLabel(context, tr = getDmTranslations()) {
   if (context.source === "notification") {
     return tr.dmEntryFromNotification || "From notification";
   }
-  if (context.source === "profile") {
+  if (context.source === "profile" || context.source === "public_profile") {
     return tr.dmEntryFromProfile || "From profile";
+  }
+  if (context.source === "feed") {
+    return tr.dmEntryFromFeed || "From feed";
+  }
+  if (context.source === "shorts") {
+    return tr.dmEntryFromShorts || "From shorts";
   }
   return tr.dmConversationInfo || "Info";
 }
@@ -1241,8 +1247,30 @@ function buildDmEntryText(context, tr = getDmTranslations()) {
     }
     return preview || actorDisplay || tr.dmEntryFromNotification || "From notification";
   }
-  if (context.source === "profile") {
-    return actorDisplay || tr.dmOpenProfile || "Open profile";
+  if (context.source === "profile" || context.source === "public_profile") {
+    return (
+      actorDisplay ||
+      tr.dmEntryPromptProfile ||
+      tr.dmOpenProfile ||
+      "Open profile"
+    );
+  }
+  if (context.source === "feed") {
+    if (context.postLabel && preview && preview !== context.postLabel) {
+      return `${context.postLabel} · ${preview}`;
+    }
+    return preview || context.postLabel || tr.dmEntryPromptFeed || "Opened from feed.";
+  }
+  if (context.source === "shorts") {
+    if (context.postLabel && preview && preview !== context.postLabel) {
+      return `${context.postLabel} · ${preview}`;
+    }
+    return (
+      preview ||
+      context.postLabel ||
+      tr.dmEntryPromptShorts ||
+      "Opened from a short."
+    );
   }
   return preview || actorDisplay || "";
 }
@@ -1262,6 +1290,7 @@ function renderDmEntryContext() {
   if (!context) {
     wrap.classList.add("hidden");
     wrap.setAttribute("aria-hidden", "true");
+    delete wrap.dataset.source;
     text.textContent = "";
     openPostBtn.classList.add("hidden");
     openProfileBtn.classList.add("hidden");
@@ -1269,6 +1298,7 @@ function renderDmEntryContext() {
   }
   wrap.classList.remove("hidden");
   wrap.setAttribute("aria-hidden", "false");
+  wrap.dataset.source = `${context.source || ""}`.trim();
   label.textContent = buildDmEntryLabel(context, tr);
   text.textContent = buildDmEntryText(context, tr);
   openPostBtn.classList.toggle("hidden", !context.postId);
