@@ -1248,7 +1248,11 @@ function buildDmEntryText(context, tr = getDmTranslations()) {
     return preview || actorDisplay || tr.dmEntryFromNotification || "From notification";
   }
   if (context.source === "profile" || context.source === "public_profile") {
+    if (preview && actorDisplay) {
+      return `${actorDisplay} · ${preview}`;
+    }
     return (
+      preview ||
       actorDisplay ||
       tr.dmEntryPromptProfile ||
       tr.dmOpenProfile ||

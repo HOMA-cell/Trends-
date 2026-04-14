@@ -483,6 +483,31 @@ function buildPublicProfileStarterMessage(signal, tr) {
     value
   );
 }
+function buildPublicProfilePostMessageStarter(post, logs = [], tr = t[getCurrentLang()] || t.ja) {
+  const label = buildProfilePostHeadline(post, logs, tr) || (tr.notificationViewPost || "Post");
+  if ((Array.isArray(logs) ? logs : []).length) {
+    const template =
+      tr.dmStarterFromWorkoutPost ||
+      "Saw your {label} post. What were you focused on in that session?";
+    return template.replace("{label}", label).replace("{preview}", label);
+  }
+  if (post?.media_type === "video") {
+    const template =
+      tr.dmStarterFromVideoPost ||
+      "Saw your video post. What were you working on in that clip?";
+    return template.replace("{preview}", label || (tr.feedViewVideo || "Video"));
+  }
+  if (post?.media_url) {
+    const template =
+      tr.dmStarterFromPhotoPost ||
+      "Saw your photo post. How did that session feel?";
+    return template.replace("{preview}", label || (tr.feedViewPhoto || "Photo"));
+  }
+  const template =
+    tr.dmStarterFromPost ||
+    "Saw your post and wanted to ask about it. How's training going?";
+  return template.replace("{preview}", label || (tr.notificationViewPost || "Post"));
+}
 function buildPublicProfileMessageStarter({
   viewerProfile = null,
   targetProfile = null,
@@ -500,29 +525,7 @@ function buildPublicProfileMessageStarter({
     return tr.profileEntryPromptMessage || tr.message || "Message";
   }
   const logs = workoutLogsByPost.get(latestPost.id) || [];
-  const label = buildProfilePostHeadline(latestPost, logs, tr) || (tr.notificationViewPost || "Post");
-  if (logs.length) {
-    const template =
-      tr.dmStarterFromWorkoutPost ||
-      "Saw your {label} post. What were you focused on in that session?";
-    return template.replace("{label}", label).replace("{preview}", label);
-  }
-  if (latestPost?.media_type === "video") {
-    const template =
-      tr.dmStarterFromVideoPost ||
-      "Saw your video post. What were you working on in that clip?";
-    return template.replace("{preview}", label || (tr.feedViewVideo || "Video"));
-  }
-  if (latestPost?.media_url) {
-    const template =
-      tr.dmStarterFromPhotoPost ||
-      "Saw your photo post. How did that session feel?";
-    return template.replace("{preview}", label || (tr.feedViewPhoto || "Photo"));
-  }
-  const template =
-    tr.dmStarterFromPost ||
-    "Saw your post and wanted to ask about it. How's training going?";
-  return template.replace("{preview}", label || (tr.notificationViewPost || "Post"));
+  return buildPublicProfilePostMessageStarter(latestPost, logs, tr);
 }
 function renderPublicProfileConnection(targetEl, viewerProfile, targetProfile, tr) {
   if (!targetEl) return;
@@ -2507,6 +2510,7 @@ export async function openPublicProfile(userId, options = {}) {
           handle,
           tab: activeContentTab || "posts",
         });
+        const dmStarterMessage = buildPublicProfilePostMessageStarter(post, logs, tr);
         const likeCount = Number(likesByPost.get(post.id) || 0);
         const postComments = commentsByPost.get(post.id) || [];
         const commentCount = Number(postComments.length || 0);
@@ -2685,6 +2689,33 @@ export async function openPublicProfile(userId, options = {}) {
         }
         const footerActions = document.createElement("div");
         footerActions.className = "public-profile-post-footer-actions";
+        if (canMessage) {
+          const messageBtn = document.createElement("button");
+          messageBtn.type = "button";
+          messageBtn.className = "public-profile-post-message";
+          messageBtn.textContent = tr.message || "Message";
+          messageBtn.setAttribute(
+            "aria-label",
+            `${tr.message || "Message"} ${displayName || handle || ""}`.trim()
+          );
+          messageBtn.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            await openDmConversation(userId, {
+              profile,
+              entryContext: {
+                source: "public_profile",
+                partnerId: userId,
+                actorName: displayName || "",
+                actorHandle: handle || "",
+                postId: `${post?.id || ""}`,
+                postLabel: headlineText,
+                previewText: previewText,
+                prefillMessage: dmStarterMessage,
+              },
+            });
+          });
+          footerActions.appendChild(messageBtn);
+        }
         if (discussionTarget) {
           const discussionBtn = document.createElement("button");
           discussionBtn.type = "button";

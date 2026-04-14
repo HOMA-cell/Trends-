@@ -13799,6 +13799,31 @@
   background: rgba(239, 91, 42, 0.08);
   color: #bd4320;
 }
+.public-profile-post-message {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  background: rgba(17, 24, 39, 0.05);
+  color: #172033;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease,
+    color 180ms ease;
+}
+.public-profile-post-message:hover,
+.public-profile-post-message:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(17, 24, 39, 0.16);
+  background: rgba(17, 24, 39, 0.08);
+  color: #0f172a;
+}
 .public-profile-post-open {
   display: inline-flex;
   align-items: center;
