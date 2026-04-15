@@ -1606,6 +1606,8 @@ function renderPublicProfileContentRail(
     displayName = "",
     handle = "",
     userId = "",
+    profile = null,
+    currentUser = null,
     workoutLogsByPost = new Map(),
     likesByPost = new Map(),
     commentsByPost = new Map(),
@@ -1623,19 +1625,32 @@ function renderPublicProfileContentRail(
   targetEl.classList.remove("hidden");
   visiblePosts.forEach((post, index) => {
     const logs = workoutLogsByPost.get(post.id) || [];
-    const card = document.createElement("button");
-    card.type = "button";
+    const card = document.createElement("article");
     card.className = `public-profile-rail-card is-${normalizedTab}`;
     card.dataset.postId = `${post?.id || ""}`;
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
     const entryContext = buildPublicProfileDetailEntryContext({
       userId,
       displayName,
       handle,
       tab: normalizedTab,
     });
-    card.addEventListener("click", () => {
+    const openRailPost = () => {
       if (!post?.id) return;
       openPostDetail(`${post.id}`, { entryContext });
+    };
+    card.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("button")) return;
+      openRailPost();
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.target instanceof Element && event.target.closest("button") && event.target !== card) {
+        return;
+      }
+      event.preventDefault();
+      openRailPost();
     });
 
     const top = document.createElement("div");
@@ -1666,7 +1681,16 @@ function renderPublicProfileContentRail(
     note.textContent = buildProfilePostPreview(post, logs, tr);
 
     const likeCount = Number(likesByPost.get(post.id) || 0);
-    const commentCount = Number((commentsByPost.get(post.id) || []).length || 0);
+    const postComments = commentsByPost.get(post.id) || [];
+    const commentCount = Number((postComments || []).length || 0);
+    const canMessage = !!currentUser && `${currentUser.id || ""}` !== `${userId || ""}`;
+    const discussionTarget = getPublicProfileLatestDiscussionTarget(
+      post,
+      postComments,
+      currentUser,
+      tr
+    );
+    const railMessageStarter = buildPublicProfilePostMessageStarter(post, logs, tr);
     const stats = document.createElement("div");
     stats.className = "public-profile-rail-stats";
     const statItems = [];
@@ -1741,13 +1765,71 @@ function renderPublicProfileContentRail(
           ? tr.profileContentMediaHint || "Photos and videos"
           : tr.profileContentPostsHint || "Latest posts";
     }
-    const cta = document.createElement("span");
+    const actions = document.createElement("div");
+    actions.className = "public-profile-rail-actions";
+    if (canMessage) {
+      const messageBtn = document.createElement("button");
+      messageBtn.type = "button";
+      messageBtn.className = "public-profile-rail-action is-message";
+      messageBtn.textContent = tr.message || "Message";
+      messageBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await openDmConversation(userId, {
+          profile,
+          entryContext: {
+            source: "public_profile",
+            partnerId: userId,
+            actorName: displayName || "",
+            actorHandle: handle || "",
+            postId: `${post?.id || ""}`,
+            postLabel: buildProfilePostHeadline(post, logs, tr),
+            previewText: buildProfilePostPreview(post, logs, tr),
+            prefillMessage: railMessageStarter,
+          },
+        });
+      });
+      actions.appendChild(messageBtn);
+    }
+    if (discussionTarget) {
+      const discussBtn = document.createElement("button");
+      discussBtn.type = "button";
+      discussBtn.className = "public-profile-rail-action is-discuss";
+      if (discussionTarget.canQuickReply) {
+        discussBtn.classList.add("is-reply");
+      }
+      discussBtn.textContent = discussionTarget.canQuickReply
+        ? tr.commentReply || "Reply"
+        : tr.feedOpenDiscussion || "Open discussion";
+      discussBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openPostDetail(`${post.id}`, {
+          entryContext,
+          focusComments: true,
+          focusCommentId: discussionTarget.latestCommentId,
+          focusCommentActorId: discussionTarget.latestCommentActorId,
+          focusCommentCreatedAt: discussionTarget.latestComment?.created_at || "",
+          replyToCommentId: discussionTarget.canQuickReply ? discussionTarget.latestCommentId : "",
+          replyToCommentActorId: discussionTarget.canQuickReply ? discussionTarget.latestCommentActorId : "",
+          replyToCommentCreatedAt: discussionTarget.canQuickReply
+            ? discussionTarget.latestComment?.created_at || ""
+            : "",
+        });
+      });
+      actions.appendChild(discussBtn);
+    }
+    const cta = document.createElement("button");
+    cta.type = "button";
     cta.className = `public-profile-rail-cta is-${getPublicProfilePostKind(
       post,
       logs
     )}`;
     cta.textContent = getPublicProfilePostCtaLabel(post, logs, tr);
-    bottom.append(meta, cta);
+    cta.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openRailPost();
+    });
+    actions.appendChild(cta);
+    bottom.append(meta, actions);
 
     if (normalizedTab === "media" && post.media_url) {
       const thumb = document.createElement("div");
@@ -2378,6 +2460,8 @@ export async function openPublicProfile(userId, options = {}) {
     displayName,
     handle,
     userId,
+    profile,
+    currentUser,
     workoutLogsByPost,
     likesByPost,
     commentsByPost,
