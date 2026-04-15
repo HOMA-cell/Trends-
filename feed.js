@@ -10474,14 +10474,23 @@ export function renderPostDetail() {
           ? `${formatCompactCount(commentCount)} ${tr.comments || "Comments"}`
           : tr.comments || "Comments";
         summaryCopy.appendChild(summaryTitle);
-        const summarySub = document.createElement("div");
-        summarySub.className = "detail-comments-summary-sub";
         const latestComment = [...comments]
           .sort((a, b) => {
             const aTime = new Date(a?.created_at || 0).getTime();
             const bTime = new Date(b?.created_at || 0).getTime();
             return bTime - aTime;
           })[0];
+        const latestCommentId = `${latestComment?.id || ""}`.trim();
+        const latestCommentActorId = `${latestComment?.user_id || ""}`.trim();
+        const canQuickReplyLatestComment =
+          !!currentUser &&
+          !!latestCommentId &&
+          !!latestCommentActorId &&
+          `${currentUser.id || ""}` !== latestCommentActorId;
+        const summarySub = document.createElement(
+          latestCommentId ? "button" : "div"
+        );
+        summarySub.className = "detail-comments-summary-sub";
         if (latestComment) {
           const latestHandle =
             latestComment.profile?.handle ||
@@ -10498,6 +10507,28 @@ export function renderPostDetail() {
           summarySub.textContent = latestPreview
             ? `${latestName} · ${latestPreview}`
             : latestName;
+          if (summarySub instanceof HTMLButtonElement) {
+            summarySub.type = "button";
+            summarySub.classList.add("is-action");
+            summarySub.setAttribute(
+              "aria-label",
+              canQuickReplyLatestComment
+                ? `${tr.commentReply || "Reply"} ${latestName}`
+                : `${tr.feedOpenDiscussion || "Open discussion"} ${latestName}`
+            );
+            summarySub.addEventListener("click", () => {
+              if (canQuickReplyLatestComment) {
+                setCommentReplyTarget(post.id, latestComment);
+                return;
+              }
+              focusPostDetailComments();
+              if (latestCommentId && typeof window !== "undefined") {
+                window.requestAnimationFrame(() => {
+                  jumpToRenderedComment(latestCommentId, { surface: "detail" });
+                });
+              }
+            });
+          }
         } else {
           summarySub.textContent = tr.commentEmpty || "No comments yet.";
         }
@@ -10513,8 +10544,6 @@ export function renderPostDetail() {
               const userId = `${comment?.user_id || ""}`;
               if (!userId || seenUsers.has(userId) || stack.childNodes.length >= 3) return;
               seenUsers.add(userId);
-              const avatar = document.createElement("div");
-              avatar.className = "avatar detail-comments-stack-avatar";
               const stackHandle =
                 comment.profile?.handle ||
                 comment.profile?.username ||
@@ -10523,13 +10552,35 @@ export function renderPostDetail() {
                 `${comment.profile?.display_name || ""}`.trim() ||
                 formatHandle(stackHandle) ||
                 "@user";
+              const avatarButton = document.createElement("button");
+              avatarButton.type = "button";
+              avatarButton.className = "detail-comments-stack-avatar-button";
+              avatarButton.setAttribute(
+                "aria-label",
+                `${tr.notificationViewProfile || "View profile"} ${stackName}`
+              );
+              avatarButton.addEventListener("click", () => {
+                closePostDetail({ syncHash: false });
+                openPublicProfile(userId, {
+                  entryContext: buildFeedProfileEntryContext({
+                    post,
+                    comment,
+                    source: detailDmSource,
+                    focusComments: true,
+                  }),
+                });
+              });
+              const avatar = document.createElement("div");
+              avatar.className = "avatar detail-comments-stack-avatar";
               renderAvatar(
                 avatar,
                 comment.profile,
                 stackName.replace("@", "").charAt(0).toUpperCase()
               );
               avatar.style.zIndex = `${4 - stack.childNodes.length}`;
-              stack.appendChild(avatar);
+              avatarButton.style.zIndex = `${4 - stack.childNodes.length}`;
+              avatarButton.appendChild(avatar);
+              stack.appendChild(avatarButton);
             });
           if (stack.childNodes.length) {
             summary.appendChild(stack);
@@ -10542,9 +10593,15 @@ export function renderPostDetail() {
           setActionButtonContent(summaryAction, {
             kind: "comment",
             icon: "💬",
-            label: tr.commentReply || "Reply",
+            label: canQuickReplyLatestComment
+              ? tr.commentReply || "Reply"
+              : tr.feedOpenDiscussion || "Open discussion",
           });
           summaryAction.addEventListener("click", () => {
+            if (canQuickReplyLatestComment) {
+              setCommentReplyTarget(post.id, latestComment);
+              return;
+            }
             focusPostDetailComments();
           });
           summary.appendChild(summaryAction);
@@ -10572,6 +10629,7 @@ export function renderPostDetail() {
           const inputWrap = buildCommentComposer(post, tr, currentUser, {
             compact: true,
             submitLabel: tr.commentSubmit || "送信",
+            showQuickReplies: true,
             replyTarget: getCommentReplyTarget(post.id),
             onClearReply: () => clearCommentReplyTarget(post.id),
           });
