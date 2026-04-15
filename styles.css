@@ -11710,6 +11710,7 @@
       flex-wrap: wrap;
       gap: 6px;
       min-width: 0;
+      flex: 1 1 auto;
     }
     .detail-related-insight {
       display: inline-flex;
@@ -11723,10 +11724,21 @@
       font-weight: 700;
       white-space: nowrap;
     }
-    .detail-related-cta {
+    .detail-related-actions {
       margin-left: auto;
       display: inline-flex;
       align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .detail-related-action,
+    .detail-related-cta {
+      appearance: none;
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       min-height: 24px;
       padding: 0 10px;
       border-radius: 999px;
@@ -11737,6 +11749,55 @@
       font-weight: 800;
       white-space: nowrap;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      cursor: pointer;
+      transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background-color 180ms ease,
+        color 180ms ease,
+        box-shadow 180ms ease;
+    }
+    .detail-related-action {
+      margin-left: 0;
+      padding-inline: 9px;
+      background: rgba(255, 255, 255, 0.76);
+      color: #5e5449;
+      box-shadow: none;
+    }
+    .detail-related-action:hover,
+    .detail-related-action:focus-visible,
+    .detail-related-cta:hover,
+    .detail-related-cta:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+    }
+    .detail-related-action.is-message {
+      border-color: rgba(17, 24, 39, 0.1);
+      background: rgba(17, 24, 39, 0.05);
+      color: #172033;
+    }
+    .detail-related-action.is-message:hover,
+    .detail-related-action.is-message:focus-visible {
+      border-color: rgba(17, 24, 39, 0.16);
+      background: rgba(17, 24, 39, 0.08);
+      color: #0f172a;
+    }
+    .detail-related-action.is-discuss:hover,
+    .detail-related-action.is-discuss:focus-visible {
+      border-color: rgba(239, 91, 42, 0.24);
+      background: rgba(255, 247, 237, 0.94);
+      color: #c84a26;
+    }
+    .detail-related-action.is-discuss.is-reply {
+      border-color: rgba(239, 91, 42, 0.2);
+      background: rgba(239, 91, 42, 0.08);
+      color: #bd4320;
+    }
+    .detail-related-cta:hover,
+    .detail-related-cta:focus-visible {
+      border-color: rgba(231, 221, 210, 1);
+      background: rgba(255, 255, 255, 0.98);
+      color: #1f1812;
     }
     .detail-comment-input {
       margin-top: 12px;
@@ -11934,6 +11995,15 @@
       .detail-related-card {
         flex-basis: min(82vw, 234px);
         padding: 11px;
+      }
+      .detail-related-footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .detail-related-actions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
       }
       .detail-related-title {
         font-size: 13px;

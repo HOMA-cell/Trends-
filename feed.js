@@ -9537,12 +9537,15 @@ export function renderPostDetail() {
               ? tr.feedViewPhoto || "View photo"
               : tr.notificationViewPost || "View post";
 
-      const buildDetailDmStarterMessage = () => {
+      const buildDetailDmStarterMessage = (targetPost = post, targetLogs = logs) => {
         const preview =
-          getCaptionPreviewText(`${post.note || post.caption || ""}`.trim()) ||
-          getDetailPrimaryActionLabel(post, logs);
-        const primaryLift = topNames[0] || "";
-        if (logs.length) {
+          getCaptionPreviewText(`${targetPost?.note || targetPost?.caption || ""}`.trim()) ||
+          getDetailPrimaryActionLabel(targetPost, targetLogs);
+        const primaryLift =
+          (Array.isArray(targetLogs) ? targetLogs : [])
+            .map((item) => `${item?.exercise || ""}`.trim())
+            .filter(Boolean)[0] || "";
+        if ((Array.isArray(targetLogs) ? targetLogs : []).length) {
           const template =
             tr.dmStarterFromWorkoutPost ||
             "Your {label} looked strong. What was the focus for this session?";
@@ -9551,13 +9554,13 @@ export function renderPostDetail() {
             .replace('{label}', label)
             .replace('{preview}', preview || label);
         }
-        if (post?.media_type === "video") {
+        if (targetPost?.media_type === "video") {
           const template =
             tr.dmStarterFromVideoPost ||
             "Saw your video post. What were you working on in that clip?";
           return template.replace('{preview}', preview || (tr.feedViewVideo || "Video"));
         }
-        if (post?.media_url) {
+        if (targetPost?.media_url) {
           const template =
             tr.dmStarterFromPhotoPost ||
             "Saw your photo post. How did that session feel?";
@@ -10125,17 +10128,30 @@ export function renderPostDetail() {
                   .filter(Boolean)
                   .join(" · ")
               : candidateBody || previewText || kindLabel;
-            const card = document.createElement("button");
-            card.type = "button";
+            const card = document.createElement("article");
             card.className = "detail-related-card";
+            card.setAttribute("role", "button");
+            card.tabIndex = 0;
             card.setAttribute(
               "aria-label",
               `${getDetailPrimaryActionLabel(candidate, candidateLogs)} ${candidateTitle || previewText || kindLabel}`
             );
-            card.addEventListener("click", () => {
+            const openRelatedPost = () => {
               openPostDetail(candidate.id, currentDetailEntryContext
                 ? { preserveEntryContext: true, entryContext: currentDetailEntryContext }
                 : {});
+            };
+            card.addEventListener("click", (event) => {
+              if (event.target instanceof Element && event.target.closest("button")) return;
+              openRelatedPost();
+            });
+            card.addEventListener("keydown", (event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              if (event.target instanceof Element && event.target.closest("button") && event.target !== card) {
+                return;
+              }
+              event.preventDefault();
+              openRelatedPost();
             });
 
             if (candidate.media_url) {
@@ -10203,10 +10219,24 @@ export function renderPostDetail() {
             footer.className = "detail-related-footer";
             const insights = document.createElement("div");
             insights.className = "detail-related-insights";
+            const candidateComments = commentsByPost.get(candidate.id) || [];
+            const recentCandidateComments = [...candidateComments].sort((a, b) => {
+              const aTime = new Date(a?.created_at || 0).getTime();
+              const bTime = new Date(b?.created_at || 0).getTime();
+              return bTime - aTime;
+            });
+            const latestCandidateComment = recentCandidateComments[0] || null;
+            const latestCandidateCommentId = `${latestCandidateComment?.id || ""}`.trim();
+            const latestCandidateCommentActorId = `${latestCandidateComment?.user_id || ""}`.trim();
+            const canReplyToRelatedComment =
+              !!currentUser &&
+              !!latestCandidateCommentId &&
+              !!latestCandidateCommentActorId &&
+              `${currentUser.id || ""}` !== latestCandidateCommentActorId;
             [
               candidateLogs.length ? `${candidateLogs.length}${tr.workoutExerciseCountLabel || "種目"}` : "",
               likeCount !== undefined ? `${formatCompactCount(Number(likesByPost.get(candidate.id) || 0))} ${tr.likes || "Likes"}` : "",
-              `${formatCompactCount(Number((commentsByPost.get(candidate.id) || []).length || 0))} ${tr.comments || "Comments"}`,
+              `${formatCompactCount(Number(candidateComments.length || 0))} ${tr.comments || "Comments"}`,
             ]
               .filter(Boolean)
               .slice(0, 2)
@@ -10217,10 +10247,80 @@ export function renderPostDetail() {
                 insights.appendChild(item);
               });
             footer.appendChild(insights);
-            const cta = document.createElement("span");
+            const actions = document.createElement("div");
+            actions.className = "detail-related-actions";
+            const candidateUserId = `${candidate.user_id || ""}`.trim();
+            const canMessageRelatedAuthor =
+              !!currentUserId &&
+              !!candidateUserId &&
+              currentUserId !== candidateUserId;
+            if (canMessageRelatedAuthor) {
+              const messageBtn = document.createElement("button");
+              messageBtn.type = "button";
+              messageBtn.className = "detail-related-action is-message";
+              messageBtn.textContent = tr.message || "Message";
+              messageBtn.addEventListener("click", async (event) => {
+                event.stopPropagation();
+                await openDmConversation(candidateUserId, {
+                  profile: candidate.profile || null,
+                  entryContext: {
+                    source:
+                      currentDetailEntryContext?.source === "shorts" || isShortsStylePost(candidate)
+                        ? "shorts"
+                        : "feed",
+                    partnerId: candidateUserId,
+                    actorName:
+                      `${candidate.profile?.display_name || ""}`.trim() ||
+                      formatHandle(candidate.profile?.handle || candidate.profile?.username || "user"),
+                    actorHandle:
+                      `${candidate.profile?.handle || candidate.profile?.username || ""}`.trim(),
+                    postId: `${candidate.id || ""}`.trim(),
+                    postLabel: getDetailPrimaryActionLabel(candidate, candidateLogs),
+                    previewText:
+                      getCaptionPreviewText(`${candidate.note || candidate.caption || ""}`.trim(), 88) ||
+                      getDetailPrimaryActionLabel(candidate, candidateLogs),
+                    prefillMessage: buildDetailDmStarterMessage(candidate, candidateLogs),
+                  },
+                });
+              });
+              actions.appendChild(messageBtn);
+            }
+            if (latestCandidateCommentId) {
+              const discussBtn = document.createElement("button");
+              discussBtn.type = "button";
+              discussBtn.className = "detail-related-action is-discuss";
+              if (canReplyToRelatedComment) discussBtn.classList.add("is-reply");
+              discussBtn.textContent = canReplyToRelatedComment
+                ? tr.commentReply || "Reply"
+                : tr.feedOpenDiscussion || "Open discussion";
+              discussBtn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                openPostDetail(candidate.id, {
+                  preserveEntryContext: true,
+                  entryContext: currentDetailEntryContext || null,
+                  focusComments: true,
+                  focusCommentId: latestCandidateCommentId,
+                  focusCommentActorId: latestCandidateCommentActorId,
+                  focusCommentCreatedAt: latestCandidateComment?.created_at || "",
+                  replyToCommentId: canReplyToRelatedComment ? latestCandidateCommentId : "",
+                  replyToCommentActorId: canReplyToRelatedComment ? latestCandidateCommentActorId : "",
+                  replyToCommentCreatedAt: canReplyToRelatedComment
+                    ? latestCandidateComment?.created_at || ""
+                    : "",
+                });
+              });
+              actions.appendChild(discussBtn);
+            }
+            const cta = document.createElement("button");
+            cta.type = "button";
             cta.className = "detail-related-cta";
             cta.textContent = getDetailPrimaryActionLabel(candidate, candidateLogs);
-            footer.appendChild(cta);
+            cta.addEventListener("click", (event) => {
+              event.stopPropagation();
+              openRelatedPost();
+            });
+            actions.appendChild(cta);
+            footer.appendChild(actions);
             body.appendChild(footer);
             card.appendChild(body);
             relatedEl.appendChild(card);
