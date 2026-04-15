@@ -11330,6 +11330,62 @@
       grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
       gap: 8px;
     }
+    .detail-hero-starters {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .detail-hero-starters-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #8a6b55;
+    }
+    .detail-hero-starter-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .detail-hero-starter {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(239, 91, 42, 0.16);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 239, 0.92));
+      color: #9f4522;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      cursor: pointer;
+      transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background-color 180ms ease,
+        color 180ms ease,
+        box-shadow 180ms ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+    .detail-hero-starter:hover,
+    .detail-hero-starter:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(239, 91, 42, 0.26);
+      background: linear-gradient(180deg, rgba(255, 251, 247, 1), rgba(255, 244, 233, 0.96));
+      color: #bf4a22;
+      box-shadow: 0 12px 20px rgba(239, 91, 42, 0.12);
+    }
+    .detail-hero-starter:disabled {
+      opacity: 0.64;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
     .detail-section-nav {
       display: flex;
       align-items: center;
@@ -11975,6 +12031,14 @@
       }
       .detail-hero-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .detail-hero-starter-list {
+        gap: 7px;
+      }
+      .detail-hero-starter {
+        min-height: 28px;
+        padding-inline: 11px;
+        font-size: 10px;
       }
       .detail-section-nav {
         gap: 6px;

@@ -9571,6 +9571,111 @@ export function renderPostDetail() {
           "Saw your post and wanted to ask about it. How's training going?";
         return template.replace('{preview}', preview || (tr.notificationViewPost || "Post"));
       };
+      const detailDmSource =
+        currentDetailEntryContext?.source === "shorts" || isShortsStylePost(post)
+          ? "shorts"
+          : "feed";
+      const buildDetailDmEntryContext = (prefillMessage = buildDetailDmStarterMessage()) => ({
+        source: detailDmSource,
+        partnerId: targetUserId,
+        actorName: displayName,
+        actorHandle: profileHandle,
+        postId: `${post.id || ""}`.trim(),
+        postLabel: getDetailPrimaryActionLabel(post, logs),
+        previewText:
+          getCaptionPreviewText(`${post.note || post.caption || ""}`.trim(), 88) ||
+          getDetailPrimaryActionLabel(post, logs),
+        prefillMessage,
+      });
+      const openDetailConversation = async (prefillMessage = buildDetailDmStarterMessage()) => {
+        closePostDetail({ syncHash: false });
+        await openDmConversation(targetUserId, {
+          profile: post.profile || null,
+          entryContext: buildDetailDmEntryContext(prefillMessage),
+        });
+      };
+      const buildDetailConversationStarters = () => {
+        const isJa = getCurrentLang() === "ja";
+        const preview =
+          getCaptionPreviewText(`${post.note || post.caption || ""}`.trim(), 72) ||
+          getDetailPrimaryActionLabel(post, logs);
+        const primaryLift = topNames[0] || "";
+        const starters = [];
+        if (logs.length) {
+          starters.push({
+            label: isJa ? "このメニュー気になる" : "Ask about workout",
+            message: primaryLift
+              ? `${primaryLift}の流れいいですね。特に何を意識したワークアウトでしたか？`
+              : `${preview}気になりました。今回のワークアウトで一番意識したことは何でしたか？`,
+          });
+          if (topWeight > 0) {
+            starters.push({
+              label: isJa ? "ベスト重量を聞く" : "Ask about best lift",
+              message: `${formatWeight(topWeight)}すごいですね。そこまで伸びたきっかけやコツがあれば聞きたいです。`,
+            });
+          }
+          starters.push({
+            label: isJa ? "最近の調子を聞く" : "Ask about training",
+            message: isJa
+              ? "最近のトレーニングの流れ、かなり良さそうですね。今いちばん伸ばしたいところってどこですか？"
+              : "Training looks like it's going well. What are you most focused on improving right now?",
+          });
+          return starters.slice(0, 3);
+        }
+        if (post?.media_type === "video") {
+          starters.push(
+            {
+              label: isJa ? "この動画について聞く" : "Ask about the clip",
+              message: isJa
+                ? `${preview}見ました。あの動画で特に意識していたポイントってありますか？`
+                : `Saw your clip: ${preview}. What were you focused on in that video?`,
+            },
+            {
+              label: isJa ? "フォームを聞く" : "Ask about form",
+              message: isJa
+                ? "動きがかなり良かったです。フォームで意識していることがあれば聞きたいです。"
+                : "The movement looked really clean. Is there anything specific you focus on with your form?",
+            }
+          );
+        } else if (post?.media_url) {
+          starters.push(
+            {
+              label: isJa ? "この日のこと聞く" : "Ask about the session",
+              message: isJa
+                ? `${preview}気になりました。この日のトレーニングってどんな感じでしたか？`
+                : `Saw your post: ${preview}. What was that session like?`,
+            },
+            {
+              label: isJa ? "最近の調子を聞く" : "Ask about training",
+              message: isJa
+                ? "最近のトレーニングの雰囲気すごく良いですね。今どこを伸ばしたいですか？"
+                : "Your recent training looks strong. What are you trying to improve most right now?",
+            }
+          );
+        } else {
+          starters.push(
+            {
+              label: isJa ? "この投稿について聞く" : "Ask about the post",
+              message: isJa
+                ? `${preview}の話、もう少し聞いてみたいです。最近のトレーニングで一番変わったことって何ですか？`
+                : `Wanted to ask about "${preview}". What's changed most in your training lately?`,
+            },
+            {
+              label: isJa ? "最近の調子を聞く" : "Ask about training",
+              message: isJa
+                ? "最近のトレーニング、かなり良さそうですね。いま一番楽しい種目って何ですか？"
+                : "Training looks like it's going well. What's the most fun lift for you right now?",
+            }
+          );
+        }
+        starters.push({
+          label: isJa ? "気軽に話しかける" : "Say hi",
+          message: isJa
+            ? "投稿いつもいいですね。最近のトレーニングの雰囲気どうですか？"
+            : "Really liked your post. How has training been feeling lately?",
+        });
+        return starters.slice(0, 3);
+      };
 
       const buildDetailRelatedPosts = () => {
         const currentUserId = `${currentUser?.id || ""}`.trim();
@@ -9705,25 +9810,7 @@ export function renderPostDetail() {
             messageBtn.addEventListener("click", async () => {
               messageBtn.disabled = true;
               try {
-                closePostDetail({ syncHash: false });
-                await openDmConversation(targetUserId, {
-                  profile: post.profile || null,
-                  entryContext: {
-                    source:
-                      currentDetailEntryContext?.source === "shorts" || isShortsStylePost(post)
-                        ? "shorts"
-                        : "feed",
-                    partnerId: targetUserId,
-                    actorName: displayName,
-                    actorHandle: profileHandle,
-                    postId: `${post.id || ""}`.trim(),
-                    postLabel: getDetailPrimaryActionLabel(post, logs),
-                    previewText:
-                      getCaptionPreviewText(`${post.note || post.caption || ""}`.trim(), 88) ||
-                      getDetailPrimaryActionLabel(post, logs),
-                    prefillMessage: buildDetailDmStarterMessage(),
-                  },
-                });
+                await openDetailConversation(buildDetailDmStarterMessage());
               } finally {
                 messageBtn.disabled = false;
               }
@@ -9786,6 +9873,42 @@ export function renderPostDetail() {
           });
         if (heroStats.childNodes.length) {
           hero.appendChild(heroStats);
+        }
+        if (canMessageAuthor) {
+          const starters = buildDetailConversationStarters();
+          if (starters.length) {
+            const starterBlock = document.createElement("div");
+            starterBlock.className = "detail-hero-starters";
+            const starterLabel = document.createElement("div");
+            starterLabel.className = "detail-hero-starters-label";
+            starterLabel.textContent =
+              getCurrentLang() === "ja"
+                ? "この投稿から話しかける"
+                : "Start from this post";
+            const starterList = document.createElement("div");
+            starterList.className = "detail-hero-starter-list";
+            starters.forEach((starter) => {
+              const starterBtn = document.createElement("button");
+              starterBtn.type = "button";
+              starterBtn.className = "detail-hero-starter";
+              starterBtn.textContent = starter.label;
+              starterBtn.setAttribute(
+                "aria-label",
+                `${tr.message || "Message"} · ${starter.label}`
+              );
+              starterBtn.addEventListener("click", async () => {
+                starterBtn.disabled = true;
+                try {
+                  await openDetailConversation(starter.message);
+                } finally {
+                  starterBtn.disabled = false;
+                }
+              });
+              starterList.appendChild(starterBtn);
+            });
+            starterBlock.append(starterLabel, starterList);
+            hero.appendChild(starterBlock);
+          }
         }
         const sectionNav = document.createElement("div");
         sectionNav.className = "detail-section-nav";
