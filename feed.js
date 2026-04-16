@@ -9754,16 +9754,6 @@ export function renderPostDetail() {
           getDetailPrimaryActionLabel(post, logs);
         const primaryLift = topNames[0] || "";
         const starters = [];
-        if (detailConnectionSignals.length) {
-          const primarySignal = detailConnectionSignals[0];
-          const starterMessage = buildDetailConnectionStarter(primarySignal, tr);
-          if (starterMessage) {
-            starters.push({
-              label: primarySignal.label,
-              message: starterMessage,
-            });
-          }
-        }
         if (logs.length) {
           starters.push({
             label: isJa ? "このメニュー気になる" : "Ask about workout",
@@ -10044,13 +10034,29 @@ export function renderPostDetail() {
           connectionTitle.className = "detail-hero-connection-title";
           connectionTitle.textContent =
             tr.profileConnectionTitle || "Why you might connect";
+          const connectionNote = document.createElement("div");
+          connectionNote.className = "detail-hero-connection-note";
+          connectionNote.textContent =
+            tr.profileConnectionNote ||
+            "Shared context makes it easier to start a conversation.";
           const connectionList = document.createElement("div");
           connectionList.className = "detail-hero-connection-list";
           detailConnectionSignals.forEach((signal) => {
-            const chip = document.createElement("div");
+            const chip = document.createElement("button");
+            chip.type = "button";
             chip.className = `detail-hero-connection-chip${
               signal.accent ? ` is-${signal.accent}` : ""
             }`;
+            chip.setAttribute(
+              "aria-label",
+              `${tr.message || "Message"} · ${signal.label} ${signal.value}`.trim()
+            );
+            chip.addEventListener("click", async () => {
+              const starterMessage =
+                buildDetailConnectionStarter(signal, tr) ||
+                buildDetailDmStarterMessage();
+              await openDetailConversation(starterMessage);
+            });
             const label = document.createElement("span");
             label.className = "detail-hero-connection-chip-label";
             label.textContent = signal.label;
@@ -10060,7 +10066,7 @@ export function renderPostDetail() {
             chip.append(label, value);
             connectionList.appendChild(chip);
           });
-          connectionBlock.append(connectionTitle, connectionList);
+          connectionBlock.append(connectionTitle, connectionNote, connectionList);
           hero.appendChild(connectionBlock);
         }
         if (canMessageAuthor) {
