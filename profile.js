@@ -1657,6 +1657,77 @@ function updatePublicProfileActionDock(
   }
   dockEl.classList.remove("hidden");
 }
+function updatePublicProfileActionDockContext(
+  {
+    contextLead = null,
+    userId = "",
+    displayName = "",
+    handle = "",
+    currentUser = null,
+    commentsByPost = new Map(),
+    tr = t[getCurrentLang()] || t.ja,
+  } = {}
+) {
+  const wrap = $("public-profile-action-dock-context");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const post = contextLead?.post || null;
+  if (!post?.id) {
+    wrap.classList.add("hidden");
+    return;
+  }
+  const logs = contextLead?.logs || [];
+  const entryContext = buildPublicProfileDetailEntryContext({
+    userId,
+    displayName,
+    handle,
+    tab: contextLead?.tab || getPublicProfileContentTab(),
+  });
+  const viewBtn = document.createElement("button");
+  viewBtn.type = "button";
+  viewBtn.className = "public-profile-action-dock-context-action";
+  viewBtn.textContent = getPublicProfilePostCtaLabel(post, logs, tr);
+  viewBtn.addEventListener("click", () => {
+    openPostDetail(`${post.id}`, { entryContext });
+  });
+  wrap.appendChild(viewBtn);
+
+  const discussionTarget = getPublicProfileLatestDiscussionTarget(
+    post,
+    commentsByPost.get(post.id) || [],
+    currentUser,
+    tr
+  );
+  if (discussionTarget) {
+    const discussBtn = document.createElement("button");
+    discussBtn.type = "button";
+    discussBtn.className = "public-profile-action-dock-context-action is-discuss";
+    discussBtn.textContent = discussionTarget.canQuickReply
+      ? tr.commentReply || "Reply"
+      : tr.feedOpenDiscussion || "Open discussion";
+    discussBtn.addEventListener("click", () => {
+      openPostDetail(`${post.id}`, {
+        entryContext,
+        focusComments: true,
+        focusCommentId: discussionTarget.latestCommentId,
+        focusCommentActorId: discussionTarget.latestCommentActorId,
+        focusCommentCreatedAt: discussionTarget.latestComment?.created_at || "",
+        replyToCommentId: discussionTarget.canQuickReply
+          ? discussionTarget.latestCommentId
+          : "",
+        replyToCommentActorId: discussionTarget.canQuickReply
+          ? discussionTarget.latestCommentActorId
+          : "",
+        replyToCommentCreatedAt: discussionTarget.canQuickReply
+          ? discussionTarget.latestComment?.created_at || ""
+          : "",
+      });
+    });
+    wrap.appendChild(discussBtn);
+  }
+
+  wrap.classList.remove("hidden");
+}
 
 function renderPublicProfileContentRail(
   targetEl,
@@ -2504,6 +2575,15 @@ export async function openPublicProfile(userId, options = {}) {
       workouts: workoutPosts.length,
     },
     contextLead,
+    tr,
+  });
+  updatePublicProfileActionDockContext({
+    contextLead,
+    userId,
+    displayName,
+    handle,
+    currentUser,
+    commentsByPost,
     tr,
   });
   if (
