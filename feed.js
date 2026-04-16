@@ -35,6 +35,7 @@ let feedContext = {
   getProfilesForUsers: async () => new Map(),
   toggleFollowForUser: async () => {},
   loadFollowStats: async () => {},
+  getCurrentProfile: () => null,
   getFollowingIds: () => new Set(),
   getLikedPostIds: () => new Set(),
   setLikedPostIds: () => {},
@@ -78,6 +79,7 @@ const getProfilesForUsers = (...args) =>
   feedContext.getProfilesForUsers?.(...args) || new Map();
 const toggleFollowForUser = (...args) => feedContext.toggleFollowForUser?.(...args);
 const loadFollowStats = (...args) => feedContext.loadFollowStats?.(...args);
+const getCurrentProfile = () => feedContext.getCurrentProfile?.() || null;
 const getFollowingIds = () => feedContext.getFollowingIds?.() || new Set();
 const getLikedPostIds = () => feedContext.getLikedPostIds?.() || new Set();
 const getLikesByPost = () => feedContext.getLikesByPost?.() || new Map();
@@ -147,6 +149,152 @@ function buildFeedProfileEntryContext({
     commentCreatedAt: `${comment?.created_at || ""}`.trim(),
     focusComments: !!focusComments || !!comment,
   };
+}
+
+function normalizeDetailProfileText(value = "") {
+  return `${value || ""}`
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function extractDetailProfileTerms(value = "") {
+  return Array.from(
+    new Set(
+      `${value || ""}`
+        .split(/[,\n/・|]+/)
+        .map((item) => `${item || ""}`.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function formatDetailExperience(value, tr) {
+  if (!value) return "";
+  const map = {
+    beginner: tr.experienceBeginner || "Beginner",
+    intermediate: tr.experienceIntermediate || "Intermediate",
+    advanced: tr.experienceAdvanced || "Advanced",
+    pro: tr.experiencePro || "Competitive",
+  };
+  return map[value] || value;
+}
+
+function buildDetailConnectionSignals(viewerProfile, targetProfile, tr) {
+  if (!viewerProfile || !targetProfile) return [];
+  const signals = [];
+  const pushSignal = (label, value, accent = "") => {
+    const text = `${value || ""}`.trim();
+    if (!label || !text) return;
+    signals.push({ label, value: text, accent });
+  };
+
+  if (
+    normalizeDetailProfileText(viewerProfile.training_goal) &&
+    normalizeDetailProfileText(viewerProfile.training_goal) ===
+      normalizeDetailProfileText(targetProfile.training_goal)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameGoal || "Similar goal",
+      targetProfile.training_goal,
+      "goal"
+    );
+  }
+  if (
+    normalizeDetailProfileText(viewerProfile.gym) &&
+    normalizeDetailProfileText(viewerProfile.gym) ===
+      normalizeDetailProfileText(targetProfile.gym)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameGym || "Same gym",
+      targetProfile.gym,
+      "gym"
+    );
+  }
+  if (
+    normalizeDetailProfileText(viewerProfile.training_split) &&
+    normalizeDetailProfileText(viewerProfile.training_split) ===
+      normalizeDetailProfileText(targetProfile.training_split)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameSplit || "Same split",
+      targetProfile.training_split,
+      "split"
+    );
+  }
+  if (
+    normalizeDetailProfileText(viewerProfile.experience_level) &&
+    normalizeDetailProfileText(viewerProfile.experience_level) ===
+      normalizeDetailProfileText(targetProfile.experience_level)
+  ) {
+    pushSignal(
+      tr.profileConnectionSameExperience || "Similar experience",
+      formatDetailExperience(targetProfile.experience_level, tr),
+      "experience"
+    );
+  }
+
+  const viewerFavoriteSet = new Set(
+    extractDetailProfileTerms(viewerProfile.favorite_lifts).map((term) =>
+      normalizeDetailProfileText(term)
+    )
+  );
+  const targetFavoriteTerms = extractDetailProfileTerms(targetProfile.favorite_lifts);
+  const sharedFavoriteTerms = targetFavoriteTerms.filter((term) =>
+    viewerFavoriteSet.has(normalizeDetailProfileText(term))
+  );
+  if (sharedFavoriteTerms.length) {
+    const preview =
+      sharedFavoriteTerms.slice(0, 2).join(" · ") +
+      (sharedFavoriteTerms.length > 2 ? ` +${sharedFavoriteTerms.length - 2}` : "");
+    pushSignal(
+      tr.profileConnectionSharedLifts || "Shared lifts",
+      preview,
+      "lifts"
+    );
+  }
+
+  return signals.slice(0, 3);
+}
+
+function buildDetailConnectionStarter(signal, tr) {
+  const label = `${signal?.label || ""}`.trim();
+  const value = `${signal?.value || ""}`.trim();
+  if (!label || !value) return "";
+  if (label === (tr.profileConnectionSameGoal || "Similar goal")) {
+    return (tr.profileConnectionStarterGoal || "同じ目標ですね。最近どんなメニューを組んでますか？").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSameGym || "Same gym")) {
+    return (tr.profileConnectionStarterGym || "{value}仲間ですね。最近よくやる種目ありますか？").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSameSplit || "Same split")) {
+    return (tr.profileConnectionStarterSplit || "{value}で回してるんですね。最近の当たりメニュー知りたいです。").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSameExperience || "Similar experience")) {
+    return (tr.profileConnectionStarterExperience || "近い経験レベルですね。今いちばん伸ばしたいところはどこですか？").replace(
+      "{value}",
+      value
+    );
+  }
+  if (label === (tr.profileConnectionSharedLifts || "Shared lifts")) {
+    return (tr.profileConnectionStarterLifts || "{value}好きなの同じですね。最近のベストやコツがあれば聞きたいです。").replace(
+      "{value}",
+      value
+    );
+  }
+  return (tr.profileConnectionStarterDefault || "{value}つながりで話しかけました。最近ハマってるトレーニングありますか？").replace(
+    "{value}",
+    value
+  );
 }
 
 function applyProfileEntryDataset(target, context) {
@@ -9536,6 +9684,11 @@ export function renderPostDetail() {
             : candidatePost?.media_url
               ? tr.feedViewPhoto || "View photo"
               : tr.notificationViewPost || "View post";
+      const detailConnectionSignals = buildDetailConnectionSignals(
+        getCurrentProfile(),
+        post.profile || null,
+        tr
+      );
 
       const buildDetailDmStarterMessage = (targetPost = post, targetLogs = logs) => {
         const preview =
@@ -9601,6 +9754,16 @@ export function renderPostDetail() {
           getDetailPrimaryActionLabel(post, logs);
         const primaryLift = topNames[0] || "";
         const starters = [];
+        if (detailConnectionSignals.length) {
+          const primarySignal = detailConnectionSignals[0];
+          const starterMessage = buildDetailConnectionStarter(primarySignal, tr);
+          if (starterMessage) {
+            starters.push({
+              label: primarySignal.label,
+              message: starterMessage,
+            });
+          }
+        }
         if (logs.length) {
           starters.push({
             label: isJa ? "このメニュー気になる" : "Ask about workout",
@@ -9873,6 +10036,32 @@ export function renderPostDetail() {
           });
         if (heroStats.childNodes.length) {
           hero.appendChild(heroStats);
+        }
+        if (canMessageAuthor && detailConnectionSignals.length) {
+          const connectionBlock = document.createElement("div");
+          connectionBlock.className = "detail-hero-connection";
+          const connectionTitle = document.createElement("div");
+          connectionTitle.className = "detail-hero-connection-title";
+          connectionTitle.textContent =
+            tr.profileConnectionTitle || "Why you might connect";
+          const connectionList = document.createElement("div");
+          connectionList.className = "detail-hero-connection-list";
+          detailConnectionSignals.forEach((signal) => {
+            const chip = document.createElement("div");
+            chip.className = `detail-hero-connection-chip${
+              signal.accent ? ` is-${signal.accent}` : ""
+            }`;
+            const label = document.createElement("span");
+            label.className = "detail-hero-connection-chip-label";
+            label.textContent = signal.label;
+            const value = document.createElement("span");
+            value.className = "detail-hero-connection-chip-value";
+            value.textContent = signal.value;
+            chip.append(label, value);
+            connectionList.appendChild(chip);
+          });
+          connectionBlock.append(connectionTitle, connectionList);
+          hero.appendChild(connectionBlock);
         }
         if (canMessageAuthor) {
           const starters = buildDetailConversationStarters();

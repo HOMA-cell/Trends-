@@ -2062,6 +2062,7 @@ async function loadProfilePostCount() {
       getProfilesForUsers: loadProfilesForUsers,
       toggleFollowForUser,
       loadFollowStats,
+      getCurrentProfile: () => currentProfile,
       getFollowingIds: () => followingIds,
       getLikedPostIds: () => likedPostIds,
       setLikedPostIds: (set) => {
