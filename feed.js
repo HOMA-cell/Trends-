@@ -9898,6 +9898,68 @@ export function renderPostDetail() {
           .filter((candidate) => `${candidate?.id || ""}` !== `${post.id || ""}`)
           .slice(0, 4);
       };
+      const buildDetailAuthorMomentum = () => {
+        const currentUserId = `${currentUser?.id || ""}`.trim();
+        const authorPosts = (getAllPosts() || [])
+          .filter((candidate) => {
+            if (!candidate) return false;
+            if (`${candidate.user_id || ""}` !== `${post.user_id || ""}`) return false;
+            if (
+              candidate.visibility === "private" &&
+              `${candidate.user_id || ""}` !== currentUserId
+            ) {
+              return false;
+            }
+            return true;
+          })
+          .sort((a, b) => {
+            const pinDiff =
+              Number(isPinnedPostForUser(b.id, b.user_id)) -
+              Number(isPinnedPostForUser(a.id, a.user_id));
+            if (pinDiff) return pinDiff;
+            return (
+              new Date(b?.date || b?.created_at || 0).getTime() -
+              new Date(a?.date || a?.created_at || 0).getTime()
+            );
+          });
+        if (!authorPosts.length) return null;
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const recentPosts = authorPosts.filter((candidate) => {
+          const time = new Date(candidate?.date || candidate?.created_at || 0).getTime();
+          return Number.isFinite(time) && time >= sevenDaysAgo;
+        });
+        const mediaPosts = authorPosts.filter((candidate) => !!candidate?.media_url);
+        const workoutPosts = authorPosts.filter((candidate) => {
+          const candidateLogs = workoutLogsByPost.get(candidate.id) || [];
+          return candidateLogs.length > 0;
+        });
+        return {
+          total: authorPosts.length,
+          latestText:
+            formatRelative(authorPosts[0]?.date || authorPosts[0]?.created_at || "") ||
+            formatDateDisplay(authorPosts[0]?.date || authorPosts[0]?.created_at || ""),
+          items: [
+            {
+              tab: "posts",
+              label: tr.profileQuickPosts7d || "Posts (7d)",
+              value: formatCompactCount(recentPosts.length),
+              isActive: !post.media_url && !logs.length,
+            },
+            {
+              tab: "media",
+              label: tr.profileTabMedia || "Media",
+              value: formatCompactCount(mediaPosts.length),
+              isActive: !!post.media_url,
+            },
+            {
+              tab: "workouts",
+              label: tr.profileTabWorkouts || "Workouts",
+              value: formatCompactCount(workoutPosts.length),
+              isActive: !!logs.length,
+            },
+          ],
+        };
+      };
 
       if (headerEl) {
         headerEl.innerHTML = "";
@@ -10068,6 +10130,44 @@ export function renderPostDetail() {
           });
         if (heroStats.childNodes.length) {
           hero.appendChild(heroStats);
+        }
+        const detailAuthorMomentum = buildDetailAuthorMomentum();
+        if (targetUserId && detailAuthorMomentum?.total) {
+          const momentumBlock = document.createElement("div");
+          momentumBlock.className = "detail-hero-momentum";
+          const momentumCopy = document.createElement("div");
+          momentumCopy.className = "detail-hero-momentum-copy";
+          const momentumKicker = document.createElement("div");
+          momentumKicker.className = "detail-hero-momentum-kicker";
+          momentumKicker.textContent = tr.profileSpotlightTitle || "Recent momentum";
+          const momentumTitle = document.createElement("div");
+          momentumTitle.className = "detail-hero-momentum-title";
+          momentumTitle.textContent = detailAuthorMomentum.latestText
+            ? `${tr.profileSpotlightLatest || "Latest post"} · ${detailAuthorMomentum.latestText}`
+            : tr.profileContentPostsHint || "Latest posts";
+          momentumCopy.append(momentumKicker, momentumTitle);
+          const momentumList = document.createElement("div");
+          momentumList.className = "detail-hero-momentum-list";
+          detailAuthorMomentum.items.forEach((item) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "detail-hero-momentum-chip";
+            if (item.isActive) chip.classList.add("is-active");
+            chip.setAttribute("aria-label", `${item.label} ${item.value}`);
+            chip.addEventListener("click", () => {
+              openDetailAuthorProfile(item.tab);
+            });
+            const label = document.createElement("span");
+            label.className = "detail-hero-momentum-label";
+            label.textContent = item.label;
+            const value = document.createElement("strong");
+            value.className = "detail-hero-momentum-value";
+            value.textContent = item.value;
+            chip.append(label, value);
+            momentumList.appendChild(chip);
+          });
+          momentumBlock.append(momentumCopy, momentumList);
+          hero.appendChild(momentumBlock);
         }
         if (canMessageAuthor && detailConnectionSignals.length) {
           const connectionBlock = document.createElement("div");
