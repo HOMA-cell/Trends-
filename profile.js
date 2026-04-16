@@ -737,6 +737,27 @@ function getPublicProfileLatestDiscussionTarget(
     canQuickReply,
   };
 }
+function buildPublicProfileCommentEntryContext(
+  post,
+  comment,
+  profile = null
+) {
+  const targetUserId = `${comment?.user_id || ""}`.trim();
+  if (!targetUserId) return null;
+  return {
+    source: "comment",
+    userId: targetUserId,
+    actorName:
+      `${profile?.display_name || ""}`.trim() ||
+      formatHandle(profile?.handle || profile?.username || ""),
+    actorHandle: `${profile?.handle || profile?.username || ""}`.trim(),
+    postId: `${post?.id || ""}`.trim(),
+    commentId: `${comment?.id || ""}`.trim(),
+    commentActorId: targetUserId,
+    commentCreatedAt: `${comment?.created_at || ""}`.trim(),
+    focusComments: true,
+  };
+}
 
 function buildPublicProfileDiscussionPreview(
   post,
@@ -794,9 +815,31 @@ function buildPublicProfileDiscussionPreview(
   const stack = document.createElement("div");
   stack.className = "post-social-preview-stack";
   recentComments.slice(0, 2).forEach((comment) => {
+    const profile = comment?.profile || null;
+    const commentEntryContext = buildPublicProfileCommentEntryContext(
+      post,
+      comment,
+      profile
+    );
+    const avatarBtn = document.createElement("button");
+    avatarBtn.type = "button";
+    avatarBtn.className = "post-social-preview-avatar-button";
+    avatarBtn.setAttribute(
+      "aria-label",
+      `${tr.notificationViewProfile || "View profile"} ${
+        profile?.display_name ||
+        formatHandle(profile?.handle || profile?.username || "user")
+      }`
+    );
+    avatarBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (!commentEntryContext?.userId) return;
+      openPublicProfile(commentEntryContext.userId, {
+        entryContext: commentEntryContext,
+      });
+    });
     const avatar = document.createElement("div");
     avatar.className = "avatar post-social-preview-avatar";
-    const profile = comment?.profile || null;
     const label =
       `${profile?.display_name || ""}`.trim() ||
       formatHandle(profile?.handle || profile?.username || "u") ||
@@ -806,7 +849,8 @@ function buildPublicProfileDiscussionPreview(
       profile,
       label.replace("@", "").charAt(0).toUpperCase() || "U"
     );
-    stack.appendChild(avatar);
+    avatarBtn.appendChild(avatar);
+    stack.appendChild(avatarBtn);
   });
   if (recentComments.length > 2) {
     const more = document.createElement("span");
@@ -824,8 +868,27 @@ function buildPublicProfileDiscussionPreview(
   kicker.textContent = `${tr.feedLatestReply || "Latest reply"} · ${formatCompactNumber(
     recentComments.length
   )}`;
-  const name = document.createElement("span");
+  const latestCommentEntryContext = buildPublicProfileCommentEntryContext(
+    post,
+    latestComment,
+    latestComment?.profile || null
+  );
+  const name = document.createElement(latestCommentEntryContext ? "button" : "span");
   name.className = "post-social-preview-name";
+  if (latestCommentEntryContext) {
+    name.type = "button";
+    name.classList.add("is-button");
+    name.setAttribute(
+      "aria-label",
+      `${tr.notificationViewProfile || "View profile"} ${latestName}`
+    );
+    name.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openPublicProfile(latestCommentEntryContext.userId, {
+        entryContext: latestCommentEntryContext,
+      });
+    });
+  }
   name.textContent = latestName;
   top.append(kicker, name);
   const snippet = document.createElement("div");
@@ -1739,9 +1802,31 @@ function updatePublicProfileActionDockPreview(
     const stack = document.createElement("div");
     stack.className = "public-profile-action-dock-preview-stack";
     discussionTarget.recentComments.slice(0, 3).forEach((comment) => {
+      const profile = comment?.profile || null;
+      const commentEntryContext = buildPublicProfileCommentEntryContext(
+        post,
+        comment,
+        profile
+      );
+      const avatarBtn = document.createElement("button");
+      avatarBtn.type = "button";
+      avatarBtn.className = "public-profile-action-dock-preview-avatar-button";
+      avatarBtn.setAttribute(
+        "aria-label",
+        `${tr.notificationViewProfile || "View profile"} ${
+          profile?.display_name ||
+          formatHandle(profile?.handle || profile?.username || "user")
+        }`
+      );
+      avatarBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (!commentEntryContext?.userId) return;
+        openPublicProfile(commentEntryContext.userId, {
+          entryContext: commentEntryContext,
+        });
+      });
       const avatar = document.createElement("div");
       avatar.className = "avatar public-profile-action-dock-preview-avatar";
-      const profile = comment?.profile || null;
       const label =
         `${profile?.display_name || ""}`.trim() ||
         formatHandle(profile?.handle || profile?.username || "u") ||
@@ -1751,7 +1836,8 @@ function updatePublicProfileActionDockPreview(
         profile,
         label.replace("@", "").charAt(0).toUpperCase() || "U"
       );
-      stack.appendChild(avatar);
+      avatarBtn.appendChild(avatar);
+      stack.appendChild(avatarBtn);
     });
     if (discussionTarget.recentComments.length > 3) {
       const more = document.createElement("span");
