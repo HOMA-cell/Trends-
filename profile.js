@@ -1657,6 +1657,82 @@ function updatePublicProfileActionDock(
   }
   dockEl.classList.remove("hidden");
 }
+function updatePublicProfileActionDockPreview(
+  {
+    contextLead = null,
+    userId = "",
+    displayName = "",
+    handle = "",
+    currentUser = null,
+    commentsByPost = new Map(),
+    tr = t[getCurrentLang()] || t.ja,
+  } = {}
+) {
+  const previewBtn = $("public-profile-action-dock-preview");
+  if (!previewBtn) return;
+  previewBtn.innerHTML = "";
+  const post = contextLead?.post || null;
+  if (!post?.id) {
+    previewBtn.classList.add("hidden");
+    previewBtn.onclick = null;
+    return;
+  }
+  const logs = contextLead?.logs || [];
+  const entryContext = buildPublicProfileDetailEntryContext({
+    userId,
+    displayName,
+    handle,
+    tab: contextLead?.tab || getPublicProfileContentTab(),
+  });
+  const discussionTarget = getPublicProfileLatestDiscussionTarget(
+    post,
+    commentsByPost.get(post.id) || [],
+    currentUser,
+    tr
+  );
+  const top = document.createElement("div");
+  top.className = "public-profile-action-dock-preview-top";
+  const kicker = document.createElement("span");
+  kicker.className = "public-profile-action-dock-preview-kicker";
+  kicker.textContent = discussionTarget
+    ? `${tr.feedLatestReply || "Latest reply"} · ${discussionTarget.latestName}`
+    : getPublicProfilePostCtaLabel(post, logs, tr);
+  const title = document.createElement("div");
+  title.className = "public-profile-action-dock-preview-title";
+  title.textContent = buildProfilePostHeadline(post, logs, tr);
+  const note = document.createElement("div");
+  note.className = "public-profile-action-dock-preview-note";
+  note.textContent = discussionTarget
+    ? discussionTarget.latestPreview
+    : buildProfilePostPreview(post, logs, tr);
+  const action = document.createElement("span");
+  action.className = "public-profile-action-dock-preview-action";
+  action.textContent = discussionTarget
+    ? discussionTarget.canQuickReply
+      ? tr.commentReply || "Reply"
+      : tr.feedOpenDiscussion || "Open discussion"
+    : getPublicProfilePostCtaLabel(post, logs, tr);
+  top.append(kicker, action);
+  previewBtn.append(top, title, note);
+  previewBtn.classList.remove("hidden");
+  previewBtn.onclick = () => {
+    openPostDetail(`${post.id}`, {
+      entryContext,
+      focusComments: !!discussionTarget,
+      focusCommentId: discussionTarget?.latestCommentId || "",
+      focusCommentActorId: discussionTarget?.latestCommentActorId || "",
+      focusCommentCreatedAt: discussionTarget?.latestComment?.created_at || "",
+      replyToCommentId:
+        discussionTarget?.canQuickReply ? discussionTarget.latestCommentId : "",
+      replyToCommentActorId:
+        discussionTarget?.canQuickReply ? discussionTarget.latestCommentActorId : "",
+      replyToCommentCreatedAt:
+        discussionTarget?.canQuickReply
+          ? discussionTarget.latestComment?.created_at || ""
+          : "",
+    });
+  };
+}
 function updatePublicProfileActionDockContext(
   {
     contextLead = null,
@@ -2575,6 +2651,15 @@ export async function openPublicProfile(userId, options = {}) {
       workouts: workoutPosts.length,
     },
     contextLead,
+    tr,
+  });
+  updatePublicProfileActionDockPreview({
+    contextLead,
+    userId,
+    displayName,
+    handle,
+    currentUser,
+    commentsByPost,
     tr,
   });
   updatePublicProfileActionDockContext({
