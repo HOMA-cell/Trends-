@@ -527,6 +527,49 @@ function buildPublicProfileMessageStarter({
   const logs = workoutLogsByPost.get(latestPost.id) || [];
   return buildPublicProfilePostMessageStarter(latestPost, logs, tr);
 }
+function getPublicProfileContextLead({
+  activeTab = "posts",
+  revealState = null,
+  userPosts = [],
+  mediaPosts = [],
+  workoutPosts = [],
+  workoutLogsByPost = new Map(),
+} = {}) {
+  const normalizedTab = normalizePublicProfileContentTab(activeTab);
+  const tabPosts =
+    normalizedTab === "media"
+      ? mediaPosts
+      : normalizedTab === "workouts"
+        ? workoutPosts
+        : userPosts;
+  const revealPostId = `${revealState?.postId || ""}`.trim();
+  const revealTab = normalizePublicProfileContentTab(revealState?.tab || "");
+  const preferredPost =
+    revealPostId && revealTab === normalizedTab
+      ? (Array.isArray(tabPosts) ? tabPosts : []).find(
+          (post) => `${post?.id || ""}`.trim() === revealPostId
+        ) || null
+      : null;
+  const leadPost =
+    preferredPost || ((Array.isArray(tabPosts) ? tabPosts : []).find((post) => !!post?.id) || null);
+  if (!leadPost) return null;
+  const logs = workoutLogsByPost.get(leadPost.id) || [];
+  return { post: leadPost, logs, tab: normalizedTab };
+}
+function getPublicProfileContextLabel(contextLead, tr = t[getCurrentLang()] || t.ja) {
+  const post = contextLead?.post || null;
+  const logs = contextLead?.logs || [];
+  if (logs.length) {
+    return tr.profileActionDockContextWorkout || "latest workout";
+  }
+  if (post?.media_type === "video") {
+    return tr.profileActionDockContextVideo || "recent video";
+  }
+  if (post?.media_url) {
+    return tr.profileActionDockContextPhoto || "recent photo";
+  }
+  return tr.profileActionDockContextPost || "latest post";
+}
 function renderPublicProfileConnection(targetEl, viewerProfile, targetProfile, tr) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
@@ -1563,6 +1606,7 @@ function updatePublicProfileActionDock(
     canMessage = false,
     isFollowing = false,
     counts = {},
+    contextLead = null,
     tr = t[getCurrentLang()] || t.ja,
   } = {}
 ) {
@@ -1573,20 +1617,36 @@ function updatePublicProfileActionDock(
   const activeCount = Number(counts?.[activeTab] || 0);
   if (!dockEl || !titleEl || !noteEl) return;
 
+  const contextLabel = contextLead
+    ? getPublicProfileContextLabel(contextLead, tr)
+    : "";
+
   if (canMessage && !isFollowing) {
     titleEl.textContent =
       tr.profileActionDockTitleConnect || "Start the conversation";
-    noteEl.textContent = (
-      tr.profileActionDockNoteConnect ||
-      "{count} things to react to in this profile."
-    ).replace("{count}", formatCompactNumber(activeCount));
+    noteEl.textContent = contextLabel
+      ? (tr.profileActionDockNoteContext ||
+          "Jump into a message from the context of {label}.").replace(
+          "{label}",
+          contextLabel
+        )
+      : (
+          tr.profileActionDockNoteConnect ||
+          "{count} things to react to in this profile."
+        ).replace("{count}", formatCompactNumber(activeCount));
   } else if (canMessage && isFollowing) {
     titleEl.textContent =
       tr.profileActionDockTitleFollow || "Keep the momentum going";
-    noteEl.textContent = (
-      tr.profileActionDockNoteFollow ||
-      "Jump back in with a message or share this profile."
-    ).replace("{count}", formatCompactNumber(activeCount));
+    noteEl.textContent = contextLabel
+      ? (tr.profileActionDockNoteContext ||
+          "Jump into a message from the context of {label}.").replace(
+          "{label}",
+          contextLabel
+        )
+      : (
+          tr.profileActionDockNoteFollow ||
+          "Jump back in with a message or share this profile."
+        ).replace("{count}", formatCompactNumber(activeCount));
   } else {
     titleEl.textContent =
       tr.profileActionDockTitleShare || "Share this profile";
@@ -2420,6 +2480,21 @@ export async function openPublicProfile(userId, options = {}) {
     },
     tr
   );
+  const activeContentTab = getPublicProfileContentTab();
+  const selectedPosts =
+    activeContentTab === "media"
+      ? mediaPosts
+      : activeContentTab === "workouts"
+        ? workoutPosts
+        : userPosts;
+  const contextLead = getPublicProfileContextLead({
+    activeTab: activeContentTab,
+    revealState,
+    userPosts,
+    mediaPosts,
+    workoutPosts,
+    workoutLogsByPost,
+  });
   updatePublicProfileActionDock({
     canMessage: !!currentUser && currentUser.id !== userId,
     isFollowing: getFollowingIds().has(userId),
@@ -2428,15 +2503,9 @@ export async function openPublicProfile(userId, options = {}) {
       media: mediaPosts.length,
       workouts: workoutPosts.length,
     },
+    contextLead,
     tr,
   });
-  const activeContentTab = getPublicProfileContentTab();
-  const selectedPosts =
-    activeContentTab === "media"
-      ? mediaPosts
-      : activeContentTab === "workouts"
-        ? workoutPosts
-        : userPosts;
   if (
     revealState &&
     revealState.tab !== "media" &&
@@ -2483,13 +2552,24 @@ export async function openPublicProfile(userId, options = {}) {
   const counts = await loadFollowCountsCached(userId, { force: forceCounts });
   const isFollowing = getFollowingIds().has(userId);
   const canMessage = !!currentUser && currentUser.id !== userId;
-  const smartMessageStarter = buildPublicProfileMessageStarter({
-    viewerProfile: currentProfile,
-    targetProfile: profile,
-    posts,
-    workoutLogsByPost,
-    tr,
-  });
+  const contextLabel = contextLead
+    ? getPublicProfileContextLabel(contextLead, tr)
+    : "";
+  const smartMessageStarter =
+    (contextLead?.post
+      ? buildPublicProfilePostMessageStarter(
+          contextLead.post,
+          contextLead.logs,
+          tr
+        )
+      : "") ||
+    buildPublicProfileMessageStarter({
+      viewerProfile: currentProfile,
+      targetProfile: profile,
+      posts,
+      workoutLogsByPost,
+      tr,
+    });
   renderProfileMetaStat(
     followingEl,
     tr.profileFollowing || "Following",
@@ -2533,6 +2613,7 @@ export async function openPublicProfile(userId, options = {}) {
     messageBtn.dataset.actorName = displayName || "";
     messageBtn.dataset.actorHandle = handle || "";
     messageBtn.dataset.prefillMessage = smartMessageStarter || "";
+    messageBtn.dataset.contextLabel = contextLabel || "";
     messageBtn.classList.toggle(
       "is-entry-highlight",
       !!currentPublicProfileEntryContext &&
@@ -2544,10 +2625,20 @@ export async function openPublicProfile(userId, options = {}) {
       messageBtn.textContent = tr.message || "Message";
       messageBtn.setAttribute(
         "aria-label",
-        `${tr.message || "Message"} ${displayName}`
+        contextLabel
+          ? `${tr.message || "Message"} · ${contextLabel}`
+          : `${tr.message || "Message"} ${displayName}`
       );
+      messageBtn.title = contextLabel
+        ? (tr.profileActionDockNoteContext ||
+            "Jump into a message from the context of {label}.").replace(
+            "{label}",
+            contextLabel
+          )
+        : "";
     } else {
       messageBtn.removeAttribute("aria-label");
+      messageBtn.removeAttribute("title");
     }
   });
   shareButtons.forEach((shareBtn) => {
