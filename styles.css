@@ -10015,6 +10015,52 @@
       -webkit-line-clamp: 2;
       overflow: hidden;
     }
+    .public-profile-action-dock-preview-meta {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+    .public-profile-action-dock-preview-stack {
+      display: inline-flex;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+    .public-profile-action-dock-preview-avatar {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255, 255, 255, 0.98);
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    }
+    .public-profile-action-dock-preview-avatar + .public-profile-action-dock-preview-avatar {
+      margin-left: -8px;
+    }
+    .public-profile-action-dock-preview-more {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      margin-left: -8px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: rgba(17, 24, 39, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.98);
+      color: #4d4237;
+      font-size: 10px;
+      font-weight: 800;
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    }
+    .public-profile-action-dock-preview-meta-label {
+      min-width: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #847365;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .public-profile-action-dock-context {
       display: flex;
       align-items: center;
@@ -10659,6 +10705,9 @@
       }
       .public-profile-action-dock-preview {
         margin-top: 5px;
+      }
+      .public-profile-action-dock-preview-meta {
+        gap: 8px;
       }
       .public-profile-action-dock-context-action {
         min-height: 30px;

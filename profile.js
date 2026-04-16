@@ -570,6 +570,23 @@ function getPublicProfileContextLabel(contextLead, tr = t[getCurrentLang()] || t
   }
   return tr.profileActionDockContextPost || "latest post";
 }
+function getPublicProfileContextMessageLabel(
+  contextLead,
+  tr = t[getCurrentLang()] || t.ja
+) {
+  const post = contextLead?.post || null;
+  const logs = contextLead?.logs || [];
+  if (logs.length) {
+    return tr.profileActionDockMessageWorkout || "Ask about workout";
+  }
+  if (post?.media_type === "video") {
+    return tr.profileActionDockMessageVideo || "Ask about video";
+  }
+  if (post?.media_url) {
+    return tr.profileActionDockMessagePhoto || "Ask about photo";
+  }
+  return tr.profileActionDockMessagePost || "Talk about this post";
+}
 function renderPublicProfileConnection(targetEl, viewerProfile, targetProfile, tr) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
@@ -1695,7 +1712,9 @@ function updatePublicProfileActionDockPreview(
   const kicker = document.createElement("span");
   kicker.className = "public-profile-action-dock-preview-kicker";
   kicker.textContent = discussionTarget
-    ? `${tr.feedLatestReply || "Latest reply"} · ${discussionTarget.latestName}`
+    ? `${tr.feedLatestReply || "Latest reply"} · ${formatCompactNumber(
+        discussionTarget.recentComments.length
+      )}`
     : getPublicProfilePostCtaLabel(post, logs, tr);
   const title = document.createElement("div");
   title.className = "public-profile-action-dock-preview-title";
@@ -1714,6 +1733,40 @@ function updatePublicProfileActionDockPreview(
     : getPublicProfilePostCtaLabel(post, logs, tr);
   top.append(kicker, action);
   previewBtn.append(top, title, note);
+  if (discussionTarget) {
+    const meta = document.createElement("div");
+    meta.className = "public-profile-action-dock-preview-meta";
+    const stack = document.createElement("div");
+    stack.className = "public-profile-action-dock-preview-stack";
+    discussionTarget.recentComments.slice(0, 3).forEach((comment) => {
+      const avatar = document.createElement("div");
+      avatar.className = "avatar public-profile-action-dock-preview-avatar";
+      const profile = comment?.profile || null;
+      const label =
+        `${profile?.display_name || ""}`.trim() ||
+        formatHandle(profile?.handle || profile?.username || "u") ||
+        "U";
+      renderAvatar(
+        avatar,
+        profile,
+        label.replace("@", "").charAt(0).toUpperCase() || "U"
+      );
+      stack.appendChild(avatar);
+    });
+    if (discussionTarget.recentComments.length > 3) {
+      const more = document.createElement("span");
+      more.className = "public-profile-action-dock-preview-more";
+      more.textContent = `+${discussionTarget.recentComments.length - 3}`;
+      stack.appendChild(more);
+    }
+    const metaLabel = document.createElement("span");
+    metaLabel.className = "public-profile-action-dock-preview-meta-label";
+    metaLabel.textContent = `${formatCompactNumber(
+      discussionTarget.recentComments.length
+    )} ${tr.comments || "Comments"}`;
+    meta.append(stack, metaLabel);
+    previewBtn.appendChild(meta);
+  }
   previewBtn.classList.remove("hidden");
   previewBtn.onclick = () => {
     openPostDetail(`${post.id}`, {
@@ -2720,6 +2773,9 @@ export async function openPublicProfile(userId, options = {}) {
   const contextLabel = contextLead
     ? getPublicProfileContextLabel(contextLead, tr)
     : "";
+  const contextMessageLabel = contextLead
+    ? getPublicProfileContextMessageLabel(contextLead, tr)
+    : tr.message || "Message";
   const smartMessageStarter =
     (contextLead?.post
       ? buildPublicProfilePostMessageStarter(
@@ -2787,11 +2843,14 @@ export async function openPublicProfile(userId, options = {}) {
         canMessage
     );
     if (canMessage) {
-      messageBtn.textContent = tr.message || "Message";
+      const isDockMessage = messageBtn.id === "btn-public-dock-message";
+      messageBtn.textContent = isDockMessage
+        ? contextMessageLabel
+        : tr.message || "Message";
       messageBtn.setAttribute(
         "aria-label",
         contextLabel
-          ? `${tr.message || "Message"} · ${contextLabel}`
+          ? `${(isDockMessage ? contextMessageLabel : tr.message || "Message")} · ${contextLabel}`
           : `${tr.message || "Message"} ${displayName}`
       );
       messageBtn.title = contextLabel
