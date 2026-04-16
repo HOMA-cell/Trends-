@@ -11744,6 +11744,64 @@
       scroll-snap-type: x proximity;
       scrollbar-width: none;
     }
+    .detail-related-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .detail-related-header-actions {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-left: auto;
+    }
+    .detail-related-header-action {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(230, 220, 207, 0.96);
+      background: rgba(255, 255, 255, 0.96);
+      color: #4c4034;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background-color 180ms ease,
+        box-shadow 180ms ease,
+        color 180ms ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    }
+    .detail-related-header-action:hover,
+    .detail-related-header-action:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(239, 91, 42, 0.22);
+      background: rgba(255, 249, 243, 0.98);
+      color: #2c2118;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+      outline: none;
+    }
+    .detail-related-header-action.is-context {
+      background: rgba(239, 91, 42, 0.08);
+      border-color: rgba(239, 91, 42, 0.18);
+      color: #be4a22;
+    }
+    .detail-related-header-action.is-context:hover,
+    .detail-related-header-action.is-context:focus-visible {
+      background: rgba(239, 91, 42, 0.12);
+      border-color: rgba(239, 91, 42, 0.26);
+      color: #a83d1b;
+    }
     .detail-related::-webkit-scrollbar {
       display: none;
     }
@@ -12199,6 +12257,18 @@
       }
       .detail-related {
         gap: 10px;
+      }
+      .detail-related-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .detail-related-header-actions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+      }
+      .detail-related-header-action {
+        min-height: 30px;
       }
       .detail-related-card {
         flex-basis: min(82vw, 234px);

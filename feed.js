@@ -9653,6 +9653,7 @@ export function renderPostDetail() {
       const workoutEl = $("detail-workout");
       const relatedSectionEl = $("detail-related-section");
       const relatedTitleEl = $("detail-related-title");
+      const relatedHeaderActionsEl = $("detail-related-header-actions");
       const relatedEl = $("detail-related");
       const commentsEl = $("detail-comments");
       const workoutTitleEl = $("detail-workout-title");
@@ -9684,6 +9685,47 @@ export function renderPostDetail() {
             : candidatePost?.media_url
               ? tr.feedViewPhoto || "View photo"
               : tr.notificationViewPost || "View post";
+      const getDetailProfileRevealTab = (candidatePost, candidateLogs = []) => {
+        if (candidateLogs.length) return "workouts";
+        if (candidatePost?.media_url) return "media";
+        return "posts";
+      };
+      const getDetailProfileRevealLabel = (candidatePost, candidateLogs = []) => {
+        const revealTab = getDetailProfileRevealTab(candidatePost, candidateLogs);
+        if (revealTab === "workouts") return tr.profileTabWorkouts || "Workouts";
+        if (revealTab === "media") return tr.profileTabMedia || "Media";
+        return tr.profileTabPosts || "Posts";
+      };
+      const openDetailAuthorProfile = (revealTab = "posts") => {
+        const targetUserId = `${post?.user_id || ""}`.trim();
+        if (!targetUserId) return;
+        const normalizedRevealTab =
+          revealTab === "media" || revealTab === "workouts" ? revealTab : "posts";
+        const fromSamePublicProfile =
+          currentDetailEntryContext?.source === "public_profile" &&
+          `${currentDetailEntryContext?.userId || ""}`.trim() === targetUserId;
+        closePostDetail({ syncHash: false });
+        if (fromSamePublicProfile) {
+          openPublicProfile(targetUserId, {
+            preserveEntryContext: true,
+            revealTab: normalizedRevealTab,
+            revealPostId: `${post?.id || ""}`.trim(),
+          });
+          return;
+        }
+        openPublicProfile(targetUserId, {
+          entryContext: buildFeedProfileEntryContext({
+            post,
+            source:
+              currentDetailEntryContext?.source === "shorts" || isShortsStylePost(post)
+                ? "shorts"
+                : "feed",
+            focusComments: false,
+          }),
+          revealTab: normalizedRevealTab,
+          revealPostId: `${post?.id || ""}`.trim(),
+        });
+      };
       const detailConnectionSignals = buildDetailConnectionSignals(
         getCurrentProfile(),
         post.profile || null,
@@ -10398,6 +10440,9 @@ export function renderPostDetail() {
 
       if (relatedSectionEl && relatedEl && relatedTitleEl) {
         relatedEl.innerHTML = "";
+        if (relatedHeaderActionsEl) {
+          relatedHeaderActionsEl.innerHTML = "";
+        }
         const relatedPosts = buildDetailRelatedPosts();
         const relatedDisplayName =
           `${post.profile?.display_name || ""}`.trim() ||
@@ -10413,6 +10458,28 @@ export function renderPostDetail() {
         } else {
           relatedSectionEl.classList.remove("hidden");
           relatedSectionEl.setAttribute("aria-hidden", "false");
+          if (relatedHeaderActionsEl) {
+            const profileBtn = document.createElement("button");
+            profileBtn.type = "button";
+            profileBtn.className = "detail-related-header-action";
+            profileBtn.textContent = tr.notificationViewProfile || "View profile";
+            profileBtn.addEventListener("click", () => {
+              openDetailAuthorProfile("posts");
+            });
+            relatedHeaderActionsEl.appendChild(profileBtn);
+
+            const revealTab = getDetailProfileRevealTab(post, logs);
+            if (revealTab !== "posts") {
+              const contextBtn = document.createElement("button");
+              contextBtn.type = "button";
+              contextBtn.className = "detail-related-header-action is-context";
+              contextBtn.textContent = getDetailProfileRevealLabel(post, logs);
+              contextBtn.addEventListener("click", () => {
+                openDetailAuthorProfile(revealTab);
+              });
+              relatedHeaderActionsEl.appendChild(contextBtn);
+            }
+          }
           relatedPosts.forEach((candidate) => {
             const candidateLogs = workoutLogsByPost.get(candidate.id) || [];
             const candidateCaption = `${candidate.note || candidate.caption || ""}`.trim();
