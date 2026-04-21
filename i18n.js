@@ -286,6 +286,30 @@ export const t = {
         settingsHeightUnitDesc: "プロフィールの身長表示。",
         settingsDataTitle: "データ管理",
         settingsDataSub: "書き出しやリセット。",
+        settingsLaunchTitle: "運用チェック",
+        settingsLaunchSub:
+          "本番URL・Supabase・ビルド状態をここでまとめて確認できます。",
+        settingsLaunchLiveLabel: "ライブURL",
+        settingsLaunchConnectionLabel: "Supabase接続",
+        settingsLaunchBuildLabel: "ビルド状態",
+        settingsLaunchRuntimeLabel: "ランタイム異常",
+        settingsLaunchSummaryReady: "本格運用に向けて良好です",
+        settingsLaunchSummaryNeedsCheck: "運用前に確認したい項目があります",
+        settingsLaunchSummaryBlocked: "先に直したい項目があります",
+        settingsLaunchLiveConfigured:
+          "保存済みの本番URLを使用しています。",
+        settingsLaunchLiveRuntime:
+          "現在開いている本番ホストを使用しています。",
+        settingsLaunchLiveDefault:
+          "既定の本番URLを使っています。必要なら保存してください。",
+        settingsLaunchConnectionUnknown:
+          "まだ接続テストをしていません。",
+        settingsLaunchBuildLocal:
+          "ローカル build です。デプロイ後に確認してください。",
+        settingsLaunchBuildReady:
+          "本番判定に使える build meta が読めています。",
+        settingsLaunchRuntimeClean: "記録されたランタイム異常はありません。",
+        settingsLaunchRuntimeIssues: "{count} 件のランタイム異常があります。",
         settingsExportData: "データを書き出す",
         settingsConnectionTest: "接続テスト",
         settingsLiveSiteTitle: "ライブサイトURL",
@@ -1231,6 +1255,33 @@ export const t = {
         settingsHeightUnitDesc: "Profile height display.",
         settingsDataTitle: "Data tools",
         settingsDataSub: "Export or reset.",
+        settingsLaunchTitle: "Launch readiness",
+        settingsLaunchSub:
+          "Review production URL, Supabase connectivity, and build state in one place.",
+        settingsLaunchLiveLabel: "Live URL",
+        settingsLaunchConnectionLabel: "Supabase",
+        settingsLaunchBuildLabel: "Build",
+        settingsLaunchRuntimeLabel: "Runtime issues",
+        settingsLaunchSummaryReady: "Looks healthy for go-live",
+        settingsLaunchSummaryNeedsCheck:
+          "A few items should be checked before launch",
+        settingsLaunchSummaryBlocked:
+          "There are issues to fix before launch",
+        settingsLaunchLiveConfigured:
+          "Using the saved production URL.",
+        settingsLaunchLiveRuntime:
+          "Using the current production host.",
+        settingsLaunchLiveDefault:
+          "Using the default production URL. Save it if you need a different host.",
+        settingsLaunchConnectionUnknown:
+          "Connection test has not been run yet.",
+        settingsLaunchBuildLocal:
+          "This is a local build. Re-check after deployment.",
+        settingsLaunchBuildReady:
+          "Build metadata is ready for production verification.",
+        settingsLaunchRuntimeClean: "No runtime issues have been recorded.",
+        settingsLaunchRuntimeIssues:
+          "{count} runtime issues are recorded.",
         settingsExportData: "Export data",
         settingsConnectionTest: "Connection test",
         settingsLiveSiteTitle: "Live site URL",

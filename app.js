@@ -2651,6 +2651,12 @@ async function loadProfilePostCount() {
       setText("settings-height-unit-desc", "settingsHeightUnitDesc");
       setText("settings-data-title", "settingsDataTitle");
       setText("settings-data-sub", "settingsDataSub");
+      setText("settings-launch-title", "settingsLaunchTitle");
+      setText("settings-launch-sub", "settingsLaunchSub");
+      setText("settings-launch-live-label", "settingsLaunchLiveLabel");
+      setText("settings-launch-connection-label", "settingsLaunchConnectionLabel");
+      setText("settings-launch-build-label", "settingsLaunchBuildLabel");
+      setText("settings-launch-runtime-label", "settingsLaunchRuntimeLabel");
       setText("settings-live-site-title", "settingsLiveSiteTitle");
       setText("settings-live-site-hint", "settingsLiveSiteHint");
       setText("settings-live-site-label", "settingsLiveSiteLabel");
@@ -8516,6 +8522,7 @@ async function loadProfilePostCount() {
       const setLiveStatus = (message = "") => {
         if (!liveStatusEl) return;
         liveStatusEl.textContent = message;
+        renderLaunchReadinessSummary();
       };
       const renderSupabaseSourceStatus = () => {
         const sourceEl = $("settings-supabase-source");
@@ -8557,6 +8564,100 @@ async function loadProfilePostCount() {
           input.value = getLiveSiteUrl() || DEFAULT_LIVE_SITE_URL;
         }
         renderLiveSiteSourceStatus();
+        renderLaunchReadinessSummary();
+      };
+      const renderLaunchReadinessSummary = () => {
+        const summaryEl = $("settings-launch-summary");
+        const liveValueEl = $("settings-launch-live-value");
+        const connectionValueEl = $("settings-launch-connection-value");
+        const buildValueEl = $("settings-launch-build-value");
+        const runtimeValueEl = $("settings-launch-runtime-value");
+        if (
+          !summaryEl ||
+          !liveValueEl ||
+          !connectionValueEl ||
+          !buildValueEl ||
+          !runtimeValueEl
+        ) {
+          return;
+        }
+        const tr = t[currentLang] || t.ja;
+        const liveSource = getLiveSiteUrlSource();
+        const liveText =
+          liveSource === "configured"
+            ? tr.settingsLaunchLiveConfigured ||
+              "Using the saved production URL."
+            : liveSource === "runtime"
+              ? tr.settingsLaunchLiveRuntime ||
+                "Using the current production host."
+              : tr.settingsLaunchLiveDefault ||
+                "Using the default production URL.";
+        liveValueEl.textContent = `${liveText} ${getLiveSiteUrl()}`;
+
+        let connectionTone = "warn";
+        let connectionText =
+          tr.settingsLaunchConnectionUnknown ||
+          "Connection test has not been run yet.";
+        if (supabaseConnectivityState?.ok === true) {
+          connectionTone = "ok";
+          connectionText = formatConnectionStatusMessage(
+            supabaseConnectivityState,
+            tr
+          );
+        } else if (supabaseConnectivityState?.ok === false) {
+          connectionTone = "error";
+          connectionText = formatConnectionStatusMessage(
+            supabaseConnectivityState,
+            tr
+          );
+        }
+        connectionValueEl.textContent = connectionText;
+
+        const localBuild = (appBuildMeta.version || "dev-local") === "dev-local";
+        const buildText = localBuild
+          ? tr.settingsLaunchBuildLocal ||
+            "This is a local build. Re-check after deployment."
+          : tr.settingsLaunchBuildReady ||
+            "Build metadata is ready for production verification.";
+        buildValueEl.textContent = `${buildText} (${appBuildMeta.version || "dev-local"})`;
+
+        const runtimeIssueCount = Array.isArray(runtimeIssues)
+          ? runtimeIssues.length
+          : 0;
+        const runtimeText =
+          runtimeIssueCount > 0
+            ? (tr.settingsLaunchRuntimeIssues ||
+                "{count} runtime issues are recorded.").replace(
+                "{count}",
+                String(runtimeIssueCount)
+              )
+            : tr.settingsLaunchRuntimeClean ||
+              "No runtime issues have been recorded.";
+        runtimeValueEl.textContent = runtimeText;
+
+        let summaryTone = "ok";
+        let summaryText =
+          tr.settingsLaunchSummaryReady || "Looks healthy for go-live";
+        if (supabaseConnectivityState?.ok === false || runtimeIssueCount > 0) {
+          summaryTone = "error";
+          summaryText =
+            tr.settingsLaunchSummaryBlocked ||
+            "There are issues to fix before launch";
+        } else if (supabaseConnectivityState?.ok !== true || localBuild) {
+          summaryTone = "warn";
+          summaryText =
+            tr.settingsLaunchSummaryNeedsCheck ||
+            "A few items should be checked before launch";
+        }
+        summaryEl.textContent = summaryText;
+        summaryEl.classList.remove("is-ok", "is-warn", "is-error");
+        summaryEl.classList.add(
+          summaryTone === "error"
+            ? "is-error"
+            : summaryTone === "warn"
+              ? "is-warn"
+              : "is-ok"
+        );
       };
       const setInlineButtonLoading = (button, loading) => {
         if (!button) return;
@@ -8795,6 +8896,7 @@ async function loadProfilePostCount() {
       fillLiveSiteConfigInput();
       renderSupabaseSourceStatus();
       renderConnectivitySummary();
+      renderLaunchReadinessSummary();
       setLiveStatus(
         (t[currentLang] || t.ja).settingsLiveStatusHint ||
           "Use \"Check live deployment\" to compare local and live versions."
@@ -8901,6 +9003,7 @@ async function loadProfilePostCount() {
             const result = await runSupabaseConnectionTest({ force: true });
             renderAuthNetworkStatus(result);
             const message = formatConnectionStatusMessage(result, tr);
+            renderLaunchReadinessSummary();
             setStatus(message, 7000);
           } finally {
             connectionBtn.classList.remove("is-loading");
