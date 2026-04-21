@@ -11,6 +11,7 @@
     "dev": "node scripts/dev-server.mjs",
     "doctor": "node scripts/doctor.mjs",
     "prepare:deploy": "node scripts/prepare-deploy.mjs",
+    "preflight": "npm run doctor && npm run check && npm run prepare:deploy",
     "check": "node --check ads-config.js && node --check app.js && node --check feed.js && node --check dm.js && node --check profile.js && node --check settings.js && node --check i18n.js && node --check commentSync.js && node --check profileEditState.js && node --check utils.js && node --check supabaseClient.js && node --check sw.js && node --check scripts/dev-server.mjs && node --check scripts/doctor.mjs && node --check scripts/prepare-deploy.mjs",
     "ci": "npm run check && npm run lint",
     "lint": "eslint ads-config.js app.js commentSync.js dm.js feed.js i18n.js profile.js profileEditState.js settings.js supabaseClient.js sw.js utils.js scripts/*.mjs --ext .js,.mjs",

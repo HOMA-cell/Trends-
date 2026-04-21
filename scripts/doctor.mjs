@@ -25,6 +25,7 @@ const REQUIRED_SCRIPTS = [
   "dev",
   "doctor",
   "prepare:deploy",
+  "preflight",
   "check",
   "lint",
   "ci",
@@ -72,6 +73,15 @@ function extractDefaultSupabaseConfig(source) {
     url: urlMatch?.[1] || "",
     anonKey: keyMatch?.[1] || "",
   };
+}
+
+function extractDefaultLiveSiteUrl(source) {
+  const match = source.match(/const DEFAULT_LIVE_SITE_URL = "([^"]+)";/);
+  return match?.[1] || "";
+}
+
+function readWorkflowSource(filePath) {
+  return readFileSync(resolve(ROOT, filePath), "utf8");
 }
 
 function main() {
@@ -161,13 +171,74 @@ function main() {
     fail("Supabase default config", String(error?.message || error));
   }
 
+  try {
+    const appSource = readFileSync(resolve(ROOT, "app.js"), "utf8");
+    const liveSiteUrl = extractDefaultLiveSiteUrl(appSource);
+    if (!liveSiteUrl) {
+      fail(
+        "Default live site URL",
+        "Could not read DEFAULT_LIVE_SITE_URL from app.js"
+      );
+    } else if (/vercel\.app/i.test(liveSiteUrl)) {
+      ok("Default live site URL", liveSiteUrl);
+    } else {
+      warn(
+        "Default live site URL",
+        `${liveSiteUrl} (not pointing at the expected Vercel host)`
+      );
+    }
+  } catch (error) {
+    fail("Default live site URL", String(error?.message || error));
+  }
+
+  try {
+    const vercelConfig = readJson("vercel.json");
+    const buildCommand = String(vercelConfig.buildCommand || "");
+    const installCommand = String(vercelConfig.installCommand || "");
+    const outputDirectory = String(vercelConfig.outputDirectory || "");
+    if (
+      buildCommand === "npm run prepare:deploy" &&
+      installCommand === "npm ci" &&
+      outputDirectory === "."
+    ) {
+      ok(
+        "vercel.json",
+        `build=${buildCommand}, install=${installCommand}, output=${outputDirectory}`
+      );
+    } else {
+      warn(
+        "vercel.json",
+        `build=${buildCommand || "missing"}, install=${installCommand || "missing"}, output=${outputDirectory || "missing"}`
+      );
+    }
+  } catch (error) {
+    fail("vercel.json", String(error?.message || error));
+  }
+
+  try {
+    const deployWorkflow = readWorkflowSource(".github/workflows/deploy-pages.yml");
+    const isManualOnly =
+      /workflow_dispatch:/m.test(deployWorkflow) &&
+      !/^\s*push:\s*$/m.test(deployWorkflow);
+    if (isManualOnly) {
+      ok("GitHub Pages fallback workflow", "manual fallback only");
+    } else {
+      warn(
+        "GitHub Pages fallback workflow",
+        "Expected workflow_dispatch-only fallback"
+      );
+    }
+  } catch (error) {
+    fail("GitHub Pages fallback workflow", String(error?.message || error));
+  }
+
   console.log("");
   console.log("Recommended next steps");
   console.log("1. npm ci");
-  console.log("2. npm run doctor");
-  console.log("3. npm run check");
-  console.log("4. npm run dev");
-  console.log("5. Open http://127.0.0.1:8000/?fresh=1");
+  console.log("2. npm run preflight");
+  console.log("3. npm run dev");
+  console.log("4. Open http://127.0.0.1:8000/?fresh=1");
+  console.log("5. Verify https://trends-navy-psi.vercel.app/?fresh=1");
   console.log(
     "6. In Settings > Data tools, set the live site URL if you use Vercel or a custom domain"
   );

@@ -15,7 +15,7 @@ The repo now assumes Vercel is the normal production path. GitHub Pages remains 
 cd /Users/homare/Documents/Trends-
 nvm use
 npm ci
-npm run doctor
+npm run preflight
 npm run ci
 ```
 
@@ -26,6 +26,8 @@ If `nvm use` is not available yet, install Node 22 first.
 Before inviting real users, run:
 
 - `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260314_000001_direct_messages.sql`
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260318_000001_direct_messages_media.sql`
 
 Then walk through `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`.
 
@@ -80,6 +82,10 @@ After push:
    - live check reports the expected version
    - sign in / profile / feed / comments / DM all work
 
+For the full go-live flow, use:
+
+- `/Users/homare/Documents/Trends-/LAUNCH_CHECKLIST.md`
+
 ## 6) If users see stale files
 
 This app uses a service worker.
@@ -107,4 +113,4 @@ Use it only when you intentionally want a static fallback deployment.
 - `anon` key is allowed in frontend only with proper RLS
 - never place `service_role` in frontend code
 - keep production URL saved in app settings if you switch domains
-- run `npm run doctor` after major env or deploy changes
+- run `npm run preflight` after major env or deploy changes

@@ -10,8 +10,7 @@ Manual fallback: GitHub Pages
 ```bash
 nvm use
 npm ci
-npm run doctor
-npm run check
+npm run preflight
 npm run dev
 ```
 
@@ -23,13 +22,14 @@ Open:
 
 - `npm run dev` - local preview server
 - `npm run doctor` - environment readiness summary
+- `npm run preflight` - doctor + syntax + deploy metadata
 - `npm run check` - syntax checks for app and support scripts
 - `npm run lint` - ESLint on app source files
 - `npm run ci` - local equivalent of GitHub CI
 
 ## Production readiness checklist
 
-1. Run `npm run doctor`
+1. Run `npm run preflight`
 2. Run `npm run ci`
 3. Apply the baseline Supabase migration:
    - `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
@@ -53,6 +53,8 @@ Open:
   - `/Users/homare/Documents/Trends-/vercel.json`
 - Deployment guide:
   - `/Users/homare/Documents/Trends-/DEPLOY.md`
+- Launch checklist:
+  - `/Users/homare/Documents/Trends-/LAUNCH_CHECKLIST.md`
 - Supabase checklist:
   - `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`
 
