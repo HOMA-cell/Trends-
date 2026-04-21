@@ -1,0 +1,7 @@
+{
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "buildCommand": "npm run prepare:deploy",
+  "installCommand": "npm ci",
+  "outputDirectory": "."
+}

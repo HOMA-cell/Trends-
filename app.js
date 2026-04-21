@@ -167,7 +167,7 @@ import {
     const PERF_DEBUG_KEY = "trends_perf_debug";
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const BUILD_META_URL = "./build-meta.json";
-    const DEFAULT_LIVE_SITE_URL = "https://homa-cell.github.io/Trends-/";
+    const DEFAULT_LIVE_SITE_URL = "https://trends-navy-psi.vercel.app/";
     const LIVE_SITE_URL_STORAGE_KEY = "trends_live_site_url_v1";
     const GITHUB_MAIN_COMMIT_API_URL =
       "https://api.github.com/repos/HOMA-cell/Trends-/commits/main";

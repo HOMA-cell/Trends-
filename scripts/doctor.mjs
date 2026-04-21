@@ -14,12 +14,21 @@ const REQUIRED_FILES = [
   "supabaseClient.js",
   "sw.js",
   "site.webmanifest",
+  "vercel.json",
   ".github/workflows/ci.yml",
   ".github/workflows/deploy-pages.yml",
   "supabase/migrations/20260207_000001_baseline_schema_and_policies.sql",
 ];
 
-const REQUIRED_SCRIPTS = ["start", "dev", "doctor", "check", "lint", "ci"];
+const REQUIRED_SCRIPTS = [
+  "start",
+  "dev",
+  "doctor",
+  "prepare:deploy",
+  "check",
+  "lint",
+  "ci",
+];
 
 let hasCriticalIssue = false;
 

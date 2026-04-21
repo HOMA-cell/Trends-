@@ -2,6 +2,9 @@
 
 Static workout-social app powered by Supabase.
 
+Primary production host: Vercel
+Manual fallback: GitHub Pages
+
 ## Quick start
 
 ```bash
@@ -36,15 +39,18 @@ Open:
    - comment / like
    - DM
    - open profile / detail / shorts
-5. In `Settings > Data tools`, set the live site URL when production is on Vercel or a custom domain
+5. In `Settings > Data tools`, save the real production URL in `Live site URL`
 6. Verify `build-meta.json` updates after deploy
+7. Run `ライブ版を確認` from inside the app
 
 ## Deploy notes
 
 - CI workflow:
   - `/Users/homare/Documents/Trends-/.github/workflows/ci.yml`
 - GitHub Pages workflow:
-  - `/Users/homare/Documents/Trends-/.github/workflows/deploy-pages.yml`
+  - `/Users/homare/Documents/Trends-/.github/workflows/deploy-pages.yml` (manual fallback only)
+- Vercel config:
+  - `/Users/homare/Documents/Trends-/vercel.json`
 - Deployment guide:
   - `/Users/homare/Documents/Trends-/DEPLOY.md`
 - Supabase checklist:

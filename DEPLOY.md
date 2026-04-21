@@ -1,44 +1,55 @@
-# Deploy And Update (Static + Supabase)
+# Deploy And Operate
 
-This app is static (`index.html` + JS/CSS) and connects to Supabase.
-Primary host: GitHub Pages via GitHub Actions (auto deploys on every push to `main`).
-Netlify is still available as an alternative.
+Trends is a static app (`index.html` + JS/CSS) backed by Supabase.
 
-## 1) One-time setup
+## Production target
 
-### A. Push this repo to GitHub
+- Primary production host: Vercel
+- Manual fallback host: GitHub Pages
+
+The repo now assumes Vercel is the normal production path. GitHub Pages remains available, but only as a manual fallback workflow.
+
+## 1) Local preflight
 
 ```bash
 cd /Users/homare/Documents/Trends-
-git add .
-git commit -m "Initial commit"
-git push -u origin main
+nvm use
+npm ci
+npm run doctor
+npm run ci
 ```
 
-### B. Enable GitHub Pages (recommended)
+If `nvm use` is not available yet, install Node 22 first.
 
-1. Open your repo on GitHub:
- - `https://github.com/HOMA-cell/Trends-`
-2. Go to `Settings` -> `Pages`.
-3. Under `Build and deployment`, set:
- - `Source`: `GitHub Actions`
-4. The workflow `.github/workflows/deploy-pages.yml` will publish on next push.
-5. Expected site URL:
- - `https://homa-cell.github.io/Trends-/`
+## 2) Supabase production setup
 
-### C. Optional: Connect GitHub repo to Netlify
+Before inviting real users, run:
 
-1. Open [https://app.netlify.com](https://app.netlify.com)
-2. `Add new site` -> `Import an existing project`
-3. Choose your GitHub repo (`HOMA-cell/Trends-`)
-4. Build settings:
- - `Build command`: (empty)
- - `Publish directory`: `.`
-5. Click `Deploy site`
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
 
-Netlify gives a URL like `https://<site-name>.netlify.app`.
+Then walk through `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`.
 
-## 2) Daily update flow (local -> internet)
+## 3) Vercel setup
+
+1. Connect the repo to Vercel
+2. Framework preset:
+   - `Other`
+3. Install command:
+   - `npm ci`
+4. Build command:
+   - `npm run prepare:deploy`
+5. Output directory:
+   - `.`
+
+This repo also includes `/Users/homare/Documents/Trends-/vercel.json`, so Vercel should pick these defaults up automatically.
+
+### What Vercel build does
+
+- Writes `build-meta.json`
+- Uses `VERCEL_GIT_COMMIT_SHA` when available
+- Keeps app version checks and "App update" flow accurate in production
+
+## 4) Normal release flow
 
 ```bash
 cd /Users/homare/Documents/Trends-
@@ -48,80 +59,52 @@ git push origin main
 ```
 
 After push:
-- GitHub Pages deploy runs automatically (`Actions` tab).
-- If you also connected Netlify, Netlify redeploys too.
 
-## 3) Verify the internet deploy
+- GitHub CI runs
+- Vercel deploys production
 
-1. Open your Pages URL: `https://homa-cell.github.io/Trends-/`
-2. Confirm the latest UI/feature is visible.
-3. If not visible yet, wait 30-90 seconds and reload once.
+## 5) Post-deploy checks
 
-If Actions shows:
-- `Get Pages site failed` or
-- `Pages is not enabled`
+1. Open production:
+   - `https://trends-navy-psi.vercel.app/?fresh=1`
+2. Open local preview:
+   - `http://127.0.0.1:8000/?fresh=1`
+3. In the app, open:
+   - `設定 > 管理・ツール > データ管理`
+4. Save the real production URL in `Live site URL`
+5. Run:
+   - `接続テスト`
+   - `ライブ版を確認`
+6. Confirm:
+   - build version is not `dev-local`
+   - live check reports the expected version
+   - sign in / profile / feed / comments / DM all work
 
-Fix once in GitHub:
-1. Open `https://github.com/HOMA-cell/Trends-/settings/pages`
-2. `Build and deployment` -> `Source` -> `GitHub Actions`
-3. Go to `Actions` and click `Re-run jobs`
+## 6) If users see stale files
 
-Alternative:
-- Open your Netlify URL if you are using Netlify.
-- Confirm the latest UI/feature is visible.
-- If not visible yet, wait 30-90 seconds and reload once.
+This app uses a service worker.
 
-## 4) Local preview
+Inside the app:
 
-```bash
-cd /Users/homare/Documents/Trends-
-python3 -m http.server 8000
-```
+1. `設定 > 管理・ツール > データ管理`
+2. `キャッシュを削除`
+3. `アプリを最新化`
 
-Open `http://localhost:8000`.
-Keep this terminal running while you test.
+If needed, hard refresh after that.
 
-Node.js is now installed, so you can also run:
+## 7) GitHub Pages fallback
 
-```bash
-cd /Users/homare/Documents/Trends-
-npm run dev
-```
+There is still a Pages workflow:
 
-And run syntax checks with:
+- `/Users/homare/Documents/Trends-/.github/workflows/deploy-pages.yml`
 
-```bash
-npm run check
-```
+But it is now manual-only on purpose, so normal releases do not spam Pages deployment failures.
 
-## 5) If localhost:8000 does not open
+Use it only when you intentionally want a static fallback deployment.
 
-1. Check that the server command is still running in a terminal.
-2. If not, run `python3 -m http.server 8000` again.
-3. If port is busy, run `python3 -m http.server 5173` and open `http://localhost:5173`.
+## 8) Safety reminders
 
-## 6) If users see old JS/CSS after deploy
-
-This app uses a service worker for offline support, so some users may keep an old cache.
-
-1. Open the app.
-2. Go to `設定` -> `管理・ツール` -> `データ管理`.
-3. Click `アプリを最新化`.
-4. The page will reload with the latest files.
-
-If needed, click `キャッシュを削除` first, then `アプリを最新化`.
-
-## 7) Supabase safety
-
-- `anon` key is okay in frontend only with proper RLS.
-- Never put `service_role` keys in frontend files.
-
-## 8) Offline/PWA notes
-
-- This project now includes a service worker (`sw.js`) and manifest (`site.webmanifest`).
-- GitHub Pages deploy writes `build-meta.json` with commit-based version metadata.
-- The app registers the service worker as `sw.js?v=<build-version>` to reduce stale-cache issues.
-- After deploy, first visit online once to cache the app shell.
-- If users report old JS/CSS after an update:
-  - First use `アプリを最新化` from Settings.
-  - Then hard refresh (`Cmd+Shift+R` on macOS) if still needed.
+- `anon` key is allowed in frontend only with proper RLS
+- never place `service_role` in frontend code
+- keep production URL saved in app settings if you switch domains
+- run `npm run doctor` after major env or deploy changes
