@@ -3,12 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
+    "start": "npm run dev",
     "dev": "node scripts/dev-server.mjs",
-    "check": "node --check app.js && node --check feed.js && node --check dm.js && node --check profile.js && node --check settings.js && node --check i18n.js && node --check commentSync.js && node --check profileEditState.js && node --check utils.js && node --check supabaseClient.js",
+    "doctor": "node scripts/doctor.mjs",
+    "check": "node --check ads-config.js && node --check app.js && node --check feed.js && node --check dm.js && node --check profile.js && node --check settings.js && node --check i18n.js && node --check commentSync.js && node --check profileEditState.js && node --check utils.js && node --check supabaseClient.js && node --check sw.js && node --check scripts/dev-server.mjs && node --check scripts/doctor.mjs",
     "ci": "npm run check && npm run lint",
-    "lint": "eslint . --ext .js,.mjs",
-    "lint:fix": "eslint . --ext .js,.mjs --fix"
+    "lint": "eslint ads-config.js app.js commentSync.js dm.js feed.js i18n.js profile.js profileEditState.js settings.js supabaseClient.js sw.js utils.js scripts/*.mjs --ext .js,.mjs",
+    "lint:fix": "eslint ads-config.js app.js commentSync.js dm.js feed.js i18n.js profile.js profileEditState.js settings.js supabaseClient.js sw.js utils.js scripts/*.mjs --ext .js,.mjs --fix"
   },
   "devDependencies": {
     "eslint": "^8.57.1"

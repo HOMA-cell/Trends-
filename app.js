@@ -168,6 +168,7 @@ import {
     const PROFILE_EDIT_COMPACT_KEY = "trends_profile_edit_compact_v1";
     const BUILD_META_URL = "./build-meta.json";
     const DEFAULT_LIVE_SITE_URL = "https://homa-cell.github.io/Trends-/";
+    const LIVE_SITE_URL_STORAGE_KEY = "trends_live_site_url_v1";
     const GITHUB_MAIN_COMMIT_API_URL =
       "https://api.github.com/repos/HOMA-cell/Trends-/commits/main";
     const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
@@ -979,20 +980,85 @@ async function loadProfilePostCount() {
       if (!raw) return "";
       try {
         const parsed = new URL(raw);
-        return `${parsed.origin}${parsed.pathname.replace(/\/?$/, "/")}`;
+        const normalizedPathname = parsed.pathname
+          .replace(/\/index\.html?$/i, "/")
+          .replace(/\/?$/, "/");
+        return `${parsed.origin}${normalizedPathname}`;
       } catch {
         return "";
       }
     }
 
-    function getLiveSiteUrl() {
-      if (typeof window !== "undefined") {
-        const { origin, hostname, pathname } = window.location;
-        if (hostname === "homa-cell.github.io" && pathname.startsWith("/Trends-/")) {
-          return normalizeSiteBaseUrl(`${origin}/Trends-/`) || DEFAULT_LIVE_SITE_URL;
-        }
+    function hasLocalStorageAccess() {
+      return (
+        typeof window !== "undefined" &&
+        typeof window.localStorage !== "undefined"
+      );
+    }
+
+    function readStoredLiveSiteUrl() {
+      if (!hasLocalStorageAccess()) return "";
+      try {
+        return normalizeSiteBaseUrl(
+          localStorage.getItem(LIVE_SITE_URL_STORAGE_KEY) || ""
+        );
+      } catch {
+        return "";
       }
-      return DEFAULT_LIVE_SITE_URL;
+    }
+
+    function saveStoredLiveSiteUrl(value) {
+      const normalized = normalizeSiteBaseUrl(value);
+      if (!normalized) {
+        throw new Error("Invalid live site URL");
+      }
+      if (!hasLocalStorageAccess()) {
+        return normalized;
+      }
+      localStorage.setItem(LIVE_SITE_URL_STORAGE_KEY, normalized);
+      return normalized;
+    }
+
+    function clearStoredLiveSiteUrl() {
+      if (!hasLocalStorageAccess()) return;
+      localStorage.removeItem(LIVE_SITE_URL_STORAGE_KEY);
+    }
+
+    function isLocalPreviewHostname(hostname) {
+      const value = String(hostname || "").trim().toLowerCase();
+      return (
+        !value ||
+        value === "localhost" ||
+        value === "127.0.0.1" ||
+        value === "0.0.0.0" ||
+        value === "[::1]" ||
+        value.endsWith(".local")
+      );
+    }
+
+    function getCurrentSiteBaseUrl() {
+      if (typeof window === "undefined") return "";
+      const { origin, hostname, pathname, protocol } = window.location || {};
+      if (!origin || !hostname || protocol === "file:") return "";
+      if (isLocalPreviewHostname(hostname)) return "";
+      if (hostname === "homa-cell.github.io" && pathname.startsWith("/Trends-/")) {
+        return normalizeSiteBaseUrl(`${origin}/Trends-/`);
+      }
+      return normalizeSiteBaseUrl(`${origin}${pathname || "/"}`);
+    }
+
+    function getLiveSiteUrlSource() {
+      if (readStoredLiveSiteUrl()) return "configured";
+      if (getCurrentSiteBaseUrl()) return "runtime";
+      return "default";
+    }
+
+    function getLiveSiteUrl() {
+      return (
+        readStoredLiveSiteUrl() ||
+        getCurrentSiteBaseUrl() ||
+        DEFAULT_LIVE_SITE_URL
+      );
     }
 
     function getLiveBuildMetaUrl() {
@@ -2585,6 +2651,12 @@ async function loadProfilePostCount() {
       setText("settings-height-unit-desc", "settingsHeightUnitDesc");
       setText("settings-data-title", "settingsDataTitle");
       setText("settings-data-sub", "settingsDataSub");
+      setText("settings-live-site-title", "settingsLiveSiteTitle");
+      setText("settings-live-site-hint", "settingsLiveSiteHint");
+      setText("settings-live-site-label", "settingsLiveSiteLabel");
+      setText("btn-live-site-save", "settingsLiveSiteSave");
+      setText("btn-live-site-reset", "settingsLiveSiteReset");
+      setPlaceholder("settings-live-site-url", "settingsLiveSitePlaceholder");
       setText("settings-supabase-title", "settingsSupabaseTitle");
       setText("settings-supabase-url-label", "settingsSupabaseUrlLabel");
       setText("settings-supabase-key-label", "settingsSupabaseKeyLabel");
@@ -2614,6 +2686,20 @@ async function loadProfilePostCount() {
             : tr.settingsSupabaseSourceDefault ||
               "Current source: built-in default from app code";
         supabaseSourceEl.textContent = `${sourceText} (${getSupabaseHostLabel()})`;
+      }
+      const liveSiteSourceEl = $("settings-live-site-source");
+      if (liveSiteSourceEl) {
+        const source = getLiveSiteUrlSource();
+        const sourceText =
+          source === "configured"
+            ? tr.settingsLiveSiteSourceConfigured ||
+              "Current source: saved live URL"
+            : source === "runtime"
+              ? tr.settingsLiveSiteSourceRuntime ||
+                "Current source: current production host"
+              : tr.settingsLiveSiteSourceDefault ||
+                "Current source: built-in live URL";
+        liveSiteSourceEl.textContent = `${sourceText} (${getLiveSiteUrl()})`;
       }
       setText("settings-build-version-label", "settingsBuildVersionLabel");
       setText("settings-build-time-label", "settingsBuildBuiltAtLabel");
@@ -8443,11 +8529,34 @@ async function loadProfilePostCount() {
               "Current source: built-in default from app code";
         sourceEl.textContent = `${sourceText} (${getSupabaseHostLabel()})`;
       };
+      const renderLiveSiteSourceStatus = () => {
+        const sourceEl = $("settings-live-site-source");
+        if (!sourceEl) return;
+        const tr = t[currentLang] || t.ja;
+        const source = getLiveSiteUrlSource();
+        const sourceText =
+          source === "configured"
+            ? tr.settingsLiveSiteSourceConfigured ||
+              "Current source: saved live URL"
+            : source === "runtime"
+              ? tr.settingsLiveSiteSourceRuntime ||
+                "Current source: current production host"
+              : tr.settingsLiveSiteSourceDefault ||
+                "Current source: built-in default live URL";
+        sourceEl.textContent = `${sourceText} (${getLiveSiteUrl()})`;
+      };
       const fillSupabaseConfigInputs = () => {
         const urlInput = $("settings-supabase-url");
         const keyInput = $("settings-supabase-key");
         if (urlInput) urlInput.value = SUPABASE_URL || "";
         if (keyInput) keyInput.value = SUPABASE_ANON_KEY || "";
+      };
+      const fillLiveSiteConfigInput = () => {
+        const input = $("settings-live-site-url");
+        if (input) {
+          input.value = getLiveSiteUrl() || DEFAULT_LIVE_SITE_URL;
+        }
+        renderLiveSiteSourceStatus();
       };
       const setInlineButtonLoading = (button, loading) => {
         if (!button) return;
@@ -8478,6 +8587,8 @@ async function loadProfilePostCount() {
             build_version: appBuildMeta.version || "dev-local",
             build_time: appBuildMeta.builtAt || null,
             location: typeof window !== "undefined" ? window.location.href : "",
+            live_site_url: getLiveSiteUrl(),
+            live_site_source: getLiveSiteUrlSource(),
             lang: currentLang,
           },
           supabase: {
@@ -8582,17 +8693,46 @@ async function loadProfilePostCount() {
         setStatus(checkingMessage, 5200);
         setLiveStatus(checkingMessage);
         try {
+          const liveUrl = getLiveBuildMetaUrl();
           const localOrigin =
             typeof window !== "undefined" ? window.location.origin : "";
           let liveOrigin = "";
           try {
-            liveOrigin = new URL(getLiveSiteUrl()).origin;
+            liveOrigin = new URL(liveUrl).origin;
           } catch {
             liveOrigin = "";
           }
-          const canDirectCompare =
+          const sameOrigin =
             !!localOrigin && !!liveOrigin && localOrigin === liveOrigin;
-          if (!canDirectCompare) {
+          try {
+            const response = await fetch(`${liveUrl}?t=${Date.now()}`, {
+              cache: "no-store",
+              mode: "cors",
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            const liveMetaRaw = await response.json();
+            const liveMeta = normalizeBuildMeta(liveMetaRaw);
+            const liveVersion = liveMeta.version || "unknown";
+            const liveBuiltAt = liveMeta.builtAt
+              ? formatDateTimeDisplay(liveMeta.builtAt)
+              : tr.settingsBuildUnknown || "Unknown";
+            const sameVersion = liveVersion === localVersion;
+            const message = sameVersion
+              ? `${tr.settingsLiveUpToDate || "Live site is up to date."} (${liveVersion})`
+              : `${tr.settingsLiveOutdated || "Live site version differs from this app."} local=${localVersion}, live=${liveVersion}`;
+            const modeHint = sameOrigin
+              ? ""
+              : `${
+                  tr.settingsLiveCrossOriginMetaHint ||
+                  "Checked the configured live host directly."
+                } `;
+            const detail = `${modeHint}${message} | local built: ${localBuiltAt} | live built: ${liveBuiltAt}`;
+            setLiveStatus(detail);
+            setStatus(message, 7000);
+            return;
+          } catch (liveMetaError) {
             const remoteSha = await fetchGitHubMainCommitShortSha();
             const hasComparableLocal = isLikelyCommitVersion(localVersion);
             const isMatch =
@@ -8605,34 +8745,17 @@ async function loadProfilePostCount() {
                 "Current build ID differs from latest GitHub main commit.";
             const modeHint =
               tr.settingsLiveCrossOriginHint ||
-              "Running outside the live host, so checked latest GitHub main commit.";
+              "Could not read live build metadata, so checked the latest GitHub main commit.";
+            const detail = String(
+              liveMetaError?.message || liveMetaError || ""
+            ).slice(0, 120);
+            const extra = detail ? ` (${detail})` : "";
             setStatus(summary, 7000);
             setLiveStatus(
-              `${modeHint} ${summary} (local=${localVersion}, main=${remoteSha}, local built: ${localBuiltAt})`
+              `${modeHint} ${summary}${extra} (local=${localVersion}, main=${remoteSha}, local built: ${localBuiltAt})`
             );
             return;
           }
-          const liveUrl = getLiveBuildMetaUrl();
-          const response = await fetch(`${liveUrl}?t=${Date.now()}`, {
-            cache: "no-store",
-          });
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          const liveMetaRaw = await response.json();
-          const liveMeta = normalizeBuildMeta(liveMetaRaw);
-          const liveVersion = liveMeta.version || "unknown";
-          const liveBuiltAt = liveMeta.builtAt
-            ? formatDateTimeDisplay(liveMeta.builtAt)
-            : tr.settingsBuildUnknown || "Unknown";
-          const sameVersion = liveVersion === localVersion;
-          const message = sameVersion
-            ? `${tr.settingsLiveUpToDate || "Live site is up to date."} (${liveVersion})`
-            : `${tr.settingsLiveOutdated || "Live site version differs from this app."} local=${localVersion}, live=${liveVersion}`;
-          const detail = `${message} | local built: ${localBuiltAt} | live built: ${liveBuiltAt}`;
-          setLiveStatus(detail);
-          setStatus(message, 7000);
-          return;
         } catch (error) {
           const detail = String(error?.message || error || "").slice(0, 180);
           const message =
@@ -8669,6 +8792,7 @@ async function loadProfilePostCount() {
         return { ok: false, result };
       };
       fillSupabaseConfigInputs();
+      fillLiveSiteConfigInput();
       renderSupabaseSourceStatus();
       renderConnectivitySummary();
       setLiveStatus(
@@ -8796,6 +8920,56 @@ async function loadProfilePostCount() {
           } finally {
             setInlineButtonLoading(liveCheckBtn, false);
           }
+        });
+      }
+
+      const liveSiteSaveBtn = $("btn-live-site-save");
+      if (liveSiteSaveBtn && liveSiteSaveBtn.dataset.bound !== "true") {
+        liveSiteSaveBtn.dataset.bound = "true";
+        liveSiteSaveBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          const input = $("settings-live-site-url");
+          const nextValue = normalizeSiteBaseUrl(input?.value || "");
+          if (!nextValue) {
+            setStatus(
+              tr.settingsLiveSiteInvalid ||
+                "Invalid live site URL. Use a full https URL.",
+              4200
+            );
+            return;
+          }
+          try {
+            const saved = saveStoredLiveSiteUrl(nextValue);
+            fillLiveSiteConfigInput();
+            setStatus(
+              `${
+                tr.settingsLiveSiteSaved ||
+                "Saved live site URL for deployment checks."
+              } (${saved})`,
+              3200
+            );
+          } catch {
+            setStatus(
+              tr.settingsLiveSiteInvalid ||
+                "Invalid live site URL. Use a full https URL.",
+              4200
+            );
+          }
+        });
+      }
+
+      const liveSiteResetBtn = $("btn-live-site-reset");
+      if (liveSiteResetBtn && liveSiteResetBtn.dataset.bound !== "true") {
+        liveSiteResetBtn.dataset.bound = "true";
+        liveSiteResetBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          clearStoredLiveSiteUrl();
+          fillLiveSiteConfigInput();
+          setStatus(
+            tr.settingsLiveSiteResetDone ||
+              "Reverted to automatic live site detection.",
+            3200
+          );
         });
       }
 
@@ -8997,6 +9171,8 @@ async function loadProfilePostCount() {
           );
           if (!ok) return;
           settingsController.resetToDefaults();
+          clearStoredLiveSiteUrl();
+          fillLiveSiteConfigInput();
           setStatus(t[currentLang].settingsResetDone || "Settings reset.");
         });
       }

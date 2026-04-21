@@ -1317,6 +1317,28 @@
                   <button class="btn btn-ghost" id="btn-toggle-perf-debug">描画パフォーマンスをON</button>
                   <button class="btn btn-danger" id="btn-reset-settings">設定をリセット</button>
                 </div>
+                <div class="settings-runtime-config">
+                  <div class="settings-note" id="settings-live-site-title">ライブサイトURL</div>
+                  <div class="settings-note" id="settings-live-site-hint">
+                    Vercel や独自ドメインを使う場合は、ここに本番URLを入れておくと確認導線が安定します。
+                  </div>
+                  <div class="field">
+                    <label id="settings-live-site-label">Live site URL</label>
+                    <input
+                      id="settings-live-site-url"
+                      type="text"
+                      placeholder="https://trends-navy-psi.vercel.app/"
+                      autocapitalize="off"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </div>
+                  <div class="settings-note" id="settings-live-site-source" role="status" aria-live="polite"></div>
+                  <div class="settings-actions">
+                    <button class="btn btn-ghost" id="btn-live-site-save">ライブURLを保存</button>
+                    <button class="btn btn-ghost" id="btn-live-site-reset">自動判定に戻す</button>
+                  </div>
+                </div>
                 <div class="settings-supabase-config">
                   <div class="settings-note" id="settings-supabase-title">Supabase 接続先</div>
                   <div class="field">

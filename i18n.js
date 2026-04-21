@@ -288,6 +288,25 @@ export const t = {
         settingsDataSub: "書き出しやリセット。",
         settingsExportData: "データを書き出す",
         settingsConnectionTest: "接続テスト",
+        settingsLiveSiteTitle: "ライブサイトURL",
+        settingsLiveSiteHint:
+          "Vercel や独自ドメインを使う場合は、本番URLを保存しておくと更新確認と導線が安定します。",
+        settingsLiveSiteLabel: "Live site URL",
+        settingsLiveSitePlaceholder: "https://trends-navy-psi.vercel.app/",
+        settingsLiveSiteSave: "ライブURLを保存",
+        settingsLiveSiteReset: "自動判定に戻す",
+        settingsLiveSiteSaved:
+          "ライブサイトURLを保存しました。以後はこのURLを本番として扱います。",
+        settingsLiveSiteResetDone:
+          "ライブサイトURLを自動判定に戻しました。",
+        settingsLiveSiteInvalid:
+          "ライブサイトURLが正しくありません。https から始まるURLを入れてください。",
+        settingsLiveSiteSourceConfigured:
+          "現在のソース: 保存したライブURL",
+        settingsLiveSiteSourceRuntime:
+          "現在のソース: 今開いている本番ホスト",
+        settingsLiveSiteSourceDefault:
+          "現在のソース: アプリ既定のライブURL",
         settingsLiveCheck: "ライブ版を確認",
         settingsOpenLiveSite: "ライブサイトを開く",
         settingsLiveChecking: "ライブ版の状態を確認中...",
@@ -298,7 +317,9 @@ export const t = {
           "「ライブ版を確認」でローカルと公開版のビルド差分を確認できます。",
         settingsLiveOpenDone: "ライブサイトを新しいタブで開きました。",
         settingsLiveCrossOriginHint:
-          "ローカル表示中のため、GitHub main の最新コミットで確認しました。",
+          "ライブ版の build-meta を直接読めなかったため、GitHub main の最新コミットで確認しました。",
+        settingsLiveCrossOriginMetaHint:
+          "設定したライブホストの build-meta を直接確認しました。",
         settingsLiveRepoMatch:
           "現在のビルドIDは GitHub main の最新コミットと一致しています。",
         settingsLiveRepoMismatch:
@@ -1212,6 +1233,25 @@ export const t = {
         settingsDataSub: "Export or reset.",
         settingsExportData: "Export data",
         settingsConnectionTest: "Connection test",
+        settingsLiveSiteTitle: "Live site URL",
+        settingsLiveSiteHint:
+          "If production runs on Vercel or a custom domain, save that URL here so live checks and shortcuts stay accurate.",
+        settingsLiveSiteLabel: "Live site URL",
+        settingsLiveSitePlaceholder: "https://trends-navy-psi.vercel.app/",
+        settingsLiveSiteSave: "Save live URL",
+        settingsLiveSiteReset: "Use auto detection",
+        settingsLiveSiteSaved:
+          "Saved the live site URL for deployment checks and shortcuts.",
+        settingsLiveSiteResetDone:
+          "Reverted to automatic live site detection.",
+        settingsLiveSiteInvalid:
+          "Invalid live site URL. Enter a full https URL.",
+        settingsLiveSiteSourceConfigured:
+          "Current source: saved live URL",
+        settingsLiveSiteSourceRuntime:
+          "Current source: current production host",
+        settingsLiveSiteSourceDefault:
+          "Current source: built-in live URL",
         settingsLiveCheck: "Check live deployment",
         settingsOpenLiveSite: "Open live site",
         settingsLiveChecking: "Checking live deployment...",
@@ -1222,7 +1262,9 @@ export const t = {
           "Use \"Check live deployment\" to compare local and live builds.",
         settingsLiveOpenDone: "Opened live site in a new tab.",
         settingsLiveCrossOriginHint:
-          "Running outside the live host, so checked latest GitHub main commit.",
+          "Could not read the live build metadata directly, so checked the latest GitHub main commit instead.",
+        settingsLiveCrossOriginMetaHint:
+          "Checked build metadata from the configured live host directly.",
         settingsLiveRepoMatch:
           "Current build ID matches the latest GitHub main commit.",
         settingsLiveRepoMismatch:
