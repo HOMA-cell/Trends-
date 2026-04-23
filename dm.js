@@ -3674,18 +3674,10 @@ function updateThreadItem(button, thread, tr, query = "") {
   if (draft) {
     appendMetaPill(tr.dmDraftBadge || "Draft", "is-draft");
   }
-  if (isPinned) {
-    appendMetaPill(tr.dmPinnedBadge || "Pinned", "is-pinned");
-  }
-  if (isMuted) {
-    appendMetaPill(tr.dmMutedBadge || "Muted", "is-muted");
-  }
   if (presence.kind === "typing") {
     appendMetaPill(presence.label || tr.dmTyping || "Typing…", "is-typing");
   } else if (presence.kind === "active") {
     appendMetaPill(presence.label || tr.dmPresenceTitle || "Active", "is-active");
-  } else if (presence.kind === "recent") {
-    appendMetaPill(presence.label, "is-recent");
   }
   pills.classList.toggle("hidden", pills.childElementCount === 0);
 
