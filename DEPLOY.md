@@ -15,6 +15,7 @@ The repo now assumes Vercel is the normal production path. GitHub Pages remains 
 cd /Users/homare/Documents/Trends-
 nvm use
 npm ci
+npm run security
 npm run preflight
 npm run ci
 ```
@@ -112,5 +113,7 @@ Use it only when you intentionally want a static fallback deployment.
 
 - `anon` key is allowed in frontend only with proper RLS
 - never place `service_role` in frontend code
+- advanced runtime override tools are hidden on production unless you open the app with `?ops=1`
 - keep production URL saved in app settings if you switch domains
 - run `npm run preflight` after major env or deploy changes
+- review `/Users/homare/Documents/Trends-/SECURITY.md` before inviting real users

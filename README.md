@@ -22,6 +22,7 @@ Open:
 
 - `npm run dev` - local preview server
 - `npm run doctor` - environment readiness summary
+- `npm run security` - security-focused static checks
 - `npm run preflight` - doctor + syntax + deploy metadata
 - `npm run check` - syntax checks for app and support scripts
 - `npm run lint` - ESLint on app source files
@@ -30,8 +31,9 @@ Open:
 ## Production readiness checklist
 
 1. Run `npm run preflight`
-2. Run `npm run ci`
-3. Apply the baseline Supabase migration:
+2. Run `npm run security`
+3. Run `npm run ci`
+4. Apply the baseline Supabase migration:
    - `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
 4. Walk through:
    - sign in
@@ -57,6 +59,8 @@ Open:
   - `/Users/homare/Documents/Trends-/LAUNCH_CHECKLIST.md`
 - Supabase checklist:
   - `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`
+- Security notes:
+  - `/Users/homare/Documents/Trends-/SECURITY.md`
 
 ## Node version
 

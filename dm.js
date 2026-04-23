@@ -2000,7 +2000,6 @@ function getFilteredThreads() {
 
 function renderThreadSummary() {
   const summary = $("dm-thread-summary");
-  if (!summary) return;
   const tr = getDmTranslations();
   const filtered = getFilteredThreads();
   const hasSearch = normalizeDmSearchText(dmThreadSearch).length > 0;
@@ -2017,8 +2016,212 @@ function renderThreadSummary() {
       tr
     )}`;
   }
-  summary.textContent = summaryText;
-  summary.classList.toggle("is-empty", !summaryText);
+  if (summary) {
+    summary.textContent = summaryText;
+    summary.classList.toggle("is-empty", !summaryText);
+  }
+  renderDmInboxInsights(filtered, tr);
+}
+
+function renderDmInboxInsights(filteredThreads = getFilteredThreads(), tr = getDmTranslations()) {
+  const totalValue = $("dm-inbox-stat-total");
+  const unreadValue = $("dm-inbox-stat-unread");
+  const activeValue = $("dm-inbox-stat-active");
+  const totalLabel = $("dm-inbox-insight-total-label");
+  const unreadLabel = $("dm-inbox-insight-unread-label");
+  const activeLabel = $("dm-inbox-insight-active-label");
+  const glanceKicker = $("dm-inbox-glance-kicker");
+  const glanceTitle = $("dm-inbox-glance-title");
+  const glanceNote = $("dm-inbox-glance-note");
+  if (
+    !totalValue &&
+    !unreadValue &&
+    !activeValue &&
+    !totalLabel &&
+    !unreadLabel &&
+    !activeLabel &&
+    !glanceKicker &&
+    !glanceTitle &&
+    !glanceNote
+  ) {
+    return;
+  }
+
+  const counts = getThreadViewCounts();
+  const activeCount = getDmPresenceThreads().length;
+  const filteredCount = Array.isArray(filteredThreads) ? filteredThreads.length : 0;
+  const normalizedQuery = normalizeDmSearchText(dmThreadSearch);
+  const activePartner = dmPartners.find((partner) => partner.id === dmActivePartnerId) || null;
+  const activeIdentity = activePartner
+    ? getProfileIdentity(activePartner.profile, activePartner.id)
+    : null;
+
+  if (totalValue) totalValue.textContent = `${counts.all || 0}`;
+  if (unreadValue) unreadValue.textContent = `${counts.unread || 0}`;
+  if (activeValue) activeValue.textContent = `${activeCount || 0}`;
+  if (totalLabel) {
+    totalLabel.textContent = tr.dmThreadSummaryChats || tr.dmThreadSummaryThreadUnit || "Chats";
+  }
+  if (unreadLabel) unreadLabel.textContent = tr.dmFilterUnread || "Unread";
+  if (activeLabel) activeLabel.textContent = tr.dmPresenceTitle || "Active";
+  if (glanceKicker) {
+    glanceKicker.textContent = tr.dmInboxOverviewTitle || "View";
+  }
+
+  let nextTitle = tr.dmInboxOverviewDefault || tr.dmConversationIdle || "Latest conversations";
+  let nextNote =
+    tr.dmInboxOverviewDefaultNote ||
+    "Pin, unread, and search make it easier to focus on the right thread.";
+
+  if (normalizedQuery) {
+    nextTitle = tr.dmInboxOverviewSearch || "Search results";
+    nextNote = (
+      tr.dmInboxOverviewSearchNote || "\"{query}\" matches {count} conversations"
+    )
+      .replace("{query}", dmThreadSearch.trim())
+      .replace("{count}", `${filteredCount}`);
+  } else if (activeIdentity) {
+    nextTitle = tr.dmInboxOverviewActive || "Open conversation";
+    nextNote = (
+      tr.dmInboxOverviewActiveNote || "Currently reading messages with {name}."
+    ).replace("{name}", activeIdentity.primary);
+  } else if (dmThreadView !== "all") {
+    const label = getDmThreadViewLabel(dmThreadView, tr);
+    nextTitle = label;
+    nextNote = (tr.dmInboxOverviewFilteredNote || "Showing {count} conversations in {label}.")
+      .replace("{count}", `${filteredCount}`)
+      .replace("{label}", label);
+  }
+
+  if (glanceTitle) glanceTitle.textContent = nextTitle;
+  if (glanceNote) glanceNote.textContent = nextNote;
+}
+
+function createDmGlanceStat(label, value) {
+  const item = document.createElement("div");
+  item.className = "dm-chat-glance-stat";
+  const valueEl = document.createElement("span");
+  valueEl.className = "dm-chat-glance-stat-value";
+  valueEl.textContent = `${value}`;
+  const labelEl = document.createElement("span");
+  labelEl.className = "dm-chat-glance-stat-label";
+  labelEl.textContent = label;
+  item.append(valueEl, labelEl);
+  return item;
+}
+
+function renderDmConversationGlance() {
+  const wrap = $("dm-chat-glance");
+  const kicker = $("dm-chat-glance-kicker");
+  const note = $("dm-chat-glance-note");
+  const stats = $("dm-chat-glance-stats");
+  const facts = $("dm-chat-glance-facts");
+  if (!wrap || !kicker || !note || !stats || !facts) return;
+
+  const activePartner = dmPartners.find((partner) => partner.id === dmActivePartnerId) || null;
+  if (!activePartner) {
+    wrap.classList.add("hidden");
+    wrap.setAttribute("aria-hidden", "true");
+    stats.replaceChildren();
+    facts.replaceChildren();
+    facts.classList.add("hidden");
+    return;
+  }
+
+  const tr = getDmTranslations();
+  const identity = getProfileIdentity(activePartner.profile, activePartner.id);
+  const presence = getDmPartnerPresence(activePartner.id, tr);
+  const baseMessages = dmMessages.filter((message) => !parseDmReactionMessage(message));
+  const mediaCount = baseMessages.filter((message) => getDmMessageHasImage(message)).length;
+  const sharedCount = baseMessages.filter((message) => !!parseDmLinkedMessage(message, tr)).length;
+  const replyCount = baseMessages.filter((message) => !!parseDmReplyMessage(message)).length;
+
+  wrap.classList.remove("hidden");
+  wrap.setAttribute("aria-hidden", "false");
+  kicker.textContent = tr.dmChatGlanceTitle || "Conversation snapshot";
+  note.textContent =
+    presence.label ||
+    identity.secondary ||
+    (tr.dmChatGlanceNote || "Recent activity with {name}").replace("{name}", identity.primary);
+
+  stats.replaceChildren(
+    createDmGlanceStat(tr.dmChatStatMessages || tr.dmInfoMessages || "Messages", baseMessages.length),
+    createDmGlanceStat(tr.dmChatStatMedia || tr.dmInfoMediaCount || "Photos", mediaCount),
+    createDmGlanceStat(tr.dmChatStatShared || tr.dmInfoSharedCount || "Shares", sharedCount),
+    createDmGlanceStat(tr.dmChatStatReplies || tr.dmInfoReplies || "Replies", replyCount)
+  );
+
+  const factItems = getDmInfoFacts(activePartner.profile, tr).slice(0, 3);
+  if (!factItems.length) {
+    facts.replaceChildren();
+    facts.classList.add("hidden");
+    return;
+  }
+
+  const factNodes = factItems.map((item) => {
+    const chip = document.createElement("div");
+    chip.className = "dm-chat-glance-fact";
+    const label = document.createElement("span");
+    label.className = "dm-chat-glance-fact-label";
+    label.textContent = item.label;
+    const value = document.createElement("span");
+    value.className = "dm-chat-glance-fact-value";
+    value.textContent = item.value;
+    chip.append(label, value);
+    return chip;
+  });
+  facts.replaceChildren(...factNodes);
+  facts.classList.remove("hidden");
+}
+
+function renderDmComposerContext() {
+  const title = $("dm-composer-context-title");
+  const note = $("dm-composer-context-note");
+  const wrap = $("dm-composer-context");
+  if (!title || !note || !wrap) return;
+
+  const tr = getDmTranslations();
+  const currentUser = getCurrentUser();
+  const input = $("dm-input");
+  const activePartner = dmPartners.find((partner) => partner.id === dmActivePartnerId) || null;
+
+  let nextTitle =
+    tr.dmComposerContextIdleTitle ||
+    tr.dmComposerDisabledPlaceholder ||
+    "Select a conversation to start typing.";
+  let nextNote =
+    tr.dmComposerContextIdleNote ||
+    tr.dmSelectPartner ||
+    "Pick a partner from the list to enable the composer.";
+
+  if (!currentUser) {
+    nextTitle = tr.dmLoginRequired || "Please log in to use DMs.";
+    nextNote = "";
+  } else if (activePartner) {
+    const identity = getProfileIdentity(activePartner.profile, activePartner.id);
+    const presence = getDmPartnerPresence(activePartner.id, tr);
+    const rawTitle =
+      tr.dmComposerContextActiveTitle || "{name}にメッセージ";
+    nextTitle = rawTitle.replace("{name}", identity.primary);
+    if (dmReplyTargetId) {
+      nextNote = tr.dmComposerContextReplyNote || "返信付きで送信します。";
+    } else if (dmPendingMediaFile) {
+      nextNote = tr.dmComposerContextMediaNote || "写真を添えて送信します。";
+    } else if (hasDmDraft(activePartner.id) && !`${input?.value || ""}`.trim()) {
+      nextNote = tr.dmComposerContextDraftNote || "この相手に未送信の下書きがあります。";
+    } else {
+      nextNote =
+        presence.label ||
+        identity.secondary ||
+        tr.dmComposerContextPresenceNote ||
+        tr.dmChatSubIdle ||
+        "";
+    }
+  }
+
+  title.textContent = nextTitle;
+  note.textContent = nextNote;
+  wrap.classList.toggle("is-muted", !activePartner);
 }
 
 function renderDmPresenceStrip() {
@@ -2380,6 +2583,12 @@ function getDmComposerPlaceholder() {
   if (!dmActivePartnerId) {
     return tr.dmComposerDisabledPlaceholder || tr.dmSelectPartner || "Select a conversation.";
   }
+  const activePartner = dmPartners.find((partner) => partner.id === dmActivePartnerId) || null;
+  if (activePartner) {
+    const identity = getProfileIdentity(activePartner.profile, activePartner.id);
+    const template = tr.dmComposerPlaceholderWithName || "{name}にメッセージ";
+    return template.replace("{name}", identity.primary);
+  }
   return tr.dmInputPlaceholder || "Type a message";
 }
 
@@ -2419,6 +2628,7 @@ function updateDmComposerState() {
     form.classList.toggle("has-media", hasMedia);
     form.classList.toggle("has-reply", !!dmReplyTargetId);
   }
+  renderDmComposerContext();
 }
 
 function getDmMessageById(messageId) {
@@ -5329,6 +5539,7 @@ function renderConversationMessages(options = {}) {
     dmRenderedMessagePartnerId = "";
     dmRenderedMessageKeys = [];
     dmReactionPickerMessageId = "";
+    renderDmConversationGlance();
     renderDmChatContext();
     renderDmPinnedMessageBar();
     renderDmEntryContext();
@@ -5344,6 +5555,7 @@ function renderConversationMessages(options = {}) {
     dmRenderedMessagePartnerId = dmActivePartnerId;
     dmRenderedMessageKeys = [];
     dmReactionPickerMessageId = "";
+    renderDmConversationGlance();
     renderDmChatContext();
     renderDmPinnedMessageBar();
     renderDmEntryContext();
@@ -5431,6 +5643,9 @@ function renderConversationMessages(options = {}) {
     }
     dmRenderedMessagePartnerId = dmActivePartnerId;
     dmRenderedMessageKeys = nextMessageKeys;
+    renderDmConversationGlance();
+    renderDmChatContext();
+    renderDmPinnedMessageBar();
     renderDmEntryContext();
     updateDmMessageSearchState();
     renderDmInfoPanel();
@@ -5469,6 +5684,7 @@ function renderConversationMessages(options = {}) {
   }
   dmRenderedMessagePartnerId = dmActivePartnerId;
   dmRenderedMessageKeys = nextMessageKeys;
+  renderDmConversationGlance();
   renderDmChatContext();
   renderDmPinnedMessageBar();
   renderDmEntryContext();
@@ -6920,10 +7136,13 @@ export function renderDmPage(options = {}) {
     if (jumpUnreadBtn) jumpUnreadBtn.classList.add("hidden");
     if (jumpLatestBtn) jumpLatestBtn.classList.add("hidden");
     renderDmReplyComposer();
+    renderDmInboxInsights([], tr);
     renderDmPresenceStrip();
+    renderDmConversationGlance();
     renderDmChatContext();
     renderDmPinnedMessageBar();
     renderDmEntryContext();
+    renderDmComposerContext();
     setThreadStatus("", "");
     setSendStatus("", "");
     return;

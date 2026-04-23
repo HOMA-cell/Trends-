@@ -7,12 +7,14 @@ Use this when we are about to let real users in.
 ```bash
 cd /Users/homare/Documents/Trends-
 npm ci
+npm run security
 npm run preflight
 ```
 
 Expected:
 
 - Node 22
+- security audit passes
 - `doctor` passes
 - syntax checks pass
 - deploy metadata can be generated
@@ -31,6 +33,15 @@ Then verify:
 - RLS is enabled
 - DM tables exist
 - comment / like / follow / notification tables exist
+
+If you have Supabase CLI access configured, you can also check linked migration state with:
+
+```bash
+cd /Users/homare/Documents/Trends-
+npm run db:status
+```
+
+This requires `supabase login` or `SUPABASE_ACCESS_TOKEN`.
 
 Reference:
 
@@ -80,6 +91,7 @@ With a real account:
 
 Safe to open to real users when all are true:
 
+- `npm run security` passes
 - `npm run preflight` passes
 - CI is green
 - Vercel is green

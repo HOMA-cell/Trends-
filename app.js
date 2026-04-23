@@ -169,6 +169,7 @@ import {
     const BUILD_META_URL = "./build-meta.json";
     const DEFAULT_LIVE_SITE_URL = "https://trends-navy-psi.vercel.app/";
     const LIVE_SITE_URL_STORAGE_KEY = "trends_live_site_url_v1";
+    const RUNTIME_TOOLS_QUERY_PARAM = "ops";
     const GITHUB_MAIN_COMMIT_API_URL =
       "https://api.github.com/repos/HOMA-cell/Trends-/commits/main";
     const SUPABASE_CONNECTIVITY_CACHE_KEY = "trends_supabase_connectivity_v1";
@@ -1045,6 +1046,18 @@ async function loadProfilePostCount() {
         return normalizeSiteBaseUrl(`${origin}/Trends-/`);
       }
       return normalizeSiteBaseUrl(`${origin}${pathname || "/"}`);
+    }
+
+    function areRuntimeToolsEnabled() {
+      if (typeof window === "undefined") return false;
+      const hostname = window.location?.hostname || "";
+      if (isLocalPreviewHostname(hostname)) return true;
+      try {
+        const params = new URLSearchParams(window.location.search || "");
+        return params.get(RUNTIME_TOOLS_QUERY_PARAM) === "1";
+      } catch {
+        return false;
+      }
     }
 
     function getLiveSiteUrlSource() {
@@ -2651,6 +2664,7 @@ async function loadProfilePostCount() {
       setText("settings-height-unit-desc", "settingsHeightUnitDesc");
       setText("settings-data-title", "settingsDataTitle");
       setText("settings-data-sub", "settingsDataSub");
+      setText("settings-runtime-tools-note", "settingsRuntimeToolsNoteHidden");
       setText("settings-launch-title", "settingsLaunchTitle");
       setText("settings-launch-sub", "settingsLaunchSub");
       setText("settings-launch-live-label", "settingsLaunchLiveLabel");
@@ -3840,6 +3854,7 @@ async function loadProfilePostCount() {
         return;
       }
       await supabase.auth.signOut();
+      await clearLocalRuntimeCaches();
       currentUser = null;
       currentProfile = null;
       profilePostCount = null;
@@ -8158,6 +8173,7 @@ async function loadProfilePostCount() {
       }
 
       const submitBtn = $("btn-submit");
+      const backdrop = $("post-modal-backdrop");
       setButtonLoading(submitBtn, true, "Posting...");
 
       const date = $("post-date").value;
@@ -8211,6 +8227,7 @@ async function loadProfilePostCount() {
           date: date || null,
           bodyweight: bodyweightValue,
           note: caption || null,
+          caption: caption || null,
           media_url: mediaUrl,
           media_type: mediaType,
           visibility,
@@ -8256,15 +8273,47 @@ async function loadProfilePostCount() {
           }
         }
 
-        applyOptimisticPost(insertedPost.id, payload, logsWithPr);
-        resetPostForm();
-        clearPostDraft();
-        const backdrop = $("post-modal-backdrop");
-        if (backdrop) backdrop.classList.add("hidden");
+        let uiRefreshFailed = false;
+        try {
+          applyOptimisticPost(insertedPost.id, payload, logsWithPr);
+        } catch (uiError) {
+          uiRefreshFailed = true;
+          console.error("post optimistic render error:", uiError);
+        }
+
+        try {
+          resetPostForm();
+        } catch (resetError) {
+          uiRefreshFailed = true;
+          console.error("post form reset error:", resetError);
+        }
+
+        try {
+          clearPostDraft();
+        } catch (draftError) {
+          uiRefreshFailed = true;
+          console.error("post draft clear error:", draftError);
+        }
+
+        closeBackdrop(backdrop);
         loadFeed({ softRefresh: true, forceNetwork: true }).catch((feedError) => {
           console.error("post refresh error:", feedError);
         });
-        showToast("投稿しました！", "success");
+
+        if (uiRefreshFailed) {
+          showToast(
+            "投稿は保存されました。画面の更新で問題があったため、必要なら再読み込みしてください。",
+            "warning"
+          );
+        } else {
+          showToast("投稿しました！", "success");
+        }
+      } catch (submitError) {
+        console.error("submit post unexpected error:", submitError);
+        showToast(
+          "投稿処理に失敗しました。もう一度お試しください。",
+          "error"
+        );
       } finally {
         setButtonLoading(submitBtn, false);
       }
@@ -8565,6 +8614,25 @@ async function loadProfilePostCount() {
         }
         renderLiveSiteSourceStatus();
         renderLaunchReadinessSummary();
+      };
+      const applyRuntimeToolsVisibility = () => {
+        const noteEl = $("settings-runtime-tools-note");
+        const toolSections = [
+          $("settings-live-site-config"),
+          $("settings-supabase-config"),
+          $("settings-ads-config"),
+        ].filter(Boolean);
+        const runtimeToolsEnabled = areRuntimeToolsEnabled();
+        toolSections.forEach((section) => {
+          section.classList.toggle("hidden", !runtimeToolsEnabled);
+        });
+        if (!noteEl) return;
+        const tr = t[currentLang] || t.ja;
+        noteEl.textContent = runtimeToolsEnabled
+          ? tr.settingsRuntimeToolsNoteVisible ||
+            "Advanced runtime tools are visible in local mode or with ?ops=1."
+          : tr.settingsRuntimeToolsNoteHidden ||
+            "Advanced runtime tools are hidden on production. Open local preview or add ?ops=1 when you need them.";
       };
       const renderLaunchReadinessSummary = () => {
         const summaryEl = $("settings-launch-summary");
@@ -8896,6 +8964,7 @@ async function loadProfilePostCount() {
       fillLiveSiteConfigInput();
       renderSupabaseSourceStatus();
       renderConnectivitySummary();
+      applyRuntimeToolsVisibility();
       renderLaunchReadinessSummary();
       setLiveStatus(
         (t[currentLang] || t.ja).settingsLiveStatusHint ||

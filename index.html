@@ -202,183 +202,228 @@
       <!-- DM ページ -->
       <div class="page-view" data-page="messages">
         <section class="card dm-shell">
-          <div class="dm-shell-header">
-            <div class="dm-shell-heading">
-              <div class="card-title" id="messages-title">ダイレクトメッセージ</div>
-              <div class="card-sub" id="messages-sub">フォロー中ユーザーと会話できます。</div>
-            </div>
-            <div class="dm-shell-actions">
-              <button
-                class="btn btn-ghost btn-xs"
-                id="btn-dm-refresh"
-                type="button"
-                aria-label="更新"
-                title="更新"
-              >更新</button>
-              <button
-                class="btn btn-primary btn-xs"
-                id="btn-dm-compose"
-                type="button"
-                title="新規メッセージ"
-              >新規メッセージ</button>
-            </div>
-          </div>
-          <div class="template-status" id="dm-login-required"></div>
-          <div id="dm-layout" class="dm-layout hidden">
-            <aside class="dm-sidebar">
-              <div class="dm-thread-toolbar">
-                <input
-                  id="dm-thread-search"
-                  type="text"
-                  placeholder="会話を検索"
-                  autocomplete="off"
-                />
-                <button class="btn btn-ghost btn-xs hidden" id="btn-dm-thread-search-clear" type="button">
-                  クリア
-                </button>
+          <div class="dm-shell-frame">
+            <div class="dm-shell-header">
+              <div class="dm-shell-heading">
+                <div class="card-title" id="messages-title">ダイレクトメッセージ</div>
+                <div class="card-sub" id="messages-sub">フォロー中ユーザーと会話できます。</div>
               </div>
-              <div class="dm-thread-filters" id="dm-thread-filters" role="tablist" aria-label="DM filters">
-                <button class="chip chip-active" id="dm-filter-all" type="button">すべて</button>
-                <button class="chip" id="dm-filter-unread" type="button">未読</button>
-                <button class="chip" id="dm-filter-pinned" type="button">固定</button>
-                <button class="chip" id="dm-filter-muted" type="button">消音</button>
-              </div>
-              <div class="dm-thread-summary" id="dm-thread-summary">-</div>
-              <div class="dm-presence-strip hidden" id="dm-presence-strip" aria-hidden="true">
-                <div class="dm-presence-strip-head">
-                  <div class="dm-presence-strip-title" id="dm-presence-strip-title">アクティブ</div>
-                  <div class="dm-presence-strip-meta" id="dm-presence-strip-meta">-</div>
-                </div>
-                <div class="dm-presence-strip-list" id="dm-presence-strip-list"></div>
-              </div>
-              <div class="field dm-partner-field dm-partner-field-hidden" aria-hidden="true">
-                <label id="dm-partner-label" class="sr-only" for="dm-partner-select">相手</label>
-                <select id="dm-partner-select" class="select-sm"></select>
-              </div>
-              <div class="template-status" id="dm-thread-status"></div>
-              <div id="dm-thread-list" class="dm-thread-list"></div>
-            </aside>
-            <section class="dm-chat">
-              <div class="dm-chat-header">
-                <div class="dm-chat-header-main" id="dm-chat-header-main">
-                  <button class="btn btn-ghost btn-xs dm-mobile-back hidden" id="btn-dm-back" type="button">
-                    一覧
-                  </button>
-                  <div class="avatar dm-chat-avatar" id="dm-chat-avatar" aria-hidden="true">U</div>
-                  <div class="dm-chat-header-texts">
-                    <div class="dm-chat-title" id="dm-chat-title">会話を選択</div>
-                    <div class="dm-chat-sub" id="dm-chat-sub">-</div>
-                  </div>
-                </div>
-                <div class="dm-chat-header-actions">
-                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-search" type="button">検索</button>
-                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-info" type="button">情報</button>
-                </div>
-              </div>
-              <div class="dm-chat-search hidden" id="dm-chat-search">
-                <input
-                  id="dm-message-search"
-                  type="text"
-                  placeholder="会話内を検索"
-                  autocomplete="off"
-                />
-                <div class="dm-chat-search-actions">
-                  <div class="dm-chat-search-count" id="dm-message-search-count">-</div>
-                  <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-prev" type="button">↑</button>
-                  <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-next" type="button">↓</button>
-                  <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-close" type="button">閉じる</button>
-                </div>
-                <div class="dm-chat-search-days hidden" id="dm-message-search-days"></div>
-                <div class="dm-chat-search-results hidden" id="dm-message-search-results"></div>
-              </div>
-              <div class="dm-chat-context hidden" id="dm-chat-context">
-                <div class="dm-chat-context-copy">
-                  <div class="dm-chat-context-label" id="dm-chat-context-label">最近のメディア</div>
-                  <div class="dm-chat-context-meta" id="dm-chat-context-meta">-</div>
-                </div>
-                <div class="dm-chat-media-strip" id="dm-chat-media-strip"></div>
-              </div>
-              <div class="dm-pinned-message hidden" id="dm-pinned-message">
-                <div class="dm-pinned-message-copy">
-                  <div class="dm-pinned-message-label" id="dm-pinned-message-label">固定メッセージ</div>
-                  <button
-                    class="dm-pinned-message-body"
-                    id="btn-dm-pinned-message-open"
-                    type="button"
-                  >-</button>
-                </div>
+              <div class="dm-shell-actions">
                 <button
-                  class="btn btn-ghost btn-xs dm-pinned-message-clear"
-                  id="btn-dm-pinned-message-clear"
+                  class="btn btn-ghost btn-xs"
+                  id="btn-dm-refresh"
                   type="button"
-                >解除</button>
+                  aria-label="更新"
+                  title="更新"
+                >更新</button>
+                <button
+                  class="btn btn-primary btn-xs"
+                  id="btn-dm-compose"
+                  type="button"
+                  title="新規メッセージ"
+                >新規メッセージ</button>
               </div>
-              <div class="dm-entry-context hidden" id="dm-entry-context" aria-hidden="true">
-                <div class="dm-entry-context-copy">
-                  <div class="dm-entry-context-label" id="dm-entry-context-label">通知から移動</div>
-                  <div class="dm-entry-context-text" id="dm-entry-context-text">-</div>
-                </div>
-                <div class="dm-entry-context-actions">
-                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-post" type="button">投稿へ</button>
-                  <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-profile" type="button">プロフィール</button>
-                  <button class="btn btn-ghost btn-xs dm-entry-context-dismiss" id="btn-dm-entry-dismiss" type="button">×</button>
-                </div>
-              </div>
-              <div class="dm-chat-stage">
-                <div class="dm-floating-date hidden" id="dm-floating-date" aria-live="polite"></div>
-                <div id="dm-message-list" class="dm-message-list"></div>
-                <button class="btn btn-ghost btn-xs hidden dm-jump-unread" id="btn-dm-jump-unread" type="button">
-                  未読へ
-                </button>
-                <button class="btn btn-primary btn-xs hidden dm-jump-latest" id="btn-dm-jump-latest" type="button">
-                  最新へ
-                </button>
-              </div>
-              <div class="dm-composer">
-                <div id="dm-reply-preview" class="dm-reply-preview hidden" aria-live="polite">
-                  <div class="dm-reply-preview-copy">
-                    <div id="dm-reply-title" class="dm-reply-preview-title"></div>
-                    <div id="dm-reply-author" class="dm-reply-preview-author"></div>
-                    <div id="dm-reply-text" class="dm-reply-preview-text"></div>
+            </div>
+            <div class="template-status" id="dm-login-required"></div>
+            <div id="dm-layout" class="dm-layout hidden">
+              <aside class="dm-sidebar">
+                <div class="dm-sidebar-top">
+                  <div class="dm-thread-toolbar">
+                    <input
+                      id="dm-thread-search"
+                      type="text"
+                      placeholder="会話を検索"
+                      autocomplete="off"
+                    />
+                    <button class="btn btn-ghost btn-xs hidden" id="btn-dm-thread-search-clear" type="button">
+                      クリア
+                    </button>
                   </div>
-                  <button
-                    class="btn btn-ghost btn-xs dm-reply-preview-close"
-                    id="btn-dm-reply-cancel"
-                    type="button"
-                  >×</button>
-                </div>
-                <form id="dm-form" class="dm-form">
-                  <input id="dm-media-input" type="file" accept="image/*" class="sr-only" />
-                  <button
-                    class="btn btn-ghost btn-xs dm-media-btn"
-                    id="btn-dm-media"
-                    type="button"
-                    aria-label="写真を追加"
-                    title="写真を追加"
-                  >＋</button>
-                  <textarea
-                    id="dm-input"
-                    maxlength="600"
-                    rows="1"
-                    placeholder="メッセージを入力"
-                    autocomplete="off"
-                  ></textarea>
-                  <button class="btn btn-primary" id="btn-dm-send" type="submit">送信</button>
-                </form>
-                <div class="dm-media-preview hidden" id="dm-media-preview">
-                  <img id="dm-media-preview-image" alt="" />
-                  <div class="dm-media-preview-copy">
-                    <div class="dm-media-preview-label" id="dm-media-preview-label"></div>
-                    <div class="dm-media-preview-name" id="dm-media-preview-name"></div>
+                  <div class="dm-thread-filters" id="dm-thread-filters" role="tablist" aria-label="DM filters">
+                    <button class="chip chip-active" id="dm-filter-all" type="button">すべて</button>
+                    <button class="chip" id="dm-filter-unread" type="button">未読</button>
+                    <button class="chip" id="dm-filter-pinned" type="button">固定</button>
+                    <button class="chip" id="dm-filter-muted" type="button">消音</button>
                   </div>
-                  <button class="btn btn-ghost btn-xs" id="btn-dm-media-remove" type="button">削除</button>
+                  <div class="dm-thread-summary" id="dm-thread-summary">-</div>
+                  <div class="dm-inbox-insights" id="dm-inbox-insights">
+                    <div class="dm-inbox-insight-grid">
+                      <div class="dm-inbox-insight-card">
+                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-total-label">会話</div>
+                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-total">0</div>
+                      </div>
+                      <div class="dm-inbox-insight-card">
+                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-unread-label">未読</div>
+                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-unread">0</div>
+                      </div>
+                      <div class="dm-inbox-insight-card">
+                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-active-label">アクティブ</div>
+                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-active">0</div>
+                      </div>
+                    </div>
+                    <div class="dm-inbox-glance">
+                      <div class="dm-inbox-glance-kicker" id="dm-inbox-glance-kicker">今の表示</div>
+                      <div class="dm-inbox-glance-title" id="dm-inbox-glance-title">最新の会話</div>
+                      <div class="dm-inbox-glance-note" id="dm-inbox-glance-note">固定や未読で絞り込めます。</div>
+                    </div>
+                  </div>
+                  <div class="dm-presence-strip hidden" id="dm-presence-strip" aria-hidden="true">
+                    <div class="dm-presence-strip-head">
+                      <div class="dm-presence-strip-title" id="dm-presence-strip-title">アクティブ</div>
+                      <div class="dm-presence-strip-meta" id="dm-presence-strip-meta">-</div>
+                    </div>
+                    <div class="dm-presence-strip-list" id="dm-presence-strip-list"></div>
+                  </div>
+                  <div class="field dm-partner-field dm-partner-field-hidden" aria-hidden="true">
+                    <label id="dm-partner-label" class="sr-only" for="dm-partner-select">相手</label>
+                    <select id="dm-partner-select" class="select-sm"></select>
+                  </div>
                 </div>
-                <div class="dm-form-meta">
-                  <div class="dm-input-count" id="dm-input-count">0/600</div>
+                <div class="template-status" id="dm-thread-status"></div>
+                <div class="dm-thread-list-wrap">
+                  <div id="dm-thread-list" class="dm-thread-list"></div>
                 </div>
-                <div class="template-status" id="dm-send-status"></div>
-              </div>
-            </section>
+              </aside>
+              <section class="dm-chat">
+                <div class="dm-chat-top">
+                  <div class="dm-chat-header">
+                    <div class="dm-chat-header-main" id="dm-chat-header-main">
+                      <button class="btn btn-ghost btn-xs dm-mobile-back hidden" id="btn-dm-back" type="button">
+                        一覧
+                      </button>
+                      <div class="avatar dm-chat-avatar" id="dm-chat-avatar" aria-hidden="true">U</div>
+                      <div class="dm-chat-header-texts">
+                        <div class="dm-chat-title" id="dm-chat-title">会話を選択</div>
+                        <div class="dm-chat-sub" id="dm-chat-sub">-</div>
+                      </div>
+                    </div>
+                    <div class="dm-chat-header-actions">
+                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-search" type="button">検索</button>
+                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-info" type="button">情報</button>
+                    </div>
+                  </div>
+                  <div class="dm-chat-search hidden" id="dm-chat-search">
+                    <input
+                      id="dm-message-search"
+                      type="text"
+                      placeholder="会話内を検索"
+                      autocomplete="off"
+                    />
+                    <div class="dm-chat-search-actions">
+                      <div class="dm-chat-search-count" id="dm-message-search-count">-</div>
+                      <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-prev" type="button">↑</button>
+                      <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-next" type="button">↓</button>
+                      <button class="btn btn-ghost btn-xs" id="btn-dm-message-search-close" type="button">閉じる</button>
+                    </div>
+                    <div class="dm-chat-search-days hidden" id="dm-message-search-days"></div>
+                    <div class="dm-chat-search-results hidden" id="dm-message-search-results"></div>
+                  </div>
+                  <div class="dm-chat-context hidden" id="dm-chat-context">
+                    <div class="dm-chat-context-copy">
+                      <div class="dm-chat-context-label" id="dm-chat-context-label">最近のメディア</div>
+                      <div class="dm-chat-context-meta" id="dm-chat-context-meta">-</div>
+                    </div>
+                    <div class="dm-chat-media-strip" id="dm-chat-media-strip"></div>
+                  </div>
+                  <div class="dm-pinned-message hidden" id="dm-pinned-message">
+                    <div class="dm-pinned-message-copy">
+                      <div class="dm-pinned-message-label" id="dm-pinned-message-label">固定メッセージ</div>
+                      <button
+                        class="dm-pinned-message-body"
+                        id="btn-dm-pinned-message-open"
+                        type="button"
+                      >-</button>
+                    </div>
+                    <button
+                      class="btn btn-ghost btn-xs dm-pinned-message-clear"
+                      id="btn-dm-pinned-message-clear"
+                      type="button"
+                    >解除</button>
+                  </div>
+                  <div class="dm-entry-context hidden" id="dm-entry-context" aria-hidden="true">
+                    <div class="dm-entry-context-copy">
+                      <div class="dm-entry-context-label" id="dm-entry-context-label">通知から移動</div>
+                      <div class="dm-entry-context-text" id="dm-entry-context-text">-</div>
+                    </div>
+                    <div class="dm-entry-context-actions">
+                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-post" type="button">投稿へ</button>
+                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-profile" type="button">プロフィール</button>
+                      <button class="btn btn-ghost btn-xs dm-entry-context-dismiss" id="btn-dm-entry-dismiss" type="button">×</button>
+                    </div>
+                  </div>
+                  <div class="dm-chat-glance hidden" id="dm-chat-glance" aria-hidden="true">
+                    <div class="dm-chat-glance-head">
+                      <div class="dm-chat-glance-kicker" id="dm-chat-glance-kicker">会話のスナップショット</div>
+                      <div class="dm-chat-glance-note" id="dm-chat-glance-note">-</div>
+                    </div>
+                    <div class="dm-chat-glance-stats" id="dm-chat-glance-stats"></div>
+                    <div class="dm-chat-glance-facts hidden" id="dm-chat-glance-facts"></div>
+                  </div>
+                </div>
+                <div class="dm-chat-main">
+                  <div class="dm-chat-stage">
+                    <div class="dm-floating-date hidden" id="dm-floating-date" aria-live="polite"></div>
+                    <div id="dm-message-list" class="dm-message-list"></div>
+                    <button class="btn btn-ghost btn-xs hidden dm-jump-unread" id="btn-dm-jump-unread" type="button">
+                      未読へ
+                    </button>
+                    <button class="btn btn-primary btn-xs hidden dm-jump-latest" id="btn-dm-jump-latest" type="button">
+                      最新へ
+                    </button>
+                  </div>
+                </div>
+                <div class="dm-chat-bottom">
+                  <div class="dm-composer">
+                    <div class="dm-composer-context" id="dm-composer-context">
+                      <div class="dm-composer-context-title" id="dm-composer-context-title">会話を選ぶと送信できます</div>
+                      <div class="dm-composer-context-note" id="dm-composer-context-note">一覧から相手を選んでください。</div>
+                    </div>
+                    <div id="dm-reply-preview" class="dm-reply-preview hidden" aria-live="polite">
+                      <div class="dm-reply-preview-copy">
+                        <div id="dm-reply-title" class="dm-reply-preview-title"></div>
+                        <div id="dm-reply-author" class="dm-reply-preview-author"></div>
+                        <div id="dm-reply-text" class="dm-reply-preview-text"></div>
+                      </div>
+                      <button
+                        class="btn btn-ghost btn-xs dm-reply-preview-close"
+                        id="btn-dm-reply-cancel"
+                        type="button"
+                      >×</button>
+                    </div>
+                    <form id="dm-form" class="dm-form">
+                      <input id="dm-media-input" type="file" accept="image/*" class="sr-only" />
+                      <button
+                        class="btn btn-ghost btn-xs dm-media-btn"
+                        id="btn-dm-media"
+                        type="button"
+                        aria-label="写真を追加"
+                        title="写真を追加"
+                      >＋</button>
+                      <textarea
+                        id="dm-input"
+                        maxlength="600"
+                        rows="1"
+                        placeholder="メッセージを入力"
+                        autocomplete="off"
+                      ></textarea>
+                      <button class="btn btn-primary" id="btn-dm-send" type="submit">送信</button>
+                    </form>
+                    <div class="dm-media-preview hidden" id="dm-media-preview">
+                      <img id="dm-media-preview-image" alt="" />
+                      <div class="dm-media-preview-copy">
+                        <div class="dm-media-preview-label" id="dm-media-preview-label"></div>
+                        <div class="dm-media-preview-name" id="dm-media-preview-name"></div>
+                      </div>
+                      <button class="btn btn-ghost btn-xs" id="btn-dm-media-remove" type="button">削除</button>
+                    </div>
+                    <div class="dm-form-meta">
+                      <div class="dm-input-count" id="dm-input-count">0/600</div>
+                    </div>
+                    <div class="template-status" id="dm-send-status"></div>
+                  </div>
+                </div>
+              </section>
+            </div>
           </div>
           <div class="dm-compose-modal hidden" id="dm-compose-modal" aria-hidden="true">
             <button class="dm-compose-backdrop" id="btn-dm-compose-backdrop" type="button" aria-label="閉じる"></button>
@@ -856,104 +901,116 @@
       <!-- 公開プロフィール ページ -->
       <div class="page-view" data-page="public-profile">
         <section class="card profile-card" id="public-profile-card" data-collapsible="public-profile-details" data-default-open="false">
-          <div class="card-header">
-            <div class="card-title" id="public-profile-title">Profile</div>
-            <div class="public-profile-header-actions">
-              <button class="btn btn-ghost btn-xs" id="btn-back-to-feed">戻る</button>
-              <button class="btn btn-ghost btn-xs" id="btn-share-profile" data-public-share-trigger>共有</button>
-              <button class="btn btn-ghost btn-xs" data-collapsible-btn>Show more</button>
+          <div class="public-profile-hero">
+            <div class="card-header">
+              <div class="card-title" id="public-profile-title">Profile</div>
+              <div class="public-profile-header-actions">
+                <button class="btn btn-ghost btn-xs" id="btn-back-to-feed">戻る</button>
+                <button class="btn btn-ghost btn-xs" id="btn-share-profile" data-public-share-trigger>共有</button>
+                <button class="btn btn-ghost btn-xs" data-collapsible-btn>Show more</button>
+              </div>
+            </div>
+            <div class="public-profile-header">
+              <div class="public-profile-main">
+                <div class="avatar avatar-lg" id="public-profile-avatar">-</div>
+                <div>
+                  <div class="public-profile-name" id="public-profile-name">-</div>
+                  <div class="public-profile-subline">
+                    <div class="card-sub" id="public-profile-handle">-</div>
+                    <span class="profile-subline-dot" aria-hidden="true">•</span>
+                    <div class="card-sub hidden" id="public-profile-joined">-</div>
+                  </div>
+                </div>
+              </div>
+              <div class="public-profile-actions">
+                <button class="btn btn-ghost hidden" id="btn-public-message" data-public-message-trigger>メッセージ</button>
+                <button class="btn btn-primary" id="btn-public-follow" data-public-follow-trigger>フォロー</button>
+              </div>
             </div>
           </div>
-          <div class="public-profile-header">
-            <div class="public-profile-main">
-              <div class="avatar avatar-lg" id="public-profile-avatar">-</div>
-              <div>
-                <div class="public-profile-name" id="public-profile-name">-</div>
-                <div class="public-profile-subline">
-                  <div class="card-sub" id="public-profile-handle">-</div>
-                  <span class="profile-subline-dot" aria-hidden="true">•</span>
-                  <div class="card-sub hidden" id="public-profile-joined">-</div>
+          <div class="public-profile-overview-grid">
+            <div class="public-profile-overview-main">
+              <div class="public-profile-entry hidden" id="public-profile-entry" aria-hidden="true">
+                <div class="public-profile-entry-copy">
+                  <div class="public-profile-entry-label" id="public-profile-entry-label">通知から移動</div>
+                  <div class="public-profile-entry-text" id="public-profile-entry-text">-</div>
+                </div>
+                <button
+                  class="btn btn-ghost btn-xs public-profile-entry-action hidden"
+                  id="btn-public-profile-entry-action"
+                  type="button"
+                >
+                  投稿に戻る
+                </button>
+              </div>
+              <div class="profile-meta" id="public-profile-meta">
+                <span id="public-profile-posts">-</span>
+                <span id="public-profile-following">-</span>
+                <span id="public-profile-followers">-</span>
+                <span id="public-profile-streak">-</span>
+              </div>
+              <div class="public-profile-bio" id="public-profile-bio"></div>
+              <div class="public-profile-hero-facts hidden" id="public-profile-hero-facts"></div>
+              <div class="profile-badges hidden" id="public-profile-badges"></div>
+              <div class="public-profile-connection hidden" id="public-profile-connection"></div>
+            </div>
+            <div class="public-profile-overview-side">
+              <div class="public-profile-spotlight hidden" id="public-profile-spotlight"></div>
+              <div class="profile-pinned hidden" id="public-profile-pinned"></div>
+              <div class="profile-quick-stats hidden" id="public-profile-quick-stats"></div>
+              <div class="public-profile-details-panel">
+                <div class="collapsible-content" data-collapsible-content>
+                  <div class="profile-stats-grid hidden" id="public-profile-stats-grid"></div>
+                  <div class="profile-banner" id="public-profile-banner"></div>
+                  <div class="card-sub" id="public-profile-facts-title">プロフィール情報</div>
+                  <div class="profile-facts" id="public-profile-facts"></div>
+                  <div class="card-sub" id="public-profile-highlights-title">ハイライト</div>
+                  <div class="profile-highlights" id="public-profile-highlights"></div>
                 </div>
               </div>
             </div>
-            <div class="public-profile-actions">
-              <button class="btn btn-ghost hidden" id="btn-public-message" data-public-message-trigger>メッセージ</button>
-              <button class="btn btn-primary" id="btn-public-follow" data-public-follow-trigger>フォロー</button>
+          </div>
+          <div class="public-profile-content-panel">
+            <div class="public-profile-content-tabs" id="public-profile-content-tabs" role="tablist" aria-label="Profile content">
+              <button class="public-profile-content-tab is-active" id="btn-public-tab-posts" data-profile-content-tab="posts" type="button">
+                <span id="public-tab-posts-label">投稿</span>
+                <span class="public-profile-content-count" id="public-tab-posts-count">0</span>
+              </button>
+              <button class="public-profile-content-tab" id="btn-public-tab-media" data-profile-content-tab="media" type="button">
+                <span id="public-tab-media-label">メディア</span>
+                <span class="public-profile-content-count" id="public-tab-media-count">0</span>
+              </button>
+              <button class="public-profile-content-tab" id="btn-public-tab-workouts" data-profile-content-tab="workouts" type="button">
+                <span id="public-tab-workouts-label">ワークアウト</span>
+                <span class="public-profile-content-count" id="public-tab-workouts-count">0</span>
+              </button>
             </div>
-          </div>
-          <div class="public-profile-entry hidden" id="public-profile-entry" aria-hidden="true">
-            <div class="public-profile-entry-copy">
-              <div class="public-profile-entry-label" id="public-profile-entry-label">通知から移動</div>
-              <div class="public-profile-entry-text" id="public-profile-entry-text">-</div>
+            <div class="public-profile-content-summary" id="public-profile-content-summary">
+              <div class="public-profile-content-summary-copy">
+                <div class="public-profile-content-summary-title" id="public-profile-content-summary-title">投稿</div>
+                <div class="public-profile-content-summary-note" id="public-profile-content-summary-note">最新の投稿</div>
+              </div>
+              <div class="public-profile-content-summary-count" id="public-profile-content-summary-count">0</div>
             </div>
-            <button
-              class="btn btn-ghost btn-xs public-profile-entry-action hidden"
-              id="btn-public-profile-entry-action"
-              type="button"
-            >
-              投稿に戻る
-            </button>
-          </div>
-          <div class="profile-meta" id="public-profile-meta">
-            <span id="public-profile-posts">-</span>
-            <span id="public-profile-following">-</span>
-            <span id="public-profile-followers">-</span>
-            <span id="public-profile-streak">-</span>
-          </div>
-          <div class="public-profile-bio" id="public-profile-bio"></div>
-          <div class="public-profile-connection hidden" id="public-profile-connection"></div>
-          <div class="public-profile-hero-facts hidden" id="public-profile-hero-facts"></div>
-          <div class="public-profile-spotlight hidden" id="public-profile-spotlight"></div>
-          <div class="profile-badges hidden" id="public-profile-badges"></div>
-          <div class="profile-pinned hidden" id="public-profile-pinned"></div>
-          <div class="profile-quick-stats hidden" id="public-profile-quick-stats"></div>
-          <div class="collapsible-content" data-collapsible-content>
-            <div class="profile-stats-grid hidden" id="public-profile-stats-grid"></div>
-            <div class="profile-banner" id="public-profile-banner"></div>
-            <div class="card-sub" id="public-profile-facts-title">プロフィール情報</div>
-            <div class="profile-facts" id="public-profile-facts"></div>
-            <div class="card-sub" id="public-profile-highlights-title">ハイライト</div>
-            <div class="profile-highlights" id="public-profile-highlights"></div>
-          </div>
-          <div class="public-profile-content-tabs" id="public-profile-content-tabs" role="tablist" aria-label="Profile content">
-            <button class="public-profile-content-tab is-active" id="btn-public-tab-posts" data-profile-content-tab="posts" type="button">
-              <span id="public-tab-posts-label">投稿</span>
-              <span class="public-profile-content-count" id="public-tab-posts-count">0</span>
-            </button>
-            <button class="public-profile-content-tab" id="btn-public-tab-media" data-profile-content-tab="media" type="button">
-              <span id="public-tab-media-label">メディア</span>
-              <span class="public-profile-content-count" id="public-tab-media-count">0</span>
-            </button>
-            <button class="public-profile-content-tab" id="btn-public-tab-workouts" data-profile-content-tab="workouts" type="button">
-              <span id="public-tab-workouts-label">ワークアウト</span>
-              <span class="public-profile-content-count" id="public-tab-workouts-count">0</span>
-            </button>
-          </div>
-          <div class="public-profile-content-summary" id="public-profile-content-summary">
-            <div class="public-profile-content-summary-copy">
-              <div class="public-profile-content-summary-title" id="public-profile-content-summary-title">投稿</div>
-              <div class="public-profile-content-summary-note" id="public-profile-content-summary-note">最新の投稿</div>
+            <div class="public-profile-action-dock" id="public-profile-action-dock">
+              <div class="public-profile-action-dock-copy">
+                <div class="public-profile-action-dock-title" id="public-profile-action-dock-title">つながる</div>
+                <div class="public-profile-action-dock-note" id="public-profile-action-dock-note">進捗を見ながらそのまま会話できます。</div>
+                <button class="public-profile-action-dock-preview hidden" id="public-profile-action-dock-preview" type="button"></button>
+                <div class="public-profile-action-dock-context hidden" id="public-profile-action-dock-context"></div>
+              </div>
+              <div class="public-profile-action-dock-actions">
+                <button class="btn btn-ghost hidden" id="btn-public-dock-message" data-public-message-trigger>メッセージ</button>
+                <button class="btn btn-primary hidden" id="btn-public-dock-follow" data-public-follow-trigger>フォロー</button>
+                <button class="btn btn-ghost" id="btn-public-dock-share" data-public-share-trigger>共有</button>
+              </div>
             </div>
-            <div class="public-profile-content-summary-count" id="public-profile-content-summary-count">0</div>
-          </div>
-          <div class="public-profile-action-dock" id="public-profile-action-dock">
-            <div class="public-profile-action-dock-copy">
-              <div class="public-profile-action-dock-title" id="public-profile-action-dock-title">つながる</div>
-              <div class="public-profile-action-dock-note" id="public-profile-action-dock-note">進捗を見ながらそのまま会話できます。</div>
-              <button class="public-profile-action-dock-preview hidden" id="public-profile-action-dock-preview" type="button"></button>
-              <div class="public-profile-action-dock-context hidden" id="public-profile-action-dock-context"></div>
+            <div class="public-profile-content-rail hidden" id="public-profile-content-rail"></div>
+            <div id="public-profile-posts-list" class="feed-list public-profile-posts" style="margin-top: 12px;"></div>
+            <div class="feed-more hidden" id="public-posts-more">
+              <div class="feed-more-hint" id="public-posts-hint"></div>
+              <button class="btn btn-ghost" id="btn-public-posts-more">もっと見る</button>
             </div>
-            <div class="public-profile-action-dock-actions">
-              <button class="btn btn-ghost hidden" id="btn-public-dock-message" data-public-message-trigger>メッセージ</button>
-              <button class="btn btn-primary hidden" id="btn-public-dock-follow" data-public-follow-trigger>フォロー</button>
-              <button class="btn btn-ghost" id="btn-public-dock-share" data-public-share-trigger>共有</button>
-            </div>
-          </div>
-          <div class="public-profile-content-rail hidden" id="public-profile-content-rail"></div>
-          <div id="public-profile-posts-list" class="feed-list public-profile-posts" style="margin-top: 12px;"></div>
-          <div class="feed-more hidden" id="public-posts-more">
-            <div class="feed-more-hint" id="public-posts-hint"></div>
-            <button class="btn btn-ghost" id="btn-public-posts-more">もっと見る</button>
           </div>
         </section>
         <section class="card" id="public-profile-gallery-section" style="margin-top: 12px;">
@@ -1317,7 +1374,8 @@
                   <button class="btn btn-ghost" id="btn-toggle-perf-debug">描画パフォーマンスをON</button>
                   <button class="btn btn-danger" id="btn-reset-settings">設定をリセット</button>
                 </div>
-                <div class="settings-runtime-config">
+                <div class="settings-note" id="settings-runtime-tools-note" role="status" aria-live="polite"></div>
+                <div class="settings-runtime-config" id="settings-live-site-config">
                   <div class="settings-note" id="settings-live-site-title">ライブサイトURL</div>
                   <div class="settings-note" id="settings-live-site-hint">
                     Vercel や独自ドメインを使う場合は、ここに本番URLを入れておくと確認導線が安定します。
@@ -1339,7 +1397,7 @@
                     <button class="btn btn-ghost" id="btn-live-site-reset">自動判定に戻す</button>
                   </div>
                 </div>
-                <div class="settings-supabase-config">
+                <div class="settings-supabase-config" id="settings-supabase-config">
                   <div class="settings-note" id="settings-supabase-title">Supabase 接続先</div>
                   <div class="field">
                     <label id="settings-supabase-url-label">Project URL</label>
@@ -1371,7 +1429,7 @@
                   <div class="settings-note" id="settings-supabase-source"></div>
                   <div class="settings-note" id="settings-connection-diagnostic" role="status" aria-live="polite"></div>
                 </div>
-                <div class="settings-supabase-config">
+                <div class="settings-supabase-config" id="settings-ads-config">
                   <div class="settings-note" id="settings-ads-title">広告収益化（AdSense）</div>
                   <div class="settings-note" id="settings-ads-sub">Publisher ID と Feed Slot を設定するとフィード内に広告を表示します。</div>
                   <div class="field">
@@ -1594,7 +1652,7 @@
         <div class="card-title" id="new-post-title">新規投稿</div>
         <div class="modal-header-actions">
           <span class="draft-status" id="draft-status"></span>
-          <button class="modal-close-btn" id="btn-post-close">×</button>
+          <button class="modal-close-btn" id="btn-post-close" type="button">×</button>
         </div>
       </div>
       <div class="post-composer-mode">
@@ -1671,10 +1729,10 @@
             <div class="rest-timer">
               <span id="rest-timer-label">レストタイマー</span>
               <span class="rest-display" id="rest-timer-display">00:00</span>
-              <button class="btn btn-ghost" id="btn-rest-stop">停止</button>
+              <button class="btn btn-ghost" id="btn-rest-stop" type="button">停止</button>
             </div>
             <div id="workout-exercises" class="workout-builder"></div>
-            <button class="btn btn-ghost" id="btn-add-exercise">種目を追加</button>
+            <button class="btn btn-ghost" id="btn-add-exercise" type="button">種目を追加</button>
             <div class="template-status" id="log-status"></div>
           </div>
         </div>
@@ -1699,7 +1757,7 @@
         </div>
       </div>
       <div class="form-actions post-form-actions">
-        <button class="btn btn-primary" id="btn-submit">投稿</button>
+        <button class="btn btn-primary" id="btn-submit" type="button">投稿</button>
         <details class="post-form-more">
           <summary class="btn btn-ghost btn-xs" id="btn-post-more-actions">その他</summary>
           <div class="post-form-more-menu">
