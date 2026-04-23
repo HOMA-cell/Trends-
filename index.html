@@ -228,26 +228,12 @@
             <div id="dm-layout" class="dm-layout hidden">
               <aside class="dm-sidebar">
                 <div class="dm-sidebar-top">
-                  <div class="dm-inbox-insights" id="dm-inbox-insights">
-                    <div class="dm-inbox-glance">
-                      <div class="dm-inbox-glance-kicker" id="dm-inbox-glance-kicker">今の表示</div>
-                      <div class="dm-inbox-glance-title" id="dm-inbox-glance-title">最新の会話</div>
-                      <div class="dm-inbox-glance-note" id="dm-inbox-glance-note">固定や未読で絞り込めます。</div>
+                  <div class="dm-inbox-head">
+                    <div class="dm-inbox-head-copy">
+                      <div class="dm-inbox-head-label">受信トレイ</div>
+                      <div class="dm-inbox-head-note" id="dm-inbox-head-note">最近の会話</div>
                     </div>
-                    <div class="dm-inbox-insight-grid">
-                      <div class="dm-inbox-insight-card">
-                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-total-label">会話</div>
-                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-total">0</div>
-                      </div>
-                      <div class="dm-inbox-insight-card">
-                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-unread-label">未読</div>
-                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-unread">0</div>
-                      </div>
-                      <div class="dm-inbox-insight-card">
-                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-active-label">アクティブ</div>
-                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-active">0</div>
-                      </div>
-                    </div>
+                    <div class="dm-inbox-count" id="dm-inbox-count">0</div>
                   </div>
                   <div class="dm-sidebar-controls">
                     <div class="dm-thread-toolbar">
@@ -279,6 +265,27 @@
                   <div class="field dm-partner-field dm-partner-field-hidden" aria-hidden="true">
                     <label id="dm-partner-label" class="sr-only" for="dm-partner-select">相手</label>
                     <select id="dm-partner-select" class="select-sm"></select>
+                  </div>
+                  <div class="dm-inbox-insights hidden" id="dm-inbox-insights" aria-hidden="true">
+                    <div class="dm-inbox-glance">
+                      <div class="dm-inbox-glance-kicker" id="dm-inbox-glance-kicker">今の表示</div>
+                      <div class="dm-inbox-glance-title" id="dm-inbox-glance-title">最新の会話</div>
+                      <div class="dm-inbox-glance-note" id="dm-inbox-glance-note">固定や未読で絞り込めます。</div>
+                    </div>
+                    <div class="dm-inbox-insight-grid">
+                      <div class="dm-inbox-insight-card">
+                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-total-label">会話</div>
+                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-total">0</div>
+                      </div>
+                      <div class="dm-inbox-insight-card">
+                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-unread-label">未読</div>
+                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-unread">0</div>
+                      </div>
+                      <div class="dm-inbox-insight-card">
+                        <div class="dm-inbox-insight-label" id="dm-inbox-insight-active-label">アクティブ</div>
+                        <div class="dm-inbox-insight-value" id="dm-inbox-stat-active">0</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div class="template-status" id="dm-thread-status"></div>

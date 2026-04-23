@@ -2000,6 +2000,8 @@ function getFilteredThreads() {
 
 function renderThreadSummary() {
   const summary = $("dm-thread-summary");
+  const inboxCount = $("dm-inbox-count");
+  const inboxHeadNote = $("dm-inbox-head-note");
   const tr = getDmTranslations();
   const filtered = getFilteredThreads();
   const hasSearch = normalizeDmSearchText(dmThreadSearch).length > 0;
@@ -2019,6 +2021,18 @@ function renderThreadSummary() {
   if (summary) {
     summary.textContent = summaryText;
     summary.classList.toggle("is-empty", !summaryText);
+  }
+  if (inboxCount) {
+    inboxCount.textContent = `${filtered.length}`;
+  }
+  if (inboxHeadNote) {
+    if (hasSearch) {
+      inboxHeadNote.textContent = tr.dmInboxOverviewSearch || "Search results";
+    } else if (isFilteredView) {
+      inboxHeadNote.textContent = getDmThreadViewLabel(dmThreadView, tr);
+    } else {
+      inboxHeadNote.textContent = tr.dmInboxOverviewDefault || "Latest conversations";
+    }
   }
   renderDmInboxInsights(filtered, tr);
 }
