@@ -3501,6 +3501,7 @@ function updateThreadItem(button, thread, tr, query = "") {
   const isPinned = isDmThreadPinned(thread.partnerId);
   const isMuted = isDmThreadMuted(thread.partnerId);
   const draft = getDmDraft(thread.partnerId);
+  const presence = getDmPartnerPresence(thread.partnerId, tr);
   button.classList.toggle("is-active", isActive);
   button.classList.toggle("is-unread", Number(thread.unreadCount || 0) > 0);
   button.classList.toggle("is-pinned", isPinned);
@@ -3517,7 +3518,6 @@ function updateThreadItem(button, thread, tr, query = "") {
     button.appendChild(avatar);
   }
   const identity = getProfileIdentity(thread.profile, thread.partnerId);
-  const presence = getDmPartnerPresence(thread.partnerId, tr);
   renderAvatar(avatar, thread.profile, identity.initial);
   avatar.classList.toggle("is-online", presence.isOnline);
   avatar.classList.toggle("is-recent", presence.kind === "recent");
@@ -3656,6 +3656,39 @@ function updateThreadItem(button, thread, tr, query = "") {
     preview.appendChild(previewText);
   }
 
+  let pills = bottom.querySelector(".dm-thread-meta-pills");
+  if (!pills) {
+    pills = document.createElement("div");
+    pills.className = "dm-thread-meta-pills";
+    bottom.appendChild(pills);
+  }
+  pills.replaceChildren();
+  const appendMetaPill = (text, className = "") => {
+    const value = `${text || ""}`.trim();
+    if (!value) return;
+    const pill = document.createElement("span");
+    pill.className = `dm-thread-meta-pill ${className}`.trim();
+    pill.textContent = value;
+    pills.appendChild(pill);
+  };
+  if (draft) {
+    appendMetaPill(tr.dmDraftBadge || "Draft", "is-draft");
+  }
+  if (isPinned) {
+    appendMetaPill(tr.dmPinnedBadge || "Pinned", "is-pinned");
+  }
+  if (isMuted) {
+    appendMetaPill(tr.dmMutedBadge || "Muted", "is-muted");
+  }
+  if (presence.kind === "typing") {
+    appendMetaPill(presence.label || tr.dmTyping || "Typing…", "is-typing");
+  } else if (presence.kind === "active") {
+    appendMetaPill(presence.label || tr.dmPresenceTitle || "Active", "is-active");
+  } else if (presence.kind === "recent") {
+    appendMetaPill(presence.label, "is-recent");
+  }
+  pills.classList.toggle("hidden", pills.childElementCount === 0);
+
   const unreadCount = Number(thread.unreadCount || 0);
   let badge = bottom.querySelector(".dm-thread-unread");
   if (unreadCount > 0) {
@@ -3664,8 +3697,11 @@ function updateThreadItem(button, thread, tr, query = "") {
       badge.className = "dm-thread-unread";
       bottom.appendChild(badge);
     }
-    badge.textContent = "";
-    badge.setAttribute("aria-label", `${unreadCount}`);
+    badge.textContent = unreadCount > 9 ? "9+" : `${unreadCount}`;
+    badge.setAttribute(
+      "aria-label",
+      `${tr.dmThreadSummaryUnread || "Unread"} ${unreadCount}`
+    );
     badge.title = `${unreadCount}`;
   } else if (badge) {
     badge.remove();

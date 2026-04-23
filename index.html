@@ -228,25 +228,12 @@
             <div id="dm-layout" class="dm-layout hidden">
               <aside class="dm-sidebar">
                 <div class="dm-sidebar-top">
-                  <div class="dm-thread-toolbar">
-                    <input
-                      id="dm-thread-search"
-                      type="text"
-                      placeholder="会話を検索"
-                      autocomplete="off"
-                    />
-                    <button class="btn btn-ghost btn-xs hidden" id="btn-dm-thread-search-clear" type="button">
-                      クリア
-                    </button>
-                  </div>
-                  <div class="dm-thread-filters" id="dm-thread-filters" role="tablist" aria-label="DM filters">
-                    <button class="chip chip-active" id="dm-filter-all" type="button">すべて</button>
-                    <button class="chip" id="dm-filter-unread" type="button">未読</button>
-                    <button class="chip" id="dm-filter-pinned" type="button">固定</button>
-                    <button class="chip" id="dm-filter-muted" type="button">消音</button>
-                  </div>
-                  <div class="dm-thread-summary" id="dm-thread-summary">-</div>
                   <div class="dm-inbox-insights" id="dm-inbox-insights">
+                    <div class="dm-inbox-glance">
+                      <div class="dm-inbox-glance-kicker" id="dm-inbox-glance-kicker">今の表示</div>
+                      <div class="dm-inbox-glance-title" id="dm-inbox-glance-title">最新の会話</div>
+                      <div class="dm-inbox-glance-note" id="dm-inbox-glance-note">固定や未読で絞り込めます。</div>
+                    </div>
                     <div class="dm-inbox-insight-grid">
                       <div class="dm-inbox-insight-card">
                         <div class="dm-inbox-insight-label" id="dm-inbox-insight-total-label">会話</div>
@@ -261,12 +248,27 @@
                         <div class="dm-inbox-insight-value" id="dm-inbox-stat-active">0</div>
                       </div>
                     </div>
-                    <div class="dm-inbox-glance">
-                      <div class="dm-inbox-glance-kicker" id="dm-inbox-glance-kicker">今の表示</div>
-                      <div class="dm-inbox-glance-title" id="dm-inbox-glance-title">最新の会話</div>
-                      <div class="dm-inbox-glance-note" id="dm-inbox-glance-note">固定や未読で絞り込めます。</div>
+                  </div>
+                  <div class="dm-sidebar-controls">
+                    <div class="dm-thread-toolbar">
+                      <input
+                        id="dm-thread-search"
+                        type="text"
+                        placeholder="会話を検索"
+                        autocomplete="off"
+                      />
+                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-thread-search-clear" type="button">
+                        クリア
+                      </button>
+                    </div>
+                    <div class="dm-thread-filters" id="dm-thread-filters" role="tablist" aria-label="DM filters">
+                      <button class="chip chip-active" id="dm-filter-all" type="button">すべて</button>
+                      <button class="chip" id="dm-filter-unread" type="button">未読</button>
+                      <button class="chip" id="dm-filter-pinned" type="button">固定</button>
+                      <button class="chip" id="dm-filter-muted" type="button">消音</button>
                     </div>
                   </div>
+                  <div class="dm-thread-summary" id="dm-thread-summary">-</div>
                   <div class="dm-presence-strip hidden" id="dm-presence-strip" aria-hidden="true">
                     <div class="dm-presence-strip-head">
                       <div class="dm-presence-strip-title" id="dm-presence-strip-title">アクティブ</div>
@@ -286,20 +288,30 @@
               </aside>
               <section class="dm-chat">
                 <div class="dm-chat-top">
-                  <div class="dm-chat-header">
-                    <div class="dm-chat-header-main" id="dm-chat-header-main">
-                      <button class="btn btn-ghost btn-xs dm-mobile-back hidden" id="btn-dm-back" type="button">
-                        一覧
-                      </button>
-                      <div class="avatar dm-chat-avatar" id="dm-chat-avatar" aria-hidden="true">U</div>
-                      <div class="dm-chat-header-texts">
-                        <div class="dm-chat-title" id="dm-chat-title">会話を選択</div>
-                        <div class="dm-chat-sub" id="dm-chat-sub">-</div>
+                  <div class="dm-chat-hero">
+                    <div class="dm-chat-header">
+                      <div class="dm-chat-header-main" id="dm-chat-header-main">
+                        <button class="btn btn-ghost btn-xs dm-mobile-back hidden" id="btn-dm-back" type="button">
+                          一覧
+                        </button>
+                        <div class="avatar dm-chat-avatar" id="dm-chat-avatar" aria-hidden="true">U</div>
+                        <div class="dm-chat-header-texts">
+                          <div class="dm-chat-title" id="dm-chat-title">会話を選択</div>
+                          <div class="dm-chat-sub" id="dm-chat-sub">-</div>
+                        </div>
+                      </div>
+                      <div class="dm-chat-header-actions">
+                        <button class="btn btn-ghost btn-xs hidden" id="btn-dm-search" type="button">検索</button>
+                        <button class="btn btn-ghost btn-xs hidden" id="btn-dm-info" type="button">情報</button>
                       </div>
                     </div>
-                    <div class="dm-chat-header-actions">
-                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-search" type="button">検索</button>
-                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-info" type="button">情報</button>
+                    <div class="dm-chat-glance hidden" id="dm-chat-glance" aria-hidden="true">
+                      <div class="dm-chat-glance-head">
+                        <div class="dm-chat-glance-kicker" id="dm-chat-glance-kicker">会話のスナップショット</div>
+                        <div class="dm-chat-glance-note" id="dm-chat-glance-note">-</div>
+                      </div>
+                      <div class="dm-chat-glance-stats" id="dm-chat-glance-stats"></div>
+                      <div class="dm-chat-glance-facts hidden" id="dm-chat-glance-facts"></div>
                     </div>
                   </div>
                   <div class="dm-chat-search hidden" id="dm-chat-search">
@@ -318,46 +330,40 @@
                     <div class="dm-chat-search-days hidden" id="dm-message-search-days"></div>
                     <div class="dm-chat-search-results hidden" id="dm-message-search-results"></div>
                   </div>
-                  <div class="dm-chat-context hidden" id="dm-chat-context">
-                    <div class="dm-chat-context-copy">
-                      <div class="dm-chat-context-label" id="dm-chat-context-label">最近のメディア</div>
-                      <div class="dm-chat-context-meta" id="dm-chat-context-meta">-</div>
+                  <div class="dm-chat-overview">
+                    <div class="dm-entry-context hidden" id="dm-entry-context" aria-hidden="true">
+                      <div class="dm-entry-context-copy">
+                        <div class="dm-entry-context-label" id="dm-entry-context-label">通知から移動</div>
+                        <div class="dm-entry-context-text" id="dm-entry-context-text">-</div>
+                      </div>
+                      <div class="dm-entry-context-actions">
+                        <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-post" type="button">投稿へ</button>
+                        <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-profile" type="button">プロフィール</button>
+                        <button class="btn btn-ghost btn-xs dm-entry-context-dismiss" id="btn-dm-entry-dismiss" type="button">×</button>
+                      </div>
                     </div>
-                    <div class="dm-chat-media-strip" id="dm-chat-media-strip"></div>
-                  </div>
-                  <div class="dm-pinned-message hidden" id="dm-pinned-message">
-                    <div class="dm-pinned-message-copy">
-                      <div class="dm-pinned-message-label" id="dm-pinned-message-label">固定メッセージ</div>
+                    <div class="dm-pinned-message hidden" id="dm-pinned-message">
+                      <div class="dm-pinned-message-copy">
+                        <div class="dm-pinned-message-label" id="dm-pinned-message-label">固定メッセージ</div>
+                        <button
+                          class="dm-pinned-message-body"
+                          id="btn-dm-pinned-message-open"
+                          type="button"
+                        >-</button>
+                      </div>
                       <button
-                        class="dm-pinned-message-body"
-                        id="btn-dm-pinned-message-open"
+                        class="btn btn-ghost btn-xs dm-pinned-message-clear"
+                        id="btn-dm-pinned-message-clear"
                         type="button"
-                      >-</button>
+                      >解除</button>
                     </div>
-                    <button
-                      class="btn btn-ghost btn-xs dm-pinned-message-clear"
-                      id="btn-dm-pinned-message-clear"
-                      type="button"
-                    >解除</button>
-                  </div>
-                  <div class="dm-entry-context hidden" id="dm-entry-context" aria-hidden="true">
-                    <div class="dm-entry-context-copy">
-                      <div class="dm-entry-context-label" id="dm-entry-context-label">通知から移動</div>
-                      <div class="dm-entry-context-text" id="dm-entry-context-text">-</div>
+                    <div class="dm-chat-context hidden" id="dm-chat-context">
+                      <div class="dm-chat-context-copy">
+                        <div class="dm-chat-context-label" id="dm-chat-context-label">最近のメディア</div>
+                        <div class="dm-chat-context-meta" id="dm-chat-context-meta">-</div>
+                      </div>
+                      <div class="dm-chat-media-strip" id="dm-chat-media-strip"></div>
                     </div>
-                    <div class="dm-entry-context-actions">
-                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-post" type="button">投稿へ</button>
-                      <button class="btn btn-ghost btn-xs hidden" id="btn-dm-entry-open-profile" type="button">プロフィール</button>
-                      <button class="btn btn-ghost btn-xs dm-entry-context-dismiss" id="btn-dm-entry-dismiss" type="button">×</button>
-                    </div>
-                  </div>
-                  <div class="dm-chat-glance hidden" id="dm-chat-glance" aria-hidden="true">
-                    <div class="dm-chat-glance-head">
-                      <div class="dm-chat-glance-kicker" id="dm-chat-glance-kicker">会話のスナップショット</div>
-                      <div class="dm-chat-glance-note" id="dm-chat-glance-note">-</div>
-                    </div>
-                    <div class="dm-chat-glance-stats" id="dm-chat-glance-stats"></div>
-                    <div class="dm-chat-glance-facts hidden" id="dm-chat-glance-facts"></div>
                   </div>
                 </div>
                 <div class="dm-chat-main">
