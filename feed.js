@@ -9770,6 +9770,14 @@ export function renderPostDetail() {
         currentDetailEntryContext?.source === "shorts" || isShortsStylePost(post)
           ? "shorts"
           : "feed";
+      const targetUserId = `${post.user_id || ""}`.trim();
+      const currentUserId = `${currentUser?.id || ""}`.trim();
+      const profileHandle =
+        `${post.profile?.handle || post.profile?.username || ""}`.trim();
+      const displayName =
+        `${post.profile?.display_name || ""}`.trim() ||
+        profileHandle ||
+        "user";
       const buildDetailDmEntryContext = (prefillMessage = buildDetailDmStarterMessage()) => ({
         source: detailDmSource,
         partnerId: targetUserId,
@@ -9963,8 +9971,6 @@ export function renderPostDetail() {
 
       if (headerEl) {
         headerEl.innerHTML = "";
-        const displayName =
-          post.profile?.display_name || post.profile?.handle || "user";
         const relativeText = formatRelative(post.date || post.created_at);
         const authorButton = document.createElement("button");
         authorButton.type = "button";
@@ -10015,10 +10021,6 @@ export function renderPostDetail() {
         } else {
           authorButton.disabled = true;
         }
-        const targetUserId = `${post.user_id || ""}`.trim();
-        const currentUserId = `${currentUser?.id || ""}`.trim();
-        const profileHandle =
-          `${post.profile?.handle || post.profile?.username || ""}`.trim();
         const canMessageAuthor =
           !!currentUserId && !!targetUserId && currentUserId !== targetUserId;
         const canFollowAuthor =
@@ -10558,6 +10560,7 @@ export function renderPostDetail() {
         } else {
           relatedSectionEl.classList.remove("hidden");
           relatedSectionEl.setAttribute("aria-hidden", "false");
+          const relatedCurrentUserId = `${currentUser?.id || ""}`.trim();
           if (relatedHeaderActionsEl) {
             const profileBtn = document.createElement("button");
             profileBtn.type = "button";
@@ -10736,9 +10739,9 @@ export function renderPostDetail() {
             actions.className = "detail-related-actions";
             const candidateUserId = `${candidate.user_id || ""}`.trim();
             const canMessageRelatedAuthor =
-              !!currentUserId &&
+              !!relatedCurrentUserId &&
               !!candidateUserId &&
-              currentUserId !== candidateUserId;
+              relatedCurrentUserId !== candidateUserId;
             if (canMessageRelatedAuthor) {
               const messageBtn = document.createElement("button");
               messageBtn.type = "button";

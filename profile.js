@@ -89,7 +89,6 @@ const publicProfilePostsCache = {
 let publicProfileGallerySignature = "";
 let currentPublicProfileContentTab = "posts";
 let currentPublicProfileEntryContext = null;
-let pendingPublicProfileReveal = null;
 let publicProfileRevealTimer = null;
 const profileCompactCountFormatter =
   typeof Intl !== "undefined"
@@ -187,7 +186,6 @@ function normalizePublicProfileRevealState(reveal = {}) {
 }
 
 function clearPublicProfileRevealState() {
-  pendingPublicProfileReveal = null;
   if (publicProfileRevealTimer) {
     clearTimeout(publicProfileRevealTimer);
     publicProfileRevealTimer = null;
@@ -2632,9 +2630,7 @@ export async function openPublicProfile(userId, options = {}) {
     postId: options.revealPostId,
     tab: options.revealTab,
   });
-  if (revealState) {
-    pendingPublicProfileReveal = revealState;
-  } else {
+  if (!revealState) {
     clearPublicProfileRevealState();
   }
   if (options.entryContext) {
@@ -2871,9 +2867,9 @@ export async function openPublicProfile(userId, options = {}) {
         )
       : "") ||
     buildPublicProfileMessageStarter({
-      viewerProfile: currentProfile,
+      viewerProfile: getCurrentProfile(),
       targetProfile: profile,
-      posts,
+      posts: userPosts,
       workoutLogsByPost,
       tr,
     });
@@ -3320,7 +3316,6 @@ export async function openPublicProfile(userId, options = {}) {
   if (revealState) {
     requestAnimationFrame(() => {
       revealPublicProfilePostCard(revealState);
-      pendingPublicProfileReveal = null;
     });
   }
 

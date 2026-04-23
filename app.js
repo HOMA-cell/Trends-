@@ -8662,18 +8662,15 @@ async function loadProfilePostCount() {
                 "Using the default production URL.";
         liveValueEl.textContent = `${liveText} ${getLiveSiteUrl()}`;
 
-        let connectionTone = "warn";
         let connectionText =
           tr.settingsLaunchConnectionUnknown ||
           "Connection test has not been run yet.";
         if (supabaseConnectivityState?.ok === true) {
-          connectionTone = "ok";
           connectionText = formatConnectionStatusMessage(
             supabaseConnectivityState,
             tr
           );
         } else if (supabaseConnectivityState?.ok === false) {
-          connectionTone = "error";
           connectionText = formatConnectionStatusMessage(
             supabaseConnectivityState,
             tr
