@@ -13,3 +13,12 @@ window.__TRENDS_ADS__ = Object.assign(
   },
   window.__TRENDS_ADS__ || {}
 );
+
+(function ensureDmSidebarTune() {
+  if (typeof document === "undefined" || !document.head) return;
+  if (document.querySelector('link[href="dm-sidebar-tune.css"]')) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "dm-sidebar-tune.css";
+  document.head.appendChild(link);
+})();

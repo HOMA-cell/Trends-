@@ -1,0 +1,68 @@
+/* DM sidebar tuning: keep the inbox column compact so the conversation stays primary. */
+.dm-layout {
+  grid-template-columns: clamp(252px, 22vw, 286px) minmax(0, 1fr);
+}
+
+.dm-sidebar {
+  width: 100%;
+  max-width: 286px;
+}
+
+.dm-sidebar-top {
+  padding: 14px;
+}
+
+.dm-inbox-head-label {
+  font-size: 20px;
+}
+
+.dm-inbox-count {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.dm-sidebar-controls {
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.dm-thread-filters {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.dm-thread-filters .chip {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.dm-thread-item {
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.dm-thread-item .avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.dm-thread-name {
+  font-size: 13px;
+}
+
+.dm-thread-preview {
+  font-size: 11px;
+}
+
+@media (max-width: 980px) {
+  .dm-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dm-sidebar {
+    max-width: none;
+  }
+}
