@@ -50,6 +50,7 @@ let dmRenderedConversationHeaderKey = "";
 let dmPendingMediaFile = null;
 let dmPendingMediaPreviewUrl = "";
 let dmMediaSchemaState = "unknown";
+let dmDirectMessagesSchemaState = "unknown";
 let dmPinnedThreadIds = new Set();
 let dmMutedThreadIds = new Set();
 let dmPinnedMessageIdsByPartner = {};
@@ -320,6 +321,7 @@ function clearDmState() {
   dmRenderedThreadListKey = "";
   dmRenderedConversationHeaderKey = "";
   dmMediaSchemaState = "unknown";
+  dmDirectMessagesSchemaState = "unknown";
   dmUnreadDividerMessageId = "";
   dmReplyTargetId = "";
   dmReactionPickerMessageId = "";
@@ -1056,6 +1058,40 @@ function isDmMediaColumnError(error) {
   return source.includes("media_url") || source.includes("media_type");
 }
 
+function isDmDirectMessagesMissingError(error) {
+  const code = `${error?.code || ""}`.trim().toUpperCase();
+  const source = [
+    error?.message || "",
+    error?.details || "",
+    error?.hint || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (code === "PGRST205" && source.includes("direct_messages")) return true;
+  if (code === "42P01" && source.includes("direct_messages")) return true;
+  return (
+    source.includes("public.direct_messages") &&
+    (source.includes("schema cache") || source.includes("could not find the table"))
+  );
+}
+
+function noteDmDirectMessagesSchemaResult(result) {
+  if (result?.error) {
+    if (isDmDirectMessagesMissingError(result.error)) {
+      dmDirectMessagesSchemaState = "missing";
+    }
+    return;
+  }
+  dmDirectMessagesSchemaState = "ready";
+}
+
+function getDmDirectMessagesSetupHint(tr = getDmTranslations()) {
+  return (
+    tr.dmSetupRequired ||
+    "DM database is not ready. Run the Supabase direct_messages migration first."
+  );
+}
+
 function normalizeDmMessageRows(rows = []) {
   return (rows || []).map((row) => ({
     ...row,
@@ -1086,6 +1122,7 @@ async function runDmMessageQuery(builderFactory) {
       data: normalizeDmMessageRows(result.data || []),
     };
   }
+  noteDmDirectMessagesSchemaResult(result);
   return result;
 }
 
@@ -2594,6 +2631,9 @@ function getDmComposerPlaceholder() {
   if (!getCurrentUser()) {
     return tr.dmLoginRequired || "Please log in to use DMs.";
   }
+  if (dmDirectMessagesSchemaState === "missing") {
+    return getDmDirectMessagesSetupHint(tr);
+  }
   if (!dmActivePartnerId) {
     return tr.dmComposerDisabledPlaceholder || tr.dmSelectPartner || "Select a conversation.";
   }
@@ -2616,7 +2656,8 @@ function updateDmComposerState() {
   const form = $("dm-form");
   const isSending = !!sendBtn?.classList.contains("is-loading");
   const hasConversation = !!`${dmActivePartnerId || ""}`.trim();
-  const canCompose = !!currentUser && hasConversation;
+  const canCompose =
+    !!currentUser && hasConversation && dmDirectMessagesSchemaState !== "missing";
   const hasBody = !!`${input?.value || ""}`.trim();
   const hasMedia = !!dmPendingMediaFile;
   const canSend = canCompose && (hasBody || hasMedia);
@@ -5812,7 +5853,12 @@ async function loadConversation(partnerId, options = {}) {
 
     if (error) {
       console.error("loadConversation error:", error);
-      setSendStatus(tr.dmLoadError || "Failed to load messages.", "error");
+      setSendStatus(
+        isDmDirectMessagesMissingError(error)
+          ? getDmDirectMessagesSetupHint(tr)
+          : tr.dmLoadError || "Failed to load messages.",
+        "error"
+      );
       return;
     }
 
@@ -5865,7 +5911,12 @@ export async function refreshDmData(options = {}) {
 
     if (messagesRes.error) {
       console.error("refreshDmData messages error:", messagesRes.error);
-      setThreadStatus(tr.dmLoadError || "Failed to load messages.", "error");
+      setThreadStatus(
+        isDmDirectMessagesMissingError(messagesRes.error)
+          ? getDmDirectMessagesSetupHint(tr)
+          : tr.dmLoadError || "Failed to load messages.",
+        "error"
+      );
       return;
     }
 
@@ -6110,16 +6161,21 @@ async function handleSendMessage(event) {
       mediaType = mediaUrl ? "image" : null;
     }
 
+    const insertPayload = {
+      sender_id: currentUser.id,
+      recipient_id: partnerId,
+      body: storedBody,
+    };
+    if (mediaUrl) {
+      insertPayload.media_url = mediaUrl;
+      insertPayload.media_type = mediaType;
+    }
+
     const { data: inserted, error } = await supabase
       .from("direct_messages")
-      .insert({
-        sender_id: currentUser.id,
-        recipient_id: partnerId,
-        body: storedBody,
-        media_url: mediaUrl || null,
-        media_type: mediaType,
-      })
-      .select("id,sender_id,recipient_id,body,media_url,media_type,created_at,read_at")
+      .insert(insertPayload)
+      // Always select the base fields to avoid hard-failing when media columns are missing.
+      .select(DM_MESSAGE_SELECT_BASE)
       .single();
 
     if (error) {
@@ -6127,6 +6183,9 @@ async function handleSendMessage(event) {
       dmMessages = dmMessages.filter((message) => `${message.id || ""}` !== pendingId);
       if (isDmMediaColumnError(error)) {
         dmMediaSchemaState = "disabled";
+      }
+      if (isDmDirectMessagesMissingError(error)) {
+        dmDirectMessagesSchemaState = "missing";
       }
       if (uploadedPath) {
         supabase.storage
@@ -6146,15 +6205,23 @@ async function handleSendMessage(event) {
         input.focus();
       }
       const fallbackError =
-        hasMedia && isDmMediaColumnError(error)
-          ? tr.dmPhotoSetupNeeded ||
-            "DM photo columns are not ready yet. Run the latest Supabase migration first."
-          : tr.dmSendError || "Failed to send message.";
+        isDmDirectMessagesMissingError(error)
+          ? getDmDirectMessagesSetupHint(tr)
+          : hasMedia && isDmMediaColumnError(error)
+            ? tr.dmPhotoSetupNeeded ||
+              "DM photo columns are not ready yet. Run the latest Supabase migration first."
+            : tr.dmSendError || "Failed to send message.";
       setSendStatus(fallbackError, "error");
       return;
     }
 
-    const confirmedMessage = inserted || {
+    const confirmedMessage = inserted
+      ? {
+          ...inserted,
+          media_url: mediaUrl || "",
+          media_type: mediaType,
+        }
+      : {
       id: pendingId,
       sender_id: currentUser.id,
       recipient_id: partnerId,
@@ -6239,7 +6306,7 @@ async function sendDmQuickReaction(messageId, emoji = DM_QUICK_LIKE_EMOJI) {
       recipient_id: dmActivePartnerId,
       body: reactionBody,
     })
-    .select("id,sender_id,recipient_id,body,media_url,media_type,created_at,read_at")
+    .select(DM_MESSAGE_SELECT_BASE)
     .single();
 
   if (error) {
@@ -6253,7 +6320,9 @@ async function sendDmQuickReaction(messageId, emoji = DM_QUICK_LIKE_EMOJI) {
 
   dmReactionPickerMessageId = "";
   dmMessages = dmMessages.map((message) =>
-    `${message.id || ""}` === pendingId ? { ...inserted, pending: false } : message
+    `${message.id || ""}` === pendingId
+      ? { ...inserted, media_url: "", media_type: null, pending: false }
+      : message
   );
   upsertThreadAfterLocalSend(
     dmActivePartnerId,
@@ -6290,7 +6359,7 @@ async function sendShareMessageToPartner(partnerId) {
       recipient_id: targetPartnerId,
       body,
     })
-    .select("id,sender_id,recipient_id,body,media_url,media_type,created_at,read_at")
+    .select(DM_MESSAGE_SELECT_BASE)
     .single();
 
   if (error) {

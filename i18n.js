@@ -834,6 +834,8 @@ export const t = {
         dmPhotoMessage: "写真",
         dmOpenPhoto: "写真を開く",
         dmPhotoSetupNeeded: "DM画像用のSupabase更新がまだ反映されていません。",
+        dmSetupRequired:
+          "DMのDBが未設定です。SupabaseのSQL Editorで direct_messages 用マイグレーション（20260314 / 20260318）を実行してください。",
         dmSend: "送信",
         dmInputPlaceholder: "メッセージを入力",
         dmComposerPlaceholderWithName: "{name}にメッセージ",
@@ -1837,6 +1839,8 @@ export const t = {
         dmPhotoMessage: "Photo",
         dmOpenPhoto: "Open photo",
         dmPhotoSetupNeeded: "The Supabase update for DM photos is not active yet.",
+        dmSetupRequired:
+          "DM database is not ready. Run the Supabase direct_messages migrations (20260314 / 20260318) first.",
         dmSend: "Send",
         dmInputPlaceholder: "Type a message",
         dmComposerPlaceholderWithName: "Message {name}",
