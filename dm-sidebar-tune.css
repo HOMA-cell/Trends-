@@ -1,68 +1,204 @@
-/* DM sidebar tuning: keep the inbox column compact so the conversation stays primary. */
-.dm-layout {
-  grid-template-columns: clamp(252px, 22vw, 286px) minmax(0, 1fr);
+/*
+  DM UI v4 (compact)
+  - Twitter / Instagram-ish inbox density: slim list, primary chat.
+  - Injected after styles.css (via ads-config.js) so we can override safely.
+*/
+
+/* Shell framing: reduce the “card inside card” feel. */
+.dm-shell .dm-shell-frame {
+  padding: 0 !important;
 }
 
-.dm-sidebar {
-  width: 100%;
-  max-width: 286px;
+.dm-shell .dm-shell-header {
+  padding: 14px 16px !important;
+  margin: 0 !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.92) !important;
 }
 
-.dm-sidebar-top {
-  padding: 14px;
+.dm-shell .dm-shell-heading .card-title {
+  font-size: 18px !important;
 }
 
-.dm-inbox-head-label {
-  font-size: 20px;
+.dm-shell .dm-shell-heading .card-sub {
+  display: none !important;
 }
 
-.dm-inbox-count {
-  min-width: 30px;
-  min-height: 30px;
-  padding: 0 8px;
-  font-size: 11px;
+/* Layout: slimmer inbox column, no gap. */
+#dm-layout.dm-layout {
+  display: grid !important;
+  grid-template-columns: clamp(220px, 22vw, 280px) minmax(0, 1fr) !important;
+  gap: 0 !important;
+  min-height: clamp(640px, 78vh, 920px) !important;
 }
 
-.dm-sidebar-controls {
-  gap: 8px;
-  padding-bottom: 8px;
+#dm-layout.dm-layout .dm-sidebar,
+#dm-layout.dm-layout .dm-chat {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
-.dm-thread-filters {
-  gap: 6px;
-  margin-top: 6px;
+#dm-layout.dm-layout .dm-sidebar {
+  padding: 0 !important;
+  border-right: 1px solid rgba(226, 232, 240, 0.92) !important;
+  background: #ffffff !important;
 }
 
-.dm-thread-filters .chip {
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 10px;
+#dm-layout.dm-layout .dm-chat {
+  padding: 0 !important;
+  background: #ffffff !important;
 }
 
-.dm-thread-item {
-  gap: 10px;
-  padding: 10px 14px;
+/* Inbox header: smaller. */
+#dm-layout.dm-layout .dm-sidebar-top {
+  padding: 12px 12px 10px !important;
+  gap: 10px !important;
 }
 
-.dm-thread-item .avatar {
-  width: 40px;
-  height: 40px;
+#dm-layout.dm-layout .dm-inbox-head {
+  padding: 0 0 10px !important;
 }
 
-.dm-thread-name {
-  font-size: 13px;
+#dm-layout.dm-layout .dm-inbox-head-label {
+  font-size: 16px !important;
+  line-height: 1.1 !important;
 }
 
-.dm-thread-preview {
-  font-size: 11px;
+#dm-layout.dm-layout #dm-inbox-head-note {
+  display: none !important;
+}
+
+#dm-layout.dm-layout .dm-inbox-count {
+  min-width: 26px !important;
+  min-height: 26px !important;
+  padding: 0 8px !important;
+  font-size: 11px !important;
+}
+
+/* Search: shorter pill. */
+#dm-layout.dm-layout #dm-thread-search {
+  min-height: 38px !important;
+  border-radius: 999px !important;
+  padding: 0 36px 0 34px !important;
+  font-size: 12px !important;
+}
+
+#dm-layout.dm-layout #btn-dm-thread-search-clear {
+  right: 6px !important;
+  width: 28px !important;
+  min-height: 28px !important;
+}
+
+/* Filters: keep All/Unread; hide pinned/muted in the default view (still exists logically). */
+#dm-layout.dm-layout #dm-filter-pinned,
+#dm-layout.dm-layout #dm-filter-muted {
+  display: none !important;
+}
+
+#dm-layout.dm-layout .dm-thread-filters {
+  gap: 6px !important;
+  margin-top: 6px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+#dm-layout.dm-layout .dm-thread-filters .chip {
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  font-size: 10px !important;
+  border-radius: 999px !important;
+}
+
+/* Thread list: flatter rows, tighter density. */
+#dm-layout.dm-layout .dm-thread-list-wrap {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+#dm-layout.dm-layout .dm-thread-list {
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+#dm-layout.dm-layout .dm-thread-section-label {
+  margin: 12px 12px 6px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+#dm-layout.dm-layout .dm-thread-item {
+  width: 100% !important;
+  gap: 10px !important;
+  padding: 10px 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(241, 245, 249, 1) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+#dm-layout.dm-layout .dm-thread-item:hover {
+  background: rgba(248, 250, 252, 0.9) !important;
+  box-shadow: none !important;
+}
+
+#dm-layout.dm-layout .dm-thread-item.is-active {
+  background: rgba(239, 246, 255, 0.8) !important;
+  box-shadow: inset 3px 0 0 #2563eb !important;
+}
+
+#dm-layout.dm-layout .dm-thread-item .avatar {
+  width: 38px !important;
+  height: 38px !important;
+}
+
+#dm-layout.dm-layout .dm-thread-name {
+  font-size: 13px !important;
+}
+
+#dm-layout.dm-layout .dm-thread-time {
+  font-size: 10px !important;
+}
+
+#dm-layout.dm-layout .dm-thread-preview {
+  font-size: 11px !important;
+}
+
+/* Reduce metadata clutter in list view. */
+#dm-layout.dm-layout .dm-thread-meta-pills {
+  display: none !important;
+}
+
+/* Chat empty state: make it smaller (this is the “でかすぎる” part). */
+#dm-layout.dm-layout .dm-conversation-empty {
+  max-width: 360px !important;
+  margin: 24px auto !important;
+  padding: 18px 16px !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+
+#dm-layout.dm-layout .dm-conversation-empty-avatar {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+#dm-layout.dm-layout .dm-conversation-empty-title {
+  font-size: 16px !important;
+}
+
+#dm-layout.dm-layout .dm-conversation-empty-hint {
+  font-size: 12px !important;
+}
+
+#dm-layout.dm-layout .dm-conversation-empty-prompts {
+  display: none !important;
 }
 
 @media (max-width: 980px) {
-  .dm-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .dm-sidebar {
-    max-width: none;
+  #dm-layout.dm-layout {
+    grid-template-columns: 1fr !important;
   }
 }
