@@ -24,6 +24,7 @@ Expected:
 Run:
 
 - `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260430_000001_storage_buckets.sql`
 - `/Users/homare/Documents/Trends-/supabase/migrations/20260314_000001_direct_messages.sql`
 - `/Users/homare/Documents/Trends-/supabase/migrations/20260318_000001_direct_messages_media.sql`
 

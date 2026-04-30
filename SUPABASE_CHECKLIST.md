@@ -9,6 +9,13 @@ Use this after running:
 2. Run the migration SQL.
 3. Confirm there are no errors.
 
+Minimum required migrations for production:
+
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260430_000001_storage_buckets.sql`
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260314_000001_direct_messages.sql`
+- `/Users/homare/Documents/Trends-/supabase/migrations/20260318_000001_direct_messages_media.sql`
+
 ## 2) Verify tables exist
 
 Run:
@@ -63,6 +70,11 @@ where id in ('avatars', 'post-media');
 
 Both buckets should exist and be `public = true`.
 
+If the result is empty, either:
+
+- Create the buckets from Dashboard -> Storage, or
+- Run `/Users/homare/Documents/Trends-/supabase/migrations/20260430_000001_storage_buckets.sql` in SQL Editor.
+
 ## 5) Verify critical unique constraints
 
 ```sql
@@ -98,4 +110,3 @@ order by indexname;
    - public posts are visible,
    - private posts are not visible,
    - write actions require login.
-
