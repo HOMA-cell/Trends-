@@ -260,22 +260,37 @@ async function main() {
     }
 
     for (const bucket of BUCKET_PROBES) {
-      const url = `${supabaseUrl}/storage/v1/bucket/${bucket}`;
+      // Note: /storage/v1/bucket/* requires a user JWT (or service_role) for metadata access.
+      // For a public bucket, we can still assert existence via the public object endpoint:
+      // - Missing bucket => "Bucket not found"
+      // - Existing bucket + missing key => "Object not found" (OK)
+      const url = `${supabaseUrl}/storage/v1/object/public/${bucket}/__prod_check_probe__`;
       try {
-        const res = await fetchWithTimeout(url, { headers: restHeaders }, 9000);
+        const res = await fetchWithTimeout(
+          url,
+          { headers: { apikey: supabaseAnonKey } },
+          9000
+        );
         const body = await safeReadText(res);
         const normalized = body.toLowerCase();
+
         const looksMissingBucket =
           normalized.includes("bucket not found") ||
-          normalized.includes("\"error\":\"bucket not found\"") ||
-          normalized.includes("\"statuscode\":\"404\"");
-        if (res.ok) {
-          ok(`bucket ${bucket}`, `HTTP ${res.status}`);
-        } else if (res.status === 404 || looksMissingBucket) {
+          normalized.includes("nosuchbucket") ||
+          normalized.includes("\"error\":\"bucket not found\"");
+        const looksMissingObject =
+          normalized.includes("object not found") ||
+          normalized.includes("nosuchkey") ||
+          normalized.includes("\"error\":\"not_found\"");
+
+        if (looksMissingBucket) {
           fail(`bucket ${bucket}`, `Missing (HTTP ${res.status}) ${body}`);
+        } else if (res.ok || looksMissingObject) {
+          ok(`bucket ${bucket}`, res.ok ? `HTTP ${res.status}` : `OK (HTTP ${res.status})`);
         } else {
           warn(`bucket ${bucket}`, `HTTP ${res.status}${body ? ` ${body}` : ""}`);
         }
+
         await res.arrayBuffer().catch(() => {});
       } catch (error) {
         fail(`bucket ${bucket}`, String(error?.message || error));
