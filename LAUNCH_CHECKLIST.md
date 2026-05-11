@@ -5,7 +5,7 @@ Use this when we are about to let real users in.
 ## 1) Local preflight
 
 ```bash
-cd /Users/homare/Documents/Trends-
+cd /path/to/Trends-
 npm ci
 npm run security
 npm run preflight
@@ -23,10 +23,10 @@ Expected:
 
 Run:
 
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260430_000001_storage_buckets.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260314_000001_direct_messages.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260318_000001_direct_messages_media.sql`
+- `supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+- `supabase/migrations/20260430_000001_storage_buckets.sql`
+- `supabase/migrations/20260314_000001_direct_messages.sql`
+- `supabase/migrations/20260318_000001_direct_messages_media.sql`
 
 Then verify:
 
@@ -38,7 +38,7 @@ Then verify:
 If you have Supabase CLI access configured, you can also check linked migration state with:
 
 ```bash
-cd /Users/homare/Documents/Trends-
+cd /path/to/Trends-
 npm run db:status
 ```
 
@@ -46,7 +46,7 @@ This requires `supabase login` or `SUPABASE_ACCESS_TOKEN`.
 
 Reference:
 
-- `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`
+- `SUPABASE_CHECKLIST.md`
 
 ## 3) Production deploy
 
@@ -105,4 +105,4 @@ Safe to open to real users when all are true:
 If Vercel has an incident:
 
 - GitHub Pages workflow is available as manual fallback:
-  - `/Users/homare/Documents/Trends-/.github/workflows/deploy-pages.yml`
+  - `.github/workflows/deploy-pages.yml`

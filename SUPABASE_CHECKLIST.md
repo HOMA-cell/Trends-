@@ -1,7 +1,7 @@
 # Supabase Production Checklist
 
 Use this after running:
-`/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+`supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
 
 ## 1) Migration apply
 
@@ -11,10 +11,16 @@ Use this after running:
 
 Minimum required migrations for production:
 
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260430_000001_storage_buckets.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260314_000001_direct_messages.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260318_000001_direct_messages_media.sql`
+- `supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+- `supabase/migrations/20260430_000001_storage_buckets.sql`
+- `supabase/migrations/20260314_000001_direct_messages.sql`
+- `supabase/migrations/20260318_000001_direct_messages_media.sql`
+
+Tip (Supabase CLI):
+
+- When you see docs like `supabase login --token <TOKEN>`, do not include the `<` `>` characters.
+  - Use: `supabase login --token "YOUR_TOKEN_HERE"`
+  - Or export `SUPABASE_ACCESS_TOKEN` in your shell.
 
 ## 2) Verify tables exist
 

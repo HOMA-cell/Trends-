@@ -27,9 +27,9 @@ Check these in Supabase Dashboard:
 
 Apply all production migrations:
 
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260314_000001_direct_messages.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260318_000001_direct_messages_media.sql`
+- `supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+- `supabase/migrations/20260314_000001_direct_messages.sql`
+- `supabase/migrations/20260318_000001_direct_messages_media.sql`
 
 Then confirm:
 
@@ -42,7 +42,7 @@ Then confirm:
 Run:
 
 ```bash
-cd /Users/homare/Documents/Trends-
+cd /path/to/Trends-
 npm run security
 npm run preflight
 ```

@@ -1,204 +1,444 @@
 /*
-  DM UI v4 (compact)
-  - Twitter / Instagram-ish inbox density: slim list, primary chat.
-  - Injected after styles.css (via ads-config.js) so we can override safely.
+  UI Tune v5
+  - DM: rebuild for density + clarity (Twitter / Instagram-ish).
+  - Public profile: simplify + make more “SNS profile” readable.
+  - Loaded after styles.css via ads-config.js.
 */
 
-/* Shell framing: reduce the “card inside card” feel. */
-.dm-shell .dm-shell-frame {
+/* =========================
+   DM (Messages)
+   ========================= */
+
+.page-view[data-page="messages"] {
+  --dm-divider: rgba(226, 232, 240, 0.92);
+  --dm-divider-soft: rgba(241, 245, 249, 1);
+  --dm-surface: #ffffff;
+  --dm-chat-bg: #f8fafc;
+  --dm-muted: rgba(100, 116, 139, 0.94);
+  --dm-focus: rgba(17, 24, 39, 0.16);
+}
+
+/* Shell: flatter, app-like container. */
+.page-view[data-page="messages"] .dm-shell {
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 24px !important;
+}
+
+.page-view[data-page="messages"] .dm-shell .dm-shell-frame {
   padding: 0 !important;
 }
 
-.dm-shell .dm-shell-header {
-  padding: 14px 16px !important;
+.page-view[data-page="messages"] .dm-shell .dm-shell-header {
+  padding: 12px 14px !important;
   margin: 0 !important;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.92) !important;
+  border-bottom: 1px solid var(--dm-divider) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.dm-shell .dm-shell-heading .card-title {
-  font-size: 18px !important;
+.page-view[data-page="messages"] .dm-shell .dm-shell-heading .card-title {
+  font-size: 16px !important;
+  letter-spacing: -0.02em;
 }
 
-.dm-shell .dm-shell-heading .card-sub {
+.page-view[data-page="messages"] .dm-shell .dm-shell-heading .card-sub {
   display: none !important;
 }
 
-/* Layout: slimmer inbox column, no gap. */
-#dm-layout.dm-layout {
+/* Layout: slim inbox + main chat (no gap, border divider). */
+.page-view[data-page="messages"] #dm-layout.dm-layout {
   display: grid !important;
-  grid-template-columns: clamp(220px, 22vw, 280px) minmax(0, 1fr) !important;
+  grid-template-columns: clamp(232px, 24vw, 300px) minmax(0, 1fr) !important;
   gap: 0 !important;
-  min-height: clamp(640px, 78vh, 920px) !important;
+  min-height: clamp(640px, 78vh, 940px) !important;
 }
 
-#dm-layout.dm-layout .dm-sidebar,
-#dm-layout.dm-layout .dm-chat {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-sidebar,
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-chat {
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
 
-#dm-layout.dm-layout .dm-sidebar {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-sidebar {
   padding: 0 !important;
-  border-right: 1px solid rgba(226, 232, 240, 0.92) !important;
-  background: #ffffff !important;
+  border-right: 1px solid var(--dm-divider) !important;
+  background: var(--dm-surface) !important;
 }
 
-#dm-layout.dm-layout .dm-chat {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-chat {
   padding: 0 !important;
-  background: #ffffff !important;
+  background: var(--dm-surface) !important;
 }
 
-/* Inbox header: smaller. */
-#dm-layout.dm-layout .dm-sidebar-top {
+/* Sidebar top: compact and clean. */
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-sidebar-top {
   padding: 12px 12px 10px !important;
   gap: 10px !important;
+  border-bottom: 1px solid var(--dm-divider-soft) !important;
 }
 
-#dm-layout.dm-layout .dm-inbox-head {
-  padding: 0 0 10px !important;
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-inbox-head {
+  padding: 0 0 8px !important;
 }
 
-#dm-layout.dm-layout .dm-inbox-head-label {
-  font-size: 16px !important;
-  line-height: 1.1 !important;
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-inbox-head-label {
+  font-size: 14px !important;
+  letter-spacing: -0.01em;
 }
 
-#dm-layout.dm-layout #dm-inbox-head-note {
+.page-view[data-page="messages"] #dm-layout.dm-layout #dm-inbox-head-note {
   display: none !important;
 }
 
-#dm-layout.dm-layout .dm-inbox-count {
-  min-width: 26px !important;
-  min-height: 26px !important;
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-inbox-count {
+  min-width: 24px !important;
+  min-height: 24px !important;
   padding: 0 8px !important;
   font-size: 11px !important;
 }
 
-/* Search: shorter pill. */
-#dm-layout.dm-layout #dm-thread-search {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-summary,
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-presence-strip {
+  display: none !important;
+}
+
+/* Search pill. */
+.page-view[data-page="messages"] #dm-layout.dm-layout #dm-thread-search {
   min-height: 38px !important;
   border-radius: 999px !important;
   padding: 0 36px 0 34px !important;
   font-size: 12px !important;
 }
 
-#dm-layout.dm-layout #btn-dm-thread-search-clear {
+.page-view[data-page="messages"] #dm-layout.dm-layout #btn-dm-thread-search-clear {
   right: 6px !important;
   width: 28px !important;
   min-height: 28px !important;
 }
 
-/* Filters: keep All/Unread; hide pinned/muted in the default view (still exists logically). */
-#dm-layout.dm-layout #dm-filter-pinned,
-#dm-layout.dm-layout #dm-filter-muted {
-  display: none !important;
-}
-
-#dm-layout.dm-layout .dm-thread-filters {
+/* Filters: make them look like Twitter tabs. */
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-filters {
   gap: 6px !important;
-  margin-top: 6px !important;
+  margin-top: 8px !important;
   flex-wrap: nowrap !important;
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch;
 }
 
-#dm-layout.dm-layout .dm-thread-filters .chip {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-filters .chip {
   min-height: 28px !important;
   padding: 0 10px !important;
-  font-size: 10px !important;
+  font-size: 10.5px !important;
   border-radius: 999px !important;
+  background: rgba(248, 250, 252, 0.92) !important;
+  border-color: rgba(226, 232, 240, 0.92) !important;
 }
 
-/* Thread list: flatter rows, tighter density. */
-#dm-layout.dm-layout .dm-thread-list-wrap {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-filters .chip-active {
+  background: rgba(17, 24, 39, 0.92) !important;
+  border-color: rgba(17, 24, 39, 0.92) !important;
+  color: #ffffff !important;
+}
+
+/* Thread list: dense rows, strong hierarchy. */
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-list-wrap {
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
 }
 
-#dm-layout.dm-layout .dm-thread-list {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-list {
   gap: 0 !important;
   padding: 0 !important;
 }
 
-#dm-layout.dm-layout .dm-thread-section-label {
-  margin: 12px 12px 6px !important;
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-section-label {
+  margin: 10px 12px 6px !important;
   padding: 0 !important;
   background: transparent !important;
+  color: rgba(71, 85, 105, 0.95) !important;
+  font-size: 11px !important;
 }
 
-#dm-layout.dm-layout .dm-thread-item {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-item {
   width: 100% !important;
   gap: 10px !important;
   padding: 10px 12px !important;
   border: 0 !important;
-  border-bottom: 1px solid rgba(241, 245, 249, 1) !important;
+  border-bottom: 1px solid var(--dm-divider-soft) !important;
   border-radius: 0 !important;
   background: transparent !important;
 }
 
-#dm-layout.dm-layout .dm-thread-item:hover {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-item:hover {
   background: rgba(248, 250, 252, 0.9) !important;
   box-shadow: none !important;
 }
 
-#dm-layout.dm-layout .dm-thread-item.is-active {
-  background: rgba(239, 246, 255, 0.8) !important;
-  box-shadow: inset 3px 0 0 #2563eb !important;
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-item:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.25) !important;
+  outline-offset: -2px !important;
 }
 
-#dm-layout.dm-layout .dm-thread-item .avatar {
-  width: 38px !important;
-  height: 38px !important;
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-item.is-active {
+  background: rgba(239, 246, 255, 0.75) !important;
+  box-shadow: inset 3px 0 0 rgba(37, 99, 235, 0.95) !important;
 }
 
-#dm-layout.dm-layout .dm-thread-name {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-item .avatar {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 16px !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-name {
   font-size: 13px !important;
+  font-weight: 800 !important;
 }
 
-#dm-layout.dm-layout .dm-thread-time {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-time {
   font-size: 10px !important;
+  color: var(--dm-muted) !important;
 }
 
-#dm-layout.dm-layout .dm-thread-preview {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-preview {
   font-size: 11px !important;
+  color: rgba(71, 85, 105, 0.96) !important;
 }
 
-/* Reduce metadata clutter in list view. */
-#dm-layout.dm-layout .dm-thread-meta-pills {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-preview-pill {
   display: none !important;
 }
 
-/* Chat empty state: make it smaller (this is the “でかすぎる” part). */
-#dm-layout.dm-layout .dm-conversation-empty {
-  max-width: 360px !important;
-  margin: 24px auto !important;
-  padding: 18px 16px !important;
-  border-radius: 16px !important;
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-meta-pills {
+  display: none !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-thread-unread {
+  min-width: 22px !important;
+  height: 18px !important;
+  padding: 0 6px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  background: rgba(37, 99, 235, 0.95) !important;
+  color: #fff !important;
   box-shadow: none !important;
 }
 
-#dm-layout.dm-layout .dm-conversation-empty-avatar {
+/* Chat: subtle background and cleaner header. */
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-chat-header {
+  padding: 10px 12px !important;
+  border-bottom: 1px solid var(--dm-divider) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-chat-title {
+  font-size: 14px !important;
+  font-weight: 900 !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-chat-sub {
+  font-size: 11px !important;
+  color: var(--dm-muted) !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-message-list {
+  background: var(--dm-chat-bg) !important;
+  padding: 16px 14px !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-message-row {
+  max-width: min(70%, 560px) !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-message-bubble {
+  border-radius: 18px !important;
+  padding: 10px 12px !important;
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  background: #ffffff !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-message-row.is-self .dm-message-bubble:not(.has-media) {
+  background: rgba(17, 24, 39, 0.94) !important;
+  border-color: rgba(17, 24, 39, 0.94) !important;
+  color: #ffffff !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-message-row.is-self .dm-message-text {
+  color: inherit !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-message-row.is-self .dm-message-share-card {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-message-meta {
+  font-size: 10px !important;
+  color: rgba(100, 116, 139, 0.95) !important;
+}
+
+/* Composer: more like modern messengers. */
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-composer {
+  border-top: 1px solid var(--dm-divider) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-form {
+  border-radius: 16px !important;
+  border-color: rgba(226, 232, 240, 0.92) !important;
+  padding: 6px !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout #dm-input {
+  font-size: 13px !important;
+}
+
+/* Chat empty state: keep it compact. */
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-conversation-empty {
+  max-width: 360px !important;
+  margin: 24px auto !important;
+  padding: 18px 16px !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-conversation-empty-avatar {
   width: 44px !important;
   height: 44px !important;
 }
 
-#dm-layout.dm-layout .dm-conversation-empty-title {
-  font-size: 16px !important;
-}
-
-#dm-layout.dm-layout .dm-conversation-empty-hint {
-  font-size: 12px !important;
-}
-
-#dm-layout.dm-layout .dm-conversation-empty-prompts {
+.page-view[data-page="messages"] #dm-layout.dm-layout .dm-conversation-empty-prompts {
   display: none !important;
 }
 
 @media (max-width: 980px) {
-  #dm-layout.dm-layout {
+  .page-view[data-page="messages"] #dm-layout.dm-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* =========================
+   Public Profile
+   ========================= */
+
+.page-view[data-page="public-profile"] #public-profile-card {
+  background: rgba(255, 255, 255, 0.94) !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-card::before {
+  height: 148px !important;
+  opacity: 0.92 !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-card .card-header {
+  padding: 10px 0 0 !important;
+  margin-bottom: 8px !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-card .card-title {
+  font-size: 10px !important;
+  letter-spacing: 0.12em !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-header {
+  padding-top: 16px !important;
+  margin-bottom: 10px !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-avatar {
+  width: 88px !important;
+  height: 88px !important;
+  font-size: 28px !important;
+  border-width: 4px !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-name {
+  font-size: clamp(22px, 3.2vw, 30px) !important;
+  line-height: 1.05 !important;
+  margin-bottom: 2px !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-handle,
+.page-view[data-page="public-profile"] #public-profile-joined {
+  font-size: 12px !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-actions .btn {
+  min-height: 38px !important;
+  padding-inline: 14px !important;
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+}
+
+/* Meta: Twitter-ish inline counts instead of big blocks. */
+.page-view[data-page="public-profile"] #public-profile-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 14px !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-meta > span {
+  min-width: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  flex-direction: row !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-meta .profile-meta-value {
+  font-size: 14px !important;
+}
+
+.page-view[data-page="public-profile"] #public-profile-meta .profile-meta-label {
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: rgba(71, 85, 105, 0.92) !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-overview-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.5fr) !important;
+  gap: 14px !important;
+  margin-top: -10px !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-overview-main,
+.page-view[data-page="public-profile"] .public-profile-overview-side,
+.page-view[data-page="public-profile"] .public-profile-content-panel {
+  border-radius: 22px !important;
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-bio {
+  font-size: 14px !important;
+  line-height: 1.75 !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-content-tabs {
+  border-radius: 999px !important;
+}
+
+.page-view[data-page="public-profile"] .public-profile-content-tab {
+  min-height: 36px !important;
+  border-radius: 999px !important;
+}
+
+@media (max-width: 980px) {
+  .page-view[data-page="public-profile"] .public-profile-overview-grid {
     grid-template-columns: 1fr !important;
   }
 }

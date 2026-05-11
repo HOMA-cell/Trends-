@@ -12,7 +12,7 @@ The repo now assumes Vercel is the normal production path. GitHub Pages remains 
 ## 1) Local preflight
 
 ```bash
-cd /Users/homare/Documents/Trends-
+cd /path/to/Trends-
 nvm use
 npm ci
 npm run security
@@ -26,11 +26,11 @@ If `nvm use` is not available yet, install Node 22 first.
 
 Before inviting real users, run:
 
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260314_000001_direct_messages.sql`
-- `/Users/homare/Documents/Trends-/supabase/migrations/20260318_000001_direct_messages_media.sql`
+- `supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
+- `supabase/migrations/20260314_000001_direct_messages.sql`
+- `supabase/migrations/20260318_000001_direct_messages_media.sql`
 
-Then walk through `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`.
+Then walk through `SUPABASE_CHECKLIST.md`.
 
 ## 3) Vercel setup
 
@@ -44,7 +44,7 @@ Then walk through `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`.
 5. Output directory:
    - `.`
 
-This repo also includes `/Users/homare/Documents/Trends-/vercel.json`, so Vercel should pick these defaults up automatically.
+This repo also includes `vercel.json`, so Vercel should pick these defaults up automatically.
 
 ### What Vercel build does
 
@@ -55,7 +55,7 @@ This repo also includes `/Users/homare/Documents/Trends-/vercel.json`, so Vercel
 ## 4) Normal release flow
 
 ```bash
-cd /Users/homare/Documents/Trends-
+cd /path/to/Trends-
 git add -A
 git commit -m "Your update message"
 git push origin main
@@ -85,7 +85,7 @@ After push:
 
 For the full go-live flow, use:
 
-- `/Users/homare/Documents/Trends-/LAUNCH_CHECKLIST.md`
+- `LAUNCH_CHECKLIST.md`
 
 ## 6) If users see stale files
 
@@ -103,7 +103,7 @@ If needed, hard refresh after that.
 
 There is still a Pages workflow:
 
-- `/Users/homare/Documents/Trends-/.github/workflows/deploy-pages.yml`
+- `.github/workflows/deploy-pages.yml`
 
 But it is now manual-only on purpose, so normal releases do not spam Pages deployment failures.
 
@@ -116,4 +116,4 @@ Use it only when you intentionally want a static fallback deployment.
 - advanced runtime override tools are hidden on production unless you open the app with `?ops=1`
 - keep production URL saved in app settings if you switch domains
 - run `npm run preflight` after major env or deploy changes
-- review `/Users/homare/Documents/Trends-/SECURITY.md` before inviting real users
+- review `SECURITY.md` before inviting real users
