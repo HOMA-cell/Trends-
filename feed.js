@@ -1668,6 +1668,50 @@ function isLikelyTransientNetworkError(error) {
         message.includes("timeout")
       );
     }
+
+function classifyLikeToggleIssue(error = null) {
+      const status = Number(error?.status || 0);
+      const codeText = `${error?.code || ""}`.toLowerCase().trim();
+      const messageText = `${error?.message || error?.details || error?.hint || ""}`
+        .toLowerCase()
+        .trim();
+      if (!error) return "unknown";
+      if (isLikelyTransientNetworkError(error)) return "network";
+      if (codeText === "42501" || messageText.includes("row level security") || messageText.includes("rls")) {
+        return "rls";
+      }
+      if (codeText === "23503" || messageText.includes("foreign key")) return "fk";
+      if (
+        codeText === "22p02" ||
+        messageText.includes("invalid input syntax for type uuid") ||
+        messageText.includes("invalid uuid")
+      ) {
+        return "bad_id";
+      }
+      if (codeText === "42p01" || messageText.includes("does not exist")) return "missing_table";
+      if ([401, 403].includes(status) || messageText.includes("jwt") || messageText.includes("invalid api key")) {
+        return "auth";
+      }
+      return "unknown";
+    }
+
+async function refreshSupabaseSessionOnce() {
+      try {
+        if (supabase?.auth?.refreshSession) {
+          const { data, error } = await supabase.auth.refreshSession();
+          if (error) return { ok: false, error };
+          return { ok: !!data?.session?.user, error: null };
+        }
+        if (supabase?.auth?.getSession) {
+          const { data, error } = await supabase.auth.getSession();
+          if (error) return { ok: false, error };
+          return { ok: !!data?.session?.user, error: null };
+        }
+      } catch (error) {
+        return { ok: false, error };
+      }
+      return { ok: false, error: null };
+    }
 function classifyFeedConnectionIssue(error = null, fallbackMessage = "") {
       const status = Number(error?.status || 0);
       const codeText = `${error?.code || ""}`.toLowerCase().trim();
@@ -9254,30 +9298,53 @@ export async function toggleLikeForPost(post) {
       }
 
       try {
-        if (wasLiked) {
-          const { error } = await supabase
-            .from("post_likes")
-            .delete()
-            .eq("post_id", post.id)
-            .eq("user_id", currentUser.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from("post_likes")
-            .insert({
-              post_id: post.id,
-              user_id: currentUser.id,
-            });
+        const mutateRemote = async () => {
+          if (wasLiked) {
+            const { error } = await supabase
+              .from("post_likes")
+              .delete()
+              .eq("post_id", post.id)
+              .eq("user_id", currentUser.id);
+            if (error) throw error;
+            return;
+          }
+          const { error } = await supabase.from("post_likes").insert({
+            post_id: post.id,
+            user_id: currentUser.id,
+          });
           if (error && error.code !== "23505") throw error;
           shouldNotify =
             !error &&
             post.user_id &&
             currentUser.id &&
             post.user_id !== currentUser.id;
+        };
+
+        let remoteError = null;
+        try {
+          await mutateRemote();
+        } catch (error) {
+          const issue = classifyLikeToggleIssue(error);
+          if (issue === "auth") {
+            const refreshed = await refreshSupabaseSessionOnce();
+            if (refreshed.ok) {
+              try {
+                await mutateRemote();
+              } catch (retryError) {
+                remoteError = retryError;
+              }
+            } else {
+              remoteError = error;
+            }
+          } else {
+            remoteError = error;
+          }
         }
+        if (remoteError) throw remoteError;
       } catch (error) {
         console.error("like toggle error:", error);
-        if (isLikelyTransientNetworkError(error)) {
+        const issue = classifyLikeToggleIssue(error);
+        if (issue === "network") {
           upsertLikeOfflineQueueAction(queuedAction);
           showToast(
             tr.likeQueued ||
@@ -9292,7 +9359,33 @@ export async function toggleLikeForPost(post) {
           likedPostIds.delete(post.id);
         }
         likesByPost.set(post.id, previousCount);
-        showToast(tr.likeUpdateFailed || "いいねの更新に失敗しました。", "warning");
+        if (issue === "auth") {
+          showToast(
+            tr.authSessionExpired ||
+              "セッションが切れました。いったんログアウトしてログインし直してください。",
+            "warning"
+          );
+        } else if (issue === "rls") {
+          showToast(
+            tr.likePolicyBlocked ||
+              "いいねが拒否されました（DB設定/RLS）。Supabase の post_likes ポリシーを確認してください。",
+            "warning"
+          );
+        } else if (issue === "fk") {
+          showToast(
+            tr.likePostUnavailable ||
+              "この投稿は見つかりませんでした。再読み込みしてもう一度お試しください。",
+            "warning"
+          );
+        } else if (issue === "missing_table") {
+          showToast(
+            tr.likeDbNotReady ||
+              "いいね用DBが未設定です。Supabase の baseline migration を適用してください。",
+            "warning"
+          );
+        } else {
+          showToast(tr.likeUpdateFailed || "いいねの更新に失敗しました。", "warning");
+        }
       } finally {
         pendingLikePostIds.delete(post.id);
         updateLikeButtonsForPost(post.id);
