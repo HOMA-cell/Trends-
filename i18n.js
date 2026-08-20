@@ -463,6 +463,12 @@ export const t = {
         authFailed: "ログイン / サインアップに失敗しました。",
         authLoginFailed: "ログインに失敗しました。",
         authLoginSuccess: "ログインしました！",
+        authAccountExists:
+          "このメールは登録済みです。パスワードを確認してください。",
+        authEmailNotConfirmed:
+          "メール確認が完了していません。確認メール内のリンクを開いてください。",
+        authConfirmationSent:
+          "確認メールを送信しました。メール内のリンクを開いてからログインしてください。",
         debugTitle: "設定",
         clearCache: "ローカルキャッシュを削除",
         forceAppUpdate: "アプリを最新化",
@@ -1471,6 +1477,12 @@ export const t = {
         authFailed: "Log in / sign up failed.",
         authLoginFailed: "Login failed.",
         authLoginSuccess: "Logged in.",
+        authAccountExists:
+          "This email is already registered. Please check your password.",
+        authEmailNotConfirmed:
+          "Your email is not confirmed. Open the link in the confirmation email.",
+        authConfirmationSent:
+          "Confirmation email sent. Open its link, then log in.",
         debugTitle: "Settings",
         clearCache: "Clear local cache",
         forceAppUpdate: "Update app now",

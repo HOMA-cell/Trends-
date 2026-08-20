@@ -3763,6 +3763,7 @@ async function loadProfilePostCount() {
 
       try {
         let user = null;
+        let attemptedSignUp = false;
 
         // 1. ログインを試す
         let { data, error } = await supabase.auth.signInWithPassword({
@@ -3771,7 +3772,12 @@ async function loadProfilePostCount() {
         });
 
         // 2. 無効な認証情報なら、そのメールでサインアップを試す
-        if (error && error.message === "Invalid login credentials") {
+        const invalidCredentials =
+          error &&
+          (error.code === "invalid_credentials" ||
+            error.message === "Invalid login credentials");
+        if (invalidCredentials) {
+          attemptedSignUp = true;
           ({ data, error } = await supabase.auth.signUp({
             email,
             password,
@@ -3803,15 +3809,38 @@ async function loadProfilePostCount() {
           } else {
             console.warn("Auth error:", error);
             showToast(
-              tr.authFailed || "ログイン / サインアップに失敗しました。",
+              error.code === "email_not_confirmed" ||
+                error.message === "Email not confirmed"
+                ? tr.authEmailNotConfirmed ||
+                    "メール確認が完了していません。確認メール内のリンクを開いてください。"
+                : tr.authFailed || "ログイン / サインアップに失敗しました。",
               "error"
             );
           }
           return;
         }
 
-        if (data && data.user) {
-          user = data.user;
+        if (data?.session?.user) {
+          user = data.session.user;
+        } else if (attemptedSignUp && data?.user) {
+          currentUser = null;
+          currentProfile = null;
+          profilePostCount = null;
+          updateProfileSummary();
+          updateAuthUIState();
+
+          const identities = data.user.identities;
+          const accountAlreadyExists =
+            Array.isArray(identities) && identities.length === 0;
+          showToast(
+            accountAlreadyExists
+              ? tr.authAccountExists ||
+                  "このメールは登録済みです。パスワードを確認してください。"
+              : tr.authConfirmationSent ||
+                  "確認メールを送信しました。メール内のリンクを開いてからログインしてください。",
+            accountAlreadyExists ? "error" : "success"
+          );
+          return;
         }
 
         if (!user) {
