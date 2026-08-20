@@ -176,7 +176,6 @@ import {
     const RUNTIME_ISSUES_KEY = "trends_runtime_issues_v1";
     const ADS_SETTINGS_KEY = "trends_ads_config_v1";
     const FORCE_FRESH_PARAM = "fresh";
-    const FORCE_FRESH_DONE_KEY = "trends_force_fresh_done_v1";
     const LAST_SEEN_BUILD_KEY = "trends_last_seen_build_v1";
     const BUILD_AUTO_REFRESH_DONE_KEY = "trends_build_auto_refresh_done_v1";
     const RUNTIME_ISSUES_LIMIT = 20;
@@ -1796,9 +1795,6 @@ async function loadProfilePostCount() {
       const params = new URLSearchParams(window.location.search || "");
       const wantsFresh = params.get(FORCE_FRESH_PARAM) === "1";
       if (!wantsFresh) return false;
-      const alreadyDone = sessionStorage.getItem(FORCE_FRESH_DONE_KEY) === "1";
-      if (alreadyDone) return false;
-      sessionStorage.setItem(FORCE_FRESH_DONE_KEY, "1");
       return runFreshReloadCleanupAndReplace(params);
     }
 
@@ -2040,8 +2036,15 @@ async function loadProfilePostCount() {
       setupProfileLinks();
       applySettings();
       const deferredSetupPromise = runDeferredSetupTasks();
+      const connectivity = await runSupabaseConnectionTest({
+        force: supabaseConnectivityState.ok !== true,
+        timeoutMs: 5000,
+      });
       await restoreSession();
-      await loadFeed({ forceNetwork: supabaseConnectivityState.ok === true });
+      await loadFeed({
+        forceNetwork:
+          connectivity.ok === true || supabaseConnectivityState.ok === true,
+      });
       await commentSync.flushQueue({ silent: true });
       handleHashRoute();
       await deferredSetupPromise;
