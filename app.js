@@ -1823,6 +1823,8 @@ async function loadProfilePostCount() {
       }
       try {
         localStorage.removeItem("trends_feed_cache_v1");
+        localStorage.removeItem(SUPABASE_CONNECTIVITY_CACHE_KEY);
+        localStorage.removeItem("trends_feed_network_backoff_until_v1");
       } catch {
         // ignore storage cleanup failures
       }
@@ -2039,7 +2041,7 @@ async function loadProfilePostCount() {
       applySettings();
       const deferredSetupPromise = runDeferredSetupTasks();
       await restoreSession();
-      await loadFeed();
+      await loadFeed({ forceNetwork: supabaseConnectivityState.ok === true });
       await commentSync.flushQueue({ silent: true });
       handleHashRoute();
       await deferredSetupPromise;
@@ -3999,12 +4001,18 @@ async function loadProfilePostCount() {
         supabaseConnectivityState.ok === false &&
         now < (supabaseConnectivityState.retryAfter || 0)
       ) {
-        currentUser = null;
-        currentProfile = null;
-        profilePostCount = null;
-        updateProfileSummary();
-        updateAuthUIState();
-        return;
+        const recovery = await runSupabaseConnectionTest({
+          force: true,
+          timeoutMs: 5000,
+        });
+        if (!recovery.ok) {
+          currentUser = null;
+          currentProfile = null;
+          profilePostCount = null;
+          updateProfileSummary();
+          updateAuthUIState();
+          return;
+        }
       }
 
       const { data, error } = await supabase.auth.getSession();

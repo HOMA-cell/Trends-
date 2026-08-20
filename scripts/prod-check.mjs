@@ -4,14 +4,17 @@ import { resolve } from "node:path";
 const ROOT = process.cwd();
 
 const DEFAULT_TIMEOUT_MS = 9000;
-const TABLE_PROBES = [
+const PUBLIC_TABLE_PROBES = [
   "profiles",
   "posts",
   "comments",
   "follows",
   "post_likes",
-  "workout_templates",
   "workout_sets",
+];
+
+const PROTECTED_TABLE_PROBES = [
+  "workout_templates",
   "notifications",
   "exercise_prs",
   "direct_messages",
@@ -242,7 +245,7 @@ async function main() {
       Authorization: `Bearer ${supabaseAnonKey}`,
     };
 
-    for (const table of TABLE_PROBES) {
+    for (const table of PUBLIC_TABLE_PROBES) {
       const url = `${supabaseUrl}/rest/v1/${table}?select=id&limit=1`;
       try {
         const res = await fetchWithTimeout(url, { headers: restHeaders }, 9000);
@@ -253,6 +256,29 @@ async function main() {
           fail(`table ${table}`, `Missing or not in schema cache (HTTP ${res.status}) ${body}`);
         } else {
           warn(`table ${table}`, `HTTP ${res.status}${body ? ` ${body}` : ""}`);
+        }
+      } catch (error) {
+        fail(`table ${table}`, String(error?.message || error));
+      }
+    }
+
+    for (const table of PROTECTED_TABLE_PROBES) {
+      const url = `${supabaseUrl}/rest/v1/${table}?select=id&limit=1`;
+      try {
+        const res = await fetchWithTimeout(url, { headers: restHeaders }, 9000);
+        const body = await safeReadText(res);
+        const permissionDenied =
+          (res.status === 401 || res.status === 403) &&
+          (body.includes("42501") || body.toLowerCase().includes("permission denied"));
+
+        if (permissionDenied) {
+          ok(`table ${table}`, `Protected from anon (HTTP ${res.status})`);
+        } else if (res.status === 404 || body.toLowerCase().includes("pgrst205")) {
+          fail(`table ${table}`, `Missing or not in schema cache (HTTP ${res.status}) ${body}`);
+        } else if (res.ok) {
+          fail(`table ${table}`, "Unexpected anonymous access");
+        } else {
+          fail(`table ${table}`, `Unexpected HTTP ${res.status}${body ? ` ${body}` : ""}`);
         }
       } catch (error) {
         fail(`table ${table}`, String(error?.message || error));

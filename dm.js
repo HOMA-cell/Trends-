@@ -92,6 +92,8 @@ const DM_REPLY_BODY_BREAK = "__TRENDS_DM_REPLY_BODY__";
 const DM_REACTION_PREFIX = "__TRENDS_DM_REACTION__";
 const DM_QUICK_LIKE_EMOJI = "❤️";
 const DM_IMAGE_LIMIT_BYTES = 12 * 1024 * 1024;
+const DM_MEDIA_BUCKET = "dm-media";
+const DM_MEDIA_SIGNED_URL_TTL_SECONDS = 60 * 60;
 const DM_ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -100,7 +102,7 @@ const DM_ALLOWED_IMAGE_TYPES = new Set([
 ]);
 const DM_MESSAGE_SELECT_BASE = "id,sender_id,recipient_id,body,created_at,read_at";
 const DM_MESSAGE_SELECT_WITH_MEDIA =
-  "id,sender_id,recipient_id,body,media_url,media_type,created_at,read_at";
+  "id,sender_id,recipient_id,body,media_url,media_path,media_type,created_at,read_at";
 
 export function setDmContext(next = {}) {
   dmContext = { ...dmContext, ...next };
@@ -1055,7 +1057,11 @@ function isDmMediaColumnError(error) {
   ]
     .join(" ")
     .toLowerCase();
-  return source.includes("media_url") || source.includes("media_type");
+  return (
+    source.includes("media_url") ||
+    source.includes("media_path") ||
+    source.includes("media_type")
+  );
 }
 
 function isDmDirectMessagesMissingError(error) {
@@ -1092,12 +1098,40 @@ function getDmDirectMessagesSetupHint(tr = getDmTranslations()) {
   );
 }
 
-function normalizeDmMessageRows(rows = []) {
-  return (rows || []).map((row) => ({
+async function normalizeDmMessageRows(rows = []) {
+  const normalizedRows = (rows || []).map((row) => ({
     ...row,
     media_url: `${row?.media_url || ""}`.trim(),
+    media_path: `${row?.media_path || ""}`.trim(),
     media_type: `${row?.media_type || ""}`.trim() || null,
   }));
+  const mediaPaths = [
+    ...new Set(normalizedRows.map((row) => row.media_path).filter(Boolean)),
+  ];
+  if (!mediaPaths.length) return normalizedRows;
+
+  const { data, error } = await supabase.storage
+    .from(DM_MEDIA_BUCKET)
+    .createSignedUrls(mediaPaths, DM_MEDIA_SIGNED_URL_TTL_SECONDS);
+  if (error) {
+    console.error("DM media URL signing failed:", error);
+    return normalizedRows.map((row) =>
+      row.media_path ? { ...row, media_url: "" } : row
+    );
+  }
+
+  const signedUrlsByPath = new Map();
+  (data || []).forEach((item, index) => {
+    const path = `${item?.path || mediaPaths[index] || ""}`.trim();
+    const signedUrl = `${item?.signedUrl || ""}`.trim();
+    if (path && signedUrl) signedUrlsByPath.set(path, signedUrl);
+  });
+
+  return normalizedRows.map((row) =>
+    row.media_path
+      ? { ...row, media_url: signedUrlsByPath.get(row.media_path) || "" }
+      : row
+  );
 }
 
 async function runDmMessageQuery(builderFactory) {
@@ -1119,7 +1153,7 @@ async function runDmMessageQuery(builderFactory) {
   if (!result?.error) {
     result = {
       ...result,
-      data: normalizeDmMessageRows(result.data || []),
+      data: await normalizeDmMessageRows(result.data || []),
     };
   }
   noteDmDirectMessagesSchemaResult(result);
@@ -2395,6 +2429,8 @@ function toggleDmMessagePinned(messageId) {
 }
 
 function getDmStorageObjectPath(message) {
+  const privateMediaPath = `${message?.media_path || ""}`.trim();
+  if (privateMediaPath) return privateMediaPath;
   const mediaUrl = `${message?.media_url || ""}`.trim();
   if (!mediaUrl) return "";
   try {
@@ -2458,7 +2494,7 @@ async function unsendDmMessage(messageId) {
   const storagePath = getDmStorageObjectPath(targetMessage);
   if (storagePath) {
     supabase.storage
-      .from("post-media")
+      .from(targetMessage?.media_path ? DM_MEDIA_BUCKET : "post-media")
       .remove([storagePath])
       .catch((storageError) => {
         console.error("unsendDmMessage storage cleanup error:", storageError);
@@ -6098,6 +6134,7 @@ async function handleSendMessage(event) {
       recipient_id: partnerId,
       body: storedBody,
       media_url: hasMedia ? dmPendingMediaPreviewUrl : "",
+      media_path: "",
       media_type: hasMedia ? "image" : null,
       created_at: pendingCreatedAt,
       read_at: null,
@@ -6128,12 +6165,14 @@ async function handleSendMessage(event) {
   );
   try {
     let mediaUrl = "";
+    let mediaPath = "";
     let mediaType = null;
     if (selectedMedia) {
       const ext = getDmSafeFileExtension(selectedMedia);
-      uploadedPath = `dm/${currentUser.id}/${Date.now()}.${ext}`;
+      const objectNonce = Math.random().toString(36).slice(2, 10);
+      uploadedPath = `${currentUser.id}/${partnerId}/${Date.now()}-${objectNonce}.${ext}`;
       const { error: uploadErr } = await supabase.storage
-        .from("post-media")
+        .from(DM_MEDIA_BUCKET)
         .upload(uploadedPath, selectedMedia);
 
       if (uploadErr) {
@@ -6154,11 +6193,27 @@ async function handleSendMessage(event) {
         return;
       }
 
-      const { data: publicData } = supabase.storage
-        .from("post-media")
-        .getPublicUrl(uploadedPath);
-      mediaUrl = publicData?.publicUrl || "";
-      mediaType = mediaUrl ? "image" : null;
+      const { data: signedData, error: signedUrlError } = await supabase.storage
+        .from(DM_MEDIA_BUCKET)
+        .createSignedUrl(uploadedPath, DM_MEDIA_SIGNED_URL_TTL_SECONDS);
+      if (signedUrlError || !signedData?.signedUrl) {
+        console.error("handleSendMessage signed URL error:", signedUrlError);
+        await supabase.storage.from(DM_MEDIA_BUCKET).remove([uploadedPath]);
+        dmMessages = dmMessages.filter((message) => `${message.id || ""}` !== pendingId);
+        renderConversationMessages({ forceBottom: true });
+        if (input) {
+          input.value = restoreBody;
+          autoResizeDmInput();
+          updateDmInputCounter();
+          updateDmComposerState();
+          input.focus();
+        }
+        setSendStatus(tr.dmSendError || "Failed to send message.", "error");
+        return;
+      }
+      mediaUrl = signedData.signedUrl;
+      mediaPath = uploadedPath;
+      mediaType = "image";
     }
 
     const insertPayload = {
@@ -6166,8 +6221,8 @@ async function handleSendMessage(event) {
       recipient_id: partnerId,
       body: storedBody,
     };
-    if (mediaUrl) {
-      insertPayload.media_url = mediaUrl;
+    if (mediaPath) {
+      insertPayload.media_path = mediaPath;
       insertPayload.media_type = mediaType;
     }
 
@@ -6189,7 +6244,7 @@ async function handleSendMessage(event) {
       }
       if (uploadedPath) {
         supabase.storage
-          .from("post-media")
+          .from(DM_MEDIA_BUCKET)
           .remove([uploadedPath])
           .catch(() => {});
       }
@@ -6219,6 +6274,7 @@ async function handleSendMessage(event) {
       ? {
           ...inserted,
           media_url: mediaUrl || "",
+          media_path: mediaPath || "",
           media_type: mediaType,
         }
       : {
@@ -6227,6 +6283,7 @@ async function handleSendMessage(event) {
       recipient_id: partnerId,
       body: storedBody,
       media_url: mediaUrl || "",
+      media_path: mediaPath || "",
       media_type: mediaType,
       created_at: pendingCreatedAt,
       read_at: null,
