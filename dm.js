@@ -2690,6 +2690,7 @@ function updateDmComposerState() {
   const mediaInput = $("dm-media-input");
   const mediaRemoveBtn = $("btn-dm-media-remove");
   const form = $("dm-form");
+  const layout = $("dm-layout");
   const isSending = !!sendBtn?.classList.contains("is-loading");
   const hasConversation = !!`${dmActivePartnerId || ""}`.trim();
   const canCompose =
@@ -2718,6 +2719,9 @@ function updateDmComposerState() {
     form.classList.toggle("is-disabled", !canCompose);
     form.classList.toggle("has-media", hasMedia);
     form.classList.toggle("has-reply", !!dmReplyTargetId);
+  }
+  if (layout) {
+    layout.classList.toggle("has-active-conversation", hasConversation);
   }
   renderDmComposerContext();
 }

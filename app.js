@@ -4193,7 +4193,12 @@ async function loadProfilePostCount() {
         pageScrollMap.set(page, Math.max(0, window.scrollY || window.pageYOffset || 0));
       };
       const restoreScroll = (page, behavior = "auto") => {
-        const top = pageScrollMap.has(page) ? pageScrollMap.get(page) : 0;
+        const top =
+          page === "messages"
+            ? 0
+            : pageScrollMap.has(page)
+              ? pageScrollMap.get(page)
+              : 0;
         requestAnimationFrame(() => {
           window.scrollTo({ top, behavior });
         });
