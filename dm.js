@@ -6459,6 +6459,31 @@ export function setupDmControls() {
     });
   }
 
+  const authLoginBtn = $("btn-dm-auth-login");
+  if (authLoginBtn && authLoginBtn.dataset.bound !== "true") {
+    authLoginBtn.dataset.bound = "true";
+    authLoginBtn.addEventListener("click", () => {
+      setActivePage("account");
+      if (typeof window === "undefined") return;
+      window.setTimeout(() => {
+        const openAuthFormBtn = $("btn-auth-open-form");
+        if (openAuthFormBtn instanceof HTMLButtonElement && !openAuthFormBtn.disabled) {
+          openAuthFormBtn.click();
+        }
+        const emailInput = $("auth-email");
+        if (emailInput instanceof HTMLInputElement && !emailInput.disabled) {
+          emailInput.focus();
+        }
+      }, 380);
+    });
+  }
+
+  const authFeedBtn = $("btn-dm-auth-feed");
+  if (authFeedBtn && authFeedBtn.dataset.bound !== "true") {
+    authFeedBtn.dataset.bound = "true";
+    authFeedBtn.addEventListener("click", () => setActivePage("feed"));
+  }
+
   const partnerSelect = $("dm-partner-select");
 
   if (partnerSelect && partnerSelect.dataset.bound !== "true") {
@@ -7284,6 +7309,45 @@ export function renderDmPage(options = {}) {
   const mediaRemoveBtn = $("btn-dm-media-remove");
   const jumpUnreadBtn = $("btn-dm-jump-unread");
   const jumpLatestBtn = $("btn-dm-jump-latest");
+  const dmShell = loginRequired?.closest(".dm-shell");
+
+  const setAuthGateText = () => {
+    const textById = {
+      "dm-auth-gate-eyebrow": tr.dmAuthEyebrow || "PRIVATE WORKOUT CHAT",
+      "dm-auth-gate-title":
+        tr.dmAuthTitle || "Talk closer with your training partners",
+      "dm-auth-gate-body":
+        tr.dmAuthBody ||
+        "Share form checks and workout photos in a private one-to-one conversation.",
+      "dm-auth-feature-chat": tr.dmAuthFeatureChat || "1-to-1 messages",
+      "dm-auth-feature-media": tr.dmAuthFeatureMedia || "Share photos",
+      "dm-auth-feature-post": tr.dmAuthFeaturePost || "Chat from posts",
+      "btn-dm-auth-login": tr.dmAuthLogin || "Log in / Sign up",
+      "btn-dm-auth-feed": tr.dmAuthBrowse || "Browse the feed first",
+      "dm-auth-gate-note":
+        tr.dmAuthNote || tr.dmLoginRequired || "Log in to use DMs",
+      "dm-auth-preview-question":
+        tr.dmAuthPreviewQuestion || "How did you structure today's leg session?",
+      "dm-auth-preview-workout": tr.dmAuthPreviewWorkout || "Today's workout",
+      "dm-auth-preview-workout-meta":
+        tr.dmAuthPreviewWorkoutMeta || "Squat · 5 sets",
+      "dm-auth-preview-reply":
+        tr.dmAuthPreviewReply || "Sent the post. Can you check my form?",
+      "dm-auth-preview-placeholder":
+        tr.dmInputPlaceholder || "Type a message",
+    };
+    Object.entries(textById).forEach(([id, text]) => {
+      const element = $(id);
+      if (element) element.textContent = text;
+    });
+  };
+
+  const setAuthGateVisible = (visible) => {
+    dmShell?.classList.toggle("is-auth-gate", visible);
+    if (typeof document !== "undefined") {
+      document.body?.classList.toggle("dm-auth-gate-visible", visible);
+    }
+  };
 
   if (!currentUser) {
     stopDmPolling();
@@ -7293,9 +7357,9 @@ export function renderDmPage(options = {}) {
     setDmMobileChatOpen(false);
     if (loginRequired) {
       loginRequired.classList.remove("hidden");
-      loginRequired.textContent =
-        tr.dmLoginRequired || "Please log in to use DM.";
+      setAuthGateText();
     }
+    setAuthGateVisible(true);
     if (layout) layout.classList.add("hidden");
     if (partnerSelect) partnerSelect.disabled = true;
     if (threadSearchInput) threadSearchInput.disabled = true;
@@ -7321,6 +7385,7 @@ export function renderDmPage(options = {}) {
   }
 
   if (loginRequired) loginRequired.classList.add("hidden");
+  setAuthGateVisible(false);
   syncDmPreferenceSets();
   ensureDmRealtimeChannel(dmActivePartnerId);
   if (layout) layout.classList.remove("hidden");

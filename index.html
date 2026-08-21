@@ -224,7 +224,64 @@
                 >新規メッセージ</button>
               </div>
             </div>
-            <div class="template-status" id="dm-login-required" role="status" aria-live="polite"></div>
+            <section
+              class="dm-auth-gate hidden"
+              id="dm-login-required"
+              aria-labelledby="dm-auth-gate-title"
+            >
+              <div class="dm-auth-gate-copy">
+                <div class="dm-auth-gate-eyebrow" id="dm-auth-gate-eyebrow">PRIVATE WORKOUT CHAT</div>
+                <h2 class="dm-auth-gate-title" id="dm-auth-gate-title">
+                  トレーニング仲間と、もっと近くで話そう
+                </h2>
+                <p class="dm-auth-gate-body" id="dm-auth-gate-body">
+                  フォーム相談やワークアウト写真を、気になる相手と1対1で共有できます。
+                </p>
+                <div class="dm-auth-gate-features" aria-label="DM features">
+                  <span id="dm-auth-feature-chat">1対1メッセージ</span>
+                  <span id="dm-auth-feature-media">写真を共有</span>
+                  <span id="dm-auth-feature-post">投稿から会話</span>
+                </div>
+                <div class="dm-auth-gate-actions">
+                  <button class="btn btn-primary" id="btn-dm-auth-login" type="button">
+                    ログイン / 新規登録
+                  </button>
+                  <button class="btn btn-ghost" id="btn-dm-auth-feed" type="button">
+                    先にフィードを見る
+                  </button>
+                </div>
+                <p class="dm-auth-gate-note" id="dm-auth-gate-note">
+                  DMはログイン後に利用できます
+                </p>
+              </div>
+
+              <div class="dm-auth-preview" aria-hidden="true">
+                <div class="dm-auth-preview-window">
+                  <div class="dm-auth-preview-head">
+                    <div class="dm-auth-preview-avatar">K</div>
+                    <div class="dm-auth-preview-person">
+                      <strong>WORKOUT PARTNER</strong>
+                      <span><i></i> ACTIVE NOW</span>
+                    </div>
+                    <div class="dm-auth-preview-menu">•••</div>
+                  </div>
+                  <div class="dm-auth-preview-chat">
+                    <div class="dm-auth-preview-bubble is-other" id="dm-auth-preview-question">今日の脚トレ、セットの組み方どうした？</div>
+                    <div class="dm-auth-preview-share">
+                      <div class="dm-auth-preview-share-art"><span>LEG DAY</span></div>
+                      <strong id="dm-auth-preview-workout">今日のワークアウト</strong>
+                      <span id="dm-auth-preview-workout-meta">スクワット ・ 5 sets</span>
+                    </div>
+                    <div class="dm-auth-preview-bubble is-self" id="dm-auth-preview-reply">投稿送った！フォームも見てほしい</div>
+                  </div>
+                  <div class="dm-auth-preview-compose">
+                    <span id="dm-auth-preview-placeholder">メッセージを入力</span>
+                    <b>↗</b>
+                  </div>
+                </div>
+                <div class="dm-auth-preview-stamp">ONE TO ONE<br />TRAIN TOGETHER</div>
+              </div>
+            </section>
             <div id="dm-layout" class="dm-layout hidden">
               <aside class="dm-sidebar">
                 <div class="dm-sidebar-top">
