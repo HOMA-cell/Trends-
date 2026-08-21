@@ -19,6 +19,7 @@ let dmContext = {
   openPostDetail: () => {},
   setActivePage: () => {},
   updateNavigationBadges: () => {},
+  openSafetyDialog: () => {},
 };
 
 let dmThreads = [];
@@ -119,6 +120,7 @@ const openDmPostDetail = (...args) => dmContext.openPostDetail?.(...args);
 const setActivePage = (...args) => dmContext.setActivePage?.(...args);
 const updateDmNavigationBadges = (...args) =>
   dmContext.updateNavigationBadges?.(...args);
+const openDmSafetyDialog = (...args) => dmContext.openSafetyDialog?.(...args);
 
 function getDmTotalUnreadCount() {
   return dmThreads.reduce(
@@ -4579,6 +4581,7 @@ function renderDmInfoPanel() {
   const pinBtn = $("btn-dm-info-pin");
   const muteBtn = $("btn-dm-info-mute");
   const openSearchBtn = $("btn-dm-info-open-search");
+  const safetyBtn = $("btn-dm-info-safety");
   if (
     !panel ||
     !avatar ||
@@ -4619,7 +4622,8 @@ function renderDmInfoPanel() {
     !markReadBtn ||
     !pinBtn ||
     !muteBtn ||
-    !openSearchBtn
+    !openSearchBtn ||
+    !safetyBtn
   ) {
     return;
   }
@@ -4634,6 +4638,7 @@ function renderDmInfoPanel() {
   openProfileBtn.textContent = tr.dmOpenProfile || "Open profile";
   markReadBtn.textContent = tr.dmMarkRead || "Mark read";
   openSearchBtn.textContent = tr.dmInfoOpenSearch || "Open search";
+  safetyBtn.textContent = tr.safetyMenu || "Report / block";
   openSearchBtn.classList.toggle("is-active", dmMessageSearchOpen);
 
   const active = dmPartners.find((partner) => partner.id === dmActivePartnerId);
@@ -6902,6 +6907,25 @@ export function setupDmControls() {
     infoOpenProfileBtn.addEventListener("click", () => {
       if (!dmActivePartnerId) return;
       openDmPartnerProfile(dmActivePartnerId);
+      closeDmInfoPanel();
+      renderConversationHeader({ force: true });
+    });
+  }
+
+  const infoSafetyBtn = $("btn-dm-info-safety");
+  if (infoSafetyBtn && infoSafetyBtn.dataset.bound !== "true") {
+    infoSafetyBtn.dataset.bound = "true";
+    infoSafetyBtn.addEventListener("click", () => {
+      if (!dmActivePartnerId) return;
+      const partner = dmPartners.find((item) => item.id === dmActivePartnerId);
+      const identity = getProfileIdentity(partner?.profile, dmActivePartnerId);
+      const latestMessage = dmMessages[dmMessages.length - 1] || null;
+      openDmSafetyDialog({
+        targetType: latestMessage?.id ? "message" : "profile",
+        targetId: latestMessage?.id || dmActivePartnerId,
+        userId: dmActivePartnerId,
+        label: `${identity.primary || ""} ${identity.secondary || ""}`.trim(),
+      });
       closeDmInfoPanel();
       renderConversationHeader({ force: true });
     });

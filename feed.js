@@ -54,6 +54,7 @@ let feedContext = {
   openDmShareComposer: () => {},
   openDmConversation: async () => false,
   openPublicProfile: () => {},
+  openSafetyDialog: () => {},
   onFeedLayoutChange: null,
   openPostModal: () => {},
 };
@@ -97,6 +98,7 @@ const setActivePage = (page) => feedContext.setActivePage?.(page);
 const openPostModal = (...args) => feedContext.openPostModal?.(...args);
 const openDmConversation = (...args) => feedContext.openDmConversation?.(...args);
 const openPublicProfile = (...args) => feedContext.openPublicProfile?.(...args);
+const openSafetyDialog = (...args) => feedContext.openSafetyDialog?.(...args);
 
 const compactNumberFormatters = new Map();
 
@@ -328,6 +330,12 @@ function formatRelative(value) {
   return (tr.feedDaysAgo || "{count}日前").replace("{count}", `${diffDays}`);
 }
 
+function getFeedDisplayName(profile) {
+  const value = `${profile?.display_name || ""}`.trim();
+  if (value && value.toLowerCase() !== "user") return value;
+  return getCurrentLang() === "ja" ? "Trendsメンバー" : "Trends member";
+}
+
 let currentFilter = "foryou";
 let filterMedia = false;
 let filterWorkout = false;
@@ -445,7 +453,7 @@ const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
 const FEED_FILTERS = ["foryou", "all", "following", "mine", "saved", "public"];
 const FEED_VIEW_MODES = ["feed", "shorts"];
 const FEED_POST_SELECT_FIELDS =
-  "id,user_id,date,created_at,visibility,note,caption,bodyweight,media_url,media_type,video_kind";
+  "id,user_id,date,created_at,visibility,note,caption,bodyweight,media_url,media_type,media_thumbnail_url,video_kind";
 const FEED_PROFILE_SELECT_FIELDS =
   "id,handle,display_name,avatar_url,accent_color";
 const PERF_DEBUG_KEY = "trends_perf_debug";
@@ -3636,6 +3644,18 @@ function setupFeedCardActionDelegation() {
           scheduleRenderFeed();
           return;
         }
+        if (action === "report-post" || action === "block-user") {
+          const profile = post.profile || {};
+          openSafetyDialog({
+            targetType: "post",
+            targetId: post.id,
+            userId: post.user_id,
+            label: `${profile.display_name || ""} ${formatHandle(
+              profile.handle || profile.username || ""
+            )}`.trim(),
+          });
+          return;
+        }
         if (action === "toggle-pin") {
           const currentUser = getCurrentUser();
           const tr = t[getCurrentLang()] || t.ja;
@@ -6368,6 +6388,7 @@ export function renderFeed(options = {}) {
       if (isVideoMedia) {
         mediaWrap.classList.add("is-video");
         const video = document.createElement("video");
+        if (post.media_thumbnail_url) video.poster = post.media_thumbnail_url;
         video.preload = prioritizeMedia ? "metadata" : "none";
         video.controls = false;
         video.loop = true;
@@ -6493,7 +6514,7 @@ export function renderFeed(options = {}) {
       }
       const creatorRow = document.createElement("div");
       creatorRow.className = "shorts-creator-row";
-      const displayName = post.profile?.display_name || "";
+      const displayName = getFeedDisplayName(post.profile);
       const content = document.createElement("div");
       content.className = "shorts-copy shorts-copy-panel";
       const meta = document.createElement("div");
@@ -6761,6 +6782,16 @@ export function renderFeed(options = {}) {
       saveBtn.setAttribute("aria-label", isSaved ? tr.saved || "Saved" : tr.save || "Save");
       appendShortAction(saveBtn);
 
+      if (currentUser && post.user_id && post.user_id !== currentUser.id) {
+        const safetyBtn = document.createElement("button");
+        safetyBtn.className =
+          "chip chip-log chip-action shorts-action-btn shorts-action-icon-only";
+        safetyBtn.dataset.postAction = "report-post";
+        safetyBtn.textContent = "!";
+        safetyBtn.setAttribute("aria-label", tr.safetyMenu || "Report / block");
+        appendShortAction(safetyBtn);
+      }
+
       const bottomRail = document.createElement("div");
       bottomRail.className = "shorts-bottom";
       bottomRail.append(content, actions);
@@ -6875,7 +6906,7 @@ export function renderFeed(options = {}) {
         post.profile?.username ||
         "user";
       const handleText = formatHandle(rawHandle) || "@user";
-      const displayName = post.profile?.display_name || "";
+      const displayName = getFeedDisplayName(post.profile);
       const fallbackInitial = (displayName || handleText || "U")
         .replace("@", "")
         .charAt(0)
@@ -7075,6 +7106,18 @@ export function renderFeed(options = {}) {
       }
 
       if (currentUser && post.user_id && post.user_id !== currentUser.id) {
+        const reportBtn = document.createElement("button");
+        reportBtn.className = "chip chip-log chip-action";
+        reportBtn.dataset.postAction = "report-post";
+        reportBtn.textContent = tr.reportPost || "Report";
+        appendSecondaryAction(reportBtn);
+
+        const blockBtn = document.createElement("button");
+        blockBtn.className = "chip chip-log chip-action";
+        blockBtn.dataset.postAction = "block-user";
+        blockBtn.textContent = tr.blockUser || "Block user";
+        appendSecondaryAction(blockBtn);
+
         const followBtn = document.createElement("button");
         followBtn.className = "chip chip-log btn-follow post-follow-inline";
         followBtn.setAttribute("data-user-id", post.user_id);
@@ -7135,6 +7178,7 @@ export function renderFeed(options = {}) {
         };
         if (post.media_type === "video") {
           const video = document.createElement("video");
+          if (post.media_thumbnail_url) video.poster = post.media_thumbnail_url;
           video.preload = prioritizeMedia ? "metadata" : "none";
           video.controls = true;
           video.playsInline = true;
@@ -10428,6 +10472,7 @@ export function renderPostDetail() {
           };
           if (post.media_type === "video") {
             const video = document.createElement("video");
+            if (post.media_thumbnail_url) video.poster = post.media_thumbnail_url;
             video.controls = true;
             video.playsInline = true;
             video.preload = "metadata";
@@ -10749,6 +10794,7 @@ export function renderPostDetail() {
               thumb.className = "detail-related-thumb";
               if (candidate.media_type === "video") {
                 const video = document.createElement("video");
+                if (candidate.media_thumbnail_url) video.poster = candidate.media_thumbnail_url;
                 video.muted = true;
                 video.playsInline = true;
                 video.preload = "metadata";

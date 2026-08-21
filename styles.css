@@ -19759,3 +19759,234 @@ body[data-page="account"].auth-signed-out-visible .fab {
     padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
   }
 }
+/* Production safety, recovery, and notification surfaces */
+.notifications-page {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.notifications-shell {
+  min-height: min(720px, calc(100vh - 190px));
+  padding: clamp(20px, 4vw, 42px);
+  background:
+    radial-gradient(circle at 92% 4%, rgba(228, 87, 46, 0.1), transparent 28%),
+    linear-gradient(180deg, #fffdf9 0%, #ffffff 42%);
+}
+
+.notifications-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border, #e7dfd4);
+}
+
+.notifications-eyebrow,
+.password-recovery-kicker,
+.account-danger-kicker,
+.safety-modal-kicker {
+  margin-bottom: 7px;
+  color: var(--primary, #e4572e);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.notifications-shell .notification-toolbar {
+  margin: 20px 0 8px;
+}
+
+.notifications-shell .notification-toolbar-actions {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+.notifications-shell .notification-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.password-recovery-panel {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid rgba(228, 87, 46, 0.22);
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fff9f4, #ffffff);
+}
+
+.password-recovery-form {
+  margin-top: 16px;
+}
+
+.auth-reset-link {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.account-safety-section,
+.account-danger-section {
+  margin-top: 12px;
+}
+
+.blocked-user-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.blocked-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #e7dfd4);
+  border-radius: 16px;
+  background: #fffdf9;
+}
+
+.blocked-user-identity {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.blocked-user-copy {
+  min-width: 0;
+}
+
+.blocked-user-copy strong,
+.blocked-user-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blocked-user-copy span {
+  color: var(--muted, #746d64);
+  font-size: 0.8rem;
+}
+
+.account-danger-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.7fr);
+  align-items: end;
+  gap: 24px;
+  border-color: rgba(188, 52, 42, 0.25);
+  background: linear-gradient(135deg, #fffafa, #fffdf9);
+}
+
+.account-danger-kicker {
+  color: #b7342b;
+}
+
+.account-danger-confirm {
+  display: grid;
+  gap: 10px;
+}
+
+.account-danger-confirm input {
+  width: 100%;
+}
+
+.safety-modal-panel {
+  width: min(560px, calc(100vw - 28px));
+}
+
+.safety-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.safety-action-card,
+.safety-report-card {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--border, #e7dfd4);
+  border-radius: 18px;
+  background: #fffdf9;
+}
+
+.safety-action-card {
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.safety-action-card:hover {
+  border-color: rgba(183, 52, 43, 0.45);
+  background: #fff7f6;
+}
+
+.safety-action-card span,
+.safety-report-card > span {
+  color: var(--muted, #746d64);
+  font-size: 0.86rem;
+}
+
+.safety-report-card {
+  display: grid;
+  gap: 10px;
+}
+
+.safety-report-card select,
+.safety-report-card textarea {
+  width: 100%;
+}
+
+.safety-report-card textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+@media (max-width: 720px) {
+  .mini-header {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .mini-header .mini-nav-btn {
+    min-width: 0;
+    padding-inline: 4px;
+    font-size: 0.72rem;
+  }
+
+  .mini-header .mini-nav-label {
+    font-size: 0.68rem;
+  }
+
+  .notifications-page {
+    padding-bottom: 84px;
+  }
+
+  .notifications-shell {
+    min-height: calc(100vh - 150px);
+    padding: 18px 14px 28px;
+    border-radius: 22px;
+  }
+
+  .notifications-hero {
+    display: grid;
+    gap: 16px;
+  }
+
+  .notifications-shell .notification-toolbar-actions {
+    width: 100%;
+  }
+
+  .notifications-shell .notification-toolbar-actions .btn {
+    flex: 1;
+  }
+
+  .account-danger-section {
+    grid-template-columns: 1fr;
+  }
+}

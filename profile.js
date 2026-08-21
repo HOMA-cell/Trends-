@@ -44,6 +44,8 @@ let profileContext = {
   openDmConversation: async () => false,
   toggleFollowForUser: async () => {},
   loadFollowStats: async () => {},
+  openSafetyDialog: () => {},
+  isUserBlocked: () => false,
 };
 
 export function setProfileContext(next = {}) {
@@ -79,6 +81,8 @@ const openPostDetail = (...args) => profileContext.openPostDetail?.(...args);
 const openDmConversation = (...args) => profileContext.openDmConversation?.(...args);
 const toggleFollowForUser = (...args) => profileContext.toggleFollowForUser?.(...args);
 const loadFollowStats = (...args) => profileContext.loadFollowStats?.(...args);
+const openSafetyDialog = (...args) => profileContext.openSafetyDialog?.(...args);
+const isUserBlocked = (userId) => !!profileContext.isUserBlocked?.(userId);
 const followCountCache = new Map();
 const FOLLOW_COUNT_CACHE_TTL_MS = 60 * 1000;
 const publicProfilePostsCache = {
@@ -1184,12 +1188,12 @@ export function formatExperience(value, tr) {
 }
 
 export function getProfileDisplayName(profile, fallback = "user") {
-  return (
-    profile?.display_name ||
-    profile?.handle ||
-    profile?.username ||
-    fallback
-  );
+  const displayName = `${profile?.display_name || ""}`.trim();
+  if (displayName && displayName.toLowerCase() !== "user") return displayName;
+  const handle = formatHandle(profile?.handle || profile?.username || "");
+  if (handle && handle !== "@member") return handle.replace(/^@/, "");
+  if (fallback && `${fallback}`.toLowerCase() !== "user") return fallback;
+  return getCurrentLang() === "ja" ? "Trendsメンバー" : "Trends member";
 }
 
 export function applyProfileTheme(container, profile) {
@@ -2180,6 +2184,7 @@ function renderPublicProfileContentRail(
       thumb.className = "public-profile-rail-thumb";
       if (post.media_type === "video") {
         const video = document.createElement("video");
+        if (post.media_thumbnail_url) video.poster = post.media_thumbnail_url;
         video.src = post.media_url;
         video.muted = true;
         video.playsInline = true;
@@ -2618,6 +2623,22 @@ export function setupProfileLinks() {
       }
     });
     });
+
+  const safetyButton = $("btn-public-safety");
+  if (safetyButton && safetyButton.dataset.bound !== "true") {
+    safetyButton.dataset.bound = "true";
+    safetyButton.addEventListener("click", () => {
+      const userId = getCurrentPublicProfileId();
+      const currentUser = getCurrentUser();
+      if (!userId || !currentUser || userId === currentUser.id) return;
+      openSafetyDialog({
+        targetType: "profile",
+        targetId: userId,
+        userId,
+        label: safetyButton.dataset.actorLabel || "",
+      });
+    });
+  }
 }
 
 export async function openPublicProfile(userId, options = {}) {
@@ -2690,9 +2711,10 @@ export async function openPublicProfile(userId, options = {}) {
   const shareButtons = Array.from(
     document.querySelectorAll("[data-public-share-trigger]")
   );
+  const safetyButton = $("btn-public-safety");
 
   const handleText = formatHandle(handle) || "@user";
-  const displayName = profile?.display_name || handleText.replace("@", "");
+  const displayName = getProfileDisplayName(profile, handleText.replace("@", ""));
   if (displayEl) displayEl.textContent = displayName;
   if (nameEl) nameEl.textContent = handleText;
   if (bioEl) {
@@ -2706,6 +2728,15 @@ export async function openPublicProfile(userId, options = {}) {
       .charAt(0)
       .toUpperCase();
     renderAvatar(avatarEl, profile, initial);
+  }
+  if (safetyButton) {
+    const currentUser = getCurrentUser();
+    const canUseSafety = !!currentUser && currentUser.id !== userId;
+    safetyButton.classList.toggle("hidden", !canUseSafety);
+    safetyButton.dataset.actorLabel = `${displayName} ${handleText}`.trim();
+    safetyButton.textContent = isUserBlocked(userId)
+      ? tr.safetyUnblockTitle || "ブロックを解除"
+      : tr.safetyMenu || "通報 / ブロック";
   }
   if (cardEl) applyProfileTheme(cardEl, profile);
   if (bannerEl) {
@@ -3244,6 +3275,7 @@ export async function openPublicProfile(userId, options = {}) {
           thumb.appendChild(mediaLabel);
           if (post.media_type === "video") {
             const video = document.createElement("video");
+            if (post.media_thumbnail_url) video.poster = post.media_thumbnail_url;
             video.src = post.media_url;
             video.muted = true;
             video.playsInline = true;

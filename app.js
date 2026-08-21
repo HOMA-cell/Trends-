@@ -78,6 +78,12 @@ import {
     let currentLang = "ja";
     let currentMediaFile = null;
     let currentMediaPreviewUrl = null;
+    let currentMediaMetadata = null;
+    let passwordRecoveryMode = false;
+    let authStateSubscription = null;
+    let blockedUserIds = new Set();
+    let blockedProfiles = new Map();
+    let activeSafetyTarget = null;
     const POST_VIDEO_KINDS = new Set(["standard", "short"]);
     let draftSaveTimer = null;
     let draftSaveBlockedUntil = 0;
@@ -186,7 +192,11 @@ import {
       avatar: 5 * 1024 * 1024,
       banner: 8 * 1024 * 1024,
       postImage: 12 * 1024 * 1024,
-      postVideo: 50 * 1024 * 1024,
+      postVideo: 30 * 1024 * 1024,
+    };
+    const POST_VIDEO_MAX_SECONDS = {
+      short: 60,
+      standard: 180,
     };
     const ALLOWED_IMAGE_TYPES = new Set([
       "image/jpeg",
@@ -325,6 +335,115 @@ function getFileValidationError(file, kind) {
         }
       }
       return null;
+    }
+    function readVideoMetadata(file) {
+      return new Promise((resolve, reject) => {
+        if (!file?.type?.startsWith("video")) {
+          resolve(null);
+          return;
+        }
+        const video = document.createElement("video");
+        const url = URL.createObjectURL(file);
+        const cleanup = () => {
+          URL.revokeObjectURL(url);
+          video.removeAttribute("src");
+          video.load();
+        };
+        video.preload = "metadata";
+        video.muted = true;
+        video.playsInline = true;
+        video.onloadedmetadata = () => {
+          const metadata = {
+            duration: Number(video.duration || 0),
+            width: Number(video.videoWidth || 0),
+            height: Number(video.videoHeight || 0),
+          };
+          cleanup();
+          resolve(metadata);
+        };
+        video.onerror = () => {
+          cleanup();
+          reject(new Error("Unable to read video metadata"));
+        };
+        video.src = url;
+      });
+    }
+
+    function getVideoDurationValidationError(metadata, kind = "standard") {
+      if (!metadata || !Number.isFinite(metadata.duration)) return null;
+      const maxSeconds = POST_VIDEO_MAX_SECONDS[kind] || POST_VIDEO_MAX_SECONDS.standard;
+      if (metadata.duration <= maxSeconds + 0.25) return null;
+      const tr = t[currentLang] || t.ja;
+      return (tr.postVideoTooLong || "動画が長すぎます（{seconds}秒まで）。").replace(
+        "{seconds}",
+        `${maxSeconds}`
+      );
+    }
+
+    function formatVideoDuration(seconds = 0) {
+      const safe = Math.max(0, Math.round(Number(seconds) || 0));
+      const minutes = Math.floor(safe / 60);
+      return `${minutes}:${String(safe % 60).padStart(2, "0")}`;
+    }
+
+    function createVideoThumbnailBlob(file, metadata = null) {
+      return new Promise((resolve) => {
+        if (!file?.type?.startsWith("video")) {
+          resolve(null);
+          return;
+        }
+        const video = document.createElement("video");
+        const url = URL.createObjectURL(file);
+        let finished = false;
+        const finish = (blob = null) => {
+          if (finished) return;
+          finished = true;
+          URL.revokeObjectURL(url);
+          video.removeAttribute("src");
+          video.load();
+          resolve(blob);
+        };
+        const capture = () => {
+          try {
+            const sourceWidth = Number(video.videoWidth || metadata?.width || 0);
+            const sourceHeight = Number(video.videoHeight || metadata?.height || 0);
+            if (!sourceWidth || !sourceHeight) {
+              finish(null);
+              return;
+            }
+            const maxWidth = 960;
+            const scale = Math.min(1, maxWidth / sourceWidth);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+            canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+            const context = canvas.getContext("2d", { alpha: false });
+            if (!context) {
+              finish(null);
+              return;
+            }
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => finish(blob), "image/jpeg", 0.82);
+          } catch {
+            finish(null);
+          }
+        };
+        video.preload = "auto";
+        video.muted = true;
+        video.playsInline = true;
+        video.onerror = () => finish(null);
+        video.onloadedmetadata = () => {
+          const duration = Number(video.duration || metadata?.duration || 0);
+          const captureAt = Math.min(Math.max(duration * 0.18, 0.15), 1.5);
+          if (captureAt > 0 && duration > captureAt) {
+            video.onseeked = capture;
+            video.currentTime = captureAt;
+          } else {
+            video.onloadeddata = capture;
+          }
+        };
+        video.src = url;
+        window.setTimeout(() => finish(null), 8000);
+      });
     }
 function loadSettings() {
       return settingsController.loadSettings();
@@ -2034,7 +2153,9 @@ async function loadProfilePostCount() {
       commentSync.setupOnlineSync();
       setupLanguageSwitcher();
       setupAuthUI();
+      setupAuthStateListener();
       setupAccountPageUI();
+      setupSafetyControls();
       setupPostForm();
       setupFeedControls();
       setupDmControls();
@@ -2181,6 +2302,7 @@ async function loadProfilePostCount() {
           openPublicProfile(userId, options);
         }
       },
+      openSafetyDialog: (target) => openSafetyDialog(target),
       openPostModal: (options = {}) => {
         if (typeof openPostModal === "function") {
           openPostModal(options);
@@ -2239,6 +2361,8 @@ async function loadProfilePostCount() {
       openDmConversation,
       toggleFollowForUser,
       loadFollowStats,
+      openSafetyDialog: (target) => openSafetyDialog(target),
+      isUserBlocked: (userId) => blockedUserIds.has(`${userId || ""}`),
     });
 
     setDmContext({
@@ -2270,6 +2394,7 @@ async function loadProfilePostCount() {
       openMediaViewer: (url, type = "image", options = {}) =>
         openMediaModal(url, type, options),
       updateNavigationBadges: (badges = {}) => updateNavigationBadges(badges),
+      openSafetyDialog: (target) => openSafetyDialog(target),
     });
 
 
@@ -2385,14 +2510,14 @@ async function loadProfilePostCount() {
         tr.navMessages || "DM"
       );
       syncNavigationBadge(
-        "nav-account-badge",
+        "nav-notifications-badge",
         navigationBadgeState.notificationUnread,
-        tr.navAccount || "Account"
+        tr.navNotifications || "Notifications"
       );
       syncNavigationBadge(
-        "mini-nav-account-badge",
+        "mini-nav-notifications-badge",
         navigationBadgeState.notificationUnread,
-        tr.navAccount || "Account"
+        tr.navNotifications || "Notifications"
       );
     }
 
@@ -2421,12 +2546,14 @@ async function loadProfilePostCount() {
       setText("mini-header-title", "appTitle");
       setText("nav-feed-label", "navFeed");
       setText("nav-messages-label", "navMessages");
+      setText("nav-notifications-label", "navNotifications");
       setText("nav-account-label", "navAccount");
       setText("nav-settings", "navSettings");
       setText("mini-nav-feed-label", "navFeed");
       setText("mini-nav-shorts-label", "navShorts");
       setText("mini-nav-post", "navPost");
       setText("mini-nav-messages-label", "navMessages");
+      setText("mini-nav-notifications-label", "navNotifications");
       setText("mini-nav-account-label", "navAccount");
       setText("mini-nav-settings", "navSettings");
       const miniPostTab = $("mini-nav-post");
@@ -2791,6 +2918,21 @@ async function loadProfilePostCount() {
       setText("notification-filter-comment", "notificationsComments");
       setText("notification-filter-follow", "notificationsFollows");
       setText("notification-filter-like", "notificationsLikes");
+      setText("btn-auth-reset-request", "authResetLink");
+      setText("password-recovery-title", "authRecoveryTitle");
+      setText("password-recovery-sub", "authRecoverySub");
+      setText("btn-recovery-update", "authRecoverySubmit");
+      setText("account-safety-title", "safetySettingsTitle");
+      setText("account-safety-sub", "safetySettingsSub");
+      setText("btn-refresh-blocks", "notificationsRefresh");
+      setText("account-danger-title", "accountDangerTitle");
+      setText("account-danger-sub", "accountDangerSub");
+      setText("btn-delete-account", "accountDangerSubmit");
+      setText("safety-modal-title", "safetyModalTitle");
+      setText("safety-block-title", "safetyBlockTitle");
+      setText("safety-block-sub", "safetyBlockSub");
+      setText("safety-report-title", "safetyReportTitle");
+      setText("btn-safety-report", "safetyReportSubmit");
       setText("public-profile-title", "publicProfile");
       setText("btn-back-to-feed", "back");
       setText("btn-share-profile", "shareProfile");
@@ -3000,6 +3142,10 @@ async function loadProfilePostCount() {
       const openPageSettingsBtn = $("btn-account-open-settings");
       const openSettingsBtn = $("btn-auth-open-settings");
       const resetConnectionBtn = $("btn-auth-reset-connection");
+      const resetPasswordBtn = $("btn-auth-reset-request");
+      const recoveryUpdateBtn = $("btn-recovery-update");
+      const deleteConfirmation = $("account-delete-confirmation");
+      const deleteAccountBtn = $("btn-delete-account");
       if (authForm && authForm.dataset.bound !== "true") {
         authForm.dataset.bound = "true";
         authForm.addEventListener("submit", (event) => {
@@ -3053,6 +3199,388 @@ async function loadProfilePostCount() {
         resetConnectionBtn.addEventListener("click", () => {
           resetSupabaseConfigToDefaultAndReload();
         });
+      }
+      if (resetPasswordBtn && resetPasswordBtn.dataset.bound !== "true") {
+        resetPasswordBtn.dataset.bound = "true";
+        resetPasswordBtn.addEventListener("click", handlePasswordResetRequest);
+      }
+      if (recoveryUpdateBtn && recoveryUpdateBtn.dataset.bound !== "true") {
+        recoveryUpdateBtn.dataset.bound = "true";
+        recoveryUpdateBtn.addEventListener("click", handlePasswordRecoveryUpdate);
+      }
+      if (deleteConfirmation && deleteConfirmation.dataset.bound !== "true") {
+        deleteConfirmation.dataset.bound = "true";
+        deleteConfirmation.addEventListener("input", () => {
+          if (deleteAccountBtn) {
+            deleteAccountBtn.disabled = deleteConfirmation.value.trim() !== "DELETE";
+          }
+        });
+      }
+      if (deleteAccountBtn && deleteAccountBtn.dataset.bound !== "true") {
+        deleteAccountBtn.dataset.bound = "true";
+        deleteAccountBtn.addEventListener("click", handleDeleteAccount);
+      }
+    }
+
+    function getPasswordRecoveryRedirectUrl() {
+      const url = new URL(window.location.href);
+      url.hash = "";
+      url.search = "";
+      url.searchParams.set("recovery", "1");
+      return url.toString();
+    }
+
+    async function handlePasswordResetRequest() {
+      const email = `${$("auth-email")?.value || ""}`.trim();
+      const button = $("btn-auth-reset-request");
+      const tr = t[currentLang] || t.ja;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showToast(
+          tr.authResetEmailRequired || "再設定メールを送るメールアドレスを入力してください。",
+          "warning"
+        );
+        $("auth-email")?.focus();
+        return;
+      }
+      setButtonLoading(button, true, tr.authResetSending || "送信中...");
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: getPasswordRecoveryRedirectUrl(),
+        });
+        if (error) throw error;
+        showToast(
+          tr.authResetSent || "パスワード再設定メールを送信しました。",
+          "success",
+          5000
+        );
+      } catch (error) {
+        console.error("password reset request error:", error);
+        showToast(
+          tr.authResetFailed || "再設定メールを送信できませんでした。",
+          "error"
+        );
+      } finally {
+        setButtonLoading(button, false);
+      }
+    }
+
+    async function handlePasswordRecoveryUpdate() {
+      const password = `${$("recovery-password")?.value || ""}`;
+      const confirmation = `${$("recovery-password-confirm")?.value || ""}`;
+      const button = $("btn-recovery-update");
+      const tr = t[currentLang] || t.ja;
+      if (password.length < 8) {
+        showToast(tr.authPasswordTooShort || "パスワードは8文字以上にしてください。", "warning");
+        return;
+      }
+      if (password !== confirmation) {
+        showToast(tr.authPasswordMismatch || "パスワードが一致しません。", "warning");
+        return;
+      }
+      setButtonLoading(button, true, tr.authPasswordUpdating || "更新中...");
+      try {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        passwordRecoveryMode = false;
+        $("recovery-password").value = "";
+        $("recovery-password-confirm").value = "";
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.delete("recovery");
+        history.replaceState(null, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+        updateAuthUIState();
+        showToast(tr.authPasswordUpdated || "パスワードを更新しました。", "success");
+      } catch (error) {
+        console.error("password recovery update error:", error);
+        showToast(tr.authPasswordUpdateFailed || "パスワードを更新できませんでした。", "error");
+      } finally {
+        setButtonLoading(button, false);
+      }
+    }
+
+    function setupAuthStateListener() {
+      if (authStateSubscription) return;
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "PASSWORD_RECOVERY") {
+          passwordRecoveryMode = true;
+          currentUser = session?.user || currentUser;
+          window.setTimeout(() => {
+            updateAuthUIState();
+            if (typeof setActivePage === "function") {
+              setActivePage("account", { scrollBehavior: "smooth" });
+            }
+            $("recovery-password")?.focus();
+          }, 0);
+        } else if (event === "TOKEN_REFRESHED" && session?.user) {
+          currentUser = session.user;
+        }
+      });
+      authStateSubscription = data?.subscription || null;
+    }
+
+    function normalizeSafetyTarget(target = {}) {
+      const userId = `${target.userId || target.targetUserId || ""}`.trim();
+      const targetType = ["post", "profile", "comment", "message"].includes(
+        `${target.targetType || ""}`
+      )
+        ? `${target.targetType}`
+        : "profile";
+      const targetId = `${target.targetId || (targetType === "profile" ? userId : "")}`.trim();
+      if (!userId || !targetId) return null;
+      return {
+        userId,
+        targetType,
+        targetId,
+        label: `${target.label || target.handle || ""}`.trim(),
+      };
+    }
+
+    function closeSafetyDialog() {
+      closeBackdrop($("safety-modal-backdrop"));
+      activeSafetyTarget = null;
+      const status = $("safety-modal-status");
+      if (status) status.textContent = "";
+    }
+
+    function openSafetyDialog(target = {}) {
+      const normalized = normalizeSafetyTarget(target);
+      const tr = t[currentLang] || t.ja;
+      if (!currentUser) {
+        showToast(tr.safetyLoginRequired || "通報・ブロックにはログインが必要です。", "warning");
+        if (typeof setActivePage === "function") setActivePage("account");
+        return;
+      }
+      if (!normalized || normalized.userId === currentUser.id) return;
+      activeSafetyTarget = normalized;
+      const targetEl = $("safety-modal-target");
+      if (targetEl) {
+        targetEl.textContent = normalized.label || tr.safetyTargetFallback || "このユーザー";
+      }
+      const blockButton = $("btn-safety-block");
+      const blockTitle = $("safety-block-title");
+      const isBlocked = blockedUserIds.has(normalized.userId);
+      if (blockTitle) {
+        blockTitle.textContent = isBlocked
+          ? tr.safetyUnblockTitle || "ブロックを解除"
+          : tr.safetyBlockTitle || "このユーザーをブロック";
+      }
+      if (blockButton) blockButton.dataset.mode = isBlocked ? "unblock" : "block";
+      const details = $("safety-report-details");
+      if (details) details.value = "";
+      openBackdrop($("safety-modal-backdrop"));
+    }
+
+    async function loadBlockedUsers() {
+      const status = $("blocked-user-status");
+      if (!currentUser) {
+        blockedUserIds = new Set();
+        blockedProfiles = new Map();
+        renderBlockedUsers();
+        return;
+      }
+      if (status) status.textContent = "";
+      const { data, error } = await supabase
+        .from("user_blocks")
+        .select("blocked_id,created_at")
+        .eq("blocker_id", currentUser.id)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("load blocked users error:", error);
+        if (status) status.textContent = (t[currentLang] || t.ja).safetyBlocksLoadFailed || "ブロック一覧を取得できませんでした。";
+        return;
+      }
+      blockedUserIds = new Set((data || []).map((row) => `${row.blocked_id || ""}`).filter(Boolean));
+      blockedProfiles = blockedUserIds.size
+        ? await loadProfilesForUsers(Array.from(blockedUserIds))
+        : new Map();
+      renderBlockedUsers();
+    }
+
+    function renderBlockedUsers() {
+      const list = $("blocked-user-list");
+      const status = $("blocked-user-status");
+      const tr = t[currentLang] || t.ja;
+      if (!list) return;
+      list.innerHTML = "";
+      if (!currentUser) {
+        if (status) status.textContent = "";
+        return;
+      }
+      if (!blockedUserIds.size) {
+        if (status) status.textContent = tr.safetyBlocksEmpty || "ブロック中のユーザーはいません。";
+        return;
+      }
+      if (status) status.textContent = "";
+      blockedUserIds.forEach((userId) => {
+        const profile = blockedProfiles.get(userId) || null;
+        const row = document.createElement("div");
+        row.className = "blocked-user-row";
+        const identity = document.createElement("div");
+        identity.className = "blocked-user-identity";
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        renderAvatar(avatar, profile, "T");
+        const copy = document.createElement("div");
+        copy.className = "blocked-user-copy";
+        const name = document.createElement("strong");
+        name.textContent = getProfileDisplayName(profile, tr.safetyMemberFallback || "Trendsメンバー");
+        const handle = document.createElement("span");
+        handle.textContent = formatHandle(profile?.handle || `member_${userId.replaceAll("-", "").slice(0, 8)}`);
+        copy.append(name, handle);
+        identity.append(avatar, copy);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "btn btn-ghost btn-xs";
+        button.dataset.unblockUserId = userId;
+        button.textContent = tr.safetyUnblock || "解除";
+        row.append(identity, button);
+        list.appendChild(row);
+      });
+    }
+
+    async function toggleSafetyBlock() {
+      if (!currentUser || !activeSafetyTarget) return;
+      const button = $("btn-safety-block");
+      const mode = button?.dataset.mode === "unblock" ? "unblock" : "block";
+      const userId = activeSafetyTarget.userId;
+      const tr = t[currentLang] || t.ja;
+      setButtonLoading(button, true, tr.safetySaving || "更新中...");
+      try {
+        const query = supabase.from("user_blocks");
+        const { error } = mode === "unblock"
+          ? await query.delete().eq("blocker_id", currentUser.id).eq("blocked_id", userId)
+          : await query.insert({ blocker_id: currentUser.id, blocked_id: userId });
+        if (error) throw error;
+        await loadBlockedUsers();
+        closeSafetyDialog();
+        showToast(
+          mode === "unblock"
+            ? tr.safetyUnblocked || "ブロックを解除しました。"
+            : tr.safetyBlocked || "ユーザーをブロックしました。",
+          "success"
+        );
+        currentPublicProfileId = null;
+        if (typeof setActivePage === "function") setActivePage("feed");
+        await loadFeed({ forceNetwork: true });
+      } catch (error) {
+        console.error("toggle block error:", error);
+        showToast(tr.safetyBlockFailed || "ブロック設定を更新できませんでした。", "error");
+      } finally {
+        setButtonLoading(button, false);
+      }
+    }
+
+    async function submitSafetyReport() {
+      if (!currentUser || !activeSafetyTarget) return;
+      const button = $("btn-safety-report");
+      const status = $("safety-modal-status");
+      const tr = t[currentLang] || t.ja;
+      const reason = `${$("safety-report-reason")?.value || "other"}`;
+      const details = `${$("safety-report-details")?.value || ""}`.trim();
+      setButtonLoading(button, true, tr.safetySending || "送信中...");
+      if (status) status.textContent = "";
+      try {
+        const { error } = await supabase.from("content_reports").insert({
+          reporter_id: currentUser.id,
+          target_type: activeSafetyTarget.targetType,
+          target_id: activeSafetyTarget.targetId,
+          target_user_id: activeSafetyTarget.userId,
+          reason,
+          details: details || null,
+        });
+        if (error) throw error;
+        closeSafetyDialog();
+        showToast(tr.safetyReportSent || "通報を受け付けました。", "success");
+      } catch (error) {
+        console.error("report content error:", error);
+        if (status) status.textContent = tr.safetyReportFailed || "通報を送信できませんでした。";
+      } finally {
+        setButtonLoading(button, false);
+      }
+    }
+
+    async function unblockUserFromList(userId) {
+      if (!currentUser || !userId) return;
+      const { error } = await supabase
+        .from("user_blocks")
+        .delete()
+        .eq("blocker_id", currentUser.id)
+        .eq("blocked_id", userId);
+      if (error) {
+        showToast((t[currentLang] || t.ja).safetyBlockFailed || "ブロック設定を更新できませんでした。", "error");
+        return;
+      }
+      await loadBlockedUsers();
+      await loadFeed({ forceNetwork: true });
+      showToast((t[currentLang] || t.ja).safetyUnblocked || "ブロックを解除しました。", "success");
+    }
+
+    function setupSafetyControls() {
+      const backdrop = $("safety-modal-backdrop");
+      const closeButton = $("btn-safety-close");
+      const blockButton = $("btn-safety-block");
+      const reportButton = $("btn-safety-report");
+      const refreshButton = $("btn-refresh-blocks");
+      const blockedList = $("blocked-user-list");
+      if (closeButton && closeButton.dataset.bound !== "true") {
+        closeButton.dataset.bound = "true";
+        closeButton.addEventListener("click", closeSafetyDialog);
+      }
+      if (backdrop && backdrop.dataset.bound !== "true") {
+        backdrop.dataset.bound = "true";
+        backdrop.addEventListener("click", (event) => {
+          if (event.target === backdrop) closeSafetyDialog();
+        });
+      }
+      if (blockButton && blockButton.dataset.bound !== "true") {
+        blockButton.dataset.bound = "true";
+        blockButton.addEventListener("click", toggleSafetyBlock);
+      }
+      if (reportButton && reportButton.dataset.bound !== "true") {
+        reportButton.dataset.bound = "true";
+        reportButton.addEventListener("click", submitSafetyReport);
+      }
+      if (refreshButton && refreshButton.dataset.bound !== "true") {
+        refreshButton.dataset.bound = "true";
+        refreshButton.addEventListener("click", loadBlockedUsers);
+      }
+      if (blockedList && blockedList.dataset.bound !== "true") {
+        blockedList.dataset.bound = "true";
+        blockedList.addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-unblock-user-id]");
+          if (!button) return;
+          unblockUserFromList(`${button.dataset.unblockUserId || ""}`);
+        });
+      }
+    }
+
+    async function handleDeleteAccount() {
+      const confirmation = `${$("account-delete-confirmation")?.value || ""}`.trim();
+      const button = $("btn-delete-account");
+      const status = $("account-delete-status");
+      const tr = t[currentLang] || t.ja;
+      if (!currentUser || confirmation !== "DELETE") return;
+      const accepted = window.confirm(
+        tr.accountDeleteConfirm || "アカウントと全データを完全に削除します。よろしいですか？"
+      );
+      if (!accepted) return;
+      setButtonLoading(button, true, tr.accountDeleting || "削除中...");
+      if (status) status.textContent = tr.accountDeleting || "削除中...";
+      try {
+        const { data, error } = await supabase.functions.invoke("delete-account", {
+          body: { confirmation: "DELETE" },
+        });
+        if (error || data?.deleted !== true) {
+          throw error || new Error(data?.error || "Account deletion failed");
+        }
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        await clearLocalRuntimeCaches();
+        window.location.replace(window.location.pathname);
+      } catch (error) {
+        console.error("delete account error:", error);
+        if (status) status.textContent = tr.accountDeleteFailed || "アカウントを削除できませんでした。";
+        showToast(tr.accountDeleteFailed || "アカウントを削除できませんでした。", "error");
+      } finally {
+        setButtonLoading(button, false);
       }
     }
 
@@ -3908,6 +4436,7 @@ async function loadProfilePostCount() {
         await loadExercisePRs();
         await loadTemplates();
         await loadNotifications();
+        await loadBlockedUsers();
         await loadFeed();
         await commentSync.flushQueue({ silent: true });
 
@@ -3945,6 +4474,9 @@ async function loadProfilePostCount() {
       likesEnabled = true;
       notifications = [];
       notificationsEnabled = true;
+      blockedUserIds = new Set();
+      blockedProfiles = new Map();
+      passwordRecoveryMode = false;
       workoutExercises = [];
       workoutLogsByPost = new Map();
       workoutLogsEnabled = true;
@@ -3994,11 +4526,19 @@ async function loadProfilePostCount() {
       const openAdvancedBtn = $("btn-open-profile-advanced");
       const loginRequired = $("login-required");
       const postSubmitBtn = $("btn-submit");
+      const recoveryPanel = $("password-recovery-panel");
+      const safetySection = $("account-safety-section");
+      const dangerSection = $("account-danger-section");
 
       if (authEmail) authEmail.disabled = loggedIn;
       if (authPassword) authPassword.disabled = loggedIn;
       if (authSignedOut) authSignedOut.classList.toggle("hidden", loggedIn);
       if (authSignedIn) authSignedIn.classList.toggle("hidden", !loggedIn);
+      if (recoveryPanel) {
+        recoveryPanel.classList.toggle("hidden", !passwordRecoveryMode);
+      }
+      if (safetySection) safetySection.classList.toggle("hidden", !loggedIn || passwordRecoveryMode);
+      if (dangerSection) dangerSection.classList.toggle("hidden", !loggedIn || passwordRecoveryMode);
       if (accountPanel) {
         accountPanel.classList.toggle("is-signed-in", loggedIn);
         accountPanel.classList.toggle("is-signed-out", !loggedIn);
@@ -4131,6 +4671,10 @@ async function loadProfilePostCount() {
         return;
       }
 
+      if (new URLSearchParams(window.location.search).get("recovery") === "1") {
+        passwordRecoveryMode = true;
+      }
+
       setSupabaseConnectivityState({
         ok: true,
         timedOut: false,
@@ -4146,6 +4690,7 @@ async function loadProfilePostCount() {
       await loadExercisePRs();
       await loadTemplates();
       await loadNotifications();
+      await loadBlockedUsers();
       await commentSync.flushQueue({ silent: true });
 
       updateProfileSummary();
@@ -4209,6 +4754,7 @@ async function loadProfilePostCount() {
         const miniFeed = $("mini-nav-feed");
         const miniShorts = $("mini-nav-shorts");
         const miniMessages = $("mini-nav-messages");
+        const miniNotifications = $("mini-nav-notifications");
         const miniAccount = $("mini-nav-account");
         if (miniFeed) {
           miniFeed.classList.toggle("is-active", page === "feed" && !isShorts);
@@ -4218,6 +4764,9 @@ async function loadProfilePostCount() {
         }
         if (miniMessages) {
           miniMessages.classList.toggle("is-active", page === "messages");
+        }
+        if (miniNotifications) {
+          miniNotifications.classList.toggle("is-active", page === "notifications");
         }
         if (miniAccount) {
           miniAccount.classList.toggle("is-active", page === "account");
@@ -4342,6 +4891,14 @@ async function loadProfilePostCount() {
           renderPrList();
           renderInsights();
           renderOnboardingChecklist();
+        }
+        if (page === "notifications") {
+          renderNotifications();
+          if (currentUser) {
+            loadNotifications().catch((error) => {
+              console.error("notification page refresh error:", error);
+            });
+          }
         }
         queueCollapsibleHeightRefresh();
         if (!shouldAnimate && options.restoreScroll !== false) {
@@ -4706,7 +5263,12 @@ async function loadProfilePostCount() {
           img.alt = "preview";
           body.appendChild(img);
         }
-        const fileLabel = file.name || note || "";
+        const mediaFacts = [];
+        if (file.type.startsWith("video") && currentMediaMetadata?.duration) {
+          mediaFacts.push(formatVideoDuration(currentMediaMetadata.duration));
+        }
+        mediaFacts.push(formatFileSizeMb(file.size));
+        const fileLabel = [file.name || note || "", ...mediaFacts].filter(Boolean).join(" · ");
         noteEl.textContent = fileLabel;
         if (pickerSub) {
           pickerSub.textContent = fileLabel || tr.postMediaPickerHint || "Add a photo or video";
@@ -4742,6 +5304,7 @@ async function loadProfilePostCount() {
         mediaInput.value = "";
       }
       currentMediaFile = null;
+      currentMediaMetadata = null;
       renderMediaPreview(null);
     }
 
@@ -4998,10 +5561,11 @@ async function loadProfilePostCount() {
       const videoKindInputs = document.querySelectorAll(
         'input[name="post-video-kind"]'
       );
-      const applySelectedPostMediaFile = (file, inputEl = null) => {
+      const applySelectedPostMediaFile = async (file, inputEl = null) => {
         const error = getFileValidationError(file, "post");
         if (error) {
           currentMediaFile = null;
+          currentMediaMetadata = null;
           if (inputEl) {
             inputEl.value = "";
           }
@@ -5009,15 +5573,46 @@ async function loadProfilePostCount() {
           showToast(error, "warning");
           return false;
         }
+        if (file?.type?.startsWith("video")) {
+          try {
+            currentMediaMetadata = await readVideoMetadata(file);
+          } catch (metadataError) {
+            console.error("video metadata error:", metadataError);
+            currentMediaFile = null;
+            currentMediaMetadata = null;
+            if (inputEl) inputEl.value = "";
+            renderMediaPreview(null);
+            showToast(
+              (t[currentLang] || t.ja).postVideoUnreadable ||
+                "動画を読み取れませんでした。別のmp4/mov/webmを選んでください。",
+              "warning"
+            );
+            return false;
+          }
+          const durationError = getVideoDurationValidationError(
+            currentMediaMetadata,
+            getSelectedPostVideoKind()
+          );
+          if (durationError) {
+            currentMediaFile = null;
+            currentMediaMetadata = null;
+            if (inputEl) inputEl.value = "";
+            renderMediaPreview(null);
+            showToast(durationError, "warning");
+            return false;
+          }
+        } else {
+          currentMediaMetadata = null;
+        }
         currentMediaFile = file || null;
         renderMediaPreview(currentMediaFile);
         queueDraftSave();
         return true;
       };
       if (mediaInput) {
-        mediaInput.addEventListener("change", (e) => {
+        mediaInput.addEventListener("change", async (e) => {
           const file = e.target.files?.[0];
-          applySelectedPostMediaFile(file, e.target);
+          await applySelectedPostMediaFile(file, e.target);
         });
       }
       if (mediaDropzone && mediaDropzone.dataset.bound !== "true") {
@@ -5043,12 +5638,12 @@ async function loadProfilePostCount() {
           if (nextTarget instanceof Node && mediaDropzone.contains(nextTarget)) return;
           clearDropzoneState();
         });
-        mediaDropzone.addEventListener("drop", (event) => {
+        mediaDropzone.addEventListener("drop", async (event) => {
           event.preventDefault();
           clearDropzoneState();
           const file = event.dataTransfer?.files?.[0];
           if (!file) return;
-          applySelectedPostMediaFile(file, mediaInput);
+          await applySelectedPostMediaFile(file, mediaInput);
         });
         mediaDropzone.addEventListener("blur", clearDropzoneState);
       }
@@ -5063,7 +5658,14 @@ async function loadProfilePostCount() {
         if (input.dataset.bound === "true") return;
         input.dataset.bound = "true";
         input.addEventListener("change", () => {
-          setSelectedPostVideoKind(getSelectedPostVideoKind());
+          const kind = getSelectedPostVideoKind();
+          const durationError = getVideoDurationValidationError(currentMediaMetadata, kind);
+          if (durationError) {
+            setSelectedPostVideoKind("standard");
+            showToast(durationError, "warning");
+            return;
+          }
+          setSelectedPostVideoKind(kind);
           queueDraftSave();
         });
       });
@@ -8219,6 +8821,7 @@ async function loadProfilePostCount() {
       const templateSelect = $("post-template");
       if (templateSelect) templateSelect.value = "";
       currentMediaFile = null;
+      currentMediaMetadata = null;
       setSelectedPostVideoKind("standard");
       renderMediaPreview(null);
       workoutExercises = [];
@@ -8292,6 +8895,7 @@ async function loadProfilePostCount() {
             : payload.bodyweight,
         media_url: payload.media_url || "",
         media_type: payload.media_type || "",
+        media_thumbnail_url: payload.media_thumbnail_url || "",
         video_kind: payload.video_kind || null,
         profile: buildCurrentUserFeedProfile(),
       };
@@ -8337,6 +8941,8 @@ async function loadProfilePostCount() {
       const weight = $("post-weight").value;
       const caption = $("post-caption").value.trim();
       const visibility = $("post-visibility").value;
+      const uploadedMediaPaths = [];
+      let postInserted = false;
 
       try {
         if (!date && !caption && !currentMediaFile) {
@@ -8346,6 +8952,7 @@ async function loadProfilePostCount() {
 
         let mediaUrl = null;
         let mediaType = null;
+        let mediaThumbnailUrl = null;
 
         if (currentMediaFile) {
           const mediaValidationError = getFileValidationError(currentMediaFile, "post");
@@ -8353,6 +8960,21 @@ async function loadProfilePostCount() {
             showToast(mediaValidationError, "warning");
             return;
           }
+          const isVideo = currentMediaFile.type.startsWith("video");
+          if (isVideo && !currentMediaMetadata) {
+            currentMediaMetadata = await readVideoMetadata(currentMediaFile);
+          }
+          const videoKind = getSelectedPostVideoKind();
+          const durationError = isVideo
+            ? getVideoDurationValidationError(currentMediaMetadata, videoKind)
+            : null;
+          if (durationError) {
+            showToast(durationError, "warning");
+            return;
+          }
+          const thumbnailBlob = isVideo
+            ? await createVideoThumbnailBlob(currentMediaFile, currentMediaMetadata)
+            : null;
           const ext = getSafeFileExtension(currentMediaFile);
           const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
 
@@ -8367,15 +8989,32 @@ async function loadProfilePostCount() {
             );
             return;
           }
+          uploadedMediaPaths.push(path);
 
           const { data: publicData } = supabase.storage
             .from("post-media")
             .getPublicUrl(path);
 
           mediaUrl = publicData.publicUrl;
-          mediaType = currentMediaFile.type.startsWith("video")
-            ? "video"
-            : "image";
+          mediaType = isVideo ? "video" : "image";
+          if (thumbnailBlob) {
+            const thumbnailPath = `public/${currentUser.id}/${Date.now()}-poster.jpg`;
+            const { error: thumbnailError } = await supabase.storage
+              .from("post-media")
+              .upload(thumbnailPath, thumbnailBlob, {
+                contentType: "image/jpeg",
+                cacheControl: "31536000",
+              });
+            if (!thumbnailError) {
+              uploadedMediaPaths.push(thumbnailPath);
+              const { data: thumbnailPublicData } = supabase.storage
+                .from("post-media")
+                .getPublicUrl(thumbnailPath);
+              mediaThumbnailUrl = thumbnailPublicData.publicUrl;
+            } else {
+              console.warn("video thumbnail upload error:", thumbnailError);
+            }
+          }
         }
 
         const bodyweightValue = weight ? toKg(Number(weight)) : null;
@@ -8387,6 +9026,7 @@ async function loadProfilePostCount() {
           caption: caption || null,
           media_url: mediaUrl,
           media_type: mediaType,
+          media_thumbnail_url: mediaThumbnailUrl,
           video_kind:
             mediaType === "video" ? getSelectedPostVideoKind() : null,
           visibility,
@@ -8399,10 +9039,14 @@ async function loadProfilePostCount() {
           .single();
 
         if (error || !insertedPost) {
+          if (uploadedMediaPaths.length) {
+            await supabase.storage.from("post-media").remove(uploadedMediaPaths);
+          }
           showToast("投稿エラー: " + (error?.message || "unknown"), "error");
           console.error(error);
           return;
         }
+        postInserted = true;
 
         const workoutLogs = collectWorkoutLogs();
         const prResult = computePRUpdates(workoutLogs);
@@ -8469,6 +9113,9 @@ async function loadProfilePostCount() {
         }
       } catch (submitError) {
         console.error("submit post unexpected error:", submitError);
+        if (!postInserted && uploadedMediaPaths.length) {
+          await supabase.storage.from("post-media").remove(uploadedMediaPaths);
+        }
         showToast(
           "投稿処理に失敗しました。もう一度お試しください。",
           "error"

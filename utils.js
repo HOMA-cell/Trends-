@@ -129,7 +129,11 @@ export function normalizeHandleUrl(base, value) {
 
 export function formatHandle(value) {
   if (!value) return "";
-  return value.startsWith("@") ? value : `@${value}`;
+  const raw = `${value}`.replace(/^@/, "").trim();
+  if (!raw) return "";
+  const legacyMatch = raw.match(/^user_([0-9a-f]{8})[0-9a-f]{24}$/i);
+  const safe = legacyMatch ? `member_${legacyMatch[1]}` : raw === "user" ? "member" : raw;
+  return `@${safe}`;
 }
 
 export function normalizeExerciseName(name) {

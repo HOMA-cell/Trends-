@@ -53,9 +53,12 @@
           <span class="mini-nav-label" id="nav-messages-label">DM</span>
           <span class="nav-badge hidden" id="nav-messages-badge" aria-live="polite"></span>
         </button>
+        <button class="mini-nav-btn" data-page-target="notifications" id="nav-notifications">
+          <span class="mini-nav-label" id="nav-notifications-label">通知</span>
+          <span class="nav-badge hidden" id="nav-notifications-badge" aria-live="polite"></span>
+        </button>
         <button class="mini-nav-btn" data-page-target="account" id="nav-account">
           <span class="mini-nav-label" id="nav-account-label">アカウント</span>
-          <span class="nav-badge hidden" id="nav-account-badge" aria-live="polite"></span>
         </button>
       </div>
     </header>
@@ -96,12 +99,20 @@
       </button>
       <button
         class="mini-nav-btn"
+        data-page-target="notifications"
+        data-mini-tab="notifications"
+        id="mini-nav-notifications"
+      >
+        <span class="mini-nav-label" id="mini-nav-notifications-label">通知</span>
+        <span class="nav-badge hidden" id="mini-nav-notifications-badge" aria-live="polite"></span>
+      </button>
+      <button
+        class="mini-nav-btn"
         data-page-target="account"
         data-mini-tab="account"
         id="mini-nav-account"
       >
         <span class="mini-nav-label" id="mini-nav-account-label">アカウント</span>
-        <span class="nav-badge hidden" id="mini-nav-account-badge" aria-live="polite"></span>
       </button>
     </div>
 
@@ -577,6 +588,7 @@
                 <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-mark-read" type="button">既読にする</button>
                 <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-pin" type="button">固定</button>
                 <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-mute" type="button">ミュート</button>
+                <button class="btn btn-ghost btn-sm dm-info-action" id="btn-dm-info-safety" type="button">通報 / ブロック</button>
               </div>
               <div class="dm-info-tabs" id="dm-info-tabs" role="tablist" aria-label="Conversation info tabs">
                 <button class="chip chip-active" id="dm-info-tab-overview" type="button" data-dm-info-tab="overview">概要</button>
@@ -626,6 +638,44 @@
               </section>
             </aside>
           </div>
+        </section>
+      </div>
+
+      <!-- 通知 ページ -->
+      <div class="page-view notifications-page" data-page="notifications">
+        <section class="card notifications-shell" id="notifications-section">
+          <div class="notifications-hero">
+            <div>
+              <div class="notifications-eyebrow" id="notifications-eyebrow">ACTIVITY</div>
+              <div class="card-title" id="notifications-title">通知</div>
+              <div class="card-sub" id="notifications-sub">
+                コメント、いいね、フォローをまとめて確認できます。
+              </div>
+            </div>
+            <div class="notification-toolbar-actions">
+              <button class="btn btn-ghost" id="btn-refresh-notifications">更新</button>
+              <button class="btn btn-primary" id="btn-mark-all-read">全て既読</button>
+            </div>
+          </div>
+          <div class="notification-toolbar">
+            <div class="chips chips-scroll">
+              <button class="chip chip-active" id="notification-filter-all">すべて</button>
+              <button class="chip" id="notification-filter-unread">未読</button>
+              <button class="chip" id="notification-filter-comment">コメント</button>
+              <button class="chip" id="notification-filter-follow">フォロー</button>
+              <button class="chip" id="notification-filter-like">いいね</button>
+            </div>
+            <div class="notification-unread-count hidden" id="notification-unread-count"></div>
+          </div>
+          <div class="notification-priority hidden" id="notification-priority">
+            <div class="notification-priority-head">
+              <div class="notification-priority-title" id="notification-priority-title">優先して見る</div>
+              <div class="notification-priority-sub" id="notification-priority-sub">今すぐ返したい通知</div>
+            </div>
+            <div class="notification-priority-rail" id="notification-priority-rail"></div>
+          </div>
+          <div id="notification-list" class="notification-list"></div>
+          <div id="notification-status" class="template-status"></div>
         </section>
       </div>
 
@@ -710,6 +760,9 @@
                   </button>
                 </form>
                 <div class="auth-caption" id="auth-caption">初回は自動でアカウント作成されます。</div>
+                <button class="btn btn-ghost btn-xs auth-reset-link" id="btn-auth-reset-request" type="button">
+                  パスワードを忘れた方
+                </button>
                 <button class="btn btn-ghost btn-xs auth-close-button" id="btn-auth-close-form" type="button">
                   閉じる
                 </button>
@@ -725,6 +778,17 @@
                 <div class="account-email" id="account-user-email">-</div>
               </div>
               <button class="btn btn-ghost btn-xs" id="btn-logout">ログアウト</button>
+            </div>
+          </div>
+
+          <div class="password-recovery-panel hidden" id="password-recovery-panel">
+            <div class="password-recovery-kicker" id="password-recovery-kicker">SECURE RECOVERY</div>
+            <div class="card-title" id="password-recovery-title">新しいパスワードを設定</div>
+            <div class="card-sub" id="password-recovery-sub">8文字以上の新しいパスワードを入力してください。</div>
+            <div class="auth-form password-recovery-form">
+              <input id="recovery-password" type="password" placeholder="New password" autocomplete="new-password" />
+              <input id="recovery-password-confirm" type="password" placeholder="Confirm password" autocomplete="new-password" />
+              <button class="btn btn-primary" id="btn-recovery-update" type="button">パスワードを更新</button>
             </div>
           </div>
 
@@ -768,6 +832,31 @@
             <button class="btn btn-ghost btn-xs" id="btn-auth-open-settings">接続設定を開く</button>
             <button class="btn btn-ghost btn-xs hidden" id="btn-auth-reset-connection">デフォルト接続に戻す</button>
           </div>
+        </section>
+
+        <section class="card account-safety-section hidden" id="account-safety-section">
+          <div class="card-header">
+            <div>
+              <div class="card-title" id="account-safety-title">安全とプライバシー</div>
+              <div class="card-sub" id="account-safety-sub">ブロックした相手の確認と解除ができます。</div>
+            </div>
+            <button class="btn btn-ghost btn-xs" id="btn-refresh-blocks" type="button">更新</button>
+          </div>
+          <div class="blocked-user-list" id="blocked-user-list"></div>
+          <div class="template-status" id="blocked-user-status"></div>
+        </section>
+
+        <section class="card account-danger-section hidden" id="account-danger-section">
+          <div class="account-danger-copy">
+            <div class="account-danger-kicker" id="account-danger-kicker">DANGER ZONE</div>
+            <div class="card-title" id="account-danger-title">アカウントを削除</div>
+            <div class="card-sub" id="account-danger-sub">投稿、DM、プロフィールを完全に削除します。この操作は取り消せません。</div>
+          </div>
+          <div class="account-danger-confirm">
+            <input id="account-delete-confirmation" type="text" placeholder="DELETE と入力" autocomplete="off" />
+            <button class="btn btn-danger" id="btn-delete-account" type="button" disabled>完全に削除</button>
+          </div>
+          <div class="template-status" id="account-delete-status"></div>
         </section>
       
         <section class="card profile-card hidden" id="profile-section" data-collapsible="profile-details" data-default-open="false">
@@ -896,43 +985,6 @@
           </div>
         </section>
 
-        <section class="card extra-section hidden" id="notifications-section" style="margin-top: 12px;" data-collapsible="notifications-details" data-default-open="false">
-          <div class="card-header">
-            <div>
-              <div class="card-title" id="notifications-title">通知</div>
-              <div class="card-sub" id="notifications-sub">
-                コメントやフォローがここに届きます。
-              </div>
-            </div>
-            <button class="btn btn-ghost btn-xs" data-collapsible-btn>もっと見る</button>
-          </div>
-          <div class="collapsible-content" data-collapsible-content>
-            <div class="notification-toolbar-actions">
-              <button class="btn btn-ghost" id="btn-refresh-notifications">更新</button>
-              <button class="btn btn-ghost" id="btn-mark-all-read">全て既読</button>
-            </div>
-            <div class="notification-toolbar">
-              <div class="chips chips-scroll">
-                <button class="chip chip-active" id="notification-filter-all">すべて</button>
-                <button class="chip" id="notification-filter-unread">未読</button>
-                <button class="chip" id="notification-filter-comment">コメント</button>
-                <button class="chip" id="notification-filter-follow">フォロー</button>
-                <button class="chip" id="notification-filter-like">いいね</button>
-              </div>
-              <div class="notification-unread-count hidden" id="notification-unread-count"></div>
-            </div>
-            <div class="notification-priority hidden" id="notification-priority">
-              <div class="notification-priority-head">
-                <div class="notification-priority-title" id="notification-priority-title">優先して見る</div>
-                <div class="notification-priority-sub" id="notification-priority-sub">今すぐ返したい通知</div>
-              </div>
-              <div class="notification-priority-rail" id="notification-priority-rail"></div>
-            </div>
-            <div id="notification-list" class="notification-list"></div>
-            <div id="notification-status" class="template-status"></div>
-          </div>
-        </section>
-
         <section class="card extra-section hidden" id="history-section" style="margin-top: 12px;" data-collapsible="history-details" data-default-open="false">
           <div class="card-header">
             <div>
@@ -1041,6 +1093,7 @@
               <div class="public-profile-actions">
                 <button class="btn btn-ghost hidden" id="btn-public-message" data-public-message-trigger>メッセージ</button>
                 <button class="btn btn-primary" id="btn-public-follow" data-public-follow-trigger>フォロー</button>
+                <button class="btn btn-ghost hidden" id="btn-public-safety" type="button">通報 / ブロック</button>
               </div>
             </div>
           </div>
@@ -1847,7 +1900,7 @@
             </label>
           </div>
           <p class="post-video-kind-help" id="post-video-kind-help">
-            ショートは専用画面、通常動画はフィードに表示されます。
+            ショートは60秒、通常動画は3分・30MBまで。サムネイルは自動生成されます。
           </p>
         </fieldset>
       </div>
@@ -1975,6 +2028,39 @@
     <section class="media-modal-content">
       <button class="modal-close-btn" id="btn-media-close">×</button>
       <div id="media-modal-body"></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="safety-modal-backdrop" data-no-page-swipe>
+    <section class="card modal-panel safety-modal-panel" role="dialog" aria-modal="true" aria-labelledby="safety-modal-title">
+      <div class="modal-header-row">
+        <div>
+          <div class="safety-modal-kicker" id="safety-modal-kicker">SAFETY</div>
+          <div class="card-title" id="safety-modal-title">このコンテンツについて</div>
+          <div class="card-sub" id="safety-modal-target">-</div>
+        </div>
+        <button class="modal-close-btn" id="btn-safety-close" type="button">×</button>
+      </div>
+      <div class="safety-actions">
+        <button class="safety-action-card" id="btn-safety-block" type="button">
+          <strong id="safety-block-title">このユーザーをブロック</strong>
+          <span id="safety-block-sub">お互いの投稿とDMを非表示にします。</span>
+        </button>
+        <div class="safety-report-card">
+          <strong id="safety-report-title">運営に通報</strong>
+          <label class="sr-only" for="safety-report-reason">理由</label>
+          <select id="safety-report-reason">
+            <option value="spam">スパム</option>
+            <option value="harassment">嫌がらせ</option>
+            <option value="inappropriate">不適切な内容</option>
+            <option value="impersonation">なりすまし</option>
+            <option value="other">その他</option>
+          </select>
+          <textarea id="safety-report-details" maxlength="1000" placeholder="必要なら詳しい状況を入力"></textarea>
+          <button class="btn btn-primary" id="btn-safety-report" type="button">通報を送信</button>
+        </div>
+      </div>
+      <div class="template-status" id="safety-modal-status" role="status" aria-live="polite"></div>
     </section>
   </div>
 
