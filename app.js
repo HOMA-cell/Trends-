@@ -194,6 +194,13 @@ import {
       postImage: 12 * 1024 * 1024,
       postVideo: 30 * 1024 * 1024,
     };
+    const TEXT_LIMITS = {
+      post: 2200,
+      comment: 1000,
+      profileDisplayName: 80,
+      profileHandle: 40,
+      profileBio: 500,
+    };
     const POST_VIDEO_MAX_SECONDS = {
       short: 60,
       standard: 180,
@@ -301,6 +308,50 @@ function getSafeFileExtension(file) {
       const fromType = (file?.type || "").split("/")[1] || "";
       const safe = fromType.toLowerCase().replace(/[^a-z0-9]/g, "");
       return safe || "bin";
+    }
+    function getOwnedPublicStoragePath(urlValue, bucket, userId = currentUser?.id) {
+      const rawUrl = String(urlValue || "").trim();
+      const normalizedBucket = String(bucket || "").trim();
+      const normalizedUserId = String(userId || "").trim();
+      if (!rawUrl || !normalizedBucket || !normalizedUserId) return "";
+      try {
+        const parsedUrl = new URL(rawUrl, window.location.origin);
+        const supabaseOrigin = new URL(SUPABASE_URL).origin;
+        if (parsedUrl.origin !== supabaseOrigin) return "";
+        const marker = `/storage/v1/object/public/${normalizedBucket}/`;
+        if (!parsedUrl.pathname.startsWith(marker)) return "";
+        const path = decodeURIComponent(parsedUrl.pathname.slice(marker.length));
+        const ownPrefix = `public/${normalizedUserId}/`;
+        if (!path.startsWith(ownPrefix) || path.includes("..")) return "";
+        return path;
+      } catch {
+        return "";
+      }
+    }
+
+    async function removeStoragePaths(bucket, paths = []) {
+      const normalizedPaths = Array.from(
+        new Set((paths || []).map((path) => String(path || "").trim()).filter(Boolean))
+      );
+      if (!normalizedPaths.length) return true;
+      try {
+        const { error } = await supabase.storage.from(bucket).remove(normalizedPaths);
+        if (error) {
+          console.warn(`${bucket} cleanup error:`, error);
+          return false;
+        }
+      } catch (error) {
+        console.warn(`${bucket} cleanup error:`, error);
+        return false;
+      }
+      return true;
+    }
+
+    async function removeOwnedPublicStorageUrls(bucket, urls = [], userId = currentUser?.id) {
+      const paths = (urls || [])
+        .map((url) => getOwnedPublicStoragePath(url, bucket, userId))
+        .filter(Boolean);
+      return removeStoragePaths(bucket, paths);
     }
 function getFileValidationError(file, kind) {
       if (!file) return null;
@@ -1363,6 +1414,22 @@ async function loadProfilePostCount() {
         /networkerror/i.test(message) ||
         /fetcherror/i.test(name)
       );
+    }
+
+    function isMissingDataResourceError(error, resourceName = "") {
+      const code = String(error?.code || "").toUpperCase();
+      const source = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`
+        .toLowerCase()
+        .trim();
+      const missing =
+        code === "PGRST205" ||
+        code === "42P01" ||
+        source.includes("schema cache") ||
+        source.includes("could not find the table") ||
+        source.includes("relation does not exist");
+      if (!missing) return false;
+      const normalizedResource = String(resourceName || "").toLowerCase().trim();
+      return !normalizedResource || source.includes(normalizedResource);
     }
 
     function formatConnectionStatusMessage(
@@ -4100,6 +4167,9 @@ async function loadProfilePostCount() {
         const youtubeEl = $("profile-youtube");
         const websiteEl = $("profile-website");
         const accentEl = $("profile-accent");
+        const previousAvatarUrl = currentProfile?.avatar_url || "";
+        const previousBannerUrl = currentProfile?.banner_url || "";
+        const uploadedProfilePaths = [];
 
         const displayName = displayEl?.value.trim() || null;
         let handle = handleEl?.value.trim() || "";
@@ -4113,6 +4183,17 @@ async function loadProfilePostCount() {
         }
 
         const bio = bioEl?.value.trim() || null;
+        if (
+          (displayName?.length || 0) > TEXT_LIMITS.profileDisplayName ||
+          handle.length > TEXT_LIMITS.profileHandle ||
+          (bio?.length || 0) > TEXT_LIMITS.profileBio
+        ) {
+          const message =
+            tr.profileTextTooLong || "プロフィールの文字数上限を超えています。";
+          if (status) status.textContent = message;
+          showToast(message, "warning");
+          return;
+        }
         const readOptionalNullable = (el, fallback = null) => {
           if (!el) return fallback;
           const value = el.value.trim();
@@ -4184,6 +4265,7 @@ async function loadProfilePostCount() {
             showToast(uploadErr.message, "error");
             return;
           }
+          uploadedProfilePaths.push(path);
 
           const { data: publicData } = supabase.storage
             .from("avatars")
@@ -4202,10 +4284,12 @@ async function loadProfilePostCount() {
 
           if (uploadErr) {
             console.error("banner upload error:", uploadErr);
+            await removeStoragePaths("avatars", uploadedProfilePaths);
             if (status) status.textContent = uploadErr.message;
             showToast(uploadErr.message, "error");
             return;
           }
+          uploadedProfilePaths.push(path);
 
           const { data: publicData } = supabase.storage
             .from("avatars")
@@ -4243,6 +4327,7 @@ async function loadProfilePostCount() {
 
         if (error || !data) {
           console.error("profile update error:", error);
+          await removeStoragePaths("avatars", uploadedProfilePaths);
           if (status) {
             status.textContent =
               tr.profileSaveError || "Failed to update profile.";
@@ -4250,6 +4335,15 @@ async function loadProfilePostCount() {
           showToast(tr.profileSaveError || "Failed to update profile.", "error");
           return;
         }
+
+        await removeOwnedPublicStorageUrls(
+          "avatars",
+          [
+            avatarUrl !== previousAvatarUrl ? previousAvatarUrl : "",
+            bannerUrl !== previousBannerUrl ? previousBannerUrl : "",
+          ],
+          currentUser.id
+        );
 
         currentProfile = data;
         profileCache.set(currentUser.id, data);
@@ -4342,6 +4436,14 @@ async function loadProfilePostCount() {
           (error.code === "invalid_credentials" ||
             error.message === "Invalid login credentials");
         if (invalidCredentials) {
+          if (password.length < 8) {
+            showToast(
+              tr.authPasswordTooShort ||
+                "新規登録のパスワードは8文字以上にしてください。",
+              "warning"
+            );
+            return;
+          }
           attemptedSignUp = true;
           ({ data, error } = await supabase.auth.signUp({
             email,
@@ -6615,7 +6717,7 @@ async function loadProfilePostCount() {
 
       if (error) {
         console.error("loadNotifications error:", error);
-        notificationsEnabled = false;
+        notificationsEnabled = !isMissingDataResourceError(error, "notifications");
       } else {
         const actorMap = await loadProfilesForUsers(
           (data || []).map((item) => item.actor_id)
@@ -8763,7 +8865,9 @@ async function loadProfilePostCount() {
       });
       if (error) {
         console.error("createNotification error:", error);
-        notificationsEnabled = false;
+        if (isMissingDataResourceError(error, "notifications")) {
+          notificationsEnabled = false;
+        }
       }
     }
 
@@ -8941,12 +9045,31 @@ async function loadProfilePostCount() {
       const weight = $("post-weight").value;
       const caption = $("post-caption").value.trim();
       const visibility = $("post-visibility").value;
+      const tr = t[currentLang] || t.ja;
       const uploadedMediaPaths = [];
       let postInserted = false;
 
       try {
         if (!date && !caption && !currentMediaFile) {
           showToast("何かしら入力してください。", "warning");
+          return;
+        }
+        if (caption.length > TEXT_LIMITS.post) {
+          showToast(
+            (
+              tr.postTextTooLong ||
+              "キャプションは{count}文字以内にしてください。"
+            ).replace("{count}", `${TEXT_LIMITS.post}`),
+            "warning"
+          );
+          return;
+        }
+        if (visibility === "private" && currentMediaFile) {
+          showToast(
+            tr.postPrivateMediaUnsupported ||
+              "非公開投稿には画像・動画を添付できません。公開範囲を変更するか、メディアを外してください。",
+            "warning"
+          );
           return;
         }
 
@@ -9161,7 +9284,9 @@ async function loadProfilePostCount() {
         if (commentSync.isLikelyTransientNetworkError(error)) {
           return commentsByPost.get(postId) || [];
         }
-        commentsEnabled = false;
+        if (isMissingDataResourceError(error, "comments")) {
+          commentsEnabled = false;
+        }
         refreshFeedPostComments(postId);
         return commentsByPost.get(postId) || [];
       }
@@ -9214,6 +9339,16 @@ async function loadProfilePostCount() {
       }
       if (!body) return;
       const tr = t[currentLang] || t.ja;
+      if (body.length > TEXT_LIMITS.comment) {
+        showToast(
+          (tr.commentTooLong || "コメントは{count}文字以内にしてください。").replace(
+            "{count}",
+            `${TEXT_LIMITS.comment}`
+          ),
+          "warning"
+        );
+        return;
+      }
 
       let profile = currentProfile || null;
       if (!profile && currentUser?.id) {
@@ -9261,7 +9396,9 @@ async function loadProfilePostCount() {
           return;
         }
         console.error("comment insert error:", error);
-        commentsEnabled = false;
+        if (isMissingDataResourceError(error, "comments")) {
+          commentsEnabled = false;
+        }
         refreshFeedPostComments(postId);
         showToast("コメントの投稿に失敗しました。", "error");
         return;
@@ -9289,11 +9426,32 @@ async function loadProfilePostCount() {
     async function deletePost(id) {
       const ok = window.confirm("この投稿を削除しますか？");
       if (!ok) return;
-      const { error } = await supabase.from("posts").delete().eq("id", id);
+      if (!currentUser) {
+        showToast("ログインしてください。", "warning");
+        return;
+      }
+      const { data: deletedRows, error } = await supabase
+        .from("posts")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", currentUser.id)
+        .select("id, media_url, media_thumbnail_url");
       if (error) {
         showToast("削除エラー: " + error.message, "error");
         return;
       }
+      if (!Array.isArray(deletedRows) || deletedRows.length === 0) {
+        showToast(
+          "投稿を削除できませんでした。再読み込みして確認してください。",
+          "error"
+        );
+        return;
+      }
+      await removeOwnedPublicStorageUrls(
+        "post-media",
+        [deletedRows[0]?.media_url, deletedRows[0]?.media_thumbnail_url],
+        currentUser.id
+      );
       await loadFeed();
     }
 

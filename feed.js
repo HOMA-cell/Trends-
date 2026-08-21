@@ -501,6 +501,7 @@ const FEED_DISCOVERY_TAG_LIMIT = 8;
 const FEED_DISCOVERY_USER_LIMIT = 8;
 const FEED_SEEN_POSTS_LIMIT = 2000;
 const FEED_CAPTION_TRIM_LIMIT = 140;
+const COMMENT_BODY_MAX_LENGTH = 1000;
 const shortsVisibilityRatios = new Map();
 let shortsSoundEnabled = false;
 const commentReplyTargets = new Map();
@@ -9078,6 +9079,7 @@ function buildCommentComposer(post, tr, currentUser, options = {}) {
         ? "comment-form-input is-inline"
         : "comment-form-input";
       field.placeholder = tr.commentPlaceholder || "Add a comment";
+      field.maxLength = COMMENT_BODY_MAX_LENGTH;
       if (compact) {
         field.type = "text";
       }

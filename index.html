@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap"
   />
   <link
     rel="icon"
@@ -947,15 +947,15 @@
               <div class="profile-editor">
                 <div class="field">
                   <label id="profile-display-label">表示名</label>
-                  <input id="profile-display" type="text" placeholder="表示名を入力" />
+                  <input id="profile-display" type="text" maxlength="80" placeholder="表示名を入力" />
                 </div>
                 <div class="field">
                   <label id="profile-handle-label">ハンドル</label>
-                  <input id="profile-handle" type="text" placeholder="handle" />
+                  <input id="profile-handle" type="text" maxlength="40" placeholder="handle" />
                 </div>
                 <div class="field field-span">
                   <label id="profile-bio-label">自己紹介</label>
-                  <textarea id="profile-bio-input" placeholder="筋トレのこだわりなど"></textarea>
+                  <textarea id="profile-bio-input" maxlength="500" placeholder="筋トレのこだわりなど"></textarea>
                 </div>
               </div>
             </div>
@@ -1773,11 +1773,11 @@
         <div class="profile-editor">
           <div class="field">
             <label id="profile-location-label">場所</label>
-            <input id="profile-location" type="text" placeholder="Tokyo" />
+            <input id="profile-location" type="text" maxlength="120" placeholder="Tokyo" />
           </div>
           <div class="field">
             <label id="profile-height-label">身長</label>
-            <input id="profile-height" type="number" placeholder="170" />
+            <input id="profile-height" type="number" min="80" max="300" placeholder="170" />
           </div>
         </div>
       </div>
@@ -1791,19 +1791,19 @@
           </div>
           <div class="field">
             <label id="profile-goal-label">目標</label>
-            <input id="profile-goal" type="text" placeholder="筋肥大 / パワーアップ" />
+            <input id="profile-goal" type="text" maxlength="160" placeholder="筋肥大 / パワーアップ" />
           </div>
           <div class="field">
             <label id="profile-gym-label">ジム</label>
-            <input id="profile-gym" type="text" placeholder="Anytime Fitness" />
+            <input id="profile-gym" type="text" maxlength="160" placeholder="Anytime Fitness" />
           </div>
           <div class="field">
             <label id="profile-split-label">分割</label>
-            <input id="profile-split" type="text" placeholder="Push/Pull/Legs" />
+            <input id="profile-split" type="text" maxlength="160" placeholder="Push/Pull/Legs" />
           </div>
           <div class="field field-span">
             <label id="profile-favorite-label">好きな種目</label>
-            <textarea id="profile-favorite" placeholder="Bench, Squat, Deadlift"></textarea>
+            <textarea id="profile-favorite" maxlength="500" placeholder="Bench, Squat, Deadlift"></textarea>
           </div>
         </div>
       </div>
@@ -1847,7 +1847,7 @@
         <div class="modal-section-title" id="post-section-caption">キャプション</div>
         <div class="field">
           <label id="label-caption">キャプション / トレメモ</label>
-          <textarea id="post-caption" placeholder="bench 100"></textarea>
+          <textarea id="post-caption" maxlength="2200" placeholder="bench 100"></textarea>
         </div>
       </div>
       <div class="modal-section">

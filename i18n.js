@@ -622,6 +622,7 @@ export const t = {
         profileDraftRestored: "プロフィール下書きを復元しました。",
         profileSaveSuccess: "プロフィールを更新しました。",
         profileSaveError: "プロフィール更新に失敗しました。",
+        profileTextTooLong: "プロフィールの文字数上限を超えています。",
         profileDisplayPlaceholder: "表示名を入力",
         profileHandlePlaceholder: "handle",
         profileBioPlaceholder: "筋トレのこだわりなど",
@@ -652,6 +653,7 @@ export const t = {
         commentAdd: "送信",
         commentQueued:
           "オフラインのため、コメントを保存しました。オンライン時に送信します。",
+        commentTooLong: "コメントは{count}文字以内にしてください。",
         commentPending: "送信待ち",
         commentPlaceholder: "コメントを書く",
         commentLoading: "読み込み中...",
@@ -1057,6 +1059,9 @@ export const t = {
         authPasswordUpdateFailed: "パスワードを更新できませんでした。",
         postVideoTooLong: "動画が長すぎます（{seconds}秒まで）。",
         postVideoUnreadable: "動画を読み取れませんでした。別のmp4/mov/webmを選んでください。",
+        postTextTooLong: "キャプションは{count}文字以内にしてください。",
+        postPrivateMediaUnsupported:
+          "非公開投稿には画像・動画を添付できません。公開範囲を変更するか、メディアを外してください。",
         safetyLoginRequired: "通報・ブロックにはログインが必要です。",
         safetyTargetFallback: "このユーザー",
         safetyMenu: "通報 / ブロック",
@@ -1717,6 +1722,7 @@ export const t = {
         profileDraftRestored: "Profile draft restored.",
         profileSaveSuccess: "Profile updated.",
         profileSaveError: "Failed to update profile.",
+        profileTextTooLong: "One or more profile fields are too long.",
         profileDisplayPlaceholder: "Your name",
         profileHandlePlaceholder: "handle",
         profileBioPlaceholder: "Training goals or focus",
@@ -1747,6 +1753,7 @@ export const t = {
         commentAdd: "Post",
         commentQueued:
           "You are offline. Comment is queued and will be sent when online.",
+        commentTooLong: "Keep comments within {count} characters.",
         commentPending: "Pending",
         commentPlaceholder: "Add a comment",
         commentLoading: "Loading...",
@@ -2152,6 +2159,9 @@ export const t = {
         authPasswordUpdateFailed: "Could not update the password.",
         postVideoTooLong: "This video is too long (maximum {seconds} seconds).",
         postVideoUnreadable: "Could not read this video. Try another mp4, mov, or webm file.",
+        postTextTooLong: "Keep captions within {count} characters.",
+        postPrivateMediaUnsupported:
+          "Private posts cannot include media yet. Change the visibility or remove the media.",
         safetyLoginRequired: "Sign in to report or block.",
         safetyTargetFallback: "This member",
         safetyMenu: "Report / block",
