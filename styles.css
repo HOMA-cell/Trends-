@@ -12910,6 +12910,77 @@
       font-size: 11px;
       color: var(--text-sub);
     }
+    .post-video-kind {
+      min-width: 0;
+      margin: 12px 0 0;
+      padding: 0;
+      border: 0;
+    }
+    .post-video-kind legend {
+      margin-bottom: 8px;
+      padding: 0;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .post-video-kind-options {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .post-video-kind-option {
+      position: relative;
+      display: flex;
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fffdf9;
+      cursor: pointer;
+      transition:
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease;
+    }
+    .post-video-kind-option:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+    }
+    .post-video-kind-option.is-selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+    .post-video-kind-option input {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .post-video-kind-option:has(input:focus-visible) {
+      outline: 3px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      outline-offset: 2px;
+    }
+    .post-video-kind-copy {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .post-video-kind-copy strong {
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.3;
+    }
+    .post-video-kind-copy span,
+    .post-video-kind-help {
+      color: var(--text-sub);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .post-video-kind-help {
+      margin: 7px 2px 0;
+    }
     .draft-hint {
       font-size: 11px;
       color: var(--text-sub);
@@ -13067,6 +13138,9 @@
         width: 36px;
         height: 36px;
         font-size: 20px;
+      }
+      .post-video-kind-options {
+        grid-template-columns: 1fr;
       }
       .post-form-actions #btn-submit {
         flex: 1;

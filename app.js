@@ -78,6 +78,7 @@ import {
     let currentLang = "ja";
     let currentMediaFile = null;
     let currentMediaPreviewUrl = null;
+    const POST_VIDEO_KINDS = new Set(["standard", "short"]);
     let draftSaveTimer = null;
     let draftSaveBlockedUntil = 0;
     let postComposerAdvanced = false;
@@ -2456,6 +2457,12 @@ async function loadProfilePostCount() {
       setText("post-composer-hint", "postSimpleHint");
       setText("post-media-picker-title", "media");
       setText("post-media-picker-sub", "postMediaPickerHint");
+      setText("post-video-kind-label", "postVideoKindLabel");
+      setText("post-video-kind-standard-title", "postVideoKindStandard");
+      setText("post-video-kind-standard-desc", "postVideoKindStandardDesc");
+      setText("post-video-kind-short-title", "postVideoKindShort");
+      setText("post-video-kind-short-desc", "postVideoKindShortDesc");
+      setText("post-video-kind-help", "postVideoKindHelp");
       setText("login-required", "pleaseLogin");
 
       // Feed
@@ -4589,6 +4596,41 @@ async function loadProfilePostCount() {
       el.classList.toggle("is-active", Boolean(message) && active);
     }
 
+    function getSelectedPostVideoKind() {
+      const selected = document.querySelector(
+        'input[name="post-video-kind"]:checked'
+      );
+      const value = `${selected?.value || "standard"}`;
+      return POST_VIDEO_KINDS.has(value) ? value : "standard";
+    }
+
+    function setSelectedPostVideoKind(value = "standard") {
+      const normalized = POST_VIDEO_KINDS.has(value) ? value : "standard";
+      document
+        .querySelectorAll('input[name="post-video-kind"]')
+        .forEach((input) => {
+          input.checked = input.value === normalized;
+        });
+      document.querySelectorAll("[data-video-kind-option]").forEach((option) => {
+        option.classList.toggle(
+          "is-selected",
+          option.getAttribute("data-video-kind-option") === normalized
+        );
+      });
+    }
+
+    function syncPostVideoKindControl(file = currentMediaFile) {
+      const field = $("post-video-kind-field");
+      const isVideo = Boolean(file?.type?.startsWith("video"));
+      if (field) {
+        field.classList.toggle("hidden", !isVideo);
+        field.disabled = !isVideo;
+      }
+      if (!isVideo) {
+        setSelectedPostVideoKind("standard");
+      }
+    }
+
     function renderMediaPreview(file, note = "") {
       const preview = $("post-media-preview");
       const body = $("post-media-preview-body");
@@ -4606,6 +4648,7 @@ async function loadProfilePostCount() {
       body.innerHTML = "";
 
       if (file) {
+        syncPostVideoKindControl(file);
         const url = URL.createObjectURL(file);
         currentMediaPreviewUrl = url;
         dropzone?.classList.add("is-filled");
@@ -4631,6 +4674,7 @@ async function loadProfilePostCount() {
       }
 
       if (note) {
+        syncPostVideoKindControl(null);
         dropzone?.classList.remove("is-filled");
         pickerTitle && (pickerTitle.textContent = tr.media || "Media");
         if (pickerSub) {
@@ -4639,6 +4683,7 @@ async function loadProfilePostCount() {
         noteEl.textContent = note;
         preview.classList.remove("hidden");
       } else {
+        syncPostVideoKindControl(null);
         dropzone?.classList.remove("is-filled");
         pickerTitle && (pickerTitle.textContent = tr.media || "Media");
         if (pickerSub) {
@@ -4683,6 +4728,9 @@ async function loadProfilePostCount() {
         templateId,
         exercises,
         mediaName: currentMediaFile?.name || "",
+        videoKind: currentMediaFile?.type?.startsWith("video")
+          ? getSelectedPostVideoKind()
+          : "standard",
         composerAdvanced: !!postComposerAdvanced,
         updatedAt: Date.now(),
       };
@@ -4803,6 +4851,9 @@ async function loadProfilePostCount() {
           templateId: `${parsed.templateId || ""}`,
           exercises: Array.isArray(parsed.exercises) ? parsed.exercises : [],
           mediaName: `${parsed.mediaName || ""}`,
+          videoKind: POST_VIDEO_KINDS.has(`${parsed.videoKind || ""}`)
+            ? `${parsed.videoKind}`
+            : "standard",
           composerAdvanced: parsed.composerAdvanced === true,
           updatedAt: Number.isFinite(Number(parsed.updatedAt))
             ? Number(parsed.updatedAt)
@@ -4824,6 +4875,7 @@ async function loadProfilePostCount() {
       if (weightEl) weightEl.value = draft.weight || "";
       if (captionEl) captionEl.value = draft.caption || "";
       if (visibilityEl) visibilityEl.value = draft.visibility || "public";
+      setSelectedPostVideoKind(draft.videoKind || "standard");
       if (templateEl && draft.templateId) {
         const exists = Array.from(templateEl.options || []).some(
           (opt) => opt.value === draft.templateId
@@ -4901,6 +4953,9 @@ async function loadProfilePostCount() {
       const mediaInput = $("post-media");
       const mediaDropzone = $("post-media-dropzone");
       const removeMediaBtn = $("btn-remove-media");
+      const videoKindInputs = document.querySelectorAll(
+        'input[name="post-video-kind"]'
+      );
       const applySelectedPostMediaFile = (file, inputEl = null) => {
         const error = getFileValidationError(file, "post");
         if (error) {
@@ -4962,6 +5017,14 @@ async function loadProfilePostCount() {
           queueDraftSave();
         });
       }
+      videoKindInputs.forEach((input) => {
+        if (input.dataset.bound === "true") return;
+        input.dataset.bound = "true";
+        input.addEventListener("change", () => {
+          setSelectedPostVideoKind(getSelectedPostVideoKind());
+          queueDraftSave();
+        });
+      });
 
       const templateSelect = $("post-template");
       if (templateSelect) {
@@ -8109,6 +8172,7 @@ async function loadProfilePostCount() {
       const templateSelect = $("post-template");
       if (templateSelect) templateSelect.value = "";
       currentMediaFile = null;
+      setSelectedPostVideoKind("standard");
       renderMediaPreview(null);
       workoutExercises = [];
       addExercise();
@@ -8181,6 +8245,7 @@ async function loadProfilePostCount() {
             : payload.bodyweight,
         media_url: payload.media_url || "",
         media_type: payload.media_type || "",
+        video_kind: payload.video_kind || null,
         profile: buildCurrentUserFeedProfile(),
       };
       const currentPosts = Array.isArray(allPosts) ? allPosts : [];
@@ -8275,6 +8340,8 @@ async function loadProfilePostCount() {
           caption: caption || null,
           media_url: mediaUrl,
           media_type: mediaType,
+          video_kind:
+            mediaType === "video" ? getSelectedPostVideoKind() : null,
           visibility,
         };
 

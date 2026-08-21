@@ -1720,6 +1720,33 @@
             <button class="btn btn-ghost btn-xs" type="button" id="btn-remove-media">削除</button>
           </div>
         </div>
+        <fieldset class="post-video-kind hidden" id="post-video-kind-field">
+          <legend id="post-video-kind-label">動画タイプ</legend>
+          <div class="post-video-kind-options">
+            <label class="post-video-kind-option is-selected" data-video-kind-option="standard">
+              <input
+                type="radio"
+                name="post-video-kind"
+                value="standard"
+                checked
+              />
+              <span class="post-video-kind-copy">
+                <strong id="post-video-kind-standard-title">通常動画</strong>
+                <span id="post-video-kind-standard-desc">通常フィードに表示</span>
+              </span>
+            </label>
+            <label class="post-video-kind-option" data-video-kind-option="short">
+              <input type="radio" name="post-video-kind" value="short" />
+              <span class="post-video-kind-copy">
+                <strong id="post-video-kind-short-title">ショート</strong>
+                <span id="post-video-kind-short-desc">縦型の短い動画向け</span>
+              </span>
+            </label>
+          </div>
+          <p class="post-video-kind-help" id="post-video-kind-help">
+            ショートは専用画面、通常動画はフィードに表示されます。
+          </p>
+        </fieldset>
       </div>
       <div class="modal-section post-advanced-section">
         <div class="modal-section-title" id="post-section-basic">基本</div>

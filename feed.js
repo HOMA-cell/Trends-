@@ -445,7 +445,7 @@ const FEED_UI_STATE_KEY = "trends_feed_ui_state_v1";
 const FEED_FILTERS = ["foryou", "all", "following", "mine", "saved", "public"];
 const FEED_VIEW_MODES = ["feed", "shorts"];
 const FEED_POST_SELECT_FIELDS =
-  "id,user_id,date,created_at,visibility,note,caption,bodyweight,media_url,media_type";
+  "id,user_id,date,created_at,visibility,note,caption,bodyweight,media_url,media_type,video_kind";
 const FEED_PROFILE_SELECT_FIELDS =
   "id,handle,display_name,avatar_url,accent_color";
 const PERF_DEBUG_KEY = "trends_perf_debug";
@@ -2781,6 +2781,7 @@ function clampFeedPostsForCache(posts = []) {
           visibility: post.visibility || "public",
           media_url: post.media_url || "",
           media_type: post.media_type || "",
+          video_kind: post.video_kind || null,
           bodyweight:
             post.bodyweight === null || post.bodyweight === undefined
               ? null
@@ -3233,7 +3234,9 @@ function getCommentSheetBody() {
       return $("comment-sheet-body");
     }
 function isShortsStylePost(post) {
-      return Boolean(post && post.media_type === "video");
+      return Boolean(
+        post && post.media_type === "video" && post.video_kind === "short"
+      );
     }
 function syncCommentSheetContextClasses(post = null) {
       const backdrop = getCommentSheetBackdrop();
@@ -5885,12 +5888,15 @@ export function renderFeed(options = {}) {
         ? sortedBasePosts.filter((post) => matchesSearch(post))
         : sortedBasePosts;
       if (isShortsMode) {
-        gridCandidates = searchedPosts.filter((post) => isVideoPost(post));
+        gridCandidates = searchedPosts.filter((post) => isShortsStylePost(post));
       } else {
+        const standardFeedPosts = searchedPosts.filter(
+          (post) => !isShortsStylePost(post)
+        );
         gridCandidates =
           feedLayout === "grid"
-            ? searchedPosts.filter((post) => post.media_url)
-            : searchedPosts;
+            ? standardFeedPosts.filter((post) => post.media_url)
+            : standardFeedPosts;
       }
       feedQueryCache = {
         queryKey,
@@ -6120,7 +6126,7 @@ export function renderFeed(options = {}) {
             "Supabase 接続に失敗しています。設定で Project URL / Anon key を確認してください。"
         : isShortsMode
         ? tr.feedShortsEmptyDesc ||
-          "動画付き投稿をするとここに表示されます。"
+          "動画タイプを「ショート」にして投稿すると表示されます。"
         : isSavedEmpty
         ? tr.feedSavedEmptyDesc || "カード右上の保存ボタンで後で見返せます。"
         : isFollowingEmpty
@@ -6290,6 +6296,7 @@ export function renderFeed(options = {}) {
         `${post?.caption || ""}`,
         `${post?.media_url || ""}`,
         `${post?.media_type || ""}`,
+        `${post?.video_kind || ""}`,
         `${post?.bodyweight ?? ""}`,
         `${profile?.display_name || ""}`,
         `${profile?.handle || ""}`,
@@ -9485,6 +9492,7 @@ function renderDetailEntryContext(context, tr) {
     }
 function getDetailNavigablePosts() {
       const currentUserId = `${getCurrentUser()?.id || ""}`.trim();
+      const shortsScope = currentDetailEntryContext?.source === "shorts";
       const profileScope =
         currentDetailEntryContext?.source === "public_profile"
           ? currentDetailEntryContext
@@ -9492,6 +9500,7 @@ function getDetailNavigablePosts() {
       const workoutLogsByPost = getWorkoutLogsByPost();
       return (getAllPosts() || []).filter((post) => {
         if (!post) return false;
+        if (shortsScope && !isShortsStylePost(post)) return false;
         if (post.visibility === "private") {
           return !!currentUserId && `${post.user_id || ""}` === currentUserId;
         }
