@@ -989,7 +989,7 @@
   transform: rotate(8deg);
 }
 
-body[data-page="messages"].dm-auth-gate-visible .fab:disabled {
+body[data-page="messages"].dm-auth-gate-visible .fab {
   display: none !important;
 }
 

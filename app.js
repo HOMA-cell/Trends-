@@ -1375,6 +1375,7 @@ async function loadProfilePostCount() {
       if (!el) return;
       if (!result || result.ok === null) {
         el.textContent = "";
+        el.classList.add("hidden");
         el.classList.remove("feed-status-error", "feed-status-success", "feed-status-warning");
         if (actions) actions.classList.add("hidden");
         if (resetBtn) resetBtn.classList.add("hidden");
@@ -1388,10 +1389,16 @@ async function loadProfilePostCount() {
         : baseMessage;
       el.classList.remove("feed-status-error", "feed-status-success", "feed-status-warning");
       if (result.ok) {
-        el.classList.add("feed-status-success");
+        el.textContent = "";
+        el.classList.add("hidden");
+        if (actions) actions.classList.add("hidden");
+        if (resetBtn) resetBtn.classList.add("hidden");
+        return;
       } else if (localOverrideFailure) {
+        el.classList.remove("hidden");
         el.classList.add("feed-status-warning");
       } else {
+        el.classList.remove("hidden");
         el.classList.add("feed-status-error");
       }
       if (actions) {
@@ -2559,6 +2566,20 @@ async function loadProfilePostCount() {
       // アカウント / Tips / Debug
       setText("account-title", "account");
       setText("account-subtitle", "accountSignedOutHint");
+      setText("auth-welcome-eyebrow", "accountWelcomeEyebrow");
+      setText("auth-welcome-title", "accountWelcomeTitle");
+      setText("auth-welcome-body", "accountWelcomeBody");
+      setText("auth-value-post-title", "accountValuePostTitle");
+      setText("auth-value-post-note", "accountValuePostNote");
+      setText("auth-value-connect-title", "accountValueConnectTitle");
+      setText("auth-value-connect-note", "accountValueConnectNote");
+      setText("auth-value-dm-title", "accountValueDmTitle");
+      setText("auth-value-dm-note", "accountValueDmNote");
+      setText("btn-auth-browse-feed", "accountBrowseFeed");
+      setText("auth-entry-kicker", "accountEntryKicker");
+      setText("auth-entry-title", "accountEntryTitle");
+      setText("auth-entry-note", "accountEntryNote");
+      setText("auth-entry-legal", "accountEntryLegal");
       setText("account-session-chip", "accountSignedInBadge");
       setText("btn-auth-open-form", "loginSignup");
       setText("btn-auth-close-form", "accountHideLogin");
@@ -2974,6 +2995,7 @@ async function loadProfilePostCount() {
       const authBtn = $("btn-auth");
       const openAuthFormBtn = $("btn-auth-open-form");
       const closeAuthFormBtn = $("btn-auth-close-form");
+      const browseFeedBtn = $("btn-auth-browse-feed");
       const logoutBtn = $("btn-logout");
       const openPageSettingsBtn = $("btn-account-open-settings");
       const openSettingsBtn = $("btn-auth-open-settings");
@@ -2998,6 +3020,14 @@ async function loadProfilePostCount() {
         closeAuthFormBtn.dataset.bound = "true";
         closeAuthFormBtn.addEventListener("click", () => {
           setAuthFormExpanded(false);
+        });
+      }
+      if (browseFeedBtn && browseFeedBtn.dataset.bound !== "true") {
+        browseFeedBtn.dataset.bound = "true";
+        browseFeedBtn.addEventListener("click", () => {
+          if (typeof setActivePage === "function") {
+            setActivePage("feed", { scrollBehavior: "smooth" });
+          }
         });
       }
       if (logoutBtn && logoutBtn.dataset.bound !== "true") {
@@ -3955,6 +3985,7 @@ async function loadProfilePostCount() {
       const accountSubtitle = $("account-subtitle");
       const accountSessionChip = $("account-session-chip");
       const accountPanel = $("panel-account");
+      const accountPage = accountPanel?.closest(".account-page");
       const accountLabel = $("account-user");
       const accountEmail = $("account-user-email");
       const profileSection = $("profile-section");
@@ -3970,6 +4001,13 @@ async function loadProfilePostCount() {
       if (authSignedIn) authSignedIn.classList.toggle("hidden", !loggedIn);
       if (accountPanel) {
         accountPanel.classList.toggle("is-signed-in", loggedIn);
+        accountPanel.classList.toggle("is-signed-out", !loggedIn);
+      }
+      if (accountPage) {
+        accountPage.classList.toggle("is-signed-out", !loggedIn);
+      }
+      if (typeof document !== "undefined") {
+        document.body?.classList.toggle("auth-signed-out-visible", !loggedIn);
       }
       if (loggedIn) {
         setAuthFormExpanded(false);
@@ -3991,11 +4029,11 @@ async function loadProfilePostCount() {
       if (loginRequired) loginRequired.style.display = loggedIn ? "none" : "block";
       if (postSubmitBtn) postSubmitBtn.disabled = !loggedIn;
       const topPostBtn = $("btn-open-post");
-      if (topPostBtn) topPostBtn.disabled = !loggedIn;
+      if (topPostBtn) topPostBtn.disabled = false;
       const miniPostBtn = $("mini-btn-post") || $("mini-nav-post");
-      if (miniPostBtn) miniPostBtn.disabled = !loggedIn;
+      if (miniPostBtn) miniPostBtn.disabled = false;
       const fab = $("fab-open-post");
-      if (fab) fab.disabled = !loggedIn;
+      if (fab) fab.disabled = false;
       if (openAdvancedBtn) openAdvancedBtn.disabled = !loggedIn;
       if (!loggedIn) {
         const profileAdvancedBackdrop = $("profile-advanced-modal-backdrop");
@@ -4030,6 +4068,10 @@ async function loadProfilePostCount() {
       if (profileSection) profileSection.classList.toggle("hidden", !loggedIn);
       if (profileEditSection) profileEditSection.classList.toggle("hidden", !loggedIn);
       if (summarySection) summarySection.classList.toggle("hidden", !loggedIn);
+      const accountQuickActions = $("account-quick-actions");
+      if (accountQuickActions) {
+        accountQuickActions.classList.toggle("hidden", !loggedIn);
+      }
       renderAuthNetworkStatus();
       renderDmPage();
     }
@@ -5092,7 +5134,12 @@ async function loadProfilePostCount() {
 
       const openModal = (options = {}) => {
         if (!currentUser) {
-          showToast("投稿するにはログインが必要です。", "warning");
+          if (typeof setActivePage === "function") {
+            setActivePage("account", { scrollBehavior: "smooth" });
+          }
+          setTimeout(() => {
+            setAuthFormExpanded(true, { focus: true });
+          }, 360);
           return;
         }
         const quoteSeed = String(options?.quoteSeed || "").trim();

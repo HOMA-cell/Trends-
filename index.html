@@ -641,34 +641,80 @@
           </div>
 
           <div class="auth-signed-out" id="auth-signed-out">
-            <div class="auth-signed-out-eyebrow">START IN 1 MIN</div>
-            <div class="auth-benefit-strip" aria-hidden="true">
-              <span class="auth-benefit-pill">POST</span>
-              <span class="auth-benefit-pill">SHORTS</span>
-              <span class="auth-benefit-pill">DM</span>
-            </div>
-            <button class="btn btn-primary auth-open-button" id="btn-auth-open-form" type="button">
-              ログイン / サインアップ
-            </button>
-            <div class="auth-inline-form hidden" id="auth-inline-form">
-              <form id="auth-form" class="auth-form" autocomplete="on">
-                <label class="sr-only" id="auth-email-label" for="auth-email">メール</label>
-                <input id="auth-email" type="email" placeholder="email@example.com" autocomplete="email" />
-                <label class="sr-only" id="auth-password-label" for="auth-password">パスワード</label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  placeholder="Password"
-                  autocomplete="current-password"
-                />
-                <button class="btn btn-primary auth-submit" id="btn-auth" type="submit">
-                  ログイン / サインアップ
-                </button>
-              </form>
-              <div class="auth-caption" id="auth-caption">初回は自動でアカウント作成されます。</div>
-              <button class="btn btn-ghost btn-xs auth-close-button" id="btn-auth-close-form" type="button">
-                閉じる
+            <div class="auth-welcome-copy">
+              <div class="auth-signed-out-eyebrow" id="auth-welcome-eyebrow">YOUR TRAINING, CONNECTED</div>
+              <h2 class="auth-welcome-title" id="auth-welcome-title">記録するだけで終わらない。</h2>
+              <p class="auth-welcome-body" id="auth-welcome-body">
+                今日のトレーニングを残して、同じ目標を持つ仲間とつながる筋トレ専用SNSです。
+              </p>
+              <div class="auth-value-list">
+                <article class="auth-value-item">
+                  <span>01</span>
+                  <div>
+                    <strong id="auth-value-post-title">ワークアウトを記録</strong>
+                    <p id="auth-value-post-note">写真・動画・種目をひとつの投稿に。</p>
+                  </div>
+                </article>
+                <article class="auth-value-item">
+                  <span>02</span>
+                  <div>
+                    <strong id="auth-value-connect-title">仲間から刺激をもらう</strong>
+                    <p id="auth-value-connect-note">フィードとショートで次の挑戦を見つける。</p>
+                  </div>
+                </article>
+                <article class="auth-value-item">
+                  <span>03</span>
+                  <div>
+                    <strong id="auth-value-dm-title">1対1で相談する</strong>
+                    <p id="auth-value-dm-note">フォームやメニューをDMで共有。</p>
+                  </div>
+                </article>
+              </div>
+              <button class="btn btn-ghost auth-browse-button" id="btn-auth-browse-feed" type="button">
+                先にフィードを見る
               </button>
+            </div>
+
+            <div class="auth-entry-card">
+              <div class="auth-entry-brand" aria-hidden="true">
+                <span>T</span>
+                <div>
+                  <strong>TRENDS</strong>
+                  <small>WORKOUT SOCIAL</small>
+                </div>
+              </div>
+              <div class="auth-entry-kicker" id="auth-entry-kicker">START IN 1 MIN</div>
+              <h3 class="auth-entry-title" id="auth-entry-title">Trendsを始める</h3>
+              <p class="auth-entry-note" id="auth-entry-note">メールアドレスだけで、記録も会話もすぐに始められます。</p>
+              <div class="auth-benefit-strip" aria-hidden="true">
+                <span class="auth-benefit-pill">POST</span>
+                <span class="auth-benefit-pill">SHORTS</span>
+                <span class="auth-benefit-pill">DM</span>
+              </div>
+              <button class="btn btn-primary auth-open-button" id="btn-auth-open-form" type="button">
+                ログイン / サインアップ
+              </button>
+              <div class="auth-inline-form hidden" id="auth-inline-form">
+                <form id="auth-form" class="auth-form" autocomplete="on">
+                  <label class="sr-only" id="auth-email-label" for="auth-email">メール</label>
+                  <input id="auth-email" type="email" placeholder="email@example.com" autocomplete="email" />
+                  <label class="sr-only" id="auth-password-label" for="auth-password">パスワード</label>
+                  <input
+                    id="auth-password"
+                    type="password"
+                    placeholder="Password"
+                    autocomplete="current-password"
+                  />
+                  <button class="btn btn-primary auth-submit" id="btn-auth" type="submit">
+                    ログイン / サインアップ
+                  </button>
+                </form>
+                <div class="auth-caption" id="auth-caption">初回は自動でアカウント作成されます。</div>
+                <button class="btn btn-ghost btn-xs auth-close-button" id="btn-auth-close-form" type="button">
+                  閉じる
+                </button>
+              </div>
+              <p class="auth-entry-legal" id="auth-entry-legal">続行すると利用規約とプライバシーポリシーに同意したものとみなされます。</p>
             </div>
           </div>
 
