@@ -63,6 +63,8 @@ Open:
   - `/Users/homare/Documents/Trends-/SECURITY.md`
 - Monetization rollout and data boundaries:
   - `MONETIZATION.md`
+- Coach Free scope, security boundaries, and smoke test:
+  - `COACH_FREE.md`
 
 ## Node version
 

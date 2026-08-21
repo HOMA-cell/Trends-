@@ -30,6 +30,8 @@ const DEFAULT_FLAGS = Object.freeze({
   gym_directory: { enabled: false, rolloutPercent: 0, config: {} },
   gym_reviews: { enabled: false, rolloutPercent: 0, config: {} },
   gym_claims: { enabled: false, rolloutPercent: 0, config: {} },
+  coach_directory: { enabled: false, rolloutPercent: 0, config: {} },
+  coach_inquiries: { enabled: false, rolloutPercent: 0, config: {} },
 });
 
 const state = {

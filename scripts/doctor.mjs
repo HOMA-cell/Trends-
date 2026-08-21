@@ -9,6 +9,7 @@ const REQUIRED_FILES = [
   "app.js",
   "feed.js",
   "monetization.js",
+  "coach.js",
   "dm.js",
   "profile.js",
   "i18n.js",

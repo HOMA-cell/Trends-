@@ -87,6 +87,11 @@ With a real account:
 9. Send image / reply / reaction in DM
 10. Open Shorts and comments
 11. Confirm notifications arrive
+12. Coach Free:
+   - save and publish a coach profile
+   - find the coach from a second account
+   - send an inquiry
+   - read it and reply through DM
 
 ## 6) Release decision
 

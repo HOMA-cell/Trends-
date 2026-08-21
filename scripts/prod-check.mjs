@@ -20,10 +20,12 @@ const PROTECTED_TABLE_PROBES = [
   "direct_messages",
   "user_blocks",
   "content_reports",
+  "coach_inquiries",
 ];
 
 const PUBLIC_COLUMN_PROBES = [
   { table: "posts", columns: "id,media_thumbnail_url" },
+  { table: "coach_profiles", columns: "user_id,headline,status" },
 ];
 
 const PROTECTED_EDGE_FUNCTION_PROBES = ["delete-account"];
@@ -209,6 +211,7 @@ async function main() {
       "/dm-sidebar-tune.css",
       "/styles.css",
       "/app.js",
+      "/coach.js",
       "/dm.js",
       "/sw.js",
     ];

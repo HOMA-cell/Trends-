@@ -49,6 +49,9 @@
         <button class="mini-nav-btn is-active" data-page-target="feed" id="nav-feed">
           <span class="mini-nav-label" id="nav-feed-label">フィード</span>
         </button>
+        <button class="mini-nav-btn" data-page-target="coaches" id="nav-coaches">
+          <span class="mini-nav-label" id="nav-coaches-label">コーチ</span>
+        </button>
         <button class="mini-nav-btn" data-page-target="messages" id="nav-messages">
           <span class="mini-nav-label" id="nav-messages-label">DM</span>
           <span class="nav-badge hidden" id="nav-messages-badge" aria-live="polite"></span>
@@ -141,6 +144,7 @@
               <button class="chip chip-active" id="filter-foryou">おすすめ</button>
               <button class="chip" id="filter-all">すべて</button>
               <button class="chip" id="filter-mine">自分</button>
+              <button class="chip feed-coach-entry" id="btn-feed-coaches" type="button">コーチを探す</button>
             </div>
             <div class="feed-toolbar-actions">
               <button
@@ -207,6 +211,44 @@
             <button class="btn btn-ghost" id="btn-feed-more">もっと見る</button>
           </div>
          
+        </section>
+      </div>
+
+      <!-- Coach Free directory -->
+      <div class="page-view coach-page" data-page="coaches">
+        <section class="card coach-directory-shell">
+          <div class="coach-directory-hero">
+            <div class="coach-directory-copy">
+              <div class="coach-kicker" id="coach-directory-kicker">COACH FREE</div>
+              <h1 id="coach-directory-title">自分に合うコーチを見つける</h1>
+              <p id="coach-directory-sub">
+                得意分野と対応方法を比べて、気になるコーチへ直接相談できます。
+              </p>
+              <div class="coach-directory-disclaimer" id="coach-directory-disclaimer">
+                掲載内容は本人申告です。Coach Freeは資格や指導品質を認証する表示ではありません。
+              </div>
+            </div>
+            <button class="btn btn-primary coach-owner-entry" id="btn-coach-owner-entry" type="button">
+              コーチとして掲載
+            </button>
+          </div>
+          <div class="coach-directory-controls">
+            <label class="coach-search-shell" for="coach-search">
+              <span aria-hidden="true">⌕</span>
+              <input id="coach-search" type="search" maxlength="120" placeholder="名前・得意分野・エリアで検索" />
+            </label>
+            <div class="chips coach-service-filters" role="group" aria-label="対応方法">
+              <button class="chip chip-active" id="coach-filter-all" type="button" data-coach-filter="all">すべて</button>
+              <button class="chip" id="coach-filter-online" type="button" data-coach-filter="online">オンライン</button>
+              <button class="chip" id="coach-filter-person" type="button" data-coach-filter="in_person">対面</button>
+            </div>
+          </div>
+          <div class="coach-directory-meta">
+            <div id="coach-directory-count">0人のコーチ</div>
+            <button class="btn btn-ghost btn-xs" id="btn-coach-refresh" type="button">更新</button>
+          </div>
+          <div class="coach-directory-list" id="coach-directory-list"></div>
+          <div class="template-status coach-directory-status" id="coach-directory-status" role="status" aria-live="polite"></div>
         </section>
       </div>
   
@@ -856,6 +898,108 @@
           </div>
         </section>
 
+        <section class="card coach-dashboard hidden" id="coach-dashboard">
+          <div class="coach-dashboard-header">
+            <div>
+              <div class="coach-kicker" id="coach-dashboard-kicker">COACH FREE</div>
+              <div class="coach-dashboard-title-row">
+                <div class="card-title" id="coach-dashboard-title">コーチ掲載</div>
+                <span class="coach-profile-status" id="coach-profile-status">未登録</span>
+              </div>
+              <div class="card-sub" id="coach-dashboard-sub">
+                無料プロフィールを公開して、トレーニング相談を受け付けられます。
+              </div>
+            </div>
+            <div class="coach-dashboard-header-actions">
+              <button class="btn btn-ghost btn-xs hidden" id="btn-coach-edit-profile" type="button">編集</button>
+              <button class="btn btn-ghost btn-xs" id="btn-coach-view-directory" type="button">一覧を見る</button>
+            </div>
+          </div>
+
+          <div class="coach-dashboard-empty" id="coach-dashboard-empty">
+            <div class="coach-dashboard-empty-mark" aria-hidden="true">C</div>
+            <div>
+              <strong id="coach-empty-title">Coach Freeを始める</strong>
+              <p id="coach-empty-note">得意分野、対応エリア、相談方法を登録するだけで掲載できます。</p>
+            </div>
+            <button class="btn btn-primary" id="btn-coach-start" type="button">無料で登録</button>
+          </div>
+
+          <form class="coach-profile-form hidden" id="coach-profile-form">
+            <div class="coach-form-grid">
+              <div class="field field-span">
+                <label id="coach-headline-label" for="coach-headline">ひとこと紹介</label>
+                <input id="coach-headline" type="text" maxlength="120" placeholder="例：初心者向けの習慣づくりをサポート" />
+              </div>
+              <div class="field field-span">
+                <label id="coach-about-label" for="coach-about">コーチ紹介</label>
+                <textarea id="coach-about" maxlength="1600" placeholder="指導方針や相談できる内容を書いてください"></textarea>
+                <div class="field-hint" id="coach-about-hint">公開には20文字以上必要です。</div>
+              </div>
+              <div class="field field-span">
+                <label id="coach-specialties-label" for="coach-specialties">得意分野</label>
+                <input id="coach-specialties" type="text" maxlength="400" placeholder="筋肥大, ダイエット, フォーム改善" />
+                <div class="field-hint" id="coach-specialties-hint">カンマ区切り・最大8件</div>
+              </div>
+              <div class="field">
+                <label id="coach-area-label" for="coach-area">対応エリア</label>
+                <input id="coach-area" type="text" maxlength="120" placeholder="東京都 / 全国オンライン" />
+              </div>
+              <div class="field">
+                <label id="coach-experience-label" for="coach-experience">指導経験（年）</label>
+                <input id="coach-experience" type="number" min="0" max="80" inputmode="numeric" placeholder="3" />
+              </div>
+            </div>
+            <div class="coach-availability-grid">
+              <label class="coach-check-card">
+                <input id="coach-online" type="checkbox" />
+                <span>
+                  <strong id="coach-online-title">オンライン対応</strong>
+                  <small id="coach-online-note">場所を問わず相談を受付</small>
+                </span>
+              </label>
+              <label class="coach-check-card">
+                <input id="coach-in-person" type="checkbox" />
+                <span>
+                  <strong id="coach-person-title">対面対応</strong>
+                  <small id="coach-person-note">指定エリアで直接指導</small>
+                </span>
+              </label>
+              <label class="coach-check-card">
+                <input id="coach-accepting" type="checkbox" checked />
+                <span>
+                  <strong id="coach-accepting-title">問い合わせ受付</strong>
+                  <small id="coach-accepting-note">新しい相談を受け取る</small>
+                </span>
+              </label>
+            </div>
+            <label class="coach-publish-toggle">
+              <input id="coach-published" type="checkbox" />
+              <span>
+                <strong id="coach-published-title">プロフィールを公開する</strong>
+                <small id="coach-published-note">公開前は下書きとして保存されます。</small>
+              </span>
+            </label>
+            <div class="form-actions coach-form-actions">
+              <button class="btn btn-ghost" id="btn-coach-cancel" type="button">閉じる</button>
+              <button class="btn btn-primary" id="btn-coach-save" type="submit">保存</button>
+            </div>
+            <div class="template-status" id="coach-profile-form-status" role="status" aria-live="polite"></div>
+          </form>
+
+          <div class="coach-inbox hidden" id="coach-inbox">
+            <div class="coach-inbox-header">
+              <div>
+                <div class="card-title" id="coach-inbox-title">問い合わせ</div>
+                <div class="card-sub" id="coach-inbox-sub">相談内容を確認して、DMで返信できます。</div>
+              </div>
+              <span class="coach-inbox-count" id="coach-inbox-count">0</span>
+            </div>
+            <div class="coach-inbox-list" id="coach-inbox-list"></div>
+            <div class="template-status" id="coach-inbox-status" role="status" aria-live="polite"></div>
+          </div>
+        </section>
+
         <section class="card account-safety-section hidden" id="account-safety-section">
           <div class="card-header">
             <div>
@@ -1158,6 +1302,27 @@
                   <div class="card-sub" id="public-profile-highlights-title">ハイライト</div>
                   <div class="profile-highlights" id="public-profile-highlights"></div>
                 </div>
+              </div>
+            </div>
+          </div>
+          <div class="public-profile-coach hidden" id="public-profile-coach">
+            <div class="public-profile-coach-topline">
+              <span class="coach-free-badge" id="public-profile-coach-badge">COACH FREE</span>
+              <span class="coach-profile-status" id="public-profile-coach-availability">相談受付中</span>
+            </div>
+            <div class="public-profile-coach-layout">
+              <div>
+                <h2 id="public-profile-coach-headline">-</h2>
+                <p id="public-profile-coach-about"></p>
+                <div class="public-profile-coach-disclaimer" id="public-profile-coach-disclaimer">
+                  本人申告・未認証プロフィール
+                </div>
+                <div class="coach-specialty-list" id="public-profile-coach-specialties"></div>
+                <div class="public-profile-coach-meta" id="public-profile-coach-meta"></div>
+              </div>
+              <div class="public-profile-coach-actions">
+                <button class="btn btn-primary" id="btn-public-coach-inquiry" type="button">相談してみる</button>
+                <button class="btn btn-ghost" id="btn-public-coach-directory" type="button">コーチ一覧</button>
               </div>
             </div>
           </div>
@@ -2083,6 +2248,44 @@
         </div>
       </div>
       <div class="template-status" id="safety-modal-status" role="status" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="coach-inquiry-backdrop" data-no-page-swipe>
+    <section class="card modal-panel coach-inquiry-panel" role="dialog" aria-modal="true" aria-labelledby="coach-inquiry-title">
+      <div class="modal-header-row">
+        <div>
+          <div class="coach-kicker" id="coach-inquiry-kicker">COACH INQUIRY</div>
+          <div class="card-title" id="coach-inquiry-title">コーチに相談する</div>
+          <div class="card-sub" id="coach-inquiry-recipient">-</div>
+        </div>
+        <button class="modal-close-btn" id="btn-coach-inquiry-close" type="button">×</button>
+      </div>
+      <form id="coach-inquiry-form" class="coach-inquiry-form">
+        <div class="field">
+          <label id="coach-inquiry-topic-label" for="coach-inquiry-topic">相談内容</label>
+          <select id="coach-inquiry-topic">
+            <option value="programming" id="coach-topic-programming">メニュー作成</option>
+            <option value="form_check" id="coach-topic-form">フォーム相談</option>
+            <option value="online" id="coach-topic-online">オンライン指導</option>
+            <option value="in_person" id="coach-topic-person">対面指導</option>
+            <option value="other" id="coach-topic-other">その他</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="coach-inquiry-message-label" for="coach-inquiry-message">メッセージ</label>
+          <textarea id="coach-inquiry-message" maxlength="1500" placeholder="目標や現在困っていることを具体的に書いてください"></textarea>
+          <div class="coach-inquiry-counter" id="coach-inquiry-counter">0 / 1500</div>
+        </div>
+        <div class="coach-inquiry-privacy" id="coach-inquiry-privacy">
+          この内容は相手のコーチだけに表示されます。返信はDMで届きます。
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" id="btn-coach-inquiry-cancel" type="button">キャンセル</button>
+          <button class="btn btn-primary" id="btn-coach-inquiry-submit" type="submit">問い合わせを送る</button>
+        </div>
+        <div class="template-status" id="coach-inquiry-status" role="status" aria-live="polite"></div>
+      </form>
     </section>
   </div>
 

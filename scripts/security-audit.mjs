@@ -9,6 +9,7 @@ const FRONTEND_FILES = [
   'app.js',
   'feed.js',
   'monetization.js',
+  'coach.js',
   'dm.js',
   'profile.js',
   'settings.js',

@@ -69,6 +69,13 @@ import {
   loadPublicMonetizationState,
   loadUserEntitlements,
 } from "./monetization.js";
+import {
+  applyCoachTranslations,
+  handleCoachPageChange,
+  refreshCoachAuthState,
+  setCoachContext,
+  setupCoachControls,
+} from "./coach.js";
 
     // ---- 状態 ----
     let currentUser = null;
@@ -2273,6 +2280,7 @@ async function loadProfilePostCount() {
       setupFeedControls();
       setupDmControls();
       setupPageTabs();
+      setupCoachControls();
       setupMiniHeader();
       setupPostDetailModal();
       setupProfileLinks();
@@ -2320,6 +2328,14 @@ async function loadProfilePostCount() {
 
     function handleHashRoute() {
       const hash = window.location.hash || "";
+      if (hash === "#coaches") {
+        closePostDetail({ syncHash: false });
+        currentPublicProfileId = null;
+        if (typeof setActivePage === "function") {
+          setActivePage("coaches");
+        }
+        return;
+      }
       if (hash.startsWith("#profile=")) {
         closePostDetail({ syncHash: false });
         const userId = hash.replace("#profile=", "");
@@ -2512,6 +2528,23 @@ async function loadProfilePostCount() {
         openMediaModal(url, type, options),
       updateNavigationBadges: (badges = {}) => updateNavigationBadges(badges),
       openSafetyDialog: (target) => openSafetyDialog(target),
+    });
+
+    setCoachContext({
+      getCurrentUser: () => currentUser,
+      getCurrentLang: () => currentLang,
+      getCurrentProfile: () => currentProfile,
+      getProfilesForUsers: loadProfilesForUsers,
+      setActivePage: (page, options = {}) => {
+        if (typeof setActivePage === "function") {
+          setActivePage(page, options);
+        }
+      },
+      openPublicProfile: (userId, options = {}) => {
+        if (userId) openPublicProfile(userId, options);
+      },
+      openDmConversation: (userId, options = {}) =>
+        openDmConversation(userId, options),
     });
 
 
@@ -3230,6 +3263,7 @@ async function loadProfilePostCount() {
       if (typeof renderMonetizationPreview === "function") {
         renderMonetizationPreview();
       }
+      applyCoachTranslations();
       if (typeof openPublicProfile === "function" && currentPublicProfileId) {
         openPublicProfile(currentPublicProfileId);
       }
@@ -4792,6 +4826,9 @@ async function loadProfilePostCount() {
       }
       renderAuthNetworkStatus();
       renderDmPage();
+      refreshCoachAuthState().catch((error) => {
+        console.error("coach auth state refresh error", error);
+      });
     }
 
     async function restoreSession() {
@@ -5088,6 +5125,7 @@ async function loadProfilePostCount() {
           });
         }
         handleDmPageChange(page);
+        handleCoachPageChange(page);
         return true;
       };
       setActivePage = setPage;
@@ -5104,6 +5142,9 @@ async function loadProfilePostCount() {
           if (tab.hasAttribute("data-feed-view-target")) return;
           const targetPage = tab.getAttribute("data-page-target");
           if (!targetPage) return;
+          if (targetPage !== "coaches" && window.location.hash === "#coaches") {
+            history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+          }
           setPage(targetPage, { scrollBehavior: "smooth" });
         });
       });
@@ -5113,6 +5154,9 @@ async function loadProfilePostCount() {
         tab.dataset.boundFeedMode = "true";
         tab.addEventListener("click", () => {
           const targetMode = `${tab.getAttribute("data-feed-view-target") || "feed"}`.trim();
+          if (window.location.hash === "#coaches") {
+            history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+          }
           setPage("feed", { scrollBehavior: "smooth" });
           setFeedState({
             feedViewMode: targetMode === "shorts" ? "shorts" : "feed",

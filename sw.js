@@ -20,6 +20,7 @@ const SHELL_ASSETS = [
   "./app.js",
   "./feed.js",
   "./monetization.js",
+  "./coach.js",
   "./dm.js",
   "./profile.js",
   "./settings.js",

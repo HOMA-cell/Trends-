@@ -3345,6 +3345,14 @@ export async function openPublicProfile(userId, options = {}) {
   }
   renderGalleryPage();
 
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(
+      new CustomEvent("trends-public-profile-opened", {
+        detail: { userId: `${userId}` },
+      })
+    );
+  }
+
   if (revealState) {
     requestAnimationFrame(() => {
       revealPublicProfilePostCard(revealState);
