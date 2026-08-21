@@ -321,7 +321,7 @@ function formatRelative(value) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  const tr = t(getCurrentLang()) || {};
+  const tr = t[getCurrentLang()] || t.ja || {};
   const diffMs = Date.now() - date.getTime();
   const diffMins = Math.max(0, Math.round(diffMs / 60000));
   if (diffMins < 1) return tr.feedJustNow || "たった今";
