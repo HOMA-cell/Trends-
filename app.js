@@ -62,6 +62,13 @@ import {
   openDmShareComposer,
   openDmConversation,
 } from "./dm.js";
+import {
+  getMonetizationDiagnostics,
+  hasActiveEntitlement,
+  isFeatureEnabled,
+  loadPublicMonetizationState,
+  loadUserEntitlements,
+} from "./monetization.js";
 
     // ---- 状態 ----
     let currentUser = null;
@@ -1030,6 +1037,14 @@ async function loadProfilePostCount() {
     }
 
     function setupAdsSettingsUI() {
+      const settingsRoot = $("settings-ads-config");
+      const allowLocalOverrides =
+        typeof window !== "undefined" &&
+        window.__TRENDS_ADS__?.allowLocalOverrides === true;
+      if (settingsRoot) {
+        settingsRoot.classList.toggle("hidden", !allowLocalOverrides);
+      }
+      if (!allowLocalOverrides) return;
       const clientInput = $("settings-ads-client");
       const slotInput = $("settings-ads-slot");
       const testModeToggle = $("settings-ads-testmode");
@@ -1107,6 +1122,36 @@ async function loadProfilePostCount() {
         window.__trendsAdsUiListenerBound = true;
         window.addEventListener("trends-ads-config-changed", () => {
           fill();
+        });
+      }
+    }
+
+    function renderMonetizationPreview() {
+      const section = $("monetization-preview");
+      if (!section) return;
+      const isPro = hasActiveEntitlement("pro");
+      const visible = isPro || isFeatureEnabled("pro_preview", currentUser?.id || "");
+      section.classList.toggle("hidden", !visible);
+      section.classList.toggle("is-entitled", isPro);
+      const status = $("monetization-preview-status");
+      if (status) {
+        const tr = t[currentLang] || t.ja;
+        status.textContent = isPro
+          ? tr.monetizationProActive || "Pro"
+          : tr.monetizationProPreparing || "準備中";
+      }
+    }
+
+    function setupMonetizationPreview() {
+      renderMonetizationPreview();
+      if (
+        typeof window !== "undefined" &&
+        !window.__trendsMonetizationListenerBound
+      ) {
+        window.__trendsMonetizationListenerBound = true;
+        window.addEventListener("trends-monetization-changed", () => {
+          renderMonetizationPreview();
+          renderFeed({ forcePageRender: true });
         });
       }
     }
@@ -2171,6 +2216,7 @@ async function loadProfilePostCount() {
         () => setupProfileEditShortcuts(),
         () => setupSettingsUI(),
         () => setupExtraSectionsToggle(),
+        () => setupMonetizationPreview(),
         () => setupAdsSettingsUI(),
         () => setupDebug(),
         () => setupFollowButtons(),
@@ -2236,7 +2282,11 @@ async function loadProfilePostCount() {
         force: supabaseConnectivityState.ok !== true,
         timeoutMs: 5000,
       });
+      if (connectivity.ok === true || supabaseConnectivityState.ok === true) {
+        await loadPublicMonetizationState();
+      }
       await restoreSession();
+      await loadUserEntitlements(currentUser?.id || "");
       await loadFeed({
         forceNetwork:
           connectivity.ok === true || supabaseConnectivityState.ok === true,
@@ -2629,6 +2679,27 @@ async function loadProfilePostCount() {
         miniPostTab.setAttribute("title", tr.newPost);
       }
       setText("mini-btn-post", "newPost");
+      setText("monetization-preview-kicker", "monetizationPreviewKicker");
+      setText("monetization-preview-title", "monetizationPreviewTitle");
+      setText("monetization-preview-status", "monetizationProPreparing");
+      setText("monetization-preview-sub", "monetizationPreviewSub");
+      setText(
+        "monetization-preview-feature-analysis",
+        "monetizationFeatureAnalysis"
+      );
+      setText(
+        "monetization-preview-feature-report",
+        "monetizationFeatureReport"
+      );
+      setText(
+        "monetization-preview-feature-export",
+        "monetizationFeatureExport"
+      );
+      setText(
+        "monetization-preview-feature-adfree",
+        "monetizationFeatureAdFree"
+      );
+      setText("monetization-preview-note", "monetizationPreviewNote");
 
       // 新規投稿まわり（要素がなければ自動的にスキップされる）
       setText("new-post-title", "newPost");
@@ -3155,6 +3226,9 @@ async function loadProfilePostCount() {
       }
       if (typeof renderBuildMeta === "function") {
         renderBuildMeta();
+      }
+      if (typeof renderMonetizationPreview === "function") {
+        renderMonetizationPreview();
       }
       if (typeof openPublicProfile === "function" && currentPublicProfileId) {
         openPublicProfile(currentPublicProfileId);
@@ -4539,6 +4613,7 @@ async function loadProfilePostCount() {
         await loadTemplates();
         await loadNotifications();
         await loadBlockedUsers();
+        await loadUserEntitlements(currentUser.id);
         await loadFeed();
         await commentSync.flushQueue({ silent: true });
 
@@ -4558,6 +4633,7 @@ async function loadProfilePostCount() {
       await supabase.auth.signOut();
       await clearLocalRuntimeCaches();
       currentUser = null;
+      await loadUserEntitlements("");
       currentProfile = null;
       profilePostCount = null;
       currentFollowingCount = 0;
@@ -9749,6 +9825,7 @@ async function loadProfilePostCount() {
               ? runtimeIssues.length
               : 0,
           },
+          monetization: getMonetizationDiagnostics(),
           runtime_issues: Array.isArray(runtimeIssues) ? runtimeIssues : [],
           settings,
         };

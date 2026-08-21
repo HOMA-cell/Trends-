@@ -14,6 +14,12 @@ import {
   toDateKey,
   computeStreak,
 } from "./utils.js";
+import {
+  getActiveSponsorCampaign,
+  getFeedSponsorSettings,
+  isFeatureEnabled,
+  shouldSuppressAds,
+} from "./monetization.js";
 
 let feedContext = {
   getCurrentUser: () => null,
@@ -521,6 +527,7 @@ const FEED_AD_MAX_INTERVAL = 20;
 const FEED_AD_MIN_START_AT = 2;
 const FEED_AD_MAX_START_AT = 40;
 const FEED_AD_MAX_COUNT = 8;
+const sponsorSessionPlacements = new Set();
 let feedUiStateLoaded = false;
 let feedDiscoveryExpanded = false;
 let feedStatsExpanded = false;
@@ -601,8 +608,12 @@ function normalizeFeedAdsSettings(payload = {}, fallback = {}) {
           payload.feedMaxAds === undefined ? fallback.feedMaxAds : payload.feedMaxAds,
           0,
           FEED_AD_MAX_COUNT,
-          3
+          2
         ),
+        allowLocalOverrides:
+          payload.allowLocalOverrides === undefined
+            ? fallback.allowLocalOverrides === true
+            : payload.allowLocalOverrides === true,
       };
     }
 function getRuntimeFeedAdsSettings() {
@@ -610,6 +621,7 @@ function getRuntimeFeedAdsSettings() {
         typeof window !== "undefined" ? window.__TRENDS_ADS__ || {} : {},
         {}
       );
+      if (!defaults.allowLocalOverrides) return defaults;
       try {
         const stored = JSON.parse(localStorage.getItem(ADS_SETTINGS_KEY) || "{}");
         return normalizeFeedAdsSettings(stored, defaults);
@@ -670,7 +682,7 @@ function shouldInsertFeedAdBeforePost({
       settings,
       enabled,
     }) {
-      if (!enabled || !isFeedAdsConfigured(settings)) return false;
+      if (!enabled || !settings) return false;
       if (postIndex < settings.feedStartAt) return false;
       if (postIndex >= visibleCount) return false;
       if (insertedCount >= settings.feedMaxAds) return false;
@@ -709,6 +721,91 @@ function createFeedAdCard(settings, tr) {
           requestFeedAdRender(ins);
         }, 0);
       }
+      return card;
+    }
+function emitSponsorInteraction(type, campaign, placementKey) {
+      if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent("trends-sponsor-interaction", {
+          detail: {
+            type,
+            campaignId: campaign?.id || "",
+            campaignSlug: campaign?.slug || "",
+            placement: "feed",
+            placementKey,
+          },
+        })
+      );
+    }
+function createSponsorCampaignCard(campaign, placementKey) {
+      const card = document.createElement("article");
+      card.className = "feed-ad-card feed-sponsor-card";
+      card.setAttribute("data-ad-kind", "native-sponsor");
+      card.setAttribute("data-campaign-id", campaign.id);
+
+      const top = document.createElement("div");
+      top.className = "feed-sponsor-top";
+      const sponsor = document.createElement("div");
+      sponsor.className = "feed-sponsor-name";
+      sponsor.textContent = campaign.sponsorName || "Trends";
+      const disclosure = document.createElement("div");
+      disclosure.className = "feed-ad-label";
+      disclosure.textContent = campaign.disclosure;
+      top.append(sponsor, disclosure);
+
+      const content = document.createElement("div");
+      content.className = "feed-sponsor-content";
+      if (campaign.imageUrl) {
+        const image = document.createElement("img");
+        image.className = "feed-sponsor-image";
+        image.src = campaign.imageUrl;
+        image.alt = "";
+        image.loading = "lazy";
+        image.decoding = "async";
+        content.appendChild(image);
+      }
+
+      const copy = document.createElement("div");
+      copy.className = "feed-sponsor-copy";
+      const headline = document.createElement("div");
+      headline.className = "feed-sponsor-headline";
+      headline.textContent = campaign.headline;
+      const body = document.createElement("div");
+      body.className = "feed-sponsor-body";
+      body.textContent = campaign.body;
+      copy.append(headline, body);
+
+      const isInternalPreview = campaign.destination === "#pro-preview";
+      const cta = document.createElement(isInternalPreview ? "button" : "a");
+      cta.className = "feed-sponsor-cta";
+      cta.textContent = campaign.cta;
+      if (isInternalPreview) {
+        cta.type = "button";
+        cta.addEventListener("click", () => {
+          emitSponsorInteraction("click", campaign, placementKey);
+          setActivePage("account");
+          setTimeout(() => {
+            document.getElementById("monetization-preview")?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }, 120);
+        });
+      } else {
+        cta.href = campaign.destination;
+        cta.target = "_blank";
+        cta.rel = "sponsored noopener noreferrer";
+        cta.addEventListener("click", () => {
+          emitSponsorInteraction("click", campaign, placementKey);
+        });
+      }
+      copy.appendChild(cta);
+      content.appendChild(copy);
+      card.append(top, content);
+      sponsorSessionPlacements.add(placementKey);
+      emitSponsorInteraction("placement", campaign, placementKey);
       return card;
     }
 const openBackdrop = (backdrop) => {
@@ -5465,10 +5562,20 @@ export function renderFeed(options = {}) {
     const followingIds = getFollowingIds();
     const tr = t[currentLang] || t.ja;
     const isShortsMode = feedViewMode === "shorts";
+    const viewerId = currentUser?.id || "";
     const adsSettings = getRuntimeFeedAdsSettings();
+    const sponsorSettings = getFeedSponsorSettings(viewerId);
+    const sponsorCampaign = getActiveSponsorCampaign(currentLang, viewerId);
+    const sponsorAdsEnabled = Boolean(sponsorSettings.enabled && sponsorCampaign);
+    const externalAdsEnabled =
+      isFeatureEnabled("external_ads", viewerId) && isFeedAdsConfigured(adsSettings);
+    const activeAdSettings = sponsorAdsEnabled ? sponsorSettings : adsSettings;
     const feedAdsEnabled =
-      !isShortsMode && feedLayout === "list" && isFeedAdsConfigured(adsSettings);
-    if (feedAdsEnabled) {
+      !shouldSuppressAds() &&
+      !isShortsMode &&
+      feedLayout === "list" &&
+      (sponsorAdsEnabled || externalAdsEnabled);
+    if (feedAdsEnabled && externalAdsEnabled && !sponsorAdsEnabled) {
       ensureAdSenseScript(adsSettings);
     }
     const pullIndicator = $("feed-pull-indicator");
@@ -5812,6 +5919,9 @@ export function renderFeed(options = {}) {
       Array.from(followedTopics).sort().slice(0, 120).join(","),
       Array.from(currentUserRepostedIds).sort().slice(0, 120).join(","),
       currentPinnedPostId,
+      sponsorCampaign?.id || "",
+      sponsorAdsEnabled ? "sponsor-on" : "sponsor-off",
+      shouldSuppressAds() ? "ad-free" : "ads-allowed",
     ].join("|");
     const baseQueryKey = [
       currentUser?.id || "",
@@ -6068,6 +6178,9 @@ export function renderFeed(options = {}) {
       String(gridCandidates.length),
       gridCandidates[0]?.id || "",
       gridCandidates[gridCandidates.length - 1]?.id || "",
+      sponsorCampaign?.id || "",
+      sponsorAdsEnabled ? "sponsor-on" : "sponsor-off",
+      shouldSuppressAds() ? "ad-free" : "ads-allowed",
     ].join("|");
     const existingPostCards = Array.from(
       container.querySelectorAll(".post-card[data-post-id]")
@@ -6097,7 +6210,7 @@ export function renderFeed(options = {}) {
       existingPostIds.length === nextPostIds.length &&
       existingPostIds.every((postId, index) => postId === nextPostIds[index]);
     const existingAdCount = canAppend
-      ? container.querySelectorAll(".feed-ad-card[data-ad-kind='in-feed']").length
+      ? container.querySelectorAll(".feed-ad-card[data-ad-kind]").length
       : 0;
     const renderMode = canAppend ? "append" : canPatchCards ? "patch" : "full";
 
@@ -7695,17 +7808,29 @@ export function renderFeed(options = {}) {
       const end = Math.min(index + batchSize, visibleSlice.length);
       const cardBuilder = isShortsMode ? createShortsCard : createPostCard;
       for (; index < end; index += 1) {
+        const sponsorPlacementKey = sponsorCampaign
+          ? `${sponsorCampaign.id}:${visibleSlice[index]?.id || index}`
+          : "";
+        const sponsorSessionAllowsPlacement =
+          !sponsorAdsEnabled ||
+          sponsorSessionPlacements.has(sponsorPlacementKey) ||
+          sponsorSessionPlacements.size < sponsorSettings.sessionMaxAds;
         if (
           !isShortsMode &&
+          sponsorSessionAllowsPlacement &&
           shouldInsertFeedAdBeforePost({
             postIndex: index,
             insertedCount: renderedAdCount,
             visibleCount: visibleSlice.length,
-            settings: adsSettings,
+            settings: activeAdSettings,
             enabled: feedAdsEnabled,
           })
         ) {
-          fragment.appendChild(createFeedAdCard(adsSettings, tr));
+          fragment.appendChild(
+            sponsorAdsEnabled
+              ? createSponsorCampaignCard(sponsorCampaign, sponsorPlacementKey)
+              : createFeedAdCard(adsSettings, tr)
+          );
           renderedAdCount += 1;
         }
         const nextCard = cardBuilder(visibleSlice[index], index);

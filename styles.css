@@ -1093,6 +1093,105 @@
     .feed-ad-body {
       min-height: 92px;
     }
+    .feed-sponsor-card {
+      position: relative;
+      overflow: hidden;
+      padding: 16px;
+      border-style: solid;
+      border-color: rgba(228, 87, 46, 0.2);
+      background:
+        radial-gradient(circle at 92% 12%, rgba(228, 87, 46, 0.16), transparent 32%),
+        linear-gradient(135deg, #fffdf9 0%, #fff7ee 56%, #f8fbff 100%);
+    }
+    .feed-sponsor-card::after {
+      content: "";
+      position: absolute;
+      right: -26px;
+      bottom: -40px;
+      width: 116px;
+      height: 116px;
+      border: 18px solid rgba(17, 24, 39, 0.04);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .feed-sponsor-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .feed-sponsor-name {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+    .feed-sponsor-top .feed-ad-label {
+      margin: 0;
+      padding: 4px 8px;
+      border: 1px solid rgba(154, 106, 79, 0.18);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.7);
+    }
+    .feed-sponsor-content {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 18px;
+    }
+    .feed-sponsor-image {
+      width: 112px;
+      height: 84px;
+      object-fit: cover;
+      border-radius: 14px;
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .feed-sponsor-copy {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 8px 16px;
+      min-width: 0;
+    }
+    .feed-sponsor-headline {
+      width: 100%;
+      font-family: var(--font-display);
+      font-size: clamp(18px, 2.1vw, 24px);
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+    }
+    .feed-sponsor-body {
+      flex: 1 1 280px;
+      max-width: 620px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+    .feed-sponsor-cta {
+      flex: 0 0 auto;
+      min-height: 38px;
+      padding: 0 14px;
+      border: 1px solid rgba(17, 24, 39, 0.12);
+      border-radius: 999px;
+      background: var(--ink);
+      color: #fff;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .feed-sponsor-cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(17, 24, 39, 0.14);
+    }
     @media (max-width: 700px) {
       .post-card {
         border-radius: 18px;
@@ -1115,6 +1214,26 @@
       }
       .feed-ad-body {
         min-height: 84px;
+      }
+      .feed-sponsor-card {
+        padding: 14px;
+      }
+      .feed-sponsor-content {
+        display: block;
+      }
+      .feed-sponsor-image {
+        width: 100%;
+        height: 150px;
+        margin-bottom: 12px;
+      }
+      .feed-sponsor-headline {
+        font-size: 19px;
+      }
+      .feed-sponsor-body {
+        font-size: 12px;
+      }
+      .feed-sponsor-cta {
+        min-height: 36px;
       }
       .post-card:hover {
         transform: none;
@@ -19988,5 +20107,121 @@ body[data-page="account"].auth-signed-out-visible .fab {
 
   .account-danger-section {
     grid-template-columns: 1fr;
+  }
+}
+
+.page-view.account-page .monetization-preview {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.55fr);
+  gap: 24px;
+  overflow: hidden;
+  margin-top: 12px;
+  padding: 26px;
+  border-color: rgba(228, 87, 46, 0.18);
+  background:
+    radial-gradient(circle at 85% 12%, rgba(228, 87, 46, 0.2), transparent 30%),
+    linear-gradient(130deg, #111827 0%, #172033 58%, #2b2420 100%);
+  color: #fff;
+}
+
+.monetization-preview.hidden {
+  display: none;
+}
+
+.monetization-preview::before {
+  content: "PRO";
+  position: absolute;
+  right: 18px;
+  bottom: -34px;
+  color: rgba(255, 255, 255, 0.035);
+  font-family: var(--font-display);
+  font-size: clamp(100px, 18vw, 220px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  pointer-events: none;
+}
+
+.monetization-preview-copy,
+.monetization-preview-note {
+  position: relative;
+  z-index: 1;
+}
+
+.monetization-preview-kicker {
+  margin-bottom: 8px;
+  color: #ff9a78;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.monetization-preview-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.monetization-preview .card-title {
+  color: #fff;
+  font-size: clamp(24px, 3vw, 36px);
+  letter-spacing: -0.04em;
+}
+
+.monetization-preview-status {
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8ddd3;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.monetization-preview-sub {
+  max-width: 620px;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.monetization-preview-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.monetization-preview-features span {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.monetization-preview-note {
+  align-self: end;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  line-height: 1.65;
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 720px) {
+  .monetization-preview {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 20px;
+  }
+
+  .monetization-preview-note {
+    align-self: auto;
   }
 }

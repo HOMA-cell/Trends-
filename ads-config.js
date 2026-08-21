@@ -7,9 +7,10 @@ window.__TRENDS_ADS__ = Object.assign(
     client: "",
     feedSlot: "",
     testMode: true,
-    feedInterval: 8,
-    feedStartAt: 4,
-    feedMaxAds: 3,
+    feedInterval: 12,
+    feedStartAt: 6,
+    feedMaxAds: 2,
+    allowLocalOverrides: false,
   },
   window.__TRENDS_ADS__ || {}
 );

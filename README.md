@@ -61,6 +61,8 @@ Open:
   - `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`
 - Security notes:
   - `/Users/homare/Documents/Trends-/SECURITY.md`
+- Monetization rollout and data boundaries:
+  - `MONETIZATION.md`
 
 ## Node version
 

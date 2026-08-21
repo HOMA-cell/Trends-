@@ -8,6 +8,7 @@ const REQUIRED_FILES = [
   "styles.css",
   "app.js",
   "feed.js",
+  "monetization.js",
   "dm.js",
   "profile.js",
   "i18n.js",
