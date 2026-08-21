@@ -18,7 +18,15 @@ const PROTECTED_TABLE_PROBES = [
   "notifications",
   "exercise_prs",
   "direct_messages",
+  "user_blocks",
+  "content_reports",
 ];
+
+const PUBLIC_COLUMN_PROBES = [
+  { table: "posts", columns: "id,media_thumbnail_url" },
+];
+
+const PROTECTED_EDGE_FUNCTION_PROBES = ["delete-account"];
 
 const BUCKET_PROBES = ["avatars", "post-media"];
 
@@ -262,8 +270,26 @@ async function main() {
       }
     }
 
+    for (const probe of PUBLIC_COLUMN_PROBES) {
+      const url = `${supabaseUrl}/rest/v1/${probe.table}?select=${probe.columns}&limit=1`;
+      try {
+        const res = await fetchWithTimeout(url, { headers: restHeaders }, 9000);
+        const body = await safeReadText(res);
+        if (res.ok) {
+          ok(`columns ${probe.table}`, probe.columns);
+        } else {
+          fail(
+            `columns ${probe.table}`,
+            `HTTP ${res.status}${body ? ` ${body}` : ""}`
+          );
+        }
+      } catch (error) {
+        fail(`columns ${probe.table}`, String(error?.message || error));
+      }
+    }
+
     for (const table of PROTECTED_TABLE_PROBES) {
-      const url = `${supabaseUrl}/rest/v1/${table}?select=id&limit=1`;
+      const url = `${supabaseUrl}/rest/v1/${table}?select=*&limit=1`;
       try {
         const res = await fetchWithTimeout(url, { headers: restHeaders }, 9000);
         const body = await safeReadText(res);
@@ -282,6 +308,35 @@ async function main() {
         }
       } catch (error) {
         fail(`table ${table}`, String(error?.message || error));
+      }
+    }
+
+    for (const functionName of PROTECTED_EDGE_FUNCTION_PROBES) {
+      const url = `${supabaseUrl}/functions/v1/${functionName}`;
+      try {
+        const res = await fetchWithTimeout(
+          url,
+          {
+            method: "POST",
+            headers: {
+              apikey: supabaseAnonKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ confirmation: "DELETE" }),
+          },
+          9000
+        );
+        const body = await safeReadText(res);
+        if (res.status === 401) {
+          ok(`function ${functionName}`, "Protected from unauthenticated requests");
+        } else {
+          fail(
+            `function ${functionName}`,
+            `Expected HTTP 401, received ${res.status}${body ? ` ${body}` : ""}`
+          );
+        }
+      } catch (error) {
+        fail(`function ${functionName}`, String(error?.message || error));
       }
     }
 
