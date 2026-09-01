@@ -142,6 +142,41 @@ function main() {
   }
 
   try {
+    const migration = readText(
+      'supabase/migrations/20260901104327_beta_readiness_controls.sql'
+    );
+    const requiredControls = [
+      'alter table public.app_events enable row level security',
+      'alter table public.beta_feedback enable row level security',
+      'revoke all on table public.app_events from public, anon, authenticated',
+      'revoke all on table public.beta_feedback from public, anon, authenticated',
+      'revoke all on function private.hook_restrict_beta_signups(jsonb)',
+      'to supabase_auth_admin',
+    ];
+    const missing = requiredControls.filter((token) => !migration.includes(token));
+    if (missing.length) {
+      fail('Beta migration access controls', missing.join(', '));
+    } else {
+      ok('Beta migration access controls', 'RLS and least-privilege grants present');
+    }
+  } catch (error) {
+    fail('Beta migration access controls', String(error?.message || error));
+  }
+
+  try {
+    const legalSources = ['privacy.html', 'terms.html', 'contact.html']
+      .map((filePath) => readText(filePath))
+      .join('\n');
+    if (/trends-app\.example/i.test(legalSources)) {
+      fail('Published legal contact', 'Placeholder contact domain remains');
+    } else {
+      ok('Published legal contact', 'No placeholder contact domain');
+    }
+  } catch (error) {
+    fail('Published legal contact', String(error?.message || error));
+  }
+
+  try {
     const gitignore = readText('.gitignore');
     const needed = ['.DS_Store', 'supabase/.DS_Store'];
     const missing = needed.filter((entry) => !gitignore.includes(entry));

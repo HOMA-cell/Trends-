@@ -20,6 +20,8 @@ const PROTECTED_TABLE_PROBES = [
   "direct_messages",
   "user_blocks",
   "content_reports",
+  "app_events",
+  "beta_feedback",
 ];
 
 const PUBLIC_COLUMN_PROBES = [
@@ -211,6 +213,9 @@ async function main() {
       "/app.js",
       "/dm.js",
       "/sw.js",
+      "/privacy.html",
+      "/terms.html",
+      "/contact.html",
     ];
     for (const asset of assets) {
       try {

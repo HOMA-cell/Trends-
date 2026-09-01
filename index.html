@@ -745,6 +745,14 @@
                 ログイン / サインアップ
               </button>
               <div class="auth-inline-form hidden" id="auth-inline-form">
+                <div class="auth-mode-switch" role="tablist" aria-label="認証方法">
+                  <button class="auth-mode-button is-active" id="btn-auth-mode-login" type="button" role="tab" aria-selected="true">
+                    ログイン
+                  </button>
+                  <button class="auth-mode-button" id="btn-auth-mode-signup" type="button" role="tab" aria-selected="false">
+                    招待登録
+                  </button>
+                </div>
                 <form id="auth-form" class="auth-form" autocomplete="on">
                   <label class="sr-only" id="auth-email-label" for="auth-email">メール</label>
                   <input id="auth-email" type="email" placeholder="email@example.com" autocomplete="email" />
@@ -756,10 +764,15 @@
                     autocomplete="current-password"
                   />
                   <button class="btn btn-primary auth-submit" id="btn-auth" type="submit">
-                    ログイン / サインアップ
+                    ログイン
                   </button>
                 </form>
-                <div class="auth-caption" id="auth-caption">初回は自動でアカウント作成されます。</div>
+                <div class="auth-caption" id="auth-caption">登録済みのメールアドレスでログインしてください。</div>
+                <div class="auth-beta-note hidden" id="auth-beta-note">
+                  <strong id="auth-beta-title">クローズドβ</strong>
+                  <span id="auth-beta-body">招待済みのメールアドレスだけ登録できます。</span>
+                  <a id="auth-beta-request-link" href="./contact.html#beta">β参加を申請</a>
+                </div>
                 <button class="btn btn-ghost btn-xs auth-reset-link" id="btn-auth-reset-request" type="button">
                   パスワードを忘れた方
                 </button>
@@ -1767,6 +1780,7 @@
         <a href="./privacy.html" id="footer-privacy-link" target="_blank" rel="noopener noreferrer">プライバシー</a>
         <a href="./terms.html" id="footer-terms-link" target="_blank" rel="noopener noreferrer">利用規約</a>
         <a href="./contact.html" id="footer-contact-link" target="_blank" rel="noopener noreferrer">お問い合わせ</a>
+        <button id="footer-feedback-link" type="button">不具合・要望を送る</button>
       </div>
       <div class="site-footer-note" id="footer-note">広告配信時は Cookie と計測が使われる場合があります。</div>
     </footer>
@@ -2083,6 +2097,32 @@
         </div>
       </div>
       <div class="template-status" id="safety-modal-status" role="status" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="feedback-modal-backdrop" data-no-page-swipe>
+    <section class="card modal-panel feedback-modal-panel" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
+      <div class="modal-header-row">
+        <div>
+          <div class="feedback-modal-kicker">BETA FEEDBACK</div>
+          <div class="card-title" id="feedback-modal-title">不具合・要望を送る</div>
+          <div class="card-sub" id="feedback-modal-sub">短い内容でも大丈夫です。運営が確認します。</div>
+        </div>
+        <button class="modal-close-btn" id="btn-feedback-close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="feedback-form">
+        <label id="feedback-category-label" for="feedback-category">種類</label>
+        <select id="feedback-category">
+          <option id="feedback-option-bug" value="bug">不具合</option>
+          <option id="feedback-option-usability" value="usability">使いにくいところ</option>
+          <option id="feedback-option-idea" value="idea">機能の提案</option>
+          <option id="feedback-option-other" value="other">その他</option>
+        </select>
+        <label id="feedback-message-label" for="feedback-message">内容</label>
+        <textarea id="feedback-message" minlength="10" maxlength="2000" placeholder="起きたこと、期待していた動き、改善案など"></textarea>
+        <button class="btn btn-primary" id="btn-feedback-submit" type="button">送信する</button>
+      </div>
+      <div class="template-status" id="feedback-modal-status" role="status" aria-live="polite"></div>
     </section>
   </div>
 
