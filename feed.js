@@ -7155,14 +7155,16 @@ export function renderFeed(options = {}) {
         secondaryActions.appendChild(button);
       };
       const likeBtn = document.createElement("button");
-      likeBtn.className = "chip chip-like chip-action reaction-btn reaction-like";
+      likeBtn.className =
+        "chip chip-like chip-action reaction-btn reaction-like chip-compact";
       likeBtn.dataset.postAction = "toggle-like";
       const likeState = getLikeUiState(post.id, localLikedIds);
       applyLikeButtonState(likeBtn, likeState, tr);
       appendPrimaryAction(likeBtn);
 
       const commentBtn = document.createElement("button");
-      commentBtn.className = "chip chip-log chip-action reaction-btn reaction-comment";
+      commentBtn.className =
+        "chip chip-log chip-action reaction-btn reaction-comment chip-compact";
       commentBtn.dataset.postAction = "toggle-comments";
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost);
       appendPrimaryAction(commentBtn);
@@ -8201,6 +8203,8 @@ function applyLikeButtonState(likeBtn, state, tr) {
           "aria-label",
           compactCount > 0 ? `${likeLabel} (${compactCount})` : likeLabel
         );
+        likeBtn.title =
+          compactCount > 0 ? `${likeLabel} (${compactCount})` : likeLabel;
         return;
       }
       setActionButtonContent(likeBtn, {
@@ -8272,6 +8276,7 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost) {
         });
         if (isCompact) {
           commentBtn.setAttribute("aria-label", `${commentsLabel} (${compactCount})`);
+          commentBtn.title = `${commentsLabel} (${compactCount})`;
         }
       } else {
         setActionButtonContent(commentBtn, {
@@ -8281,6 +8286,7 @@ function updateCommentButtonState(commentBtn, postId, tr, commentsByPost) {
         });
         if (isCompact) {
           commentBtn.setAttribute("aria-label", commentsLabel);
+          commentBtn.title = commentsLabel;
         }
       }
     }
