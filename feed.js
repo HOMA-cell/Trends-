@@ -7182,7 +7182,7 @@ export function renderFeed(options = {}) {
             : tr.notificationViewPost || "View post";
       setActionButtonContent(openDetailBtn, {
         kind: "open",
-        icon: "↗",
+        icon: "→",
         label: openDetailLabel,
       });
       openDetailBtn.setAttribute("aria-label", openDetailLabel);
