@@ -5733,6 +5733,16 @@ export function renderFeed(options = {}) {
       }
       return tr.feedReasonRecent || "Recent";
     };
+    const getDisplayReasonLabel = (post) => {
+      const label = getForYouReasonLabel(post);
+      if (
+        label === (tr.feedReasonRecent || "Recent") ||
+        label === (tr.feedReasonMedia || "With media")
+      ) {
+        return "";
+      }
+      return label;
+    };
     const prioritizePinnedPosts = (posts = []) => {
       if (!Array.isArray(posts) || !posts.length) return [];
       if (!currentUser?.id || !currentPinnedPostId) return posts;
@@ -5791,6 +5801,18 @@ export function renderFeed(options = {}) {
       const mediaType = `${post?.media_type || ""}`.trim().toLowerCase();
       if (mediaType === "video") return true;
       return /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(`${post.media_url}`);
+    };
+    const hasVisibleFeedContent = (post) => {
+      if (!post) return false;
+      if (`${post.note || post.caption || ""}`.trim()) return true;
+      if (`${post.media_url || ""}`.trim()) return true;
+      if ((workoutLogsByPost.get(post.id) || []).length) return true;
+      return Boolean(
+        settings.showBodyweight &&
+          post.bodyweight !== null &&
+          post.bodyweight !== undefined &&
+          `${post.bodyweight}`.trim()
+      );
     };
     renderFeedDiscoverySections({
       allPosts,
@@ -5908,6 +5930,7 @@ export function renderFeed(options = {}) {
       filterMedia ? "1" : "0",
       filterWorkout ? "1" : "0",
       sortOrder,
+      settings.showBodyweight ? "bodyweight-visible" : "bodyweight-hidden",
       feedLayout,
       searchValue,
       Array.isArray(allPosts) ? allPosts.length : 0,
@@ -5933,6 +5956,7 @@ export function renderFeed(options = {}) {
       filterMedia ? "1" : "0",
       filterWorkout ? "1" : "0",
       sortOrder,
+      settings.showBodyweight ? "bodyweight-visible" : "bodyweight-hidden",
       Array.isArray(allPosts) ? allPosts.length : 0,
       firstPostId,
       lastPostId,
@@ -5965,6 +5989,9 @@ export function renderFeed(options = {}) {
         const visiblePosts = Array.isArray(allPosts)
           ? allPosts.filter((post) => {
               if (!canSeePost(post) || !matchesFilter(post)) {
+                return false;
+              }
+              if (!hasVisibleFeedContent(post)) {
                 return false;
               }
               if (hiddenPostIds.has(`${post?.id || ""}`)) {
@@ -6697,7 +6724,7 @@ export function renderFeed(options = {}) {
         visibility.textContent = tr.privateOnly || "Private";
         topBadges.appendChild(visibility);
       }
-      const reasonLabel = getForYouReasonLabel(post);
+      const reasonLabel = getDisplayReasonLabel(post);
       if (reasonLabel) {
         const reason = document.createElement("span");
         reason.className = "shorts-meta-chip shorts-reason";
@@ -7074,7 +7101,7 @@ export function renderFeed(options = {}) {
         badgeNodes.push(visibilityBadge);
       }
 
-      const reasonLabel = getForYouReasonLabel(post);
+      const reasonLabel = getDisplayReasonLabel(post);
       if (isPinnedByOwner) {
         const pinBadge = document.createElement("span");
         pinBadge.className = "post-pin-badge";
@@ -7183,9 +7210,10 @@ export function renderFeed(options = {}) {
       setActionButtonContent(openDetailBtn, {
         kind: "open",
         icon: "→",
-        label: openDetailLabel,
+        label: "",
       });
       openDetailBtn.setAttribute("aria-label", openDetailLabel);
+      openDetailBtn.title = openDetailLabel;
       ctaActions.appendChild(openDetailBtn);
 
       const shareBtn = document.createElement("button");

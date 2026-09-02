@@ -1877,13 +1877,14 @@
       letter-spacing: 0.02em;
     }
     .post-footer .post-action-row-cta .post-inline-open {
-      min-width: 0;
+      width: 34px;
+      min-width: 34px;
       min-height: 34px;
-      padding: 2px 7px 2px 10px;
+      padding: 2px;
       justify-content: center;
-      gap: 6px;
+      gap: 0;
       border-color: transparent;
-      border-radius: 10px;
+      border-radius: 999px;
       background: transparent;
       color: #626c79;
       box-shadow: none;
@@ -1903,7 +1904,7 @@
     }
     .post-footer .post-action-row-cta .post-inline-open .chip-icon {
       position: relative;
-      order: 2;
+      order: 1;
       width: 16px;
       height: 16px;
       flex: 0 0 16px;
@@ -11572,6 +11573,11 @@
       box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4);
       z-index: 50;
     }
+    @media (min-width: 701px) {
+      .fab {
+        display: none;
+      }
+    }
 
     /* ---- 投稿モーダル ---- */
     .modal-backdrop {
@@ -13436,10 +13442,53 @@
       border-color: #111827;
     }
 
+@media (min-width: 701px) {
+  header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "brand nav controls";
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 16px;
+  }
+  header .header-main {
+    display: contents;
+  }
+  header .header-brand {
+    grid-area: brand;
+    flex: none;
+  }
+  header #app-title {
+    font-size: 21px;
+  }
+  header #app-sub {
+    display: none;
+  }
+  header .header-nav {
+    grid-area: nav;
+    justify-self: center;
+    padding: 3px;
+  }
+  header .header-nav .mini-nav-btn {
+    min-height: 32px;
+    padding-inline: 12px;
+    font-size: 11px;
+  }
+  header .top-controls {
+    grid-area: controls;
+  }
+  header #btn-open-post,
+  header #lang-select {
+    min-height: 34px;
+  }
+}
+
 .feed-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 .page-view[data-page="feed"] > .card.is-shorts-mode {
   display: flex;
@@ -14323,8 +14372,17 @@
 }
 .feed-list .post-card {
   margin-bottom: 0;
-  padding: 10px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  box-shadow: none;
   contain: layout style paint;
+}
+.feed-list .post-header {
+  margin-bottom: 0;
+}
+.feed-list .post-footer {
+  margin-top: 6px;
+  padding-top: 4px;
 }
 .feed-list .post-new-badge,
 .feed-list .post-caption-tags,
@@ -14533,8 +14591,8 @@
     margin-top: 2px;
   }
   .feed-list .post-footer {
-    margin-top: 8px;
-    padding-top: 6px;
+    margin-top: 5px;
+    padding-top: 4px;
     gap: 8px;
   }
   .feed-list .post-action-row-primary {
@@ -14569,9 +14627,10 @@
     justify-content: flex-end;
   }
   .feed-list .post-action-row-cta .post-inline-open {
-    min-width: 0;
+    width: 36px;
+    min-width: 36px;
     min-height: 36px;
-    padding-inline: 9px 7px;
+    padding: 2px;
   }
 .feed-list .post-action-menu > summary {
   min-height: 20px;
@@ -14595,7 +14654,7 @@
 }
 @media (max-width: 520px) {
   .feed-list .post-card {
-    padding: 9px;
+    padding: 8px;
     border-radius: 16px;
   }
   .feed-list .post-media {
@@ -14715,10 +14774,10 @@
     margin-left: auto;
   }
   .feed-list .post-action-row-cta .post-inline-open {
-    min-width: 0;
-    width: auto;
+    min-width: 40px;
+    width: 40px;
     min-height: 40px;
-    padding-inline: 9px 7px;
+    padding: 4px;
     justify-content: center;
   }
   .feed-list .post-action-menu > summary {
