@@ -151,6 +151,7 @@ import {
     let serviceWorkerBuildResolved = false;
     let authRetryBlockedUntil = 0;
     let authFormExpanded = false;
+    let authMode = "login";
     let supabaseConnectivityState = {
       ok: null,
       restStatus: 0,
@@ -174,6 +175,8 @@ import {
     };
     let runtimeIssues = [];
     let runtimeIssueCaptureBound = false;
+    let productEventsEnabled = true;
+    let betaFeedbackEnabled = true;
 
     const POST_DRAFT_KEY = "trends_post_draft_v1";
     const POST_COMPOSER_ADVANCED_KEY = "trends_post_composer_advanced_v1";
@@ -1813,6 +1816,17 @@ async function loadProfilePostCount() {
       }
     }
 
+    function sanitizeRuntimeTelemetryMessage(message = "") {
+      return String(message)
+        .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+        .replace(
+          /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+          "[id]"
+        )
+        .replace(/https?:\/\/\S+/gi, "[url]")
+        .slice(0, 300);
+    }
+
     function setupRuntimeIssueCapture() {
       if (runtimeIssueCaptureBound) return;
       runtimeIssueCaptureBound = true;
@@ -1831,6 +1845,12 @@ async function loadProfilePostCount() {
           source,
           stack,
         });
+        void trackProductEvent("runtime_error", {
+          type: "window.error",
+          message: sanitizeRuntimeTelemetryMessage(message),
+          page: window.location.pathname,
+          build: `${appBuildMeta?.version || "unknown"}`,
+        });
       });
       window.addEventListener("unhandledrejection", (event) => {
         const reason = event?.reason;
@@ -1844,7 +1864,59 @@ async function loadProfilePostCount() {
           source: "",
           stack,
         });
+        void trackProductEvent("runtime_error", {
+          type: "unhandledrejection",
+          message: sanitizeRuntimeTelemetryMessage(message),
+          page: window.location.pathname,
+          build: `${appBuildMeta?.version || "unknown"}`,
+        });
       });
+    }
+
+    function sanitizeProductEventMetadata(metadata = {}) {
+      return Object.fromEntries(
+        Object.entries(metadata)
+          .slice(0, 20)
+          .map(([key, value]) => {
+            const safeKey = `${key || "value"}`.slice(0, 64);
+            if (typeof value === "string") {
+              return [safeKey, value.slice(0, 300)];
+            }
+            if (typeof value === "number" && Number.isFinite(value)) {
+              return [safeKey, value];
+            }
+            if (typeof value === "boolean" || value === null) {
+              return [safeKey, value];
+            }
+            return [safeKey, `${value ?? ""}`.slice(0, 300)];
+          })
+      );
+    }
+
+    async function trackProductEvent(eventName, metadata = {}) {
+      if (!productEventsEnabled || !currentUser?.id || !eventName) return false;
+      try {
+        const { error } = await supabase.from("app_events").insert({
+          user_id: currentUser.id,
+          event_name: `${eventName}`.slice(0, 64),
+          metadata: sanitizeProductEventMetadata(metadata),
+          client_created_at: new Date().toISOString(),
+        });
+        if (error) {
+          if (isMissingDataResourceError(error, "app_events")) {
+            productEventsEnabled = false;
+          } else {
+            console.warn("product event insert error:", error);
+          }
+          return false;
+        }
+        return true;
+      } catch (error) {
+        if (!isLikelyFetchError(error)) {
+          console.warn("product event error:", error);
+        }
+        return false;
+      }
     }
 
     async function runSupabaseConnectionProbe(options = {}) {
@@ -2269,6 +2341,7 @@ async function loadProfilePostCount() {
       setupAuthStateListener();
       setupAccountPageUI();
       setupSafetyControls();
+      setupFeedbackControls();
       setupPostForm();
       setupFeedControls();
       setupDmControls();
@@ -2420,6 +2493,8 @@ async function loadProfilePostCount() {
         }
       },
       openSafetyDialog: (target) => openSafetyDialog(target),
+      trackProductEvent: (eventName, metadata = {}) =>
+        trackProductEvent(eventName, metadata),
       openPostModal: (options = {}) => {
         if (typeof openPostModal === "function") {
           openPostModal(options);
@@ -2512,6 +2587,8 @@ async function loadProfilePostCount() {
         openMediaModal(url, type, options),
       updateNavigationBadges: (badges = {}) => updateNavigationBadges(badges),
       openSafetyDialog: (target) => openSafetyDialog(target),
+      trackProductEvent: (eventName, metadata = {}) =>
+        trackProductEvent(eventName, metadata),
     });
 
 
@@ -2850,9 +2927,12 @@ async function loadProfilePostCount() {
       setText("btn-auth-close-form", "accountHideLogin");
       setText("auth-email-label", "accountEmailLabel");
       setText("auth-password-label", "accountPasswordLabel");
-      setText("btn-auth", "loginSignup");
       setText("btn-logout", "logout");
-      setText("auth-caption", "accountAutoCreateHint");
+      setText("btn-auth-mode-login", "authModeLogin");
+      setText("btn-auth-mode-signup", "authModeSignup");
+      setText("auth-beta-title", "authBetaTitle");
+      setText("auth-beta-body", "authBetaBody");
+      setText("auth-beta-request-link", "authBetaRequest");
       setText("btn-account-open-settings", "accountOpenSettings");
       setText("account-jump-profile", "profileTitle");
       setText("account-jump-edit", "profileEditTitle");
@@ -2861,10 +2941,22 @@ async function loadProfilePostCount() {
       setText("btn-auth-reset-connection", "authResetConnection");
       setPlaceholder("auth-email", "accountEmailPlaceholder");
       setPlaceholder("auth-password", "accountPasswordPlaceholder");
+      syncAuthModeUi();
       setText("footer-privacy-link", "footerPrivacy");
       setText("footer-terms-link", "footerTerms");
       setText("footer-contact-link", "footerContact");
+      setText("footer-feedback-link", "footerFeedback");
       setText("footer-note", "footerAdNotice");
+      setText("feedback-modal-title", "feedbackTitle");
+      setText("feedback-modal-sub", "feedbackSub");
+      setText("feedback-category-label", "feedbackCategory");
+      setText("feedback-message-label", "feedbackMessage");
+      setText("feedback-option-bug", "feedbackOptionBug");
+      setText("feedback-option-usability", "feedbackOptionUsability");
+      setText("feedback-option-idea", "feedbackOptionIdea");
+      setText("feedback-option-other", "feedbackOptionOther");
+      setText("btn-feedback-submit", "feedbackSubmit");
+      setPlaceholder("feedback-message", "feedbackPlaceholder");
 
       const feedOptionsBtn = $("btn-feed-options");
       if (feedOptionsBtn) {
@@ -3236,6 +3328,44 @@ async function loadProfilePostCount() {
     }
 
       // ------------------ Auth ------------------
+    function syncAuthModeUi() {
+      const tr = t[currentLang] || t.ja;
+      const signingUp = authMode === "signup";
+      const loginButton = $("btn-auth-mode-login");
+      const signupButton = $("btn-auth-mode-signup");
+      const submitButton = $("btn-auth");
+      const passwordInput = $("auth-password");
+      const caption = $("auth-caption");
+      const betaNote = $("auth-beta-note");
+      const resetButton = $("btn-auth-reset-request");
+
+      loginButton?.classList.toggle("is-active", !signingUp);
+      signupButton?.classList.toggle("is-active", signingUp);
+      loginButton?.setAttribute("aria-selected", signingUp ? "false" : "true");
+      signupButton?.setAttribute("aria-selected", signingUp ? "true" : "false");
+      if (submitButton) {
+        submitButton.textContent = signingUp
+          ? tr.authModeSignup || "招待登録"
+          : tr.authModeLogin || "ログイン";
+      }
+      if (passwordInput) {
+        passwordInput.autocomplete = signingUp ? "new-password" : "current-password";
+      }
+      if (caption) {
+        caption.textContent = signingUp
+          ? tr.authSignupCaption || "招待されたメールアドレスで登録してください。"
+          : tr.authLoginCaption || "登録済みのメールアドレスでログインしてください。";
+      }
+      betaNote?.classList.toggle("hidden", !signingUp);
+      resetButton?.classList.toggle("hidden", signingUp);
+    }
+
+    function setAuthMode(nextMode = "login") {
+      authMode = nextMode === "signup" ? "signup" : "login";
+      syncAuthModeUi();
+      $("auth-password")?.focus();
+    }
+
     function setAuthFormExpanded(expanded, options = {}) {
       authFormExpanded = !!expanded;
       const openBtn = $("btn-auth-open-form");
@@ -3284,6 +3414,8 @@ async function loadProfilePostCount() {
       const openSettingsBtn = $("btn-auth-open-settings");
       const resetConnectionBtn = $("btn-auth-reset-connection");
       const resetPasswordBtn = $("btn-auth-reset-request");
+      const loginModeBtn = $("btn-auth-mode-login");
+      const signupModeBtn = $("btn-auth-mode-signup");
       const recoveryUpdateBtn = $("btn-recovery-update");
       const deleteConfirmation = $("account-delete-confirmation");
       const deleteAccountBtn = $("btn-delete-account");
@@ -3302,6 +3434,14 @@ async function loadProfilePostCount() {
         openAuthFormBtn.addEventListener("click", () => {
           setAuthFormExpanded(true, { focus: true });
         });
+      }
+      if (loginModeBtn && loginModeBtn.dataset.bound !== "true") {
+        loginModeBtn.dataset.bound = "true";
+        loginModeBtn.addEventListener("click", () => setAuthMode("login"));
+      }
+      if (signupModeBtn && signupModeBtn.dataset.bound !== "true") {
+        signupModeBtn.dataset.bound = "true";
+        signupModeBtn.addEventListener("click", () => setAuthMode("signup"));
       }
       if (closeAuthFormBtn && closeAuthFormBtn.dataset.bound !== "true") {
         closeAuthFormBtn.dataset.bound = "true";
@@ -3361,6 +3501,7 @@ async function loadProfilePostCount() {
         deleteAccountBtn.dataset.bound = "true";
         deleteAccountBtn.addEventListener("click", handleDeleteAccount);
       }
+      syncAuthModeUi();
     }
 
     function getPasswordRecoveryRedirectUrl() {
@@ -3690,6 +3831,111 @@ async function loadProfilePostCount() {
           const button = event.target.closest("button[data-unblock-user-id]");
           if (!button) return;
           unblockUserFromList(`${button.dataset.unblockUserId || ""}`);
+        });
+      }
+    }
+
+    function setupFeedbackControls() {
+      const openButton = $("footer-feedback-link");
+      const backdrop = $("feedback-modal-backdrop");
+      const closeButton = $("btn-feedback-close");
+      const submitButton = $("btn-feedback-submit");
+      const status = $("feedback-modal-status");
+      const messageInput = $("feedback-message");
+
+      const closeFeedback = () => closeBackdrop(backdrop);
+      const openFeedback = () => {
+        const tr = t[currentLang] || t.ja;
+        if (!currentUser) {
+          showToast(
+            tr.feedbackLoginRequired || "送信するにはログインしてください。",
+            "warning"
+          );
+          if (typeof setActivePage === "function") {
+            setActivePage("account", { scrollBehavior: "smooth" });
+          }
+          return;
+        }
+        if (status) status.textContent = "";
+        openBackdrop(backdrop);
+        window.setTimeout(() => messageInput?.focus(), 220);
+      };
+
+      if (openButton && openButton.dataset.bound !== "true") {
+        openButton.dataset.bound = "true";
+        openButton.addEventListener("click", openFeedback);
+      }
+      if (closeButton && closeButton.dataset.bound !== "true") {
+        closeButton.dataset.bound = "true";
+        closeButton.addEventListener("click", closeFeedback);
+      }
+      if (backdrop && backdrop.dataset.bound !== "true") {
+        backdrop.dataset.bound = "true";
+        backdrop.addEventListener("click", (event) => {
+          if (event.target === backdrop) closeFeedback();
+        });
+      }
+      if (submitButton && submitButton.dataset.bound !== "true") {
+        submitButton.dataset.bound = "true";
+        submitButton.addEventListener("click", async () => {
+          const tr = t[currentLang] || t.ja;
+          const message = `${messageInput?.value || ""}`.trim();
+          const category = `${$("feedback-category")?.value || "other"}`;
+          if (message.length < 10) {
+            if (status) {
+              status.textContent =
+                tr.feedbackTooShort || "内容を10文字以上で入力してください。";
+            }
+            messageInput?.focus();
+            return;
+          }
+          if (!currentUser || !betaFeedbackEnabled) {
+            if (status) {
+              status.textContent =
+                tr.feedbackFailed ||
+                "送信できませんでした。時間を置いて再試行してください。";
+            }
+            return;
+          }
+
+          setButtonLoading(
+            submitButton,
+            true,
+            tr.feedbackSending || "送信中..."
+          );
+          if (status) status.textContent = "";
+          try {
+            const { error } = await supabase.from("beta_feedback").insert({
+              user_id: currentUser.id,
+              category,
+              message,
+              page:
+                document.body?.dataset?.page ||
+                window.location.pathname.slice(0, 300),
+              build_version: `${appBuildMeta?.version || "unknown"}`.slice(0, 100),
+            });
+            if (error) throw error;
+
+            if (messageInput) messageInput.value = "";
+            void trackProductEvent("feedback_submitted", { category });
+            closeFeedback();
+            showToast(
+              tr.feedbackSent || "フィードバックを受け付けました。",
+              "success"
+            );
+          } catch (error) {
+            console.error("beta feedback error:", error);
+            if (isMissingDataResourceError(error, "beta_feedback")) {
+              betaFeedbackEnabled = false;
+            }
+            if (status) {
+              status.textContent =
+                tr.feedbackFailed ||
+                "送信できませんでした。時間を置いて再試行してください。";
+            }
+          } finally {
+            setButtonLoading(submitButton, false);
+          }
         });
       }
     }
@@ -4458,6 +4704,7 @@ async function loadProfilePostCount() {
       const password = $("auth-password").value.trim();
       const authBtn = $("btn-auth");
       const tr = t[currentLang] || t.ja;
+      const signingUp = authMode === "signup";
       const now = Date.now();
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -4491,44 +4738,36 @@ async function loadProfilePostCount() {
         return;
       }
 
-      setButtonLoading(authBtn, true, "Logging in...");
+      if (signingUp && password.length < 8) {
+        showToast(
+          tr.authPasswordTooShort || "パスワードは8文字以上にしてください。",
+          "warning"
+        );
+        return;
+      }
+
+      setButtonLoading(
+        authBtn,
+        true,
+        signingUp
+          ? tr.authSignupLoading || "登録しています..."
+          : tr.authLoginLoading || "ログインしています..."
+      );
       setAuthFormExpanded(true);
 
       try {
         let user = null;
-        let attemptedSignUp = false;
-
-        // 1. ログインを試す
-        let { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        // 2. 無効な認証情報なら、そのメールでサインアップを試す
-        const invalidCredentials =
-          error &&
-          (error.code === "invalid_credentials" ||
-            error.message === "Invalid login credentials");
-        if (invalidCredentials) {
-          if (password.length < 8) {
-            showToast(
-              tr.authPasswordTooShort ||
-                "新規登録のパスワードは8文字以上にしてください。",
-              "warning"
-            );
-            return;
-          }
-          attemptedSignUp = true;
-          ({ data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                handle: email.split("@")[0],
+        const { data, error } = signingUp
+          ? await supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                data: {
+                  handle: email.split("@")[0],
+                },
               },
-            },
-          }));
-        }
+            })
+          : await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
           if (isLikelyFetchError(error)) {
@@ -4549,21 +4788,38 @@ async function loadProfilePostCount() {
             );
           } else {
             console.warn("Auth error:", error);
-            showToast(
+            const errorMessage = String(error.message || "").toLowerCase();
+            const betaAccessRequired =
+              signingUp &&
+              (Number(error.status) === 403 ||
+                errorMessage.includes("closed beta") ||
+                errorMessage.includes("closed_beta") ||
+                errorMessage.includes("allowlist") ||
+                errorMessage.includes("invite"));
+            const emailNotConfirmed =
               error.code === "email_not_confirmed" ||
-                error.message === "Email not confirmed"
-                ? tr.authEmailNotConfirmed ||
-                    "メール確認が完了していません。確認メール内のリンクを開いてください。"
-                : tr.authFailed || "ログイン / サインアップに失敗しました。",
-              "error"
-            );
+              errorMessage.includes("email not confirmed");
+
+            let message = signingUp
+              ? tr.authSignupFailed || "招待登録に失敗しました。"
+              : tr.authLoginFailed || "ログインに失敗しました。";
+            if (betaAccessRequired) {
+              message =
+                tr.authBetaAccessRequired ||
+                "このメールアドレスにはβ招待がありません。参加申請後に登録してください。";
+            } else if (emailNotConfirmed) {
+              message =
+                tr.authEmailNotConfirmed ||
+                "メール確認が完了していません。確認メール内のリンクを開いてください。";
+            }
+            showToast(message, "error");
           }
           return;
         }
 
         if (data?.session?.user) {
           user = data.session.user;
-        } else if (attemptedSignUp && data?.user) {
+        } else if (signingUp && data?.user) {
           currentUser = null;
           currentProfile = null;
           profilePostCount = null;
@@ -4616,11 +4872,21 @@ async function loadProfilePostCount() {
         await loadUserEntitlements(currentUser.id);
         await loadFeed();
         await commentSync.flushQueue({ silent: true });
+        void trackProductEvent(
+          signingUp ? "signup_completed" : "login_succeeded",
+          { method: "password" }
+        );
 
         setAuthFormExpanded(false);
-        showToast(tr.authLoginSuccess || "ログインしました！", "success");
+        showToast(
+          signingUp
+            ? tr.authSignupSuccess || "登録してログインしました。"
+            : tr.authLoginSuccess || "ログインしました！",
+          "success"
+        );
       } finally {
         setButtonLoading(authBtn, false);
+        syncAuthModeUi();
       }
     }
 
@@ -4874,6 +5140,10 @@ async function loadProfilePostCount() {
       updateProfileSummary();
       updateAuthUIState();
       populateProfileEditor();
+      void trackProductEvent("session_started", {
+        page: document.body?.dataset?.page || "feed",
+        build: `${appBuildMeta?.version || "unknown"}`,
+      });
     }
 
 
@@ -8982,6 +9252,7 @@ async function loadProfilePostCount() {
           type: "follow",
         });
       }
+      void trackProductEvent(isFollowing ? "follow_removed" : "follow_created");
     }
 
 
@@ -9297,6 +9568,13 @@ async function loadProfilePostCount() {
           console.error("post draft clear error:", draftError);
         }
 
+        void trackProductEvent("post_created", {
+          media_type: mediaType || "none",
+          video_kind: payload.video_kind || "none",
+          visibility,
+          workout_sets: logsWithPr.length,
+        });
+
         closeBackdrop(backdrop);
         loadFeed({ softRefresh: true, forceNetwork: true }).catch((feedError) => {
           console.error("post refresh error:", feedError);
@@ -9490,6 +9768,9 @@ async function loadProfilePostCount() {
         actorId: currentUser.id,
         type: "comment",
         postId: postId,
+      });
+      void trackProductEvent("comment_created", {
+        is_reply: !!replyTarget,
       });
     }
 

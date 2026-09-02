@@ -20,6 +20,7 @@ let dmContext = {
   setActivePage: () => {},
   updateNavigationBadges: () => {},
   openSafetyDialog: () => {},
+  trackProductEvent: async () => false,
 };
 
 let dmThreads = [];
@@ -121,6 +122,7 @@ const setActivePage = (...args) => dmContext.setActivePage?.(...args);
 const updateDmNavigationBadges = (...args) =>
   dmContext.updateNavigationBadges?.(...args);
 const openDmSafetyDialog = (...args) => dmContext.openSafetyDialog?.(...args);
+const trackProductEvent = (...args) => dmContext.trackProductEvent?.(...args);
 
 function getDmTotalUnreadCount() {
   return dmThreads.reduce(
@@ -6320,6 +6322,10 @@ async function handleSendMessage(event) {
     renderConversationMessages({ forceBottom: true });
     renderThreadSummary();
     setSendStatus("", "");
+    void trackProductEvent("dm_message_sent", {
+      has_media: !!mediaPath,
+      is_reply: !!replyTargetId,
+    });
   } finally {
     if (sendBtn) {
       sendBtn.classList.remove("is-loading");

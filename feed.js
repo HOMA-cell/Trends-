@@ -61,6 +61,7 @@ let feedContext = {
   openDmConversation: async () => false,
   openPublicProfile: () => {},
   openSafetyDialog: () => {},
+  trackProductEvent: async () => false,
   onFeedLayoutChange: null,
   openPostModal: () => {},
 };
@@ -105,6 +106,7 @@ const openPostModal = (...args) => feedContext.openPostModal?.(...args);
 const openDmConversation = (...args) => feedContext.openDmConversation?.(...args);
 const openPublicProfile = (...args) => feedContext.openPublicProfile?.(...args);
 const openSafetyDialog = (...args) => feedContext.openSafetyDialog?.(...args);
+const trackProductEvent = (...args) => feedContext.trackProductEvent?.(...args);
 
 const compactNumberFormatters = new Map();
 
@@ -8728,17 +8730,43 @@ function buildCommentItemElement(comment, tr, options = {}) {
       bubble.appendChild(header);
       bubble.appendChild(text);
       content.appendChild(bubble);
-      if (typeof onReply === "function") {
+      const currentUser = getCurrentUser();
+      const canReport =
+        !!currentUser?.id &&
+        !!comment.id &&
+        !!comment.user_id &&
+        currentUser.id !== comment.user_id &&
+        !comment.pending;
+      if (typeof onReply === "function" || canReport) {
         const actions = document.createElement("div");
         actions.className = "comment-actions";
-        const replyBtn = document.createElement("button");
-        replyBtn.type = "button";
-        replyBtn.className = "chip chip-ghost chip-comment-reply";
-        replyBtn.textContent = tr.commentReply || "Reply";
-        replyBtn.addEventListener("click", () => {
-          onReply(comment);
-        });
-        actions.appendChild(replyBtn);
+        if (typeof onReply === "function") {
+          const replyBtn = document.createElement("button");
+          replyBtn.type = "button";
+          replyBtn.className = "chip chip-ghost chip-comment-reply";
+          replyBtn.textContent = tr.commentReply || "Reply";
+          replyBtn.addEventListener("click", () => {
+            onReply(comment);
+          });
+          actions.appendChild(replyBtn);
+        }
+        if (canReport) {
+          const reportBtn = document.createElement("button");
+          reportBtn.type = "button";
+          reportBtn.className = "chip chip-ghost chip-comment-report";
+          reportBtn.textContent = tr.safetyReportShort || "通報";
+          reportBtn.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openSafetyDialog({
+              targetType: "comment",
+              targetId: comment.id,
+              userId: comment.user_id,
+              label: displayName,
+            });
+          });
+          actions.appendChild(reportBtn);
+        }
         content.appendChild(actions);
       }
       if (comment.user_id) {
@@ -9445,6 +9473,7 @@ export async function toggleLikeForPost(post) {
       const desiredLiked = !wasLiked;
       const previousCount = likesByPost.get(post.id) || 0;
       let shouldNotify = false;
+      let mutationSucceeded = false;
       const queuedAction = {
         postId: post.id,
         userId: currentUser.id,
@@ -9519,6 +9548,7 @@ export async function toggleLikeForPost(post) {
           }
         }
         if (remoteError) throw remoteError;
+        mutationSucceeded = true;
       } catch (error) {
         console.error("like toggle error:", error);
         const issue = classifyLikeToggleIssue(error);
@@ -9567,6 +9597,12 @@ export async function toggleLikeForPost(post) {
       } finally {
         pendingLikePostIds.delete(post.id);
         updateLikeButtonsForPost(post.id);
+      }
+
+      if (mutationSucceeded) {
+        void trackProductEvent(
+          desiredLiked ? "like_created" : "like_removed"
+        );
       }
 
       if (shouldNotify) {
