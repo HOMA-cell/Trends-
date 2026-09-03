@@ -7007,6 +7007,9 @@ export function renderFeed(options = {}) {
         .map((item) => String(item?.exercise || "").trim())
         .filter(Boolean);
       const rawCaptionText = `${post.note || post.caption || ""}`.trim();
+      if (rawCaptionText && !post.media_url && !logs.length) {
+        card.classList.add("text-only");
+      }
       const { title: captionTitleText } = splitCaptionContent(rawCaptionText);
       const appendLimitedItems = (
         target,
