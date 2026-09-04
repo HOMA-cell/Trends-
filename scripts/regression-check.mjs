@@ -38,6 +38,14 @@ if (!feedSource.includes('targetType: "comment"')) {
   failures.push("comments must retain a report action");
 }
 
+if (
+  !feedSource.includes("reaction-btn reaction-save") ||
+  !feedSource.includes("appendPrimaryAction(saveBtn)") ||
+  feedSource.includes("appendSecondaryAction(saveBtn)")
+) {
+  failures.push("save must remain a primary feed action beside like and comment");
+}
+
 if (/trends-app\.example/i.test(contactSource)) {
   failures.push("published support pages must not contain the placeholder contact domain");
 }
