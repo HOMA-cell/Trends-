@@ -8,6 +8,8 @@ const FRONTEND_FILES = [
   'index.html',
   'app.js',
   'mediaEditor.js',
+  'mediaProcessing.js',
+  'mediaUpload.js',
   'feed.js',
   'monetization.js',
   'dm.js',

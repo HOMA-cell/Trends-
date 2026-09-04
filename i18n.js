@@ -41,6 +41,20 @@ export const t = {
         postVideoCoverSelected: "カバー",
         postVideoCoverApplied: "動画カバーを設定しました。",
         postGifEditUnsupported: "GIFはアニメーションを保つため編集できません。",
+        postMediaPreparing: "HEIC写真を変換しています…",
+        postMediaPreparingWait: "写真の準備が終わるまでお待ちください。",
+        postMediaOptimizing: "写真を安全な形式に最適化しています…",
+        postMediaUploading: "メディアをアップロードしています…",
+        postMediaUploadProgress: "アップロード中 {percent}%",
+        postUploadCancel: "中止",
+        postUploadCancelling: "アップロードを中止しています…",
+        postUploadCancelled: "アップロードを中止しました。もう一度押すと再開できます。",
+        postHeicConversionFailed:
+          "HEIC写真を変換できませんでした。別の写真を選んでください。",
+        postMediaSignatureInvalid:
+          "ファイルの内容を確認できませんでした。別の写真または動画を選んでください。",
+        postMediaUploadFailed:
+          "メディアのアップロードに失敗しました。通信を確認して、もう一度投稿してください。",
         postMediaEditorRatio: "比率",
         postMediaEditorOriginal: "元の比率",
         postMediaEditorZoom: "拡大",
@@ -1195,6 +1209,20 @@ export const t = {
         postVideoCoverSelected: "Cover",
         postVideoCoverApplied: "Video cover saved.",
         postGifEditUnsupported: "GIF editing is disabled to preserve animation.",
+        postMediaPreparing: "Converting the HEIC photo…",
+        postMediaPreparingWait: "Please wait until the photo is ready.",
+        postMediaOptimizing: "Optimizing the photo for a safe upload…",
+        postMediaUploading: "Uploading media…",
+        postMediaUploadProgress: "Uploading {percent}%",
+        postUploadCancel: "Cancel",
+        postUploadCancelling: "Cancelling upload…",
+        postUploadCancelled: "Upload cancelled. Post again to resume it.",
+        postHeicConversionFailed:
+          "We could not convert this HEIC photo. Please choose another photo.",
+        postMediaSignatureInvalid:
+          "We could not verify this file. Please choose another photo or video.",
+        postMediaUploadFailed:
+          "The media upload failed. Check your connection and post again.",
         postMediaEditorRatio: "Ratio",
         postMediaEditorOriginal: "Original",
         postMediaEditorZoom: "Zoom",

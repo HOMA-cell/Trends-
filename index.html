@@ -1991,6 +1991,29 @@
           </div>
         </div>
       </div>
+      <div
+        class="post-upload-status hidden"
+        id="post-upload-status"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="post-upload-status-row">
+          <span id="post-upload-status-label">アップロードしています…</span>
+          <strong id="post-upload-status-percent"></strong>
+        </div>
+        <div class="post-upload-progress-row">
+          <progress
+            id="post-upload-progress"
+            max="100"
+            aria-labelledby="post-upload-status-label post-upload-status-percent"
+          ></progress>
+          <button
+            class="btn btn-ghost btn-xs hidden"
+            id="btn-cancel-post-upload"
+            type="button"
+          >中止</button>
+        </div>
+      </div>
       <div class="form-actions post-form-actions">
         <button class="btn btn-primary" id="btn-submit" type="button">投稿</button>
         <details class="post-form-more">
