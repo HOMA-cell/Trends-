@@ -4,6 +4,11 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const feedSource = await readFile(new URL("../feed.js", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
+const mediaEditorSource = await readFile(
+  new URL("../mediaEditor.js", import.meta.url),
+  "utf8"
+);
+const serviceWorkerSource = await readFile(new URL("../sw.js", import.meta.url), "utf8");
 const indexSource = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const contactSource = await readFile(new URL("../contact.html", import.meta.url), "utf8");
 const betaMigrationSource = await readFile(
@@ -44,6 +49,24 @@ if (
   feedSource.includes("appendSecondaryAction(saveBtn)")
 ) {
   failures.push("save must remain a primary feed action beside like and comment");
+}
+
+if (
+  !indexSource.includes('id="post-media-editor-backdrop"') ||
+  !indexSource.includes('data-editor-aspect="portrait"') ||
+  !indexSource.includes('id="post-video-cover-time"')
+) {
+  failures.push("the post composer must retain photo editing and video cover controls");
+}
+
+if (
+  !appSource.includes("createPostMediaEditor") ||
+  !appSource.includes("currentVideoThumbnailBlob ||") ||
+  !mediaEditorSource.includes("canvasToBlob") ||
+  !mediaEditorSource.includes("captureVideoFrame") ||
+  !serviceWorkerSource.includes('"./mediaEditor.js"')
+) {
+  failures.push("edited photos and selected video covers must reach the upload flow");
 }
 
 if (/trends-app\.example/i.test(contactSource)) {

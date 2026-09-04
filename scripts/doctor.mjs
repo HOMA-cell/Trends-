@@ -7,6 +7,7 @@ const REQUIRED_FILES = [
   "index.html",
   "styles.css",
   "app.js",
+  "mediaEditor.js",
   "feed.js",
   "monetization.js",
   "dm.js",

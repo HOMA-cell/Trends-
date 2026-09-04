@@ -69,6 +69,7 @@ import {
   loadPublicMonetizationState,
   loadUserEntitlements,
 } from "./monetization.js";
+import { createPostMediaEditor } from "./mediaEditor.js";
 
     // ---- 状態 ----
     let currentUser = null;
@@ -84,8 +85,13 @@ import {
     let showExtraSections = false;
     let currentLang = "ja";
     let currentMediaFile = null;
+    let currentMediaOriginalFile = null;
     let currentMediaPreviewUrl = null;
     let currentMediaMetadata = null;
+    let currentImageEditConfig = null;
+    let currentVideoThumbnailBlob = null;
+    let currentVideoThumbnailTime = null;
+    let postMediaEditor = null;
     let passwordRecoveryMode = false;
     let authStateSubscription = null;
     let blockedUserIds = new Set();
@@ -414,8 +420,9 @@ function getFileValidationError(file, kind) {
         video.muted = true;
         video.playsInline = true;
         video.onloadedmetadata = () => {
+          const rawDuration = Number(video.duration || 0);
           const metadata = {
-            duration: Number(video.duration || 0),
+            duration: Number.isFinite(rawDuration) ? Math.max(0, rawDuration) : 0,
             width: Number(video.videoWidth || 0),
             height: Number(video.videoHeight || 0),
           };
@@ -442,12 +449,15 @@ function getFileValidationError(file, kind) {
     }
 
     function formatVideoDuration(seconds = 0) {
-      const safe = Math.max(0, Math.round(Number(seconds) || 0));
+      const numericSeconds = Number(seconds);
+      const safe = Number.isFinite(numericSeconds)
+        ? Math.max(0, Math.round(numericSeconds))
+        : 0;
       const minutes = Math.floor(safe / 60);
       return `${minutes}:${String(safe % 60).padStart(2, "0")}`;
     }
 
-    function createVideoThumbnailBlob(file, metadata = null) {
+    function createVideoThumbnailBlob(file, metadata = null, requestedTime = null) {
       return new Promise((resolve) => {
         if (!file?.type?.startsWith("video")) {
           resolve(null);
@@ -494,7 +504,10 @@ function getFileValidationError(file, kind) {
         video.onerror = () => finish(null);
         video.onloadedmetadata = () => {
           const duration = Number(video.duration || metadata?.duration || 0);
-          const captureAt = Math.min(Math.max(duration * 0.18, 0.15), 1.5);
+          const suggestedTime = Math.min(Math.max(duration * 0.18, 0.15), 1.5);
+          const captureAt = Number.isFinite(requestedTime)
+            ? Math.min(Math.max(Number(requestedTime), 0), Math.max(0, duration - 0.05))
+            : suggestedTime;
           if (captureAt > 0 && duration > captureAt) {
             video.onseeked = capture;
             video.currentTime = captureAt;
@@ -2801,6 +2814,17 @@ async function loadProfilePostCount() {
       setText("btn-post-more-actions", "postMoreActions");
       setText("draft-hint", "draftHint");
       setText("btn-remove-media", "mediaRemove");
+      setText("post-image-editor-ratio-label", "postMediaEditorRatio");
+      setText("btn-post-image-ratio-original", "postMediaEditorOriginal");
+      setText("post-image-editor-zoom-label", "postMediaEditorZoom");
+      setText("btn-post-image-rotate-left", "postMediaEditorRotateLeft");
+      setText("btn-post-image-rotate-right", "postMediaEditorRotateRight");
+      setText("btn-post-media-editor-reset", "postMediaEditorReset");
+      setText("post-image-editor-help", "postMediaEditorImageHelp");
+      setText("post-video-cover-label", "postMediaEditorVideoCover");
+      setText("post-video-cover-help", "postMediaEditorVideoHelp");
+      setText("btn-post-media-editor-cancel", "postMediaEditorCancel");
+      setText("btn-post-media-editor-apply", "postMediaEditorApply");
       setText("btn-post-mode-simple", "postModeQuick");
       setText("btn-post-toggle-advanced", "postModeWorkout");
       setText("post-composer-hint", "postSimpleHint");
@@ -5685,6 +5709,7 @@ async function loadProfilePostCount() {
       const dropzone = $("post-media-dropzone");
       const pickerTitle = $("post-media-picker-title");
       const pickerSub = $("post-media-picker-sub");
+      const editBtn = $("btn-edit-media");
       const tr = t[currentLang] || t.ja;
       if (!preview || !body || !noteEl) return;
 
@@ -5696,11 +5721,13 @@ async function loadProfilePostCount() {
 
       if (file) {
         syncPostVideoKindControl(file);
+        const isVideo = file.type.startsWith("video");
+        const canEdit = isVideo || file.type !== "image/gif";
         const url = URL.createObjectURL(file);
         currentMediaPreviewUrl = url;
         dropzone?.classList.add("is-filled");
         pickerTitle && (pickerTitle.textContent = tr.media || "Media");
-        if (file.type.startsWith("video")) {
+        if (isVideo) {
           const video = document.createElement("video");
           video.src = url;
           video.controls = true;
@@ -5712,14 +5739,29 @@ async function loadProfilePostCount() {
           body.appendChild(img);
         }
         const mediaFacts = [];
-        if (file.type.startsWith("video") && currentMediaMetadata?.duration) {
+        if (isVideo && currentMediaMetadata?.duration) {
           mediaFacts.push(formatVideoDuration(currentMediaMetadata.duration));
+        }
+        if (isVideo && Number.isFinite(currentVideoThumbnailTime)) {
+          mediaFacts.push(
+            `${tr.postVideoCoverSelected || "カバー"} ${formatVideoDuration(
+              currentVideoThumbnailTime
+            )}`
+          );
+        } else if (!isVideo && currentImageEditConfig) {
+          mediaFacts.push(tr.postImageEdited || "編集済み");
         }
         mediaFacts.push(formatFileSizeMb(file.size));
         const fileLabel = [file.name || note || "", ...mediaFacts].filter(Boolean).join(" · ");
         noteEl.textContent = fileLabel;
         if (pickerSub) {
           pickerSub.textContent = fileLabel || tr.postMediaPickerHint || "Add a photo or video";
+        }
+        if (editBtn) {
+          editBtn.classList.toggle("hidden", !canEdit);
+          editBtn.textContent = isVideo
+            ? tr.postVideoCoverEdit || "カバーを選択"
+            : tr.postImageEdit || "写真を編集";
         }
         preview.classList.remove("hidden");
         return;
@@ -5733,6 +5775,7 @@ async function loadProfilePostCount() {
           pickerSub.textContent = note;
         }
         noteEl.textContent = note;
+        editBtn?.classList.add("hidden");
         preview.classList.remove("hidden");
       } else {
         syncPostVideoKindControl(null);
@@ -5743,6 +5786,7 @@ async function loadProfilePostCount() {
         }
         preview.classList.add("hidden");
         noteEl.textContent = "";
+        editBtn?.classList.add("hidden");
       }
     }
 
@@ -5752,7 +5796,11 @@ async function loadProfilePostCount() {
         mediaInput.value = "";
       }
       currentMediaFile = null;
+      currentMediaOriginalFile = null;
       currentMediaMetadata = null;
+      currentImageEditConfig = null;
+      currentVideoThumbnailBlob = null;
+      currentVideoThumbnailTime = null;
       renderMediaPreview(null);
     }
 
@@ -6005,15 +6053,55 @@ async function loadProfilePostCount() {
 
       const mediaInput = $("post-media");
       const mediaDropzone = $("post-media-dropzone");
+      const editMediaBtn = $("btn-edit-media");
       const removeMediaBtn = $("btn-remove-media");
       const videoKindInputs = document.querySelectorAll(
         'input[name="post-video-kind"]'
       );
+      if (!postMediaEditor) {
+        postMediaEditor = createPostMediaEditor({
+          getLanguage: () => currentLang,
+          openBackdrop,
+          closeBackdrop,
+          onToast: (message, tone) => showToast(message, tone),
+          onImageApply: ({ file, config }) => {
+            currentMediaFile = file;
+            currentImageEditConfig = config;
+            currentVideoThumbnailBlob = null;
+            currentVideoThumbnailTime = null;
+            renderMediaPreview(currentMediaFile);
+            queueDraftSave();
+            showToast(
+              (t[currentLang] || t.ja).postImageEditApplied ||
+                "写真の編集を適用しました。",
+              "success"
+            );
+          },
+          onVideoApply: ({ blob, time, metadata }) => {
+            currentVideoThumbnailBlob = blob;
+            currentVideoThumbnailTime = time;
+            if (metadata?.duration > 0) {
+              currentMediaMetadata = metadata;
+            }
+            renderMediaPreview(currentMediaFile);
+            queueDraftSave();
+            showToast(
+              (t[currentLang] || t.ja).postVideoCoverApplied ||
+                "動画カバーを設定しました。",
+              "success"
+            );
+          },
+        });
+      }
       const applySelectedPostMediaFile = async (file, inputEl = null) => {
         const error = getFileValidationError(file, "post");
         if (error) {
           currentMediaFile = null;
+          currentMediaOriginalFile = null;
           currentMediaMetadata = null;
+          currentImageEditConfig = null;
+          currentVideoThumbnailBlob = null;
+          currentVideoThumbnailTime = null;
           if (inputEl) {
             inputEl.value = "";
           }
@@ -6027,7 +6115,10 @@ async function loadProfilePostCount() {
           } catch (metadataError) {
             console.error("video metadata error:", metadataError);
             currentMediaFile = null;
+            currentMediaOriginalFile = null;
             currentMediaMetadata = null;
+            currentVideoThumbnailBlob = null;
+            currentVideoThumbnailTime = null;
             if (inputEl) inputEl.value = "";
             renderMediaPreview(null);
             showToast(
@@ -6043,7 +6134,10 @@ async function loadProfilePostCount() {
           );
           if (durationError) {
             currentMediaFile = null;
+            currentMediaOriginalFile = null;
             currentMediaMetadata = null;
+            currentVideoThumbnailBlob = null;
+            currentVideoThumbnailTime = null;
             if (inputEl) inputEl.value = "";
             renderMediaPreview(null);
             showToast(durationError, "warning");
@@ -6053,6 +6147,10 @@ async function loadProfilePostCount() {
           currentMediaMetadata = null;
         }
         currentMediaFile = file || null;
+        currentMediaOriginalFile = file || null;
+        currentImageEditConfig = null;
+        currentVideoThumbnailBlob = null;
+        currentVideoThumbnailTime = null;
         renderMediaPreview(currentMediaFile);
         queueDraftSave();
         return true;
@@ -6100,6 +6198,27 @@ async function loadProfilePostCount() {
         removeMediaBtn.addEventListener("click", () => {
           clearMediaSelection();
           queueDraftSave();
+        });
+      }
+      if (editMediaBtn && editMediaBtn.dataset.bound !== "true") {
+        editMediaBtn.dataset.bound = "true";
+        editMediaBtn.addEventListener("click", () => {
+          if (!currentMediaFile || !postMediaEditor) return;
+          if (currentMediaFile.type === "image/gif") {
+            showToast(
+              (t[currentLang] || t.ja).postGifEditUnsupported ||
+                "GIFはアニメーションを保つため編集できません。",
+              "warning"
+            );
+            return;
+          }
+          void postMediaEditor.open({
+            file: currentMediaFile,
+            originalFile: currentMediaOriginalFile || currentMediaFile,
+            metadata: currentMediaMetadata,
+            imageConfig: currentImageEditConfig,
+            posterTime: currentVideoThumbnailTime,
+          });
         });
       }
       videoKindInputs.forEach((input) => {
@@ -9272,7 +9391,11 @@ async function loadProfilePostCount() {
       const templateSelect = $("post-template");
       if (templateSelect) templateSelect.value = "";
       currentMediaFile = null;
+      currentMediaOriginalFile = null;
       currentMediaMetadata = null;
+      currentImageEditConfig = null;
+      currentVideoThumbnailBlob = null;
+      currentVideoThumbnailTime = null;
       setSelectedPostVideoKind("standard");
       renderMediaPreview(null);
       workoutExercises = [];
@@ -9443,7 +9566,12 @@ async function loadProfilePostCount() {
             return;
           }
           const thumbnailBlob = isVideo
-            ? await createVideoThumbnailBlob(currentMediaFile, currentMediaMetadata)
+            ? currentVideoThumbnailBlob ||
+              (await createVideoThumbnailBlob(
+                currentMediaFile,
+                currentMediaMetadata,
+                currentVideoThumbnailTime
+              ))
             : null;
           const ext = getSafeFileExtension(currentMediaFile);
           const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
