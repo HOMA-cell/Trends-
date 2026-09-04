@@ -7,6 +7,7 @@ let hasCriticalIssue = false;
 const FRONTEND_FILES = [
   'index.html',
   'app.js',
+  'mediaEditor.js',
   'feed.js',
   'monetization.js',
   'dm.js',

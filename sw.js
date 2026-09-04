@@ -18,6 +18,7 @@ const SHELL_ASSETS = [
   "./dm-sidebar-tune.css",
   "./ads-config.js",
   "./app.js",
+  "./mediaEditor.js",
   "./feed.js",
   "./monetization.js",
   "./dm.js",

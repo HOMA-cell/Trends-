@@ -1909,7 +1909,10 @@
           <div class="media-preview-body" id="post-media-preview-body"></div>
           <div class="media-preview-actions">
             <span class="media-preview-note" id="post-media-preview-note"></span>
-            <button class="btn btn-ghost btn-xs" type="button" id="btn-remove-media">削除</button>
+            <div class="media-preview-action-buttons">
+              <button class="btn btn-ghost btn-xs" type="button" id="btn-edit-media">編集</button>
+              <button class="btn btn-ghost btn-xs" type="button" id="btn-remove-media">削除</button>
+            </div>
           </div>
         </div>
         <fieldset class="post-video-kind hidden" id="post-video-kind-field">
@@ -1936,7 +1939,7 @@
             </label>
           </div>
           <p class="post-video-kind-help" id="post-video-kind-help">
-            ショートは60秒、通常動画は3分・30MBまで。サムネイルは自動生成されます。
+            ショートは60秒、通常動画は3分・30MBまで。カバーは投稿前に選べます。
           </p>
         </fieldset>
       </div>
@@ -2000,6 +2003,77 @@
       </div>
       <div class="draft-hint" id="draft-hint">下書きは自動保存されます。</div>
       <div id="login-required">ログインしてください。</div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop post-media-editor-backdrop hidden" id="post-media-editor-backdrop" data-no-page-swipe>
+    <section
+      class="card modal-panel post-media-editor-panel"
+      id="post-media-editor-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="post-media-editor-title"
+    >
+      <div class="modal-header-row post-media-editor-header">
+        <div>
+          <div class="card-title" id="post-media-editor-title">写真を編集</div>
+          <div class="post-media-editor-subtitle" id="post-media-editor-subtitle">投稿前に見せたい範囲を整えます</div>
+        </div>
+        <button
+          class="modal-close-btn"
+          id="btn-post-media-editor-close"
+          type="button"
+          aria-label="閉じる"
+        >×</button>
+      </div>
+
+      <div class="post-media-editor-stage">
+        <canvas id="post-image-editor-canvas" aria-label="写真の編集プレビュー"></canvas>
+        <video
+          class="hidden"
+          id="post-video-editor-preview"
+          aria-label="動画カバーのプレビュー"
+          playsinline
+          muted
+        ></video>
+        <div class="post-media-editor-grid" aria-hidden="true"></div>
+      </div>
+
+      <div class="post-image-editor-controls" id="post-image-editor-controls">
+        <div class="post-media-editor-control-row">
+          <span class="post-media-editor-label" id="post-image-editor-ratio-label">比率</span>
+          <div class="post-image-editor-aspects" role="group" aria-label="写真の比率">
+            <button class="btn btn-ghost btn-xs is-active" type="button" data-editor-aspect="original" id="btn-post-image-ratio-original">元の比率</button>
+            <button class="btn btn-ghost btn-xs" type="button" data-editor-aspect="square">1:1</button>
+            <button class="btn btn-ghost btn-xs" type="button" data-editor-aspect="portrait">4:5</button>
+            <button class="btn btn-ghost btn-xs" type="button" data-editor-aspect="story">9:16</button>
+          </div>
+        </div>
+        <label class="post-media-editor-slider-row" for="post-image-editor-zoom">
+          <span class="post-media-editor-label" id="post-image-editor-zoom-label">拡大</span>
+          <input id="post-image-editor-zoom" type="range" min="1" max="3" step="0.01" value="1" />
+        </label>
+        <div class="post-image-editor-tools">
+          <button class="btn btn-ghost btn-xs" id="btn-post-image-rotate-left" type="button">↶ 左回転</button>
+          <button class="btn btn-ghost btn-xs" id="btn-post-image-rotate-right" type="button">↷ 右回転</button>
+          <button class="btn btn-ghost btn-xs" id="btn-post-media-editor-reset" type="button">リセット</button>
+        </div>
+        <p class="post-media-editor-help" id="post-image-editor-help">写真をドラッグして位置を調整できます。</p>
+      </div>
+
+      <div class="post-video-editor-controls hidden" id="post-video-editor-controls">
+        <label class="post-media-editor-slider-row" for="post-video-cover-time">
+          <span class="post-media-editor-label" id="post-video-cover-label">カバーフレーム</span>
+          <input id="post-video-cover-time" type="range" min="0" max="1" step="0.1" value="0" />
+        </label>
+        <div class="post-video-cover-time-label" id="post-video-cover-time-label">0:00 / 0:00</div>
+        <p class="post-media-editor-help" id="post-video-cover-help">スライダーを動かして、一覧に表示するフレームを選びます。</p>
+      </div>
+
+      <div class="post-media-editor-actions">
+        <button class="btn btn-ghost" id="btn-post-media-editor-cancel" type="button">キャンセル</button>
+        <button class="btn btn-primary" id="btn-post-media-editor-apply" type="button">適用</button>
+      </div>
     </section>
   </div>
 

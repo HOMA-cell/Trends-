@@ -13158,9 +13158,181 @@
       align-items: center;
       gap: 8px;
     }
+    .media-preview-action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
     .media-preview-note {
       font-size: 11px;
       color: var(--text-sub);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #btn-edit-media {
+      border-color: rgba(228, 87, 46, 0.26);
+      background: #fff6ef;
+      color: #b94a23;
+      font-weight: 800;
+    }
+    .post-media-editor-backdrop {
+      z-index: 64;
+      background: rgba(7, 12, 22, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .post-media-editor-panel {
+      max-width: 640px;
+      padding: 16px;
+      overflow: hidden;
+      border-color: rgba(255, 255, 255, 0.12);
+      background: #101722;
+      color: #f8fafc;
+      box-shadow: 0 28px 80px rgba(2, 6, 23, 0.38);
+    }
+    .post-media-editor-header {
+      margin-bottom: 14px;
+    }
+    .post-media-editor-header .card-title {
+      color: #fff;
+    }
+    .post-media-editor-header .modal-close-btn {
+      border-color: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+    .post-media-editor-subtitle {
+      margin-top: 2px;
+      color: #94a3b8;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .post-media-editor-stage {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 100%;
+      min-height: 300px;
+      max-height: 54vh;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.08), transparent 45%),
+        #080d15;
+    }
+    #post-image-editor-canvas,
+    #post-video-editor-preview {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-height: 54vh;
+      object-fit: contain;
+    }
+    #post-image-editor-canvas {
+      cursor: grab;
+      touch-action: none;
+    }
+    #post-image-editor-canvas.is-dragging {
+      cursor: grabbing;
+    }
+    #post-video-editor-preview {
+      background: #080d15;
+    }
+    .post-media-editor-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.28;
+      background:
+        linear-gradient(to right, transparent 33.1%, rgba(255, 255, 255, 0.38) 33.2%, rgba(255, 255, 255, 0.38) 33.45%, transparent 33.55%, transparent 66.4%, rgba(255, 255, 255, 0.38) 66.5%, rgba(255, 255, 255, 0.38) 66.75%, transparent 66.85%),
+        linear-gradient(to bottom, transparent 33.1%, rgba(255, 255, 255, 0.38) 33.2%, rgba(255, 255, 255, 0.38) 33.45%, transparent 33.55%, transparent 66.4%, rgba(255, 255, 255, 0.38) 66.5%, rgba(255, 255, 255, 0.38) 66.75%, transparent 66.85%);
+    }
+    .post-image-editor-controls,
+    .post-video-editor-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      padding: 14px 2px 2px;
+    }
+    .post-media-editor-control-row,
+    .post-media-editor-slider-row,
+    .post-image-editor-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .post-media-editor-label {
+      min-width: 46px;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+    .post-image-editor-aspects {
+      display: flex;
+      min-width: 0;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .post-image-editor-aspects::-webkit-scrollbar {
+      display: none;
+    }
+    .post-media-editor-panel .btn-ghost {
+      border-color: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: #dbe4f0;
+    }
+    .post-media-editor-panel .btn-ghost:hover,
+    .post-media-editor-panel .btn-ghost.is-active {
+      border-color: rgba(255, 255, 255, 0.32);
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .post-media-editor-slider-row input[type="range"] {
+      width: 100%;
+      accent-color: #f15a2b;
+      cursor: pointer;
+    }
+    .post-image-editor-tools {
+      flex-wrap: wrap;
+    }
+    .post-media-editor-help,
+    .post-video-cover-time-label {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .post-video-cover-time-label {
+      padding-left: 56px;
+      font-variant-numeric: tabular-nums;
+    }
+    .post-media-editor-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .post-media-editor-actions .btn {
+      min-width: 104px;
+    }
+    .post-media-editor-actions .btn-primary {
+      box-shadow: 0 10px 24px rgba(241, 90, 43, 0.24);
+    }
+    .post-media-editor-panel.is-processing {
+      pointer-events: none;
+    }
+    .post-media-editor-panel.is-processing .post-media-editor-stage,
+    .post-media-editor-panel.is-processing .post-image-editor-controls,
+    .post-media-editor-panel.is-processing .post-video-editor-controls {
+      opacity: 0.58;
     }
     .post-video-kind {
       min-width: 0;
@@ -13403,6 +13575,36 @@
       }
       .post-form-more-menu {
         min-width: 160px;
+      }
+      .post-media-editor-backdrop {
+        align-items: flex-end;
+        padding: 0;
+      }
+      .post-media-editor-panel {
+        max-width: 100%;
+        max-height: 94vh;
+        padding: 14px;
+        border-radius: 24px 24px 0 0;
+      }
+      .post-media-editor-stage {
+        min-height: 260px;
+        max-height: 52vh;
+        border-radius: 18px;
+      }
+      #post-image-editor-canvas,
+      #post-video-editor-preview {
+        max-height: 52vh;
+      }
+      .post-media-editor-control-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .post-image-editor-aspects {
+        width: 100%;
+      }
+      .post-media-editor-actions .btn {
+        flex: 1;
       }
     }
     /* 右上の小さいナビボタン */
