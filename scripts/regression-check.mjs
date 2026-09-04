@@ -8,6 +8,14 @@ const mediaEditorSource = await readFile(
   new URL("../mediaEditor.js", import.meta.url),
   "utf8"
 );
+const mediaProcessingSource = await readFile(
+  new URL("../mediaProcessing.js", import.meta.url),
+  "utf8"
+);
+const mediaUploadSource = await readFile(
+  new URL("../mediaUpload.js", import.meta.url),
+  "utf8"
+);
 const serviceWorkerSource = await readFile(new URL("../sw.js", import.meta.url), "utf8");
 const indexSource = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const contactSource = await readFile(new URL("../contact.html", import.meta.url), "utf8");
@@ -67,6 +75,22 @@ if (
   !serviceWorkerSource.includes('"./mediaEditor.js"')
 ) {
   failures.push("edited photos and selected video covers must reach the upload flow");
+}
+
+if (
+  !appSource.includes("uploadStorageObject") ||
+  !appSource.includes("normalizePostImage") ||
+  !appSource.includes("currentMediaUploadPath") ||
+  !mediaUploadSource.includes("findPreviousUploads") ||
+  !mediaUploadSource.includes("fingerprint:") ||
+  !mediaUploadSource.includes("storage.supabase.co/storage/v1/upload/resumable") ||
+  !mediaProcessingSource.includes("isHeicImageFile") ||
+  !mediaProcessingSource.includes("hasValidPostMediaSignature") ||
+  !indexSource.includes('id="post-upload-progress"') ||
+  !serviceWorkerSource.includes('"./mediaProcessing.js"') ||
+  !serviceWorkerSource.includes('"./mediaUpload.js"')
+) {
+  failures.push("post media uploads must remain resumable and HEIC-compatible");
 }
 
 if (/trends-app\.example/i.test(contactSource)) {

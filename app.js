@@ -70,6 +70,16 @@ import {
   loadUserEntitlements,
 } from "./monetization.js";
 import { createPostMediaEditor } from "./mediaEditor.js";
+import {
+  hasValidPostMediaSignature,
+  isHeicImageFile,
+  normalizePostImage,
+} from "./mediaProcessing.js";
+import {
+  RESUMABLE_UPLOAD_THRESHOLD_BYTES,
+  isUploadAbortError,
+  uploadStorageObject,
+} from "./mediaUpload.js";
 
     // ---- 状態 ----
     let currentUser = null;
@@ -89,9 +99,14 @@ import { createPostMediaEditor } from "./mediaEditor.js";
     let currentMediaPreviewUrl = null;
     let currentMediaMetadata = null;
     let currentImageEditConfig = null;
+    let currentMediaNormalized = false;
+    let currentMediaUploadPath = "";
     let currentVideoThumbnailBlob = null;
     let currentVideoThumbnailTime = null;
     let postMediaEditor = null;
+    let activePostUploadController = null;
+    let mediaPreparationId = 0;
+    let postMediaPreparing = false;
     let passwordRecoveryMode = false;
     let authStateSubscription = null;
     let blockedUserIds = new Set();
@@ -373,6 +388,7 @@ function getFileValidationError(file, kind) {
       if (!file) return null;
       const lang = currentLang === "en" ? "en" : "ja";
       const isImage = ALLOWED_IMAGE_TYPES.has(file.type);
+      const isPostImage = isImage || isHeicImageFile(file);
       const isVideo = ALLOWED_VIDEO_TYPES.has(file.type);
       if (kind === "avatar" || kind === "banner") {
         if (!isImage) {
@@ -389,7 +405,7 @@ function getFileValidationError(file, kind) {
         return null;
       }
       if (kind === "post") {
-        if (!isImage && !isVideo) {
+        if (!isPostImage && !isVideo) {
           return lang === "ja"
             ? "画像または動画ファイル（mp4/mov/webm）を選択してください。"
             : "Please choose an image or video file (mp4/mov/webm).";
@@ -2825,6 +2841,7 @@ async function loadProfilePostCount() {
       setText("post-video-cover-help", "postMediaEditorVideoHelp");
       setText("btn-post-media-editor-cancel", "postMediaEditorCancel");
       setText("btn-post-media-editor-apply", "postMediaEditorApply");
+      setText("btn-cancel-post-upload", "postUploadCancel");
       setText("btn-post-mode-simple", "postModeQuick");
       setText("btn-post-toggle-advanced", "postModeWorkout");
       setText("post-composer-hint", "postSimpleHint");
@@ -5667,6 +5684,39 @@ async function loadProfilePostCount() {
       el.classList.toggle("is-active", Boolean(message) && active);
     }
 
+    function setPostUploadStatus({
+      label = "",
+      percent = null,
+      cancellable = false,
+    } = {}) {
+      const wrap = $("post-upload-status");
+      const labelEl = $("post-upload-status-label");
+      const percentEl = $("post-upload-status-percent");
+      const progressEl = $("post-upload-progress");
+      const cancelBtn = $("btn-cancel-post-upload");
+      if (!wrap || !labelEl || !percentEl || !progressEl || !cancelBtn) return;
+
+      const visible = Boolean(label);
+      wrap.classList.toggle("hidden", !visible);
+      wrap.classList.toggle("is-active", visible);
+      labelEl.textContent = label;
+      const numericPercent = Number(percent);
+      if (percent !== null && percent !== undefined && Number.isFinite(numericPercent)) {
+        const safePercent = Math.max(0, Math.min(100, numericPercent));
+        progressEl.value = safePercent;
+        percentEl.textContent = `${Math.round(safePercent)}%`;
+      } else {
+        progressEl.removeAttribute("value");
+        percentEl.textContent = "";
+      }
+      cancelBtn.classList.toggle("hidden", !cancellable);
+      cancelBtn.disabled = !cancellable;
+    }
+
+    function clearPostUploadStatus() {
+      setPostUploadStatus();
+    }
+
     function getSelectedPostVideoKind() {
       const selected = document.querySelector(
         'input[name="post-video-kind"]:checked'
@@ -5791,6 +5841,7 @@ async function loadProfilePostCount() {
     }
 
     function clearMediaSelection() {
+      mediaPreparationId += 1;
       const mediaInput = $("post-media");
       if (mediaInput) {
         mediaInput.value = "";
@@ -5799,8 +5850,12 @@ async function loadProfilePostCount() {
       currentMediaOriginalFile = null;
       currentMediaMetadata = null;
       currentImageEditConfig = null;
+      currentMediaNormalized = false;
+      currentMediaUploadPath = "";
       currentVideoThumbnailBlob = null;
       currentVideoThumbnailTime = null;
+      postMediaPreparing = false;
+      if (!activePostUploadController) clearPostUploadStatus();
       renderMediaPreview(null);
     }
 
@@ -6067,6 +6122,8 @@ async function loadProfilePostCount() {
           onImageApply: ({ file, config }) => {
             currentMediaFile = file;
             currentImageEditConfig = config;
+            currentMediaNormalized = true;
+            currentMediaUploadPath = "";
             currentVideoThumbnailBlob = null;
             currentVideoThumbnailTime = null;
             renderMediaPreview(currentMediaFile);
@@ -6094,12 +6151,15 @@ async function loadProfilePostCount() {
         });
       }
       const applySelectedPostMediaFile = async (file, inputEl = null) => {
+        const preparationId = ++mediaPreparationId;
         const error = getFileValidationError(file, "post");
         if (error) {
           currentMediaFile = null;
           currentMediaOriginalFile = null;
           currentMediaMetadata = null;
           currentImageEditConfig = null;
+          currentMediaNormalized = false;
+          currentMediaUploadPath = "";
           currentVideoThumbnailBlob = null;
           currentVideoThumbnailTime = null;
           if (inputEl) {
@@ -6109,9 +6169,69 @@ async function loadProfilePostCount() {
           showToast(error, "warning");
           return false;
         }
-        if (file?.type?.startsWith("video")) {
+        if (file) {
+          let validSignature = false;
           try {
-            currentMediaMetadata = await readVideoMetadata(file);
+            validSignature = await hasValidPostMediaSignature(file);
+          } catch (signatureError) {
+            console.error("media signature validation error:", signatureError);
+          }
+          if (preparationId !== mediaPreparationId) return false;
+          if (!validSignature) {
+            const tr = t[currentLang] || t.ja;
+            if (inputEl) inputEl.value = "";
+            clearMediaSelection();
+            showToast(
+              tr.postMediaSignatureInvalid ||
+                "ファイルの内容を確認できませんでした。別の写真または動画を選んでください。",
+              "warning"
+            );
+            return false;
+          }
+        }
+        let preparedFile = file;
+        let wasNormalized = false;
+        postMediaPreparing = false;
+        if (!activePostUploadController) clearPostUploadStatus();
+        if (isHeicImageFile(file)) {
+          const tr = t[currentLang] || t.ja;
+          postMediaPreparing = true;
+          setPostUploadStatus({
+            label: tr.postMediaPreparing || "写真を準備しています…",
+          });
+          try {
+            const normalized = await normalizePostImage(file);
+            if (preparationId !== mediaPreparationId) return false;
+            preparedFile = normalized.file;
+            wasNormalized = normalized.normalized;
+          } catch (conversionError) {
+            console.error("HEIC conversion error:", conversionError);
+            if (preparationId !== mediaPreparationId) return false;
+            if (inputEl) inputEl.value = "";
+            clearMediaSelection();
+            showToast(
+              tr.postHeicConversionFailed ||
+                "HEIC写真を変換できませんでした。別の写真を選んでください。",
+              "error"
+            );
+            return false;
+          } finally {
+            if (preparationId === mediaPreparationId) {
+              postMediaPreparing = false;
+              clearPostUploadStatus();
+            }
+          }
+        }
+        const preparedValidationError = getFileValidationError(preparedFile, "post");
+        if (preparedValidationError) {
+          if (inputEl) inputEl.value = "";
+          clearMediaSelection();
+          showToast(preparedValidationError, "warning");
+          return false;
+        }
+        if (preparedFile?.type?.startsWith("video")) {
+          try {
+            currentMediaMetadata = await readVideoMetadata(preparedFile);
           } catch (metadataError) {
             console.error("video metadata error:", metadataError);
             currentMediaFile = null;
@@ -6146,9 +6266,11 @@ async function loadProfilePostCount() {
         } else {
           currentMediaMetadata = null;
         }
-        currentMediaFile = file || null;
-        currentMediaOriginalFile = file || null;
+        currentMediaFile = preparedFile || null;
+        currentMediaOriginalFile = preparedFile || null;
         currentImageEditConfig = null;
+        currentMediaNormalized = wasNormalized;
+        currentMediaUploadPath = "";
         currentVideoThumbnailBlob = null;
         currentVideoThumbnailTime = null;
         renderMediaPreview(currentMediaFile);
@@ -6258,6 +6380,17 @@ async function loadProfilePostCount() {
       if (submitBtn) {
         submitBtn.addEventListener("click", handleSubmitPost);
       }
+      const cancelUploadBtn = $("btn-cancel-post-upload");
+      if (cancelUploadBtn && cancelUploadBtn.dataset.bound !== "true") {
+        cancelUploadBtn.dataset.bound = "true";
+        cancelUploadBtn.addEventListener("click", () => {
+          const tr = t[currentLang] || t.ja;
+          setPostUploadStatus({
+            label: tr.postUploadCancelling || "アップロードを中止しています…",
+          });
+          activePostUploadController?.abort();
+        });
+      }
       const resetBtn = $("btn-reset");
       if (resetBtn) {
         resetBtn.addEventListener("click", () => {
@@ -6366,6 +6499,7 @@ async function loadProfilePostCount() {
         }
       };
       const closeModal = () => {
+        activePostUploadController?.abort();
         closeBackdrop(backdrop);
       };
       openPostModal = openModal;
@@ -9394,8 +9528,13 @@ async function loadProfilePostCount() {
       currentMediaOriginalFile = null;
       currentMediaMetadata = null;
       currentImageEditConfig = null;
+      currentMediaNormalized = false;
+      currentMediaUploadPath = "";
       currentVideoThumbnailBlob = null;
       currentVideoThumbnailTime = null;
+      mediaPreparationId += 1;
+      postMediaPreparing = false;
+      if (!activePostUploadController) clearPostUploadStatus();
       setSelectedPostVideoKind("standard");
       renderMediaPreview(null);
       workoutExercises = [];
@@ -9506,6 +9645,14 @@ async function loadProfilePostCount() {
         showToast("ログインしてください。", "warning");
         return;
       }
+      if (postMediaPreparing) {
+        const tr = t[currentLang] || t.ja;
+        showToast(
+          tr.postMediaPreparingWait || "写真の準備が終わるまでお待ちください。",
+          "warning"
+        );
+        return;
+      }
 
       const submitBtn = $("btn-submit");
       const backdrop = $("post-modal-backdrop");
@@ -9553,7 +9700,29 @@ async function loadProfilePostCount() {
             showToast(mediaValidationError, "warning");
             return;
           }
+          activePostUploadController = new AbortController();
+          const uploadSignal = activePostUploadController.signal;
           const isVideo = currentMediaFile.type.startsWith("video");
+          if (!isVideo && currentMediaFile.type !== "image/gif" && !currentMediaNormalized) {
+            setPostUploadStatus({
+              label: tr.postMediaOptimizing || "写真を最適化しています…",
+            });
+            const normalized = await normalizePostImage(currentMediaFile);
+            currentMediaFile = normalized.file;
+            currentMediaOriginalFile = normalized.file;
+            currentMediaNormalized = normalized.normalized;
+            renderMediaPreview(currentMediaFile);
+            const normalizedError = getFileValidationError(currentMediaFile, "post");
+            if (normalizedError) {
+              showToast(normalizedError, "warning");
+              return;
+            }
+          }
+          if (uploadSignal.aborted) {
+            const abortError = new Error("Upload cancelled");
+            abortError.name = "AbortError";
+            throw abortError;
+          }
           if (isVideo && !currentMediaMetadata) {
             currentMediaMetadata = await readVideoMetadata(currentMediaFile);
           }
@@ -9574,19 +9743,40 @@ async function loadProfilePostCount() {
               ))
             : null;
           const ext = getSafeFileExtension(currentMediaFile);
-          const path = `public/${currentUser.id}/${Date.now()}.${ext}`;
-
-          const { error: uploadErr } = await supabase.storage
-            .from("post-media")
-            .upload(path, currentMediaFile);
-
-          if (uploadErr) {
-            showToast(
-              "画像アップロードに失敗しました: " + uploadErr.message,
-              "error"
-            );
-            return;
-          }
+          const path =
+            currentMediaUploadPath ||
+            `public/${currentUser.id}/${Date.now()}-${Math.random()
+              .toString(16)
+              .slice(2)}.${ext}`;
+          currentMediaUploadPath = path;
+          const resumable =
+            isVideo || currentMediaFile.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES;
+          setPostUploadStatus({
+            label: tr.postMediaUploading || "メディアをアップロードしています…",
+            percent: 0,
+            cancellable: resumable,
+          });
+          await uploadStorageObject({
+            supabase,
+            supabaseUrl: SUPABASE_URL,
+            bucket: "post-media",
+            path,
+            file: currentMediaFile,
+            preferResumable: isVideo,
+            signal: uploadSignal,
+            onProgress: ({ percent, resumable: progressIsResumable }) => {
+              const roundedPercent = Math.round(percent);
+              const label = (
+                tr.postMediaUploadProgress || "アップロード中 {percent}%"
+              ).replace("{percent}", `${roundedPercent}`);
+              setPostUploadStatus({
+                label,
+                percent,
+                cancellable: progressIsResumable,
+              });
+            },
+          });
+          activePostUploadController = null;
           uploadedMediaPaths.push(path);
 
           const { data: publicData } = supabase.storage
@@ -9596,7 +9786,7 @@ async function loadProfilePostCount() {
           mediaUrl = publicData.publicUrl;
           mediaType = isVideo ? "video" : "image";
           if (thumbnailBlob) {
-            const thumbnailPath = `public/${currentUser.id}/${Date.now()}-poster.jpg`;
+            const thumbnailPath = path.replace(/\.[^.]+$/, "-poster.jpg");
             const { error: thumbnailError } = await supabase.storage
               .from("post-media")
               .upload(thumbnailPath, thumbnailBlob, {
@@ -9717,15 +9907,32 @@ async function loadProfilePostCount() {
           showToast("投稿しました！", "success");
         }
       } catch (submitError) {
-        console.error("submit post unexpected error:", submitError);
+        const uploadWasActive = Boolean(activePostUploadController);
+        if (!isUploadAbortError(submitError)) {
+          console.error("submit post unexpected error:", submitError);
+        }
         if (!postInserted && uploadedMediaPaths.length) {
           await supabase.storage.from("post-media").remove(uploadedMediaPaths);
         }
-        showToast(
-          "投稿処理に失敗しました。もう一度お試しください。",
-          "error"
-        );
+        if (isUploadAbortError(submitError)) {
+          const tr = t[currentLang] || t.ja;
+          showToast(
+            tr.postUploadCancelled || "アップロードを中止しました。",
+            "warning"
+          );
+        } else {
+          const tr = t[currentLang] || t.ja;
+          showToast(
+            uploadWasActive
+              ? tr.postMediaUploadFailed ||
+                  "メディアのアップロードに失敗しました。通信を確認して、もう一度投稿してください。"
+              : "投稿処理に失敗しました。もう一度お試しください。",
+            "error"
+          );
+        }
       } finally {
+        activePostUploadController = null;
+        clearPostUploadStatus();
         setButtonLoading(submitBtn, false);
       }
     }

@@ -19,6 +19,8 @@ const SHELL_ASSETS = [
   "./ads-config.js",
   "./app.js",
   "./mediaEditor.js",
+  "./mediaProcessing.js",
+  "./mediaUpload.js",
   "./feed.js",
   "./monetization.js",
   "./dm.js",

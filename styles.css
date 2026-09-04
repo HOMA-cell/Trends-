@@ -13497,6 +13497,59 @@
       letter-spacing: 0.01em;
       box-shadow: 0 8px 16px rgba(228, 87, 46, 0.24);
     }
+    .post-upload-status {
+      display: grid;
+      gap: 7px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--accent) 5%, #fff);
+    }
+    .post-upload-status-row,
+    .post-upload-progress-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .post-upload-status-row {
+      justify-content: space-between;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    #post-upload-status-percent {
+      color: var(--accent-strong);
+      font-variant-numeric: tabular-nums;
+    }
+    #post-upload-progress {
+      width: 100%;
+      height: 6px;
+      overflow: hidden;
+      border: 0;
+      border-radius: 999px;
+      accent-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, #fff);
+    }
+    #post-upload-progress::-webkit-progress-bar {
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 12%, #fff);
+    }
+    #post-upload-progress::-webkit-progress-value {
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), #ff8a4d);
+    }
+    #post-upload-progress::-moz-progress-bar {
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), #ff8a4d);
+    }
+    #btn-cancel-post-upload {
+      flex: 0 0 auto;
+      min-height: 28px;
+      padding-inline: 10px;
+      border-color: color-mix(in srgb, var(--danger) 28%, var(--border));
+      color: var(--danger);
+    }
     .post-form-more {
       position: relative;
     }
