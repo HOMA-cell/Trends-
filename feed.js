@@ -7199,6 +7199,23 @@ export function renderFeed(options = {}) {
       updateCommentButtonState(commentBtn, post.id, tr, commentsByPost);
       appendPrimaryAction(commentBtn);
 
+      const saveBtn = document.createElement("button");
+      saveBtn.className =
+        "chip chip-log chip-save chip-action reaction-btn reaction-save chip-compact";
+      saveBtn.dataset.postAction = "toggle-save";
+      const isSaved = savedPostIds.has(`${post.id || ""}`);
+      const saveLabel = isSaved ? tr.saved || "Saved" : tr.save || "Save";
+      setActionButtonContent(saveBtn, {
+        kind: "save",
+        icon: "🔖",
+        label: "",
+      });
+      saveBtn.classList.toggle("chip-active", isSaved);
+      saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
+      saveBtn.setAttribute("aria-label", saveLabel);
+      saveBtn.title = saveLabel;
+      appendPrimaryAction(saveBtn);
+
       const openDetailBtn = document.createElement("button");
       openDetailBtn.className =
         "chip chip-log chip-action post-inline-open surface-cta surface-cta-primary";
@@ -7230,21 +7247,6 @@ export function renderFeed(options = {}) {
       });
       shareBtn.setAttribute("aria-label", tr.share || "Share");
       appendSecondaryAction(shareBtn);
-
-      const saveBtn = document.createElement("button");
-      saveBtn.className =
-        "chip chip-log chip-save chip-action surface-cta surface-cta-secondary";
-      saveBtn.dataset.postAction = "toggle-save";
-      const isSaved = savedPostIds.has(`${post.id || ""}`);
-      setActionButtonContent(saveBtn, {
-        kind: "save",
-        icon: "🔖",
-        label: isSaved ? tr.saved || "Saved" : tr.save || "Save",
-      });
-      saveBtn.classList.toggle("chip-active", isSaved);
-      saveBtn.setAttribute("aria-pressed", isSaved ? "true" : "false");
-      saveBtn.setAttribute("aria-label", isSaved ? tr.saved || "Saved" : tr.save || "Save");
-      appendSecondaryAction(saveBtn);
 
       if (currentUser && post.user_id === currentUser.id) {
         const deleteBtn = document.createElement("button");
