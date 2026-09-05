@@ -762,7 +762,15 @@
                     type="password"
                     placeholder="Password"
                     autocomplete="current-password"
+                    maxlength="128"
+                    aria-describedby="auth-password-requirements"
                   />
+                  <div
+                    class="auth-password-requirements hidden"
+                    id="auth-password-requirements"
+                    role="status"
+                    aria-live="polite"
+                  >12文字以上で、英字・数字・記号を組み合わせてください。</div>
                   <button class="btn btn-primary auth-submit" id="btn-auth" type="submit">
                     ログイン
                   </button>
@@ -797,10 +805,16 @@
           <div class="password-recovery-panel hidden" id="password-recovery-panel">
             <div class="password-recovery-kicker" id="password-recovery-kicker">SECURE RECOVERY</div>
             <div class="card-title" id="password-recovery-title">新しいパスワードを設定</div>
-            <div class="card-sub" id="password-recovery-sub">8文字以上の新しいパスワードを入力してください。</div>
+            <div class="card-sub" id="password-recovery-sub">安全な新しいパスワードを入力してください。</div>
             <div class="auth-form password-recovery-form">
-              <input id="recovery-password" type="password" placeholder="New password" autocomplete="new-password" />
-              <input id="recovery-password-confirm" type="password" placeholder="Confirm password" autocomplete="new-password" />
+              <input id="recovery-password" type="password" minlength="12" maxlength="128" placeholder="New password" autocomplete="new-password" aria-describedby="recovery-password-requirements" />
+              <input id="recovery-password-confirm" type="password" minlength="12" maxlength="128" placeholder="Confirm password" autocomplete="new-password" />
+              <div
+                class="auth-password-requirements"
+                id="recovery-password-requirements"
+                role="status"
+                aria-live="polite"
+              >12文字以上で、英字・数字・記号を組み合わせてください。</div>
               <button class="btn btn-primary" id="btn-recovery-update" type="button">パスワードを更新</button>
             </div>
           </div>

@@ -20456,6 +20456,41 @@ body[data-page="account"].auth-signed-out-visible .fab {
   margin-top: 16px;
 }
 
+.auth-password-requirements {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -2px 2px 3px;
+  color: #667085;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.auth-password-requirements::before {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 999px;
+  background: #98a2b3;
+  content: "";
+}
+
+.auth-password-requirements.is-invalid {
+  color: #b54708;
+}
+
+.auth-password-requirements.is-invalid::before {
+  background: #f79009;
+}
+
+.auth-password-requirements.is-valid {
+  color: #067647;
+}
+
+.auth-password-requirements.is-valid::before {
+  background: #12b76a;
+}
+
 .auth-reset-link {
   align-self: flex-start;
   margin-top: 4px;

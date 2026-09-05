@@ -253,6 +253,32 @@ async function main() {
       fail("auth/v1/health", String(error?.message || error));
     }
 
+    try {
+      const res = await fetchWithTimeout(
+        `${supabaseUrl}/auth/v1/settings`,
+        { headers: { apikey: supabaseAnonKey } },
+        9000
+      );
+      if (!res.ok) {
+        const body = await safeReadText(res);
+        warn("auth signup settings", `HTTP ${res.status}${body ? ` ${body}` : ""}`);
+      } else {
+        const settings = await res.json();
+        if (settings.disable_signup === true) {
+          fail("auth signup", "New sign-ups are disabled at the Auth service");
+        } else {
+          ok("auth signup", "Enabled; closed-beta hook controls admission");
+        }
+        if (settings.mailer_autoconfirm === false) {
+          ok("auth email confirmation", "Required");
+        } else {
+          warn("auth email confirmation", "Automatic confirmation appears enabled");
+        }
+      }
+    } catch (error) {
+      warn("auth signup settings", String(error?.message || error));
+    }
+
     const restHeaders = {
       apikey: supabaseAnonKey,
       Authorization: `Bearer ${supabaseAnonKey}`,
