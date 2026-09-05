@@ -146,7 +146,7 @@ function main() {
 
   try {
     const migration = readText(
-      'supabase/migrations/20260901104327_beta_readiness_controls.sql'
+      'supabase/migrations/20260901114459_beta_readiness_controls.sql'
     );
     const requiredControls = [
       'alter table public.app_events enable row level security',

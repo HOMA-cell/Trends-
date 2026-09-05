@@ -1,0 +1,99 @@
+name: Browser E2E
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      E2E_BASE_URL: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'https://trends-navy-psi.vercel.app' || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browser runtimes
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run browser smoke tests
+        run: npm run e2e:smoke
+
+      - name: Upload failure report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: browser-smoke-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  authenticated:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      E2E_BASE_URL: https://trends-navy-psi.vercel.app
+      E2E_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
+      E2E_USER_A_PASSWORD: ${{ secrets.E2E_USER_A_PASSWORD }}
+      E2E_USER_A_HANDLE: ${{ secrets.E2E_USER_A_HANDLE }}
+      E2E_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
+      E2E_USER_B_PASSWORD: ${{ secrets.E2E_USER_B_PASSWORD }}
+      E2E_USER_B_HANDLE: ${{ secrets.E2E_USER_B_HANDLE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browser runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Check test-account secrets
+        if: env.E2E_USER_A_EMAIL == '' || env.E2E_USER_A_PASSWORD == '' || env.E2E_USER_A_HANDLE == '' || env.E2E_USER_B_EMAIL == '' || env.E2E_USER_B_PASSWORD == '' || env.E2E_USER_B_HANDLE == ''
+        run: echo "::warning::Authenticated E2E is skipped until all six E2E test-account secrets are configured."
+
+      - name: Run authenticated production flow
+        run: npm run e2e:authenticated
+
+      - name: Upload failure report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: authenticated-e2e-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14

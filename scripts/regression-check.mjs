@@ -21,7 +21,7 @@ const indexSource = await readFile(new URL("../index.html", import.meta.url), "u
 const contactSource = await readFile(new URL("../contact.html", import.meta.url), "utf8");
 const betaMigrationSource = await readFile(
   new URL(
-    "../supabase/migrations/20260901104327_beta_readiness_controls.sql",
+    "../supabase/migrations/20260901114459_beta_readiness_controls.sql",
     import.meta.url
   ),
   "utf8"
