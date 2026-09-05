@@ -24,19 +24,21 @@ Use dedicated invited beta accounts. Do not reuse an operator or personal accoun
 
 ## Database Backups
 
-Run `npm run backup:create` weekly from an operator-controlled machine. The command creates role, schema, and data dumps in a temporary directory, encrypts them with AES-256, and persists only the encrypted archive.
+On macOS, run `npm run backup:setup` once. It generates a strong encryption password and stores it in the operator's login Keychain. Install the lightweight PostgreSQL client with `brew install libpq` if Docker is not installed. Then run `npm run backup:create` weekly from the linked Supabase project directory. The command creates role, schema, data, and Storage object backups in a temporary directory, encrypts them with AES-256, verifies that the archive can be decrypted, and persists only the encrypted archive.
 
 Set these environment variables without committing them:
 
 ```text
-SUPABASE_DB_URL
-BACKUP_ENCRYPTION_PASSWORD
+SUPABASE_DB_URL (optional; the linked Supabase project is used by default)
+BACKUP_ENCRYPTION_PASSWORD (optional on a configured macOS operator machine)
 BACKUP_OUTPUT_DIR (optional; defaults to ~/Trends-backups)
+BACKUP_INCLUDE_STORAGE (optional; defaults to 1)
+STORAGE_BACKUP_BUCKETS (optional; defaults to avatars post-media dm-media)
 ```
 
-Use the Supabase session-pooler or direct database connection string for `SUPABASE_DB_URL`. Generate a long random encryption password and keep a second copy in an operator-owned password manager. Losing this password makes the backup unrecoverable. Do not upload a production dump to this public repository or its Actions artifacts.
+Keep a second copy of the Keychain password in an operator-owned password manager. Losing this password makes the backup unrecoverable. For non-macOS environments, set `BACKUP_ENCRYPTION_PASSWORD`; optionally set a Supabase session-pooler or direct database connection string in `SUPABASE_DB_URL`. Do not upload a production dump to this public repository or its Actions artifacts.
 
-Supabase database dumps include Storage metadata but not the underlying image and video objects. Back up the `avatars`, `post-media`, and `dm-media` buckets separately before broad public launch. This requires a private operator-owned destination and must not use a privileged Storage key in frontend code.
+Supabase database dumps include Storage metadata but not the underlying image and video objects. The backup command therefore downloads the `avatars`, `post-media`, and `dm-media` objects through the authenticated linked CLI and includes them in the encrypted local archive. Never put a privileged Storage key in frontend code.
 
 ## Restore Drill
 
