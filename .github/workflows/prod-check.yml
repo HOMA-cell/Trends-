@@ -2,19 +2,29 @@ name: Production Check
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "15 */6 * * *"
   push:
     branches:
       - main
 
+permissions:
+  contents: read
+
+concurrency:
+  group: production-check
+  cancel-in-progress: true
+
 jobs:
   prod_check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -24,4 +34,3 @@ jobs:
 
       - name: Run production readiness check
         run: npm run prod:check
-

@@ -27,23 +27,25 @@ Open:
 - `npm run check` - syntax checks for app and support scripts
 - `npm run lint` - ESLint on app source files
 - `npm run ci` - local equivalent of GitHub CI
+- `npm run e2e:smoke` - desktop and mobile browser smoke tests
+- `npm run e2e:authenticated` - two-account production flow when E2E secrets are set
+- `npm run backup:create` - encrypted local Supabase logical backup
 
 ## Production readiness checklist
 
 1. Run `npm run preflight`
 2. Run `npm run security`
 3. Run `npm run ci`
-4. Apply the baseline Supabase migration:
-   - `/Users/homare/Documents/Trends-/supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
-4. Walk through:
+4. Confirm `supabase migration list --linked` matches every file in `supabase/migrations`
+5. Walk through:
    - sign in
    - create a post
    - comment / like
    - DM
    - open profile / detail / shorts
-5. In `Settings > Data tools`, save the real production URL in `Live site URL`
-6. Verify `build-meta.json` updates after deploy
-7. Run `ライブ版を確認` from inside the app
+6. In `Settings > Data tools`, save the real production URL in `Live site URL`
+7. Verify `build-meta.json` updates after deploy
+8. Run `ライブ版を確認` from inside the app
 
 ## Deploy notes
 
@@ -61,6 +63,8 @@ Open:
   - `/Users/homare/Documents/Trends-/SUPABASE_CHECKLIST.md`
 - Security notes:
   - `/Users/homare/Documents/Trends-/SECURITY.md`
+- Production operations and backups:
+  - `/Users/homare/Documents/Trends-/OPERATIONS.md`
 - Monetization rollout and data boundaries:
   - `MONETIZATION.md`
 

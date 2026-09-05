@@ -5,7 +5,7 @@ This runbook is for the invited beta. Do not apply a new migration or deploy the
 ## Release Order
 
 1. Confirm the production backup and the current Vercel rollback target.
-2. Review `supabase/migrations/20260901104327_beta_readiness_controls.sql`.
+2. Review `supabase/migrations/20260901114459_beta_readiness_controls.sql`.
 3. Apply the migration to Supabase.
 4. In Supabase Dashboard, open `Authentication > Hooks > Before User Created`.
 5. Select the Postgres function `private.hook_restrict_beta_signups` and enable it.
