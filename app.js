@@ -219,6 +219,7 @@ import {
     const RUNTIME_ISSUES_LIMIT = 20;
     const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
     const SUPABASE_CONNECTIVITY_RETRY_MS = 120000;
+    const AUTH_PASSWORD_MIN_LENGTH = 12;
     const FILE_LIMITS = {
       avatar: 5 * 1024 * 1024,
       banner: 8 * 1024 * 1024,
@@ -3192,6 +3193,8 @@ async function loadProfilePostCount() {
       setText("btn-auth-reset-request", "authResetLink");
       setText("password-recovery-title", "authRecoveryTitle");
       setText("password-recovery-sub", "authRecoverySub");
+      setText("auth-password-requirements", "authPasswordRequirements");
+      setText("recovery-password-requirements", "authPasswordRequirements");
       setText("btn-recovery-update", "authRecoverySubmit");
       setText("account-safety-title", "safetySettingsTitle");
       setText("account-safety-sub", "safetySettingsSub");
@@ -3369,6 +3372,32 @@ async function loadProfilePostCount() {
     }
 
       // ------------------ Auth ------------------
+    function isAcceptableNewPassword(value) {
+      const password = `${value || ""}`;
+      if (password.length < AUTH_PASSWORD_MIN_LENGTH) return false;
+      const characterGroups = [
+        /\p{L}/u.test(password),
+        /\p{N}/u.test(password),
+        /[\p{P}\p{S}]/u.test(password),
+      ].filter(Boolean).length;
+      return characterGroups >= 2;
+    }
+
+    function updatePasswordRequirements(input, targetId) {
+      const target = $(targetId);
+      if (!target) return;
+      const value = `${input?.value || ""}`;
+      const valid = isAcceptableNewPassword(value);
+      const tr = t[currentLang] || t.ja;
+      target.classList.toggle("is-valid", valid);
+      target.classList.toggle("is-invalid", value.length > 0 && !valid);
+      target.textContent = valid
+        ? tr.authPasswordRequirementsMet || "安全なパスワードです。"
+        : tr.authPasswordRequirements ||
+          "12文字以上で、英字・数字・記号を組み合わせてください。";
+      target.dataset.valid = valid ? "true" : "false";
+    }
+
     function syncAuthModeUi() {
       const tr = t[currentLang] || t.ja;
       const signingUp = authMode === "signup";
@@ -3376,6 +3405,7 @@ async function loadProfilePostCount() {
       const signupButton = $("btn-auth-mode-signup");
       const submitButton = $("btn-auth");
       const passwordInput = $("auth-password");
+      const passwordRequirements = $("auth-password-requirements");
       const caption = $("auth-caption");
       const betaNote = $("auth-beta-note");
       const resetButton = $("btn-auth-reset-request");
@@ -3391,7 +3421,15 @@ async function loadProfilePostCount() {
       }
       if (passwordInput) {
         passwordInput.autocomplete = signingUp ? "new-password" : "current-password";
+        if (signingUp) {
+          passwordInput.minLength = AUTH_PASSWORD_MIN_LENGTH;
+        } else {
+          passwordInput.removeAttribute("minlength");
+        }
       }
+      passwordRequirements?.classList.toggle("hidden", !signingUp);
+      updatePasswordRequirements(passwordInput, "auth-password-requirements");
+      updatePasswordRequirements($("recovery-password"), "recovery-password-requirements");
       if (caption) {
         caption.textContent = signingUp
           ? tr.authSignupCaption || "招待されたメールアドレスで登録してください。"
@@ -3458,6 +3496,8 @@ async function loadProfilePostCount() {
       const loginModeBtn = $("btn-auth-mode-login");
       const signupModeBtn = $("btn-auth-mode-signup");
       const recoveryUpdateBtn = $("btn-recovery-update");
+      const authPasswordInput = $("auth-password");
+      const recoveryPasswordInput = $("recovery-password");
       const deleteConfirmation = $("account-delete-confirmation");
       const deleteAccountBtn = $("btn-delete-account");
       if (authForm && authForm.dataset.bound !== "true") {
@@ -3530,6 +3570,21 @@ async function loadProfilePostCount() {
         recoveryUpdateBtn.dataset.bound = "true";
         recoveryUpdateBtn.addEventListener("click", handlePasswordRecoveryUpdate);
       }
+      if (authPasswordInput && authPasswordInput.dataset.boundStrength !== "true") {
+        authPasswordInput.dataset.boundStrength = "true";
+        authPasswordInput.addEventListener("input", () => {
+          updatePasswordRequirements(authPasswordInput, "auth-password-requirements");
+        });
+      }
+      if (recoveryPasswordInput && recoveryPasswordInput.dataset.boundStrength !== "true") {
+        recoveryPasswordInput.dataset.boundStrength = "true";
+        recoveryPasswordInput.addEventListener("input", () => {
+          updatePasswordRequirements(
+            recoveryPasswordInput,
+            "recovery-password-requirements"
+          );
+        });
+      }
       if (deleteConfirmation && deleteConfirmation.dataset.bound !== "true") {
         deleteConfirmation.dataset.bound = "true";
         deleteConfirmation.addEventListener("input", () => {
@@ -3592,8 +3647,12 @@ async function loadProfilePostCount() {
       const confirmation = `${$("recovery-password-confirm")?.value || ""}`;
       const button = $("btn-recovery-update");
       const tr = t[currentLang] || t.ja;
-      if (password.length < 8) {
-        showToast(tr.authPasswordTooShort || "パスワードは8文字以上にしてください。", "warning");
+      if (!isAcceptableNewPassword(password)) {
+        showToast(
+          tr.authPasswordTooWeak ||
+            "12文字以上で、英字・数字・記号を組み合わせてください。",
+          "warning"
+        );
         return;
       }
       if (password !== confirmation) {
@@ -4779,9 +4838,10 @@ async function loadProfilePostCount() {
         return;
       }
 
-      if (signingUp && password.length < 8) {
+      if (signingUp && !isAcceptableNewPassword(password)) {
         showToast(
-          tr.authPasswordTooShort || "パスワードは8文字以上にしてください。",
+          tr.authPasswordTooWeak ||
+            "12文字以上で、英字・数字・記号を組み合わせてください。",
           "warning"
         );
         return;

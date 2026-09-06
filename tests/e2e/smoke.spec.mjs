@@ -16,6 +16,16 @@ test("public shell and primary navigation render without JavaScript errors", asy
   await openPage(page, "notifications");
   await openPage(page, "account");
   await expect(page.locator("#btn-auth-open-form")).toBeVisible();
+  await page.locator("#btn-auth-open-form").click();
+  await page.locator("#btn-auth-mode-signup").click();
+  const passwordRequirements = page.locator("#auth-password-requirements");
+  await expect(passwordRequirements).toBeVisible();
+  await page.locator("#auth-password").fill("weakpass");
+  await expect(passwordRequirements).toHaveAttribute("data-valid", "false");
+  await page.locator("#auth-password").fill("Trends-Beta-2026");
+  await expect(passwordRequirements).toHaveAttribute("data-valid", "true");
+  await page.locator("#btn-auth-mode-login").click();
+  await expect(passwordRequirements).toBeHidden();
 
   await openPage(page, "feed");
   await expect(page.locator("#feed-list")).toBeVisible();

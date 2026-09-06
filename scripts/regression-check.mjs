@@ -43,6 +43,27 @@ if (
   failures.push("login and invite sign-up must remain explicit, separate actions");
 }
 
+if (
+  !appSource.includes("const AUTH_PASSWORD_MIN_LENGTH = 12") ||
+  !appSource.includes("isAcceptableNewPassword") ||
+  !indexSource.includes('id="auth-password-requirements"') ||
+  !indexSource.includes('id="recovery-password-requirements"')
+) {
+  failures.push("new and recovered passwords must retain the free-tier strength guard");
+}
+
+const prodCheckSource = await readFile(
+  new URL("../scripts/prod-check.mjs", import.meta.url),
+  "utf8"
+);
+if (
+  !prodCheckSource.includes("/auth/v1/settings") ||
+  !prodCheckSource.includes("mailer_autoconfirm") ||
+  !prodCheckSource.includes("disable_signup")
+) {
+  failures.push("production checks must monitor Auth sign-up and email confirmation settings");
+}
+
 if (!indexSource.includes('id="feedback-modal-backdrop"')) {
   failures.push("the beta feedback entry and modal must remain available");
 }

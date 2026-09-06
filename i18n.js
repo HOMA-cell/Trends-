@@ -1123,9 +1123,14 @@ export const t = {
         authResetSent: "パスワード再設定メールを送信しました。",
         authResetFailed: "再設定メールを送信できませんでした。",
         authRecoveryTitle: "新しいパスワードを設定",
-        authRecoverySub: "8文字以上の新しいパスワードを入力してください。",
+        authRecoverySub: "安全な新しいパスワードを入力してください。",
         authRecoverySubmit: "パスワードを更新",
         authPasswordTooShort: "パスワードは8文字以上にしてください。",
+        authPasswordRequirements:
+          "12文字以上で、英字・数字・記号を組み合わせてください。",
+        authPasswordRequirementsMet: "安全なパスワードです。",
+        authPasswordTooWeak:
+          "12文字以上で、英字・数字・記号を組み合わせてください。",
         authPasswordMismatch: "パスワードが一致しません。",
         authPasswordUpdating: "更新中...",
         authPasswordUpdated: "パスワードを更新しました。",
@@ -2297,9 +2302,14 @@ export const t = {
         authResetSent: "Password reset email sent.",
         authResetFailed: "Could not send the reset email.",
         authRecoveryTitle: "Set a new password",
-        authRecoverySub: "Enter a new password with at least 8 characters.",
+        authRecoverySub: "Enter a secure new password.",
         authRecoverySubmit: "Update password",
         authPasswordTooShort: "Use at least 8 characters.",
+        authPasswordRequirements:
+          "Use 12+ characters and combine letters, numbers, or symbols.",
+        authPasswordRequirementsMet: "This password meets the requirements.",
+        authPasswordTooWeak:
+          "Use 12+ characters and combine letters, numbers, or symbols.",
         authPasswordMismatch: "Passwords do not match.",
         authPasswordUpdating: "Updating...",
         authPasswordUpdated: "Password updated.",
