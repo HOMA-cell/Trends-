@@ -12,6 +12,7 @@ const FRONTEND_FILES = [
   'mediaUpload.js',
   'feed.js',
   'monetization.js',
+  'operator.js',
   'dm.js',
   'profile.js',
   'settings.js',
@@ -164,6 +165,36 @@ function main() {
     }
   } catch (error) {
     fail('Beta migration access controls', String(error?.message || error));
+  }
+
+  try {
+    const migration = readText(
+      'supabase/migrations/20260906123827_operator_console.sql'
+    );
+    const requiredControls = [
+      'alter table private.operator_roles enable row level security',
+      'alter table private.operator_audit_log enable row level security',
+      'revoke all on table private.operator_roles',
+      'revoke all on table private.operator_audit_log',
+      "if (select auth.uid()) is null then",
+      "perform private.require_operator('moderator')",
+      "perform private.require_operator('owner')",
+      'security definer',
+      "set search_path = ''",
+      'revoke all on function public.operator_update_report',
+      'revoke all on function public.operator_upsert_invite',
+    ];
+    const missing = requiredControls.filter((token) => !migration.includes(token));
+    if (missing.length) {
+      fail('Operator console access controls', missing.join(', '));
+    } else {
+      ok(
+        'Operator console access controls',
+        'Private roles, explicit auth checks, audit log, and revoked public execution'
+      );
+    }
+  } catch (error) {
+    fail('Operator console access controls', String(error?.message || error));
   }
 
   try {

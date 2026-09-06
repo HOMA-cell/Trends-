@@ -70,6 +70,7 @@ import {
   loadUserEntitlements,
 } from "./monetization.js";
 import { createPostMediaEditor } from "./mediaEditor.js";
+import { createOperatorConsole } from "./operator.js";
 import {
   hasValidPostMediaSignature,
   isHeicImageFile,
@@ -218,6 +219,17 @@ import {
     const BUILD_AUTO_REFRESH_DONE_KEY = "trends_build_auto_refresh_done_v1";
     const RUNTIME_ISSUES_LIMIT = 20;
     const SUPABASE_CONNECTIVITY_TTL_MS = 15000;
+    const operatorConsole = createOperatorConsole({
+      supabase,
+      getCurrentUser: () => currentUser,
+      getCurrentLang: () => currentLang,
+      setActivePage: (page, options = {}) => {
+        if (typeof setActivePage === "function") {
+          setActivePage(page, options);
+        }
+      },
+      showToast,
+    });
     const SUPABASE_CONNECTIVITY_RETRY_MS = 120000;
     const AUTH_PASSWORD_MIN_LENGTH = 12;
     const FILE_LIMITS = {
@@ -2370,6 +2382,7 @@ async function loadProfilePostCount() {
       setupAuthUI();
       setupAuthStateListener();
       setupAccountPageUI();
+      operatorConsole.setup();
       setupSafetyControls();
       setupFeedbackControls();
       setupPostForm();
@@ -4966,6 +4979,7 @@ async function loadProfilePostCount() {
 
         updateAuthUIState();
         populateProfileEditor();
+        await operatorConsole.refreshAccess();
         await loadExercisePRs();
         await loadTemplates();
         await loadNotifications();
@@ -5000,6 +5014,7 @@ async function loadProfilePostCount() {
       await supabase.auth.signOut();
       await clearLocalRuntimeCaches();
       currentUser = null;
+      operatorConsole.reset();
       await loadUserEntitlements("");
       currentProfile = null;
       profilePostCount = null;
@@ -5177,6 +5192,7 @@ async function loadProfilePostCount() {
           profilePostCount = null;
           updateProfileSummary();
           updateAuthUIState();
+          operatorConsole.reset();
           return;
         }
       }
@@ -5202,6 +5218,7 @@ async function loadProfilePostCount() {
         profilePostCount = null;
         updateProfileSummary();
         updateAuthUIState();
+        operatorConsole.reset();
         return;
       }
 
@@ -5213,6 +5230,7 @@ async function loadProfilePostCount() {
         profilePostCount = null;
         updateProfileSummary();
         updateAuthUIState();
+        operatorConsole.reset();
         return;
       }
 
@@ -5241,6 +5259,7 @@ async function loadProfilePostCount() {
       updateProfileSummary();
       updateAuthUIState();
       populateProfileEditor();
+      await operatorConsole.refreshAccess();
       void trackProductEvent("session_started", {
         page: document.body?.dataset?.page || "feed",
         build: `${appBuildMeta?.version || "unknown"}`,
@@ -5318,13 +5337,19 @@ async function loadProfilePostCount() {
           miniNotifications.classList.toggle("is-active", page === "notifications");
         }
         if (miniAccount) {
-          miniAccount.classList.toggle("is-active", page === "account");
+          miniAccount.classList.toggle(
+            "is-active",
+            page === "account" || page === "operator"
+          );
         }
       };
       const updateTabState = (page) => {
         tabs.forEach((tab) => {
           const target = tab.getAttribute("data-page-target");
-          tab.classList.toggle("is-active", target === page);
+          tab.classList.toggle(
+            "is-active",
+            target === page || (page === "operator" && target === "account")
+          );
         });
         syncMiniBottomTabState(page);
       };
@@ -5459,6 +5484,7 @@ async function loadProfilePostCount() {
           });
         }
         handleDmPageChange(page);
+        void operatorConsole.handlePageChange(page);
         return true;
       };
       setActivePage = setPage;

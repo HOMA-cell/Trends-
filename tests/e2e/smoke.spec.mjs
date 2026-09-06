@@ -16,6 +16,8 @@ test("public shell and primary navigation render without JavaScript errors", asy
   await openPage(page, "notifications");
   await openPage(page, "account");
   await expect(page.locator("#btn-auth-open-form")).toBeVisible();
+  await expect(page.locator("#btn-account-open-operator")).toBeHidden();
+  await expect(page.locator('[data-page="operator"]')).not.toHaveClass(/is-active/);
   await page.locator("#btn-auth-open-form").click();
   await page.locator("#btn-auth-mode-signup").click();
   const passwordRequirements = page.locator("#auth-password-requirements");

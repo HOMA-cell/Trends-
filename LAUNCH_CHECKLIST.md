@@ -21,12 +21,10 @@ Expected:
 
 ## 2) Supabase
 
-Run:
-
-- `supabase/migrations/20260207_000001_baseline_schema_and_policies.sql`
-- `supabase/migrations/20260430_000001_storage_buckets.sql`
-- `supabase/migrations/20260314_000001_direct_messages.sql`
-- `supabase/migrations/20260318_000001_direct_messages_media.sql`
+Apply every tracked migration in `supabase/migrations` in timestamp order. With a
+linked CLI, use `supabase db push` and confirm `npm run db:status` reports no pending
+migrations. Do not maintain a partial hand-written migration list here because it can
+silently omit newer security controls.
 
 Then verify:
 
@@ -34,6 +32,8 @@ Then verify:
 - RLS is enabled
 - DM tables exist
 - comment / like / follow / notification tables exist
+- operator RPCs deny anonymous calls
+- the operator owner role is assigned to exactly the intended operator account
 
 If you have Supabase CLI access configured, you can also check linked migration state with:
 
@@ -87,6 +87,9 @@ With a real account:
 9. Send image / reply / reaction in DM
 10. Open Shorts and comments
 11. Confirm notifications arrive
+12. Open the operator console with the owner account
+13. Add and revoke a temporary invite
+14. Move a test report through review and resolution
 
 ## 6) Release decision
 
@@ -99,6 +102,7 @@ Safe to open to real users when all are true:
 - Supabase migration is applied
 - in-app live check is correct
 - smoke test passes
+- operator actions are recorded in `private.operator_audit_log`
 
 ## 7) Fallback
 

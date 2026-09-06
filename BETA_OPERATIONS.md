@@ -16,7 +16,9 @@ This runbook is for the invited beta. Do not apply a new migration or deploy the
 
 ## Invite Management
 
-Run these queries only in the Supabase SQL Editor. Never commit real email addresses.
+Use `アカウント > 運営コンソール > 招待` for normal invite management. Run the
+queries below only as a fallback in the Supabase SQL Editor. Never commit real email
+addresses.
 
 Add or renew an invite:
 
