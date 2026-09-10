@@ -53,7 +53,9 @@ jobs:
           retention-days: 14
 
   authenticated:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: >-
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'schedule' && vars.AUTHENTICATED_E2E_ENABLED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -80,9 +82,8 @@ jobs:
       - name: Install browser runtime
         run: npx playwright install --with-deps chromium
 
-      - name: Check test-account secrets
-        if: env.E2E_USER_A_EMAIL == '' || env.E2E_USER_A_PASSWORD == '' || env.E2E_USER_A_HANDLE == '' || env.E2E_USER_B_EMAIL == '' || env.E2E_USER_B_PASSWORD == '' || env.E2E_USER_B_HANDLE == ''
-        run: echo "::warning::Authenticated E2E is skipped until all six E2E test-account secrets are configured."
+      - name: Check test-account configuration
+        run: npm run e2e:config
 
       - name: Run authenticated production flow
         run: npm run e2e:authenticated
