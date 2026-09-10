@@ -174,6 +174,8 @@ function main() {
     const requiredControls = [
       'alter table private.operator_roles enable row level security',
       'alter table private.operator_audit_log enable row level security',
+      'create policy "operator_roles_no_direct_access"',
+      'create policy "operator_audit_log_no_direct_access"',
       'revoke all on table private.operator_roles',
       'revoke all on table private.operator_audit_log',
       "if (select auth.uid()) is null then",
@@ -183,6 +185,7 @@ function main() {
       "set search_path = ''",
       'revoke all on function public.operator_update_report',
       'revoke all on function public.operator_upsert_invite',
+      "extensions.digest(normalized_email, 'sha256')",
     ];
     const missing = requiredControls.filter((token) => !migration.includes(token));
     if (missing.length) {

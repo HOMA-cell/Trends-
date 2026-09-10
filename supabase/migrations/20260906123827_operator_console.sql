@@ -35,6 +35,20 @@ create index if not exists operator_audit_actor_created_idx
 alter table private.operator_roles enable row level security;
 alter table private.operator_audit_log enable row level security;
 
+create policy "operator_roles_no_direct_access"
+  on private.operator_roles
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+
+create policy "operator_audit_log_no_direct_access"
+  on private.operator_audit_log
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+
 revoke all on table private.operator_roles
   from public, anon, authenticated;
 revoke all on table private.operator_audit_log
@@ -537,7 +551,7 @@ begin
     (select auth.uid()),
     'invite_upserted',
     'beta_invite',
-    encode(digest(normalized_email, 'sha256'), 'hex'),
+    encode(extensions.digest(normalized_email, 'sha256'), 'hex'),
     jsonb_build_object('expires_days', safe_days)
   );
 
@@ -584,7 +598,7 @@ begin
     (select auth.uid()),
     'invite_revoked',
     'beta_invite',
-    encode(digest(normalized_email, 'sha256'), 'hex')
+    encode(extensions.digest(normalized_email, 'sha256'), 'hex')
   );
 
   return jsonb_build_object('ok', true, 'email', normalized_email, 'status', 'revoked');
