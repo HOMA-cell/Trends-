@@ -27,6 +27,9 @@ Open:
 - `npm run check` - syntax checks for app and support scripts
 - `npm run lint` - ESLint on app source files
 - `npm run ci` - local equivalent of GitHub CI
+- `npm run prod:check` - production URL and anonymous-access readiness checks
+- `npm run logs:check` - privacy-safe Supabase log health check (requires a Management API token)
+- `npm run test:observability` - unit tests for production log classification
 - `npm run e2e:smoke` - desktop and mobile browser smoke tests
 - `npm run e2e:authenticated` - two-account production flow when E2E secrets are set
 - `npm run backup:create` - encrypted local Supabase logical backup

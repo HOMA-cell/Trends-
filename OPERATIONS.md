@@ -21,6 +21,28 @@ E2E_USER_B_HANDLE
 ```
 
 Use dedicated invited beta accounts. Do not reuse an operator or personal account.
+After all six secrets are configured, create the repository variable
+`AUTHENTICATED_E2E_ENABLED=true` and manually run `Browser E2E` once. Scheduled
+authenticated tests remain disabled until that variable is enabled. A manual run fails
+closed when any secret is missing instead of reporting a misleading successful skip.
+
+## Supabase Log Monitoring
+
+`Supabase Log Check` queries the Supabase Management API every six hours after it is
+enabled. It scans the previous 24 hours of Auth, API Gateway, Storage, Postgres, and
+Edge Function logs. The workflow requests aggregate fields only: service, HTTP status,
+severity, SQLSTATE, event count, and last-seen time. It never fetches or prints raw log
+messages, paths, email addresses, IP addresses, request headers, or tokens.
+
+Configure the repository secret `SUPABASE_ACCESS_TOKEN` with an operator-owned
+Supabase personal access token. Do not reuse a browser key, anon key, or service-role
+key. Then create the repository variable `SUPABASE_LOG_MONITOR_ENABLED=true` and
+manually run `Supabase Log Check` once before relying on the schedule.
+
+The monitor treats HTTP 401 protection checks, Storage/API HTTP 400 probes, and
+Postgres SQLSTATE `42501` permission denials as expected. HTTP 5xx, HTTP 429,
+unexpected Postgres errors, and Edge Function runtime errors fail the workflow. Other
+client-side 4xx events are counted without exposing their contents.
 
 ## Operator Console
 

@@ -90,6 +90,8 @@ With a real account:
 12. Open the operator console with the owner account
 13. Add and revoke a temporary invite
 14. Move a test report through review and resolution
+15. Run authenticated Browser E2E with two dedicated test accounts
+16. Run Supabase Log Check and confirm no actionable server errors
 
 ## 6) Release decision
 
@@ -102,6 +104,8 @@ Safe to open to real users when all are true:
 - Supabase migration is applied
 - in-app live check is correct
 - smoke test passes
+- authenticated production E2E passes without skipped tests
+- Supabase Log Check is enabled and green
 - operator actions are recorded in `private.operator_audit_log`
 
 ## 7) Fallback
