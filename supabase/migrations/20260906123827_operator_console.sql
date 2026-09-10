@@ -90,26 +90,26 @@ security definer
 set search_path = ''
 as $$
 declare
-  current_role text;
+  operator_role_name text;
 begin
   if (select auth.uid()) is null then
     raise exception 'operator_authentication_required' using errcode = '42501';
   end if;
 
   select operator_role.role
-    into current_role
+    into operator_role_name
   from private.operator_roles operator_role
   where operator_role.user_id = (select auth.uid());
 
-  if current_role is null then
+  if operator_role_name is null then
     raise exception 'operator_access_required' using errcode = '42501';
   end if;
 
-  if required_role = 'owner' and current_role <> 'owner' then
+  if required_role = 'owner' and operator_role_name <> 'owner' then
     raise exception 'operator_owner_required' using errcode = '42501';
   end if;
 
-  return current_role;
+  return operator_role_name;
 end;
 $$;
 
@@ -142,12 +142,12 @@ security definer
 set search_path = ''
 as $$
 declare
-  current_role text;
+  operator_role_name text;
 begin
-  current_role := private.require_operator('moderator');
+  operator_role_name := private.require_operator('moderator');
 
   return jsonb_build_object(
-    'role', current_role,
+    'role', operator_role_name,
     'pending_reports', (
       select count(*)
       from public.content_reports report

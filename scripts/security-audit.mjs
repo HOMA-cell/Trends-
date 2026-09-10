@@ -186,10 +186,13 @@ function main() {
       'revoke all on function public.operator_update_report',
       'revoke all on function public.operator_upsert_invite',
       "extensions.digest(normalized_email, 'sha256')",
+      'operator_role_name text;',
     ];
     const missing = requiredControls.filter((token) => !migration.includes(token));
     if (missing.length) {
       fail('Operator console access controls', missing.join(', '));
+    } else if (migration.includes('current_role text;')) {
+      fail('Operator console access controls', 'Reserved current_role variable name');
     } else {
       ok(
         'Operator console access controls',
