@@ -1,6 +1,8 @@
 # Trends Moderation Runbook
 
-Use the Supabase SQL Editor with an operator account. Do not expose these queries in the browser app.
+Use `アカウント > 運営コンソール > 通報` for normal triage. Its actions are
+authorized by Postgres and recorded in the private audit log. Use the SQL below only
+as an incident-response fallback when the console is unavailable.
 
 ## Triage A Report
 

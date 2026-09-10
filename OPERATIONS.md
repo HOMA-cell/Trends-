@@ -22,6 +22,31 @@ E2E_USER_B_HANDLE
 
 Use dedicated invited beta accounts. Do not reuse an operator or personal account.
 
+## Operator Console
+
+The in-app operator console manages beta invitations, reports, moderation state,
+feedback, and the weekly activity snapshot without exposing privileged keys to the
+browser. Every write is authorized in Postgres and recorded in
+`private.operator_audit_log`.
+
+After applying `20260906123827_operator_console.sql`, bootstrap the first owner once
+from the Supabase SQL Editor. Never commit the real email address:
+
+```sql
+insert into private.operator_roles (user_id, role)
+select id, 'owner'
+from auth.users
+where lower(email) = lower('OWNER_EMAIL')
+on conflict (user_id) do update
+set role = 'owner', updated_at = now();
+```
+
+The owner sees `運営コンソール` on the Account page after the next login. Owners can
+manage invites and moderation; moderators can review reports and feedback. Add a
+moderator only from the SQL Editor after confirming the account identity. Removing a
+row from `private.operator_roles` revokes access on the next request; no frontend-only
+role flag is trusted.
+
 ## Database Backups
 
 On macOS, run `npm run backup:setup` once. It generates a strong encryption password and stores it in the operator's login Keychain. Install the lightweight PostgreSQL client with `brew install libpq` if Docker is not installed. Then run `npm run backup:create` weekly from the linked Supabase project directory. The command creates role, schema, data, and Storage object backups in a temporary directory, encrypts them with AES-256, verifies that the archive can be decrypted, and persists only the encrypted archive.
@@ -62,7 +87,7 @@ Creating a Supabase branch can incur cost and therefore requires a separate cost
 
 ## Security Limits
 
-- Supabase leaked-password protection is available only on Pro and above. On Free, keep the eight-character application minimum, enable the strongest free password requirements available in Auth settings, and reconsider Pro before open registration.
+- Supabase leaked-password protection is available only on Pro and above. On Free, keep the 12-character application minimum with mixed character classes, enable the strongest free password requirements available in Auth settings, and reconsider Pro before open registration.
 - Keep the closed-beta Before User Created hook enabled while invitations are required.
 - Review Supabase Security Advisor after every migration and at least weekly during beta.
 - The private moderation table intentionally has no browser-facing policy or grant.

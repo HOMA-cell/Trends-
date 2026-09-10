@@ -854,6 +854,12 @@
           <div class="template-status" id="auth-network-status" role="status" aria-live="polite"></div>
           <div class="account-quick-actions">
             <button class="btn btn-ghost btn-xs" id="btn-account-open-settings">アプリ設定</button>
+            <button
+              class="btn btn-ghost btn-xs hidden"
+              id="btn-account-open-operator"
+              type="button"
+              data-page-target="operator"
+            >運営コンソール</button>
           </div>
           <div class="account-buttons hidden" id="auth-network-actions">
             <button class="btn btn-ghost btn-xs" id="btn-auth-open-settings">接続設定を開く</button>
@@ -1241,6 +1247,121 @@
             <button class="btn btn-ghost" id="btn-gallery-next">Next</button>
           </div>
         </section>
+      </div>
+
+      <!-- 運営コンソール。アクセス権はDB側のRPCでも必ず検証する。 -->
+      <div class="page-view operator-page" data-page="operator">
+        <section class="card operator-hero">
+          <div class="operator-hero-copy">
+            <div class="operator-kicker">BETA OPERATIONS</div>
+            <div class="card-title">運営コンソール</div>
+            <div class="card-sub">招待・通報・フィードバックを安全に管理します。</div>
+          </div>
+          <div class="operator-hero-actions">
+            <span class="operator-role-badge" id="operator-role-badge">OPERATOR</span>
+            <button class="btn btn-ghost btn-xs" id="btn-operator-refresh" type="button">更新</button>
+            <button class="btn btn-ghost btn-xs" type="button" data-page-target="account">戻る</button>
+          </div>
+        </section>
+
+        <section class="operator-metrics" aria-label="運営指標">
+          <article class="operator-metric is-priority">
+            <span>未対応の通報</span>
+            <strong id="operator-metric-reports">-</strong>
+            <small>要確認</small>
+          </article>
+          <article class="operator-metric">
+            <span>未対応の要望</span>
+            <strong id="operator-metric-feedback">-</strong>
+            <small>要確認</small>
+          </article>
+          <article class="operator-metric">
+            <span>有効な招待</span>
+            <strong id="operator-metric-invites">-</strong>
+            <small>現在</small>
+          </article>
+          <article class="operator-metric">
+            <span>画面エラー</span>
+            <strong id="operator-metric-errors">-</strong>
+            <small>24時間</small>
+          </article>
+          <article class="operator-metric">
+            <span>利用ユーザー</span>
+            <strong id="operator-metric-users">-</strong>
+            <small>7日間</small>
+          </article>
+          <article class="operator-metric">
+            <span>新規投稿</span>
+            <strong id="operator-metric-posts">-</strong>
+            <small>7日間</small>
+          </article>
+        </section>
+
+        <section class="card operator-workspace">
+          <div class="operator-workspace-head">
+            <div class="operator-tabs" role="tablist" aria-label="管理項目">
+              <button class="operator-tab is-active" type="button" role="tab" aria-selected="true" data-operator-tab="reports">通報</button>
+              <button class="operator-tab" type="button" role="tab" aria-selected="false" data-operator-tab="feedback">要望</button>
+              <button class="operator-tab hidden" id="operator-owner-tab" type="button" role="tab" aria-selected="false" data-operator-tab="invites">招待</button>
+            </div>
+            <div class="operator-sync-note">最終取得 <span id="operator-generated-at">-</span></div>
+          </div>
+
+          <div class="operator-panel" data-operator-panel="reports">
+            <div class="operator-panel-head">
+              <div>
+                <div class="operator-panel-title">通報キュー</div>
+                <div class="operator-panel-note">内容を確認して、対応中・非公開・問題なしを記録します。</div>
+              </div>
+              <label class="operator-filter-label">
+                <span class="sr-only">通報ステータス</span>
+                <select id="operator-report-filter">
+                  <option value="open">未対応のみ</option>
+                  <option value="all">すべて</option>
+                  <option value="resolved">解決済み</option>
+                  <option value="dismissed">問題なし</option>
+                </select>
+              </label>
+            </div>
+            <div class="operator-queue" id="operator-report-list"></div>
+          </div>
+
+          <div class="operator-panel hidden" data-operator-panel="feedback">
+            <div class="operator-panel-head">
+              <div>
+                <div class="operator-panel-title">ユーザーの声</div>
+                <div class="operator-panel-note">不具合・改善案・使いにくさを対応状況ごとに管理します。</div>
+              </div>
+            </div>
+            <div class="operator-queue" id="operator-feedback-list"></div>
+          </div>
+
+          <div class="operator-panel hidden" data-operator-panel="invites">
+            <div class="operator-panel-head">
+              <div>
+                <div class="operator-panel-title">β招待</div>
+                <div class="operator-panel-note">招待登録に使えるメールアドレスと期限を管理します。</div>
+              </div>
+            </div>
+            <form class="operator-invite-form" id="operator-invite-form">
+              <label>
+                <span>メールアドレス</span>
+                <input id="operator-invite-email" type="email" autocomplete="off" required placeholder="member@example.com" />
+              </label>
+              <label>
+                <span>有効日数</span>
+                <input id="operator-invite-days" type="number" min="1" max="365" value="30" required />
+              </label>
+              <label class="operator-invite-note-field">
+                <span>メモ</span>
+                <input id="operator-invite-note" type="text" maxlength="500" value="closed beta" />
+              </label>
+              <button class="btn btn-primary" id="btn-operator-invite-save" type="submit">招待を追加</button>
+            </form>
+            <div class="operator-invite-list" id="operator-invite-list"></div>
+          </div>
+        </section>
+        <div class="operator-status" id="operator-status" role="status" aria-live="polite"></div>
       </div>
   
       <!-- 設定 ページ -->

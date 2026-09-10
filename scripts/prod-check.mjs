@@ -30,6 +30,14 @@ const PUBLIC_COLUMN_PROBES = [
 
 const PROTECTED_EDGE_FUNCTION_PROBES = ["delete-account"];
 
+const PROTECTED_RPC_PROBES = [
+  "get_my_operator_role",
+  "operator_dashboard_snapshot",
+  "operator_list_reports",
+  "operator_list_feedback",
+  "operator_list_invites",
+];
+
 const BUCKET_PROBES = ["avatars", "post-media"];
 
 let hasCriticalIssue = false;
@@ -211,6 +219,7 @@ async function main() {
       "/dm-sidebar-tune.css",
       "/styles.css",
       "/app.js",
+      "/operator.js",
       "/dm.js",
       "/sw.js",
       "/privacy.html",
@@ -339,6 +348,40 @@ async function main() {
         }
       } catch (error) {
         fail(`table ${table}`, String(error?.message || error));
+      }
+    }
+
+    for (const functionName of PROTECTED_RPC_PROBES) {
+      const url = `${supabaseUrl}/rest/v1/rpc/${functionName}`;
+      try {
+        const res = await fetchWithTimeout(
+          url,
+          {
+            method: "POST",
+            headers: {
+              ...restHeaders,
+              "Content-Type": "application/json",
+            },
+            body: "{}",
+          },
+          9000
+        );
+        const body = await safeReadText(res);
+        const permissionDenied =
+          (res.status === 401 || res.status === 403) &&
+          (body.includes("42501") || body.toLowerCase().includes("permission denied"));
+        if (permissionDenied) {
+          ok(`rpc ${functionName}`, `Protected from anon (HTTP ${res.status})`);
+        } else if (res.status === 404 || body.toLowerCase().includes("pgrst202")) {
+          fail(`rpc ${functionName}`, `Missing from schema cache (HTTP ${res.status}) ${body}`);
+        } else {
+          fail(
+            `rpc ${functionName}`,
+            `Expected permission denial, received HTTP ${res.status}${body ? ` ${body}` : ""}`
+          );
+        }
+      } catch (error) {
+        fail(`rpc ${functionName}`, String(error?.message || error));
       }
     }
 
