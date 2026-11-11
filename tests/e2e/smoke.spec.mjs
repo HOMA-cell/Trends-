@@ -9,15 +9,17 @@ test("public shell and primary navigation render without JavaScript errors", asy
   expect(response?.ok()).toBeTruthy();
   await expect(page).toHaveTitle(/Trends/);
   await expect(page.locator("#app-title")).toHaveText("Trends");
+  await expect(page.locator('[data-page="operator"]')).toBeHidden();
 
   await openPage(page, "messages");
   await expect(page.locator("#dm-login-required")).toBeVisible();
+  await expect(page.locator('[data-page="operator"]')).toBeHidden();
 
   await openPage(page, "notifications");
   await openPage(page, "account");
   await expect(page.locator("#btn-auth-open-form")).toBeVisible();
   await expect(page.locator("#btn-account-open-operator")).toBeHidden();
-  await expect(page.locator('[data-page="operator"]')).not.toHaveClass(/is-active/);
+  await expect(page.locator('[data-page="operator"]')).toBeHidden();
   await page.locator("#btn-auth-open-form").click();
   await page.locator("#btn-auth-mode-signup").click();
   const passwordRequirements = page.locator("#auth-password-requirements");

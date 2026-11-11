@@ -5311,6 +5311,12 @@ async function loadProfilePostCount() {
           layoutRoot.style.removeProperty("--page-transition-height");
           layoutRoot.style.removeProperty("min-height");
         }
+        const activePage = `${document.body?.dataset?.page || ""}`;
+        if (activePage) {
+          viewList.forEach((view) => {
+            view.classList.toggle("is-active", view.dataset.page === activePage);
+          });
+        }
       };
 
       const pageScrollMap = new Map();
@@ -5377,7 +5383,8 @@ async function loadProfilePostCount() {
       };
 
       const setPage = (page, options = {}) => {
-        const prevPage = getVisiblePage();
+        const prevPage =
+          `${document.body?.dataset?.page || ""}` || getVisiblePage();
         if (!page) return false;
         if (
           prevPage &&

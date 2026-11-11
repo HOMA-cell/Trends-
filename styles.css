@@ -20812,8 +20812,12 @@ body[data-page="account"].auth-signed-out-visible .fab {
 
 /* Operator console */
 .operator-page {
-  display: grid;
   gap: 12px;
+}
+
+.page-view.operator-page.is-active,
+.page-view.operator-page.is-transitioning {
+  display: grid;
 }
 
 body[data-page="operator"] #fab-open-post {

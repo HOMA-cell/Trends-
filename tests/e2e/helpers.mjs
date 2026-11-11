@@ -11,7 +11,10 @@ export async function openPage(page, target) {
   const selector = NAVIGATION_SELECTORS[target];
   if (!selector) throw new Error(`Unknown navigation target: ${target}`);
   await page.locator(selector).first().click();
-  await expect(page.locator(`.page-view[data-page="${target}"].is-active`)).toBeVisible();
+  const targetView = page.locator(`.page-view[data-page="${target}"].is-active`);
+  await expect(targetView).toBeVisible();
+  await expect(page.locator(".page-view.is-transitioning")).toHaveCount(0);
+  await expect(targetView).toBeVisible();
 }
 
 export async function login(page, account) {
