@@ -54,8 +54,8 @@ jobs:
 
   authenticated:
     if: >-
-      (github.event_name == 'workflow_dispatch') ||
-      (github.event_name == 'schedule' && vars.AUTHENTICATED_E2E_ENABLED == 'true')
+      vars.AUTHENTICATED_E2E_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
